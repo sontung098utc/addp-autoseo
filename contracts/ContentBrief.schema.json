@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContentBrief",
+  "description": "Yêu cầu bài viết và tài liệu đầu vào cho AI sinh nội dung",
+  "type": "object",
+  "required": ["id", "campaign_id", "primary_keyword", "search_intent", "source_refs", "locale"],
+  "properties": {
+    "id": { "type": "integer" },
+    "campaign_id": { "type": "integer" },
+    "primary_keyword": { "type": "string" },
+    "secondary_keywords": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "search_intent": { "type": "string", "enum": ["informational", "transactional", "commercial", "navigational"] },
+    "target_audience": { "type": "string" },
+    "tone_of_voice": { "type": "string", "default": "Chuyên nghiệp, hữu ích, trung thực" },
+    "source_refs": {
+      "type": "array",
+      "description": "Danh sách ID hoặc đường dẫn tài liệu thông tin sản phẩm của công ty",
+      "items": { "type": "string" }
+    },
+    "target_urls": {
+      "type": "array",
+      "description": "Danh sách URL nội bộ được phép trỏ liên kết",
+      "items": { "type": "string", "format": "uri" }
+    },
+    "locale": { "type": "string", "default": "vi_VN" },
+    "min_words": { "type": "integer", "default": 1200 },
+    "max_words": { "type": "integer", "default": 2500 },
+    "required_headings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

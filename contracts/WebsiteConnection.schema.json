@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WebsiteConnection",
+  "description": "Cấu hình kết nối website CMS đích (WordPress hoặc Magento 2)",
+  "type": "object",
+  "required": ["id", "name", "cms_type", "base_url", "store_scope", "status"],
+  "properties": {
+    "id": { "type": "integer" },
+    "name": { "type": "string", "description": "Tên gợi nhớ của website" },
+    "cms_type": { "type": "string", "enum": ["wordpress", "magento2"] },
+    "base_url": { "type": "string", "format": "uri", "description": "Địa chỉ gốc HTTPS của website" },
+    "store_scope": { "type": "string", "description": "Store view code hoặc WordPress site ID" },
+    "encrypted_credential_ref": { "type": "string", "description": "Mã khóa tham chiếu đến bản ghi credential đã mã hóa trong DB" },
+    "capability_flags": {
+      "type": "object",
+      "properties": {
+        "supports_categories": { "type": "boolean", "default": true },
+        "supports_tags": { "type": "boolean", "default": true },
+        "supports_featured_media": { "type": "boolean", "default": true },
+        "supports_seo_metadata": { "type": "boolean", "default": true },
+        "seo_plugin": { "type": "string", "enum": ["rank_math", "yoast", "none"], "default": "none" }
+      }
+    },
+    "status": { "type": "string", "enum": ["active", "revoked", "error", "pending"], "default": "pending" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

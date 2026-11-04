@@ -1,0 +1,18 @@
+{
+  "title": "WorkflowEnum",
+  "description": "Các trạng thái vòng đời bài viết và xuất bản thống nhất toàn hệ thống",
+  "article_states": [
+    "planned",
+    "drafting",
+    "needs_review",
+    "approved",
+    "rejected"
+  ],
+  "publication_states": [
+    "scheduled",
+    "publishing",
+    "published",
+    "failed",
+    "needs_reconcile"
+  ]
+}

@@ -1,0 +1,46 @@
+KẾ HOẠCH TỔNG THỂ PHẦN MỀM AUTO SEO & TỰ ĐỘNG ĐĂNG BÀI
+1. THÔNG SỐ VÀ PHẠM VI TRIỂN KHAI
+Hạng mục	Giá trị / phương án	Nội dung và quy chuẩn
+Đối tượng sử dụng	Marketing nội bộ	Phục vụ website công ty trước; tiếng Việt; chưa mở bán SaaS.
+Ngày bắt đầu	2026-11-03 00:00:00	Có thể sửa ngày; lịch công việc bên dưới tự tính lại.
+Giờ tập trung / người / ngày	6.0	Giờ người có AI hỗ trợ; không cộng thời gian AI chạy vào giờ người.
+Ngày làm việc / tuần	6.0	6 = thứ Hai–thứ Bảy. Giữ giả định Auto SEO, không lấy lịch 8h × 6 ngày của CRM.
+Tỷ lệ dự phòng giờ công	0.15	Quỹ giờ xử lý phát sinh; không phải phần đã tiêu.
+Công nghệ core	Laravel + Filament	Ứng dụng độc lập; database + Redis + worker + scheduler; chọn bộ phiên bản tương thích ở việc0.2.
+Website kết nối	WordPress và Magento 2	WordPress dùng REST API; Magento dùng bridge Company_BlogApi sau khảo sát module blog.
+Ngôn ngữ sản phẩm	Tiếng Việt	Phân tích website → từ khóa → kế hoạch → viết/duyệt bài → đăng theo lịch.
+Giờ công dự kiến	432	30 mã việc; đã gồm32h bổ sung QA/bảo mật. 64h của hai gói kiểm soát có32h đã nằm trong estimate cũ; không cộng lại.
+Giờ dự phòng	64.8	Giờ công dự kiến × tỷ lệ dự phòng.
+Ngân sách giờ công	496.8	Giờ công dự kiến + dự phòng; chưa phải số giờ đã thực hiện.
+Giờ thực tế được xác nhận	#N/A	Cộng từ nhật ký của Dev1/Dev2; loại bản mẫu, AI và bản trùng/chưa xác nhận.
+Tiến độ được nghiệm thu	0	Theo trọng số giờ dự kiến; người phụ trách cập nhật sau đối chiếu bằng chứng.
+Trạng thái kế hoạch	Chưa có xác nhận hoàn thành	Xem trạng thái nhóm ở2.1 và kết quả đo hiệu quả ở1.2.
+Tab xanh: theo dõi chính • Tab xám: tài liệu tham khảo • Nhấn dấu+ để mở chi tiết/cột kỹ thuật.
+Kho lưu trữ dữ liệu theo các ngành, lĩnh vực
+2. LỘ TRÌNH BÀN GIAO THEO MỐC DÙNG ĐƯỢC
+Mốc	Đầu ra sử dụng	Điều kiện bàn giao	Dev1 (giờ)	Dev2 (giờ)	Tổng giờ	Ngày công	Hạn dự kiến
+V1.0	AI viết bài, Marketing duyệt, đăng nháp WordPress	3 bài mẫu; đọc lại bài/ảnh/meta; CI và bảo mật trước pilot.	64	64	128	21.33333333	2026-11-19 00:00:00
+V1.1	Tự đăng WordPress và Magento theo lịch	Đúng giờ Việt Nam, đúng quota/store; không trùng; có đối soát lỗi/nút dừng.	56	2	58	9.666666667	2026-11-28 00:00:00
+V1.2	Audit SEO, kế hoạch nội dung, bàn giao nội bộ	Quan sát 4 ngày, mỗi Dev 2h/ngày; 10 bài/CMS và Marketing nghiệm thu.	26	40	66	11	2026-12-09 00:00:00
+V2	GSC, bài cũ, liên kết, nguồn từ khóa, tối ưu vận hành	Giữ V1 ổn định; có version/diff/rollback; quan sát cuối5 ngày.	98	82	180	30	2027-01-02 00:00:00
+TỔNG	Toàn bộ V1 + V2	Giờ công không đồng nghĩa số ngày lịch	244	188	432	72	2027-01-02 00:00:00
+3. CÁCH THEO DÕI KẾ HOẠCH
+Người đọc	Xem tab	Nội dung chính
+Quản lý / Marketing	1.2 - Mục tiêu	Mục tiêu, lợi ích và cách đo sau khi dùng thật.
+Nhân viên thực hiện	2.1 / 2.2	Nhóm việc, trạng thái và lịch làm của từng người.
+Phối hợp và báo cáo	6 / 7 / 7.1	Git và review: tab6; trạng thái/ghi chú từng việc: tab7; giờ công/phiênAI: tab7.1.
+Kiểm tra trước bàn giao	8 / 9	Kiểm chứng AI, nghiệm thu và bảo mật.
+THAM SỐ NGÀY NGHỈ VÀ CÁCH TÍNH LỊCH — MỞ NHÓM + KHI CẦN
+5. GIẢ ĐỊNH VỀ LỊCH
+Lịch chuẩn ở2.2 - Timeline chi tiết: lập lịch theo dependency và giờ rảnh từng người; dòng nhóm ở tab2 chỉ tổng hợp. Đổi ngày/6h/6 ngày tạiB5:B7 tự cập nhật; đổi phụ thuộc cần reviewer sửa liên kết trong timeline.
+Giờ công khác ngày lịch. Pilot4.1 giữ đủ 4 ngày làm việc, ổn định7.2 đủ 5 ngày; mỗi người2h/ngày quan sát. Không tăng432 giờ, nhưng ngày bàn giao được tính lại. Dự phòng64,8h/chờ cấp quyền chưa được rải vào lịch.
+Ngày nghỉ dùng để tính lịch
+Ngày nghỉ	Tên / ghi chú
+2027-01-01 00:00:00	Tết Dương lịch
+2027-02-04 00:00:00	Tết Âm lịch (ước tính)
+2027-02-05 00:00:00	Tết Âm lịch (ước tính)
+2027-02-08 00:00:00	Tết Âm lịch (ước tính)
+2027-02-09 00:00:00	Tết Âm lịch (ước tính)
+2027-02-10 00:00:00	Tết Âm lịch (ước tính)
+2027-04-15 00:00:00	Giỗ Tổ Hùng Vương (ước tính)
+2027-04-30 00:00:00	Giải phóng miền Nam

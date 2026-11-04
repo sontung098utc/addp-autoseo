@@ -1,0 +1,62 @@
+# ĐIỀU PHỐI CÔNG VIỆC VÀ TRẠNG THÁI TASK (TASKS.md)
+*Dự án: Phần mềm Auto SEO & Tự động đăng bài (addp-autoseo)*
+
+Bảng này đồng bộ trực tiếp với Master Plan (Google Sheet). Mọi cập nhật trạng thái phải đi kèm commit SHA và bằng chứng kiểm thử thực tế.
+
+---
+
+## MỐC V1.0: AI VIẾT BÀI, DUYỆT & ĐĂNG NHÁP WORDPRESS (128h - Hạn: 19/11/2026)
+
+| Mã việc | Chủ nhiệm | Reviewer | Giờ dự kiến | Phụ thuộc | Nhánh đề xuất | Trạng thái | Nội dung chính |
+| :---: | :---: | :---: | :---: | :---: | :--- | :---: | :--- |
+| **0.1** | Dev1 | Dev2 | 8h | - | `docs/m01/0-1/dev1/scope-contract` | **Đang làm** | Chốt phạm vi V1, quy trình duyệt, hợp đồng dữ liệu và các quy tắc. |
+| **0.2** | Dev1 | Dev2 | 24h | 0.1 | `chore/m01/0-2/dev1/infra-ci` | **Đang làm** | Dựng Laravel 11/12, Docker staging, MariaDB, Redis, HTTPS, CI workflow, backup. |
+| **0.3** | Dev2 | Dev1 | 10h | 0.1 | `feat/m01/0-3/dev2/ai-poc` | Chưa bắt đầu | Thử nghiệm mô hình AI tiếng Việt, prompt schema JSON, đo token & chi phí. |
+| **0.4** | Dev1 | Dev2 | 22h | 0.2 | `feat/m01/0-4/dev1/auth-sites` | Chưa bắt đầu | Khung Filament + Laravel: Auth, Policies 3 vai trò, quản lý website, mã hóa credential. |
+| **0.5** | Dev2 | Dev1 | 10h | 0.1 | `feat/m01/0-5/dev2/filament` | Chưa bắt đầu | Filament panel tiếng Việt & giao diện quản lý website theo contracts/fixtures. |
+| **1.2** | Dev2 | Dev1 | 16h | 0.4, 0.5 | `feat/m02/1-2/dev2/wordpress` | Chưa bắt đầu | WordPress Connector: REST API + App Password; bài, ảnh, taxonomy, SEO meta adapter. |
+| **3.1** | Dev1 | Dev2 | 20h | 0.3, 0.4 | `feat/m03/3-1/dev1/content-pipeline` | Chưa bắt đầu | Pipeline sinh dàn ý, bài viết tiếng Việt và metadata từ tài liệu công ty. |
+| **3.4** | Dev2 | Dev1 | 10h | 0.5, 0.1 | `feat/m03/3-4/dev2/review-ui` | Chưa bắt đầu | Giao diện duyệt bài (xem, sửa, duyệt, từ chối), cấu hình số bài/ảnh/chiến dịch. |
+| **3.5** | Dev2 | Dev1 | 8h | 3.1, 3.4 | `feat/m03/3-5/dev2/quality` | Chưa bắt đầu | Bộ kiểm tra chất lượng cơ bản: độ dài, heading, từ khóa chính, trùng lặp nội bộ. |
+
+---
+
+## MỐC V1.1: TỰ ĐĂNG WORDPRESS & MAGENTO THEO LỊCH (58h - Hạn: 28/11/2026)
+
+| Mã việc | Chủ nhiệm | Reviewer | Giờ dự kiến | Phụ thuộc | Nhánh đề xuất | Trạng thái | Nội dung chính |
+| :---: | :---: | :---: | :---: | :---: | :--- | :---: | :--- |
+| **1.4** | Dev1 | Dev2 | 24h | 0.4 | `feat/m02/1-4/dev1/magento-bridge` | Chưa bắt đầu | Magento 2 Connector: Module `Company_BlogApi`, OAuth/ACL, nháp, media, store scope. |
+| **3.2** | Dev1 | Dev2 | 12h | 3.1 | `feat/m05/3-2/dev1/queue-scheduler` | Chưa bắt đầu | Redis Queue, Laravel Scheduler, timeout, retry/backoff, khóa theo site. |
+| **3.3** | Dev1 | Dev2 | 8h | 3.1 | `feat/m03/3-3/dev1/media` | Chưa bắt đầu | Thư viện ảnh công ty: nén ảnh, alt text, ảnh đại diện, kiểm tra MIME. |
+| **3.6** | Dev1 | Dev2 | 14h | 1.2, 1.4, 3.2, 3.3, 3.4, 3.5 | `feat/m05/3-6/dev1/autopublish` | Chưa bắt đầu | Worker tự đăng hằng ngày lên 2 CMS, idempotency key, nút dừng khẩn cấp. |
+
+---
+
+## MỐC V1.2: AUDIT SEO, KẾ HOẠCH NỘI DUNG & BÀN GIAO V1 (66h - Hạn: 09/12/2026)
+
+| Mã việc | Chủ nhiệm | Reviewer | Giờ dự kiến | Phụ thuộc | Nhánh đề xuất | Trạng thái | Nội dung chính |
+| :---: | :---: | :---: | :---: | :---: | :--- | :---: | :--- |
+| **1.1** | Dev1 | Dev2 | 12h | 0.4 | `feat/m04/1-1/dev1/crawler` | Chưa bắt đầu | Crawler thu thập website (sitemap, URL), audit on-page cơ bản, chống SSRF. |
+| **1.3** | Dev2 | Dev1 | 8h | 1.1 | `feat/m04/1-3/dev2/audit-report` | Chưa bắt đầu | Báo cáo audit SEO tiếng Việt kèm khuyến nghị tối ưu từ AI. |
+| **2.1** | Dev2 | Dev1 | 8h | 0.3 | `feat/m04/2-1/dev2/keywords` | Chưa bắt đầu | Nhập từ khóa/CSV nội bộ, gom cụm AI (Topic Cluster & Search Intent). |
+| **2.2** | Dev2 | Dev1 | 10h | 2.1 | `feat/m04/2-2/dev2/content-plan` | Chưa bắt đầu | Lập kế hoạch nội dung, lịch biên tập, gán từ khóa, giao diện kéo thả. |
+| **4.1** | Dev1 | Dev2 | 16h | 3.6, 1.3, 2.2 | `test/m06/4-1/dev1/pilot` | Chưa bắt đầu | Chạy thử thực tế 4 ngày (mỗi người 2h/ngày), xuất bản tối thiểu 10 bài/CMS. |
+| **4.2** | Dev1 | Dev2 | 12h | 4.1 | `feat/m06/4-2/dev1/handover` | Chưa bắt đầu | Sửa lỗi pilot, tinh chỉnh prompt, viết hướng dẫn và Marketing nghiệm thu. |
+
+---
+
+## MỐC V2: MỞ RỘNG VẬN HÀNH, GSC & NÂNG CAO (180h - Hạn: 02/01/2027)
+
+| Mã việc | Chủ nhiệm | Reviewer | Giờ dự kiến | Phụ thuộc | Nhánh đề xuất | Trạng thái | Nội dung chính |
+| :---: | :---: | :---: | :---: | :---: | :--- | :---: | :--- |
+| **5.1** | Dev2 | Dev1 | 18h | 4.2 | `feat/m07/5-1/dev2/gsc` | Chưa bắt đầu | Tích hợp Google Search Console (OAuth read-only, clicks, impressions, CTR). |
+| **5.2** | Dev1 | Dev2 | 18h | 4.2 | `feat/m07/5-2/dev1/article-update` | Chưa bắt đầu | Cập nhật bài cũ tụt hạng (versioning, diff, conflict detection, rollback). |
+| **5.3** | Dev1 | Dev2 | 12h | 5.2 | `feat/m07/5-3/dev1/internal-links` | Chưa bắt đầu | Tự động đề xuất liên kết nội bộ theo ngữ cảnh, kiểm tra URL và duyệt trước khi chèn. |
+| **5.4** | Dev2 | Dev1 | 18h | 5.1 | `feat/m07/5-4/dev2/competitor-gap` | Chưa bắt đầu | Phân tích khoảng trống nội dung đối thủ, kết nối API từ khóa trả phí. |
+| **6.1** | Dev2 | Dev1 | 24h | 5.4 | `feat/m07/6-1/dev2/quality-plus` | Chưa bắt đầu | Kiểm tra chất lượng nâng cao (chống trùng lặp internet, kiểm chứng dữ kiện). |
+| **6.2** | Dev1 | Dev2 | 12h | 5.3 | `feat/m07/6-2/dev1/english` | Chưa bắt đầu | Mở rộng hỗ trợ nội dung tiếng Anh theo prompt version. |
+| **6.3** | Dev1 | Dev2 | 12h | 6.2 | `feat/m08/6-3/dev1/notifications` | Chưa bắt đầu | Thông báo qua Telegram/Email/Zalo khi có lỗi xuất bản hoặc bài cần duyệt. |
+| **6.4** | Dev2 | Dev1 | 12h | 6.1 | `feat/m08/6-4/dev2/brands-rbac` | Chưa bắt đầu | Phân quyền phòng ban và quản lý nhiều thương hiệu / website độc lập. |
+| **6.5** | Dev1 | Dev2 | 16h | 6.3 | `feat/m08/6-5/dev1/usage-ai-images` | Chưa bắt đầu | Báo cáo chi phí/usage AI, bộ nhớ cache prompt, adapter tạo ảnh AI. |
+| **7.1** | Dev1 | Dev2 | 18h | 6.5 | `feat/m08/7-1/dev1/hardening` | Chưa bắt đầu | Giám sát nâng cao, hardening bảo mật, diễn tập phục hồi (restore drill). |
+| **7.2** | Dev1 | Dev2 | 20h | 7.1, 6.4 | `test/m08/7-2/dev1/stability` | Chưa bắt đầu | Chạy ổn định 5 ngày làm việc và hoàn tất toàn bộ bàn giao V2. |

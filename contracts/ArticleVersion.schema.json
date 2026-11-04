@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ArticleVersion",
+  "description": "Phiên bản nội dung bài viết và metadata đã tạo hoặc chỉnh sửa",
+  "type": "object",
+  "required": ["id", "article_id", "version", "title", "slug", "html_content", "seo_title", "meta_description", "status"],
+  "properties": {
+    "id": { "type": "integer" },
+    "article_id": { "type": "integer" },
+    "version": { "type": "integer", "minimum": 1 },
+    "title": { "type": "string" },
+    "slug": { "type": "string" },
+    "outline": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "html_content": { "type": "string", "description": "Nội dung bài viết HTML đã được làm sạch XSS" },
+    "seo_title": { "type": "string", "maxLength": 70 },
+    "meta_description": { "type": "string", "maxLength": 160 },
+    "focus_keyword": { "type": "string" },
+    "faq_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": { "type": "string" },
+          "answer": { "type": "string" }
+        }
+      }
+    },
+    "sources_cited": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "ai_provider": { "type": "string" },
+    "ai_model": { "type": "string" },
+    "prompt_version": { "type": "string" },
+    "tokens_used": { "type": "integer" },
+    "cost_vnd": { "type": "number" },
+    "status": {
+      "type": "string",
+      "enum": ["drafting", "needs_review", "approved", "rejected"],
+      "default": "needs_review"
+    },
+    "reviewed_by": { "type": ["integer", "null"] },
+    "reviewed_at": { "type": ["string", "null"], "format": "date-time" },
+    "review_notes": { "type": "string" }
+  }
+}

@@ -1,0 +1,36 @@
+BÁO CÁO TIẾN ĐỘ — DANH SÁCH 30 ĐẦU VIỆC NHỎ
+Cập nhật ngay trên từng việc. Khi xong: chọn Hoàn thành, điền ngày, ghi chú và bằng chứng. Nhân viên xác nhận sau kiểm tra. Giờ phát sinh ghi ở7.1_Nhat_ky_gio_cong; không nhập lặp giờ tại đây.
+Mã việc	Đầu việc nhỏ	Phụ trách	Hạn dự kiến	Trạng thái	Ngày hoàn thành	Ghi chú kết quả / vướng mắc	Bằng chứng / PR	Tiến độ đang làm
+0.1	Chốt phạm vi V1, quy trình duyệt bài, danh sách website công ty và quyền truy cập (WordPress, Magento, Search Console)	Dev1	2026-11-03 00:00:00	Chưa bắt đầu				0.0
+0.2	Dựng môi trường Laravel độc lập trên OS được hỗ trợ: Docker, HTTPS, CI/quyền cơ bản và backup/restore	Dev1	2026-11-07 00:00:00	Chưa bắt đầu				0.0
+0.3	Thử nghiệm mô hình AI với tiếng Việt, viết prompt mẫu, đo chi phí thực tế mỗi bài và mỗi ảnh	Dev2	2026-11-05 00:00:00	Chưa bắt đầu				0.0
+0.4	Khung Laravel + Filament: đăng nhập, Policies, ba vai trò, quản lý website, mã hóa credential và nhật ký	Dev1	2026-11-11 00:00:00	Chưa bắt đầu				0.0
+0.5	Filament panel tiếng Việt và trang quản lý website theo contract/fixture	Dev2	2026-11-10 00:00:00	Chưa bắt đầu				0.0
+1.2	Connector WordPress: REST API + Application Passwords; tạo/sửa bài, chuyên mục, thẻ, ảnh, meta SEO (Rank Math/Yoast)	Dev2	2026-11-14 00:00:00	Chưa bắt đầu				0.0
+1.4	Connector Magento: module Company_BlogApi riêng cho Mageplaza Blog, ACL/OAuth, nháp, ảnh, chuyên mục và đối soát	Dev1	2026-11-23 00:00:00	Chưa bắt đầu				0.0
+3.1	Pipeline dàn ý, bài tiếng Việt và metadata theo tài liệu công ty; FAQ/schema nâng cao không chặn pilot	Dev1	2026-11-18 00:00:00	Chưa bắt đầu				0.0
+3.3	Thư viện ảnh công ty: chọn đủ số ảnh, nén, ảnh đại diện và alt; tạo ảnh AI bổ sung V2	Dev1	2026-11-26 00:00:00	Chưa bắt đầu				0.0
+3.4	Giao diện duyệt bài (xem, sửa, duyệt, từ chối), màn hình cấu hình số bài, số bài mỗi ngày, số ảnh mỗi bài; hiển thị trạng thái bài, lịch đăng, lỗi	Dev2	2026-11-11 00:00:00	Chưa bắt đầu				0.0
+3.5	Kiểm tra chất lượng cơ bản: độ dài, heading, từ khóa, trùng lặp nội bộ	Dev2	2026-11-19 00:00:00	Chưa bắt đầu				0.0
+1.1	Thu thập website (sitemap, trang chính) và audit SEO on-page: title, meta, heading, ảnh, liên kết, schema	Dev1	2026-12-01 00:00:00	Chưa bắt đầu				0.0
+1.3	Báo cáo audit SEO tiếng Việt kèm đề xuất tối ưu do AI viết	Dev2	2026-12-03 00:00:00	Chưa bắt đầu				0.0
+2.1	Nhập keyword/CSV nội bộ và AI gom cụm; kết nối Search Console tại V2/5.1	Dev2	2026-11-21 00:00:00	Chưa bắt đầu				0.0
+2.2	Kế hoạch nội dung: topic cluster, lịch bài, gán từ khóa, chỉnh sửa trên giao diện	Dev2	2026-11-23 00:00:00	Chưa bắt đầu				0.0
+3.2	Hàng đợi (Redis), bộ lập lịch, worker, cơ chế thử lại	Dev1	2026-11-25 00:00:00	Chưa bắt đầu				0.0
+3.6	Worker tự đăng hằng ngày lên WordPress và Magento 2 theo lịch, thử lại, báo lỗi	Dev1	2026-11-28 00:00:00	Chưa bắt đầu				0.0
+4.1	Chạy thử thực tế trên website WordPress và Magento 2 của công ty, theo dõi bài đăng hằng ngày	Dev1	2026-12-08 00:00:00	Chưa bắt đầu				0.0
+4.2	Sửa lỗi, tinh chỉnh prompt, hướng dẫn sử dụng cho bộ phận Marketing	Dev1	2026-12-09 00:00:00	Chưa bắt đầu				0.0
+5.1	Tích hợp Search Console và báo cáo click, impression, CTR, vị trí trung bình theo cùng bộ lọc	Dev2	2026-12-12 00:00:00	Chưa bắt đầu				0.0
+5.2	Cập nhật bài cũ: AI đề xuất và cập nhật bài tụt hạng	Dev1	2026-12-12 00:00:00	Chưa bắt đầu				0.0
+5.3	Liên kết nội bộ tự động	Dev1	2026-12-15 00:00:00	Chưa bắt đầu				0.0
+5.4	Phân tích đối thủ, khoảng trống nội dung; thêm API từ khóa trả phí	Dev2	2026-12-16 00:00:00	Chưa bắt đầu				0.0
+6.1	Kiểm tra chất lượng nâng cao: trùng lặp với internet, kiểm tra dữ kiện, giọng văn thương hiệu	Dev2	2026-12-21 00:00:00	Chưa bắt đầu				0.0
+6.2	Hỗ trợ tiếng Anh	Dev1	2026-12-17 00:00:00	Chưa bắt đầu				0.0
+6.3	Thông báo qua Telegram/Zalo/email; tích hợp n8n cho bước phụ trợ (tùy chọn, kiểm tra giấy phép)	Dev1	2026-12-19 00:00:00	Chưa bắt đầu				0.0
+6.4	Phân quyền theo phòng ban, nhiều thương hiệu/website	Dev2	2026-12-23 00:00:00	Chưa bắt đầu				0.0
+6.5	Usage, cache/chọn model và adapter tạo ảnh AI có quota	Dev1	2026-12-23 00:00:00	Chưa bắt đầu				0.0
+7.1	Giám sát, hardening và khôi phục nâng cao; nền tảng an toàn tối thiểu đã có ở V1/0.2	Dev1	2026-12-26 00:00:00	Chưa bắt đầu				0.0
+7.2	Chạy ổn định và sửa lỗi	Dev1	2027-01-02 00:00:00	Chưa bắt đầu				0.0
+Hướng dẫn	E: trạng thái • F: ngày hoàn thành thực tế • G: ghi kết quả / lỗi còn lại • H: link bằng chứng. Thiếu ngày, ghi chú hoặc bằng chứng thì tab2.1 vẫn Chờ review.
+Tiến độ dở dang	Mở nhóm cộtI để nhập % đang làm. Chỉ chọn Hoàn thành sau khi nhân viên kiểm chứng; ngày hoàn thành không được tự bịa hoặc lấy ngày dự kiến.
+Nhật ký giờ công	Mỗi người/phiên báo cáo tại7.1_Nhat_ky_gio_cong. Sheet này mỗi việc chỉ có1 dòng; không cộng giờ lũy kế nhiều lần.

@@ -1,0 +1,55 @@
+# Hệ thống Auto SEO & Tự động đăng bài (addp-autoseo)
+
+> Hệ thống điều phối Marketing nội bộ: Phân tích website, nghiên cứu từ khóa, lập kế hoạch nội dung, AI viết bài chuẩn SEO tiếng Việt có kiểm duyệt và tự động xuất bản theo lịch lên WordPress & Magento 2.
+
+[![CI Quality & Security Gate](https://github.com/sontung098utc/addp-autoseo/actions/workflows/ci.yml/badge.svg)](https://github.com/sontung098utc/addp-autoseo/actions)
+
+---
+
+## 1. Công nghệ chính
+* **Core Framework:** Laravel 11 + Filament 3 (PHP 8.3)
+* **Cơ sở dữ liệu & Caching:** MariaDB 10.11 + Redis 7.2
+* **Hàng đợi & Lập lịch:** Laravel Queue Worker (Redis driver) + Task Scheduler
+* **Môi trường chạy:** Docker & Docker Compose
+* **CMS kết nối:**
+  * **WordPress:** REST API v2 + Application Passwords (hỗ trợ Rank Math / Yoast SEO)
+  * **Magento 2:** Module bridge `Company_BlogApi` tương thích Mageplaza Blog (OAuth 1.0a / ACL theo Store View)
+
+---
+
+## 2. Lộ trình phát triển (Milestones)
+
+* **V1.0 (19/11/2026):** Khung ứng dụng, AI viết bài tiếng Việt từ nguồn tài liệu công ty, Filament review UI, xuất bản bản nháp lên WordPress.
+* **V1.1 (28/11/2026):** Tự động đăng bài hằng ngày lên WordPress & Magento 2 theo lịch (giờ VN), chống đăng trùng (`publication_key`), đối soát timeout và nút dừng khẩn cấp.
+* **V1.2 (09/12/2026):** Crawler thu thập website, audit SEO on-page tiếng Việt, kế hoạch bài viết theo topic cluster, chạy thử nghiệm pilot 4 ngày (10 bài/CMS) và bàn giao cho Marketing.
+* **V2.0 (02/01/2027):** Kết nối Google Search Console, cập nhật bài cũ tụt hạng (version/diff/rollback), gợi ý liên kết nội bộ tự động, phân tích đối thủ, hỗ trợ tiếng Anh và phân quyền đa thương hiệu.
+
+---
+
+## 3. Khởi chạy nhanh với Docker (Quickstart)
+
+```bash
+# 1. Sao chép file cấu hình môi trường
+cp .env.example .env
+
+# 2. Khởi động hệ thống containers (App, Nginx, DB, Redis, Worker, Scheduler)
+docker-compose up -d --build
+
+# 3. Cài đặt dependencies và khởi tạo ứng dụng
+docker-compose exec app composer install
+docker-compose exec app php artisan key:generate
+docker-compose exec app php artisan migrate --seed
+
+# 4. Truy cập giao diện quản trị Filament
+# URL: http://localhost:8000/admin
+```
+
+---
+
+## 4. Tài liệu kỹ thuật & Quy chuẩn
+
+* [AGENTS.md](AGENTS.md): Quy tắc làm việc, bảo mật và phân quyền cho Kỹ sư và AI Agent.
+* [TASKS.md](TASKS.md): Danh mục 30 mã công việc chi tiết và trạng thái WBS.
+* [GITHUB_WORKFLOW.md](GITHUB_WORKFLOW.md): Quy ước phân nhánh Git, mở PR và kiểm duyệt chéo.
+* [DAILY_REPORT_TEMPLATE.md](reports/DAILY_REPORT_TEMPLATE.md): Biểu mẫu báo cáo phiên và giờ công.
+* [Contracts](contracts/): Đặc tả JSON Schema cho dữ liệu hệ thống (`WebsiteConnection`, `ContentBrief`, `ArticleVersion`, `Publication`).

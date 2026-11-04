@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Publication",
+  "description": "Lệnh xuất bản bài viết lên website CMS đích",
+  "type": "object",
+  "required": ["id", "site_id", "article_version_id", "publication_key", "scheduled_at_utc", "status"],
+  "properties": {
+    "id": { "type": "integer" },
+    "site_id": { "type": "integer" },
+    "article_version_id": { "type": "integer" },
+    "publication_key": {
+      "type": "string",
+      "description": "Khóa duy nhất chống đăng trùng (idempotency key), ví dụ: site1-article42-v1"
+    },
+    "scheduled_at_utc": { "type": "string", "format": "date-time" },
+    "timezone": { "type": "string", "default": "Asia/Ho_Chi_Minh" },
+    "status": {
+      "type": "string",
+      "enum": ["scheduled", "publishing", "published", "failed", "needs_reconcile"],
+      "default": "scheduled"
+    },
+    "cms_post_id": { "type": ["string", "integer", "null"] },
+    "published_url": { "type": ["string", "null"], "format": "uri" },
+    "attempt_count": { "type": "integer", "default": 0 },
+    "last_error": { "type": ["string", "null"] },
+    "published_at_utc": { "type": ["string", "null"], "format": "date-time" }
+  }
+}

@@ -1,0 +1,38 @@
+MỤC TIÊU, VAI TRÒ VÀ CÁCH ĐÁNH GIÁ HIỆU QUẢ
+Dùng cho Marketing nội bộ trước. Các chỉ tiêu là mục tiêu thử nghiệm đề xuất, chưa có kết quả thực tế. Lợi ích vận hành có thể đo sau pilot; tác độngSEO/doanh thu cần theo dõi nhiều tuần/tháng và không được bảo đảm.
+A. MỤC TIÊU VÀ GIÁ TRỊ CHO CÔNG TY
+Mục tiêu	Lợi ích cho công ty	Sản phẩm bàn giao	Chỉ số đề xuất	Khi nào đánh giá	Phụ trách
+Tạo trung tâm điều phối Marketing nội bộ	Giảm thao tác đổi hệ thống và thất lạc thông tin	Website → từ khóa → kế hoạch → bài đã duyệt → lịch → URL kết quả	Tỷ lệ chiến dịch có owner/lịch/bằng chứng; mục tiêu 100% trong pilot	Có từ V1; kiểm sau 2 tuần dùng	Marketing + Quản lý
+AI hỗ trợ dàn ý, bản thảo, metadata và đăng bài	Tăng năng lực sản xuất với đội hiện có	Quy trình tạo/duyệt/đăng tái sử dụng	Thử nghiệm giảm≥30% phút người/bài với cùng tiêu chuẩn chất lượng; chốt sau baseline	Đo sau 2–4 tuần dùng thật	Marketing + hai Dev
+Lập lịch có quota và đối soát lỗi	Giữ nhịp đăng mà nhân viên không phải trực từng bài	Đúng site/store, đúng phiên bản đã duyệt, có remoteID/URL	Đề xuất≥95% bài đến hạn đăng thành công trong 15 phút; 0 bài trùng; sự cố phải truy vết	CanaryV1.1; kiểm sau 14–28 ngày	Dev1 vận hành; Marketing kiểm
+Audit có URL và dữ liệu quan sát	Ưu tiên lỗi ảnh hưởng nội dung và khả năng thu thập	Danh sách lỗi theo website, độ ưu tiên và đề xuất tiếng Việt	Đề xuất giảm≥50% lỗi mức cao đã chốt phạm vi trong 4–8 tuần; chỉ tính lỗi sửa được và đã xác minh	SauV1.2 và sau khi website được sửa	Marketing + quản trị website
+Chuẩn hóa tài liệu, giọng thương hiệu và duyệt	Giảm nội dung sai, thiếu nguồn và sai thông điệp	Lưu sources, phiên bản prompt/model và bản đã duyệt	100% bài xuất bản có người duyệt và nguồn khi có khẳng định cần kiểm chứng; không nghiệm thu chỉ bằng số lượng	Từ pilot; rà mỗi tuần	Marketing / người có chuyên môn
+Tổ chức nguồn kiến thức công ty để dùng lại	Nội dung bám đúng sản phẩm và lĩnh vực	Chốt source_refs/fixture ở0.1 và3.1; đề xuất kho theo ngành	Mỗi brief có nguồn phù hợp; nguồn chưa xác minh phải được đánh dấu	Chốt cấu trúc ởV1; nâng cấp sau PoC	Marketing giữ nguồn; Dev1/Dev2 phối hợp
+Đo năng suất và chi phí bằng dữ liệu thật	Có cơ sở phân bổ ngân sách, chọn model và cải tiến quy trình	Báo cáo task/run/chi phí + công thức giá trị giờ tiết kiệm	Phút người/bài đạt chuẩn, chi phí/bài, tỷ lệ phải sửa; không dùng giờ tiêu làm % hoàn thành	Đo từ pilot; chốt sau 1 tháng	Quản lý + Marketing + Dev
+Tạo nội dung hữu ích để mở rộng hiện diện tìm kiếm	Kỳ vọng thêm truy cập organic và cơ hội tư vấn chất lượng	Theo dõi cohort bài, query/trang, CTA và lead organic nếu đo được	So sánh GSC cùng bộ lọc; chốt mục tiêu traffic/lead sau 28 ngày baseline; chưa có mức tăng % mặc định	Xem xu hướng8–12 tuần; đánh giá kinh doanh3–6 tháng sau dùng	Marketing + Quản lý
+B. KẾT QUẢ, HIỆU QUẢ VÀ CỬA SỔ ĐÁNH GIÁ
+Hiệu quả cần đo	Kết quả / cách đo	Sau khi dùng thật	Từ ngày dự kiến	Đến ngày dự kiến	Kết quả đo
+Hiệu quả thao tác	Đo độ đều và thời gian người/bài Đo: Thử giảm≥30% thời gian với cùng chất lượng; thành công đăng≥95%	14–28 ngày sau dùng thật	2026-12-12 00:00:00	2026-12-26 00:00:00	Chưa đo
+Cải thiện lỗi SEO đã sửa	Lỗi mức cao giảm trên phạm vi có owner sửa Đo: So audit cùng phạm vi, ghi lỗi mới/lỗi cũ, xác minh đã sửa	28–56 ngày sau dùng thật	2026-12-26 00:00:00	2027-01-23 00:00:00	Chưa đo
+Tín hiệu tìm kiếm	Đánh giá xu hướng index/impressions/clicks theo nhóm bài Đo: Cùng query/page/device/country và kỳ tương đương; theo cohort, có ghi mùa vụ	56–84 ngày sau dùng thật	2027-01-23 00:00:00	2027-02-20 00:00:00	Chưa đo
+Hiệu quả kinh doanh	Đánh giá giá trị giờ tiết kiệm và lead/đơn organic nếu đo được Đo: So với tổng chi phí và baseline; không quy toàn bộ doanh thu cho phần mềm	90–180 ngày sau dùng thật	2027-02-26 00:00:00	2027-05-27 00:00:00	Chưa đo
+C. CÁCH ĐO TRƯỚC VÀ SAU
+1. Baseline	Thu 10–20 bài thủ công tương đương và 28 ngày GSC trước thay đổi nếu có quyền; ghi cả phút viết, sửa, upload, duyệt và chi phí. Chưa có dữ liệu thì để trống/Thiếu dữ liệu, không điền0 cho đẹp.
+2. Pilot và đối chiếu	20 bài pilot không tự chứng minh lợi ích lâu dài. So cùng độ khó/chất lượng, nguồn, đội thực hiện; báo cả bài phải sửa/lỗi. Rà sau 2 và4 tuần dùng thật.
+3. SEO và kinh doanh	Theo từng nhóm bài/URL, cùng bộ lọc và kỳ so sánh; ghi các thay đổi khác, mùa vụ và quảng cáo. Chỉ kết luận quan hệ quan sát được; không hứa top Google hay tăng doanh thu cố định.
+D. Ô NHẬP VÀ CÔNG THỨC GIÁ TRỊ GIỜ TIẾT KIỆM
+Ngày bắt đầu dùng thật		Chỉ điền khi Marketing xác nhận; còn trống thì cửa sổ đánh giá dùng mốc V1.1 dự kiến.
+Số bài đạt chuẩn / tháng	60	Kịch bản hiện tại, chưa phải sản lượng thực tế.
+Phút người / bài thủ công		Đo đủ viết, sửa, duyệt, upload; số liệu thật.
+Phút người / bài có AI		Tính cả review/sửa; không chỉ thời gianAI sinh.
+Chi phí quy đổi / giờ người		VND/giờ; quản lý cung cấp.
+Vận hành / tháng (VND)	454000	Giả định cũ, chưa gồm thuê bao code nếu còn duy trì; cập nhật đủ chi phí thực tế.
+Chi phí xây dựng phân bổ / tháng		Nhập cả nhân công/chi phí xây dựng phân bổ;0 chỉ khi chủ động không phân bổ.
+Giờ tiết kiệm / tháng		Có thể âm nếuAI làm tăng thời gian; không ép về0.
+Giá trị giờ tiết kiệm (VND)		Là giá trị thời gian có thể tái phân bổ, chưa phải tiền mặt tiết kiệm.
+Chênh lệch sau chi phí phân bổ		Chỉ tính khi có đủ đầu vào; không dùng để cam kết lợi nhuận.
+Kết luận hiện tại	Chưa đủ dữ liệu	Chưa điền số đo thì chưa kết luận hiệu quả tài chính.
+Mốc lập cửa sổ đánh giá	2026-11-28 00:00:00	Dùng ngày thực tế khi có, nếu chưa có thì dùng ngàyV1.1 dự kiến.
+NGUỒN THAM KHẢO — MỞ NHÓM + KHI CẦN
+NguồnSEO	https://developers.google.com/search/docs/fundamentals/seo-starter-guide	Google nêu thay đổi có thể mất từ vài giờ đến nhiều tháng; nên chờ vài tuần để đánh giá, và không phải thay đổi nào cũng có tác động đáng kể.
+Nguồn chất lượng	https://developers.google.com/search/docs/essentials/spam-policies#scaled-content	Sản xuất hàng loạt nội dung ít giá trị để thao túng thứ hạng có thể vi phạm; số bài không thay thế chất lượng.
