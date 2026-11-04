@@ -7,10 +7,10 @@
 ---
 
 ## 1. Công nghệ chính
-* **Core Framework:** Laravel 11 + Filament 3 (PHP 8.3)
-* **Cơ sở dữ liệu & Caching:** MariaDB 10.11 + Redis 7.2
+* **Core Framework:** Laravel 11 + Filament 3 (PHP 8.2)
+* **Cơ sở dữ liệu & Caching:** MariaDB 10.6 + Redis 7.2
 * **Hàng đợi & Lập lịch:** Laravel Queue Worker (Redis driver) + Task Scheduler
-* **Môi trường chạy:** Docker & Docker Compose
+* **Môi trường máy chủ:** DirectAdmin + OpenLiteSpeed (LSPHP 8.2) / Docker & Docker Compose
 * **CMS kết nối:**
   * **WordPress:** REST API v2 + Application Passwords (hỗ trợ Rank Math / Yoast SEO)
   * **Magento 2:** Module bridge `Company_BlogApi` tương thích Mageplaza Blog (OAuth 1.0a / ACL theo Store View)

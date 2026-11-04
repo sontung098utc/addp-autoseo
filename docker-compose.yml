@@ -34,7 +34,7 @@ services:
       - autoseo_network
 
   db:
-    image: mariadb:10.11
+    image: mariadb:10.6
     container_name: autoseo_db
     restart: unless-stopped
     environment:

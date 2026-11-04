@@ -1,6 +1,6 @@
-FROM php:8.3-fpm-alpine
+FROM php:8.2-fpm-alpine
 
-# Cài đặt system dependencies & PHP extensions cần thiết cho Laravel + Filament
+# Cài đặt system dependencies & PHP extensions cần thiết cho Laravel + Filament (tương thích PHP 8.2)
 RUN apk add --no-cache \
     git \
     curl \
