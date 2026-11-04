@@ -8,44 +8,44 @@ FastAPI + React	Phù hợp đội mạnh Python và cần UI riêng Linh hoạt 
 n8n	Luồng phụ trợ thông báo/kết nối Thử workflow phụ nhanh		Cần xét license, lỗi lặp, quyền và khả năng vận hành Không mặc định đã cài đặt hoặc miễn phí trong mọi cách phân phối.			Không thay core/DB/trạng thái xuất bản Tùy chọn ởV2
 B. THÔNG SỐ CHI PHÍ — GIỮ GIẢ ĐỊNH CŨ, CHƯA PHẢI BÁO GIÁ
 Tham số	Giá trị	Cách sử dụng
-USD/VND	26000.0	Thay bằng tỷ giá thực tế
-Số người dùng công cụ AI	2.0	Thuê bao lập trình, tách API ứng dụng
-Số kỳ thuê bao	3.0	Đối soát tháng gia hạn thực tế
-AI / bài (VND)	3000.0	Đo lại ở việc0.3
-Ảnh / ảnh (VND)	800.0	V1 ưu tiên ảnh công ty; không mặc định phát sinh phí
-Website vận hành	2.0	Kịch bản nội bộ
-Bài / site / tháng	30.0	Kịch bản vận hành
-Ảnh / bài	3.0	Người dùng cấu hình
-Backup / tháng (USD)	5.0	Giả định lưu trữ
-Server / tháng (VND)	0.0	0 chỉ là chưa tính tăng thêm
-API từ khóa / tháng (USD)	0.0	V2 tùy ngân sách
+USD/VND	26000	Thay bằng tỷ giá thực tế
+Số người dùng công cụ AI	2	Thuê bao lập trình, tách API ứng dụng
+Số kỳ thuê bao	3	Đối soát tháng gia hạn thực tế
+AI / bài (VND)	3000	Đo lại ở việc0.3
+Ảnh / ảnh (VND)	800	V1 ưu tiên ảnh công ty; không mặc định phát sinh phí
+Website vận hành	2	Kịch bản nội bộ
+Bài / site / tháng	30	Kịch bản vận hành
+Ảnh / bài	3	Người dùng cấu hình
+Backup / tháng (USD)	5	Giả định lưu trữ
+Server / tháng (VND)	0	0 chỉ là chưa tính tăng thêm
+API từ khóa / tháng (USD)	0	V2 tùy ngân sách
 C. CHI PHÍ XÂY DỰNG VÀ THỬ NGHIỆM — KHÔNG GỒM NHÂN CÔNG
 Mã	Version	Hạng mục	Đơn vị	Số lượng	Đơn giá	Tiền tệ	Thành tiền (VND)	Giả định / giới hạn
-1.0	V1	Máy chủ riêng hiện có, chạy Docker	gói	1.0	0.0	VND	0	Bạn đã có server nên không tính thêm; nhập chi phí nếu cần thuê thêm máy.
-2.0	V1	Thuê bao Claude toàn dự án (ngân sách ghi ở V1)	người-tháng	6	100.0	USD	15600000	Số kỳ thuê bao lấy ở ôB14 của tab này; đối soát theo hóa đơn thực tế.
-3.0	V1	Thuê bao Antigravity/Google AI toàn dự án (ghi ở V1)	người-tháng	6	20.0	USD	3120000	Số kỳ thuê bao lấy ở ôB14; đơn giá là giả định, chưa phải báo giá mới.
-4.0	V1	Sao lưu ngoài server	tháng	1.0	5.0	USD	130000	Giả định gói S3 tương thích khoảng 5 USD/tháng.
-5.0	V1	API AI viết bài khi phát triển và thử nghiệm	bài	100.0	3000	VND	300000	Giả định 100 bài thử nghiệm.
-6.0	V1	Hình ảnh khi phát triển và thử nghiệm (100 bài × 3 ảnh)	ảnh	300.0	800	VND	240000	Đơn giá lấy từ sheet Giả định.
-7.0	V1	API AI cho chạy thử trên website công ty (2 website × 10 bài)	bài	20.0	3000	VND	60000	Giả định.
-8.0	V1	Hình ảnh cho chạy thử (20 bài × 3 ảnh)	ảnh	60.0	800	VND	48000	Đơn giá lấy từ sheet Giả định.
-9.0	V2	Gói Claude (số người × số tháng của V2)	người-tháng	0.0	100.0	USD	0	Đã tính toàn dự án ở V1; không cộng lần hai
-10.0	V2	Gói Antigravity / Google AI (số người × số tháng của V2)	người-tháng	0.0	20.0	USD	0	Đã tính toàn dự án ở V1; không cộng lần hai
-11.0	V2	API từ khóa trả phí (DataForSEO hoặc tương đương)	tháng	2.0	50.0	USD	2600000	Giả định trả theo mức dùng, chỉ làm từ V2.
-12.0	V2	API AI viết bài khi phát triển và thử nghiệm	bài	150.0	3000	VND	450000	Giả định 150 bài thử.
-13.0	V2	Hình ảnh khi phát triển và thử nghiệm (150 bài × 3 ảnh)	ảnh	450.0	800	VND	360000	Đơn giá lấy từ sheet Giả định.
-14.0	V2	Giấy phép thương mại n8n (chỉ khi dùng n8n cho sản phẩm thương mại)	gói	1.0	0.0	VND	0	Dùng nội bộ thường không cần; hỏi n8n nếu sau này bán cho khách. Để 0 cho đến khi có báo giá.
-15.0	V2	Sao lưu ngoài server và giám sát	tháng	1.0	5.0	USD	130000	Giả định.
-TỔNG CHI PHÍ XÂY DỰNG		23038000
+1	V1	Máy chủ riêng hiện có, chạy Docker	gói	1	0	VND		Bạn đã có server nên không tính thêm; nhập chi phí nếu cần thuê thêm máy.
+2	V1	Thuê bao Claude toàn dự án (ngân sách ghi ở V1)	người-tháng		100	USD		Số kỳ thuê bao lấy ở ôB14 của tab này; đối soát theo hóa đơn thực tế.
+3	V1	Thuê bao Antigravity/Google AI toàn dự án (ghi ở V1)	người-tháng		20	USD		Số kỳ thuê bao lấy ở ôB14; đơn giá là giả định, chưa phải báo giá mới.
+4	V1	Sao lưu ngoài server	tháng	1	5	USD		Giả định gói S3 tương thích khoảng 5 USD/tháng.
+5	V1	API AI viết bài khi phát triển và thử nghiệm	bài	100		VND		Giả định 100 bài thử nghiệm.
+6	V1	Hình ảnh khi phát triển và thử nghiệm (100 bài × 3 ảnh)	ảnh	300		VND		Đơn giá lấy từ sheet Giả định.
+7	V1	API AI cho chạy thử trên website công ty (2 website × 10 bài)	bài	20		VND		Giả định.
+8	V1	Hình ảnh cho chạy thử (20 bài × 3 ảnh)	ảnh	60		VND		Đơn giá lấy từ sheet Giả định.
+9	V2	Gói Claude (số người × số tháng của V2)	người-tháng	0	100	USD		Đã tính toàn dự án ở V1; không cộng lần hai
+10	V2	Gói Antigravity / Google AI (số người × số tháng của V2)	người-tháng	0	20	USD		Đã tính toàn dự án ở V1; không cộng lần hai
+11	V2	API từ khóa trả phí (DataForSEO hoặc tương đương)	tháng	2	50	USD		Giả định trả theo mức dùng, chỉ làm từ V2.
+12	V2	API AI viết bài khi phát triển và thử nghiệm	bài	150		VND		Giả định 150 bài thử.
+13	V2	Hình ảnh khi phát triển và thử nghiệm (150 bài × 3 ảnh)	ảnh	450		VND		Đơn giá lấy từ sheet Giả định.
+14	V2	Giấy phép thương mại n8n (chỉ khi dùng n8n cho sản phẩm thương mại)	gói	1	0	VND		Dùng nội bộ thường không cần; hỏi n8n nếu sau này bán cho khách. Để 0 cho đến khi có báo giá.
+15	V2	Sao lưu ngoài server và giám sát	tháng	1	5	USD		Giả định.
+TỔNG CHI PHÍ XÂY DỰNG
 D. KỊCH BẢN VẬN HÀNH HẰNG THÁNG
 Mã	Khoản mục	VND / tháng	Cách tính / giới hạn
-O1	API viết bài	180000	Số website × bài/site × phí/bài
-O2	Hình ảnh	144000	Số bài × ảnh/bài × phí/ảnh; có thể0 nếu dùng ảnh công ty
-O3	Backup	130000	USD/tháng × tỷ giá
-O4	Máy chủ	0	Theo ngân sách công ty
-O5	API từ khóa	0	V2, tùy chọn
-O6	AI lập trình	6240000	Chỉ tính khi tiếp tục duy trì thuê bao sau bàn giao
-TỔNG	Vận hành	454000	Không cộng chi phí xây dựng một lần vào vận hành/tháng
+O1	API viết bài		Số website × bài/site × phí/bài
+O2	Hình ảnh		Số bài × ảnh/bài × phí/ảnh; có thể0 nếu dùng ảnh công ty
+O3	Backup		USD/tháng × tỷ giá
+O4	Máy chủ		Theo ngân sách công ty
+O5	API từ khóa		V2, tùy chọn
+O6	AI lập trình		Chỉ tính khi tiếp tục duy trì thuê bao sau bàn giao
+TỔNG	Vận hành		Không cộng chi phí xây dựng một lần vào vận hành/tháng
 E. TÁI SỬ DỤNG VÀ ĐIỀU KIỆN CẦN XÁC NHẬN
 Mục	Có thể tận dụng		Việc cần làm thêm
 Laravel/Filament	Khung auth, policies, form/table, queue, scheduler		Kiểm phiên bản/license; viết logic SEO/CMS; không tự nhận đã có code dự án.

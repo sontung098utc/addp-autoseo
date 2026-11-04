@@ -1,89 +1,37 @@
 TIMELINE LÀM VIỆC THEO NGÀY
 C/E: mã việc • D/F: giờ mỗi người • G: việc đến hạn • H: ngày quan sát. Lịch tính từ thông số ở1.1; mở nhóm + để xem công thức và lịch theo task.
 Mã việc	Mốc	Chủ nhiệm	Dev1 (giờ)	Dev2 (giờ)	Tổng giờ	Phụ thuộc	Bắt đầu (giờ)	Kết thúc (giờ)	Ngày bắt đầu	Hạn dự kiến	Ngày quan sát tối thiểu	Reviewer	Việc cần thực hiện	Trạng thái	Dev1 rảnh (giờ)	Dev2 rảnh (giờ)	Nhánh Git	Điều kiện chuyển bước
-0.1	V1.0	Dev1	4	4	8		0	4	2026-11-03 00:00:00	2026-11-03 00:00:00	0.0	Dev2	Chốt phạm vi V1, quy trình duyệt bài, danh sách website công ty và quyền truy cập (WordPress, Magento, Search Console)	Chưa bắt đầu	4	4	docs/m01/0-1/dev1/scope-contract	Chốt phạm vi, hợp đồng dữ liệu, quyền truy cập và đọc tài liệu
-0.2	V1.0	Dev1	22	2	24	0.1	4	26	2026-11-03 00:00:00	2026-11-07 00:00:00	0.0	Dev2	Dựng môi trường Laravel độc lập trên OS được hỗ trợ: Docker, HTTPS, CI/quyền cơ bản và backup/restore	Chưa bắt đầu	26	6	chore/m01/0-2/dev1/infra-ci	Staging trên OS được hỗ trợ, HTTPS, DB, backup/restore, Git/CI tối thiểu
-0.3	V1.0	Dev2	0	10	10	0.1	6	16	2026-11-04 00:00:00	2026-11-05 00:00:00	0.0	Dev1	Thử nghiệm mô hình AI với tiếng Việt, viết prompt mẫu, đo chi phí thực tế mỗi bài và mỗi ảnh	Chưa bắt đầu	26	16	feat/m01/0-3/dev2/ai-poc	PoC AI tiếng Việt, prompt version, quota và đo chi phí
-0.4	V1.0	Dev1	20	2	22	0.2	26	46	2026-11-07 00:00:00	2026-11-11 00:00:00	0.0	Dev2	Khung Laravel + Filament: đăng nhập, Policies, ba vai trò, quản lý website, mã hóa credential và nhật ký	Chưa bắt đầu	46	28	feat/m01/0-4/dev1/auth-sites	Laravel + Filament, Policies, website, mã hóa credential, nhật ký
-0.5	V1.0	Dev2	0	10	10	0.1	28	38	2026-11-07 00:00:00	2026-11-10 00:00:00	0.0	Dev1	Filament panel tiếng Việt và trang quản lý website theo contract/fixture	Chưa bắt đầu	46	38	feat/m01/0-5/dev2/filament	Filament panel tiếng Việt và quản lý website bằng fixture; QA/bảo mật theo hai tab mới; chuẩn bị và kiểm chứng trước mốc áp dụng
-3.4	V1.0	Dev2	0	10	10	0.5, 0.1	38	48	2026-11-10 00:00:00	2026-11-11 00:00:00	0.0	Dev1	Giao diện duyệt bài (xem, sửa, duyệt, từ chối), màn hình cấu hình số bài, số bài mỗi ngày, số ảnh mỗi bài; hiển thị trạng thái bài, lịch đăng, lỗi	Chưa bắt đầu	46	48	feat/m03/3-4/dev2/review-ui	Filament duyệt bài, số lượng bài/ảnh, lịch và trạng thái; xây theo mock/contract trước khi pipeline hoàn tất
-1.2	V1.0	Dev2	0	16	16	0.4, 0.5	48	64	2026-11-12 00:00:00	2026-11-14 00:00:00	0.0	Dev1	Connector WordPress: REST API + Application Passwords; tạo/sửa bài, chuyên mục, thẻ, ảnh, meta SEO (Rank Math/Yoast)	Chưa bắt đầu	46	64	feat/m02/1-2/dev2/wordpress	WordPress: nháp, ảnh, taxonomy, một adapter metadata SEO được kiểm chứng; QA/bảo mật theo hai tab mới; chuẩn bị và kiểm chứng trước mốc áp dụng
-3.1	V1.0	Dev1	18	2	20	0.3, 0.4	64	82	2026-11-14 00:00:00	2026-11-18 00:00:00	0.0	Dev2	Pipeline dàn ý, bài tiếng Việt và metadata theo tài liệu công ty; FAQ/schema nâng cao không chặn pilot	Chưa bắt đầu	82	66	feat/m03/3-1/dev1/content-pipeline	Pipeline dàn ý, bài, metadata từ tài liệu công ty; FAQ/schema nâng cao tùy chọn
-3.5	V1.0	Dev2	0	8	8	3.1, 3.4	82	90	2026-11-18 00:00:00	2026-11-19 00:00:00	0.0	Dev1	Kiểm tra chất lượng cơ bản: độ dài, heading, từ khóa, trùng lặp nội bộ	Chưa bắt đầu	82	90	feat/m03/3-5/dev2/quality	Chặn bài thiếu dữ liệu, link sai, chưa duyệt; kiểm tra trùng lặp nội bộ
-2.1	V1.2	Dev2	0	8	8	0.3	90	98	2026-11-20 00:00:00	2026-11-21 00:00:00	0.0	Dev1	Nhập keyword/CSV nội bộ và AI gom cụm; kết nối Search Console tại V2/5.1	Chưa bắt đầu	82	98	feat/m04/2-1/dev2/keywords	Nhập keyword/CSV và AI gom cụm; kết nối GSC chuyển 5.1 để không chặn pilot
-2.2	V1.2	Dev2	0	10	10	2.1	98	108	2026-11-21 00:00:00	2026-11-23 00:00:00	0.0	Dev1	Kế hoạch nội dung: topic cluster, lịch bài, gán từ khóa, chỉnh sửa trên giao diện	Chưa bắt đầu	82	108	feat/m04/2-2/dev2/content-plan	Topic cluster và lịch nội dung chỉnh sửa được
-1.4	V1.1	Dev1	24	0	24	0.4	82	106	2026-11-18 00:00:00	2026-11-23 00:00:00	0.0	Dev2	Connector Magento: module Company_BlogApi riêng cho Mageplaza Blog, ACL/OAuth, nháp, ảnh, chuyên mục và đối soát	Chưa bắt đầu	106	108	feat/m02/1-4/dev1/magento-bridge	Module Company_BlogApi riêng, không sửa Mageplaza; ACL, OAuth, draft/media và đối soát
-3.2	V1.1	Dev1	12	0	12	3.1	106	118	2026-11-23 00:00:00	2026-11-25 00:00:00	0.0	Dev2	Hàng đợi (Redis), bộ lập lịch, worker, cơ chế thử lại	Chưa bắt đầu	118	108	feat/m05/3-2/dev1/queue-scheduler	Queue/Scheduler, restart, timeout, retry/backoff và khóa theo website; QA/bảo mật theo hai tab mới; chuẩn bị và kiểm chứng trước mốc áp dụng
-3.3	V1.1	Dev1	8	0	8	3.1	118	126	2026-11-25 00:00:00	2026-11-26 00:00:00	0.0	Dev2	Thư viện ảnh công ty: chọn đủ số ảnh, nén, ảnh đại diện và alt; tạo ảnh AI bổ sung V2	Chưa bắt đầu	126	108	feat/m03/3-3/dev1/media	Thư viện ảnh công ty, nén, alt, ảnh đại diện; tạo ảnh AI nâng cao ở V2
-3.6	V1.1	Dev1	12	2	14	1.2, 1.4, 3.2, 3.3, 3.4, 3.5	126	138	2026-11-27 00:00:00	2026-11-28 00:00:00	0.0	Dev2	Worker tự đăng hằng ngày lên WordPress và Magento 2 theo lịch, thử lại, báo lỗi	Chưa bắt đầu	138	128	feat/m05/3-6/dev1/autopublish	Tự đăng hai CMS: đúng giờ, quota, idempotency và đối soát timeout; QA/bảo mật theo hai tab mới; chuẩn bị và kiểm chứng trước mốc áp dụng
-1.1	V1.2	Dev1	12	0	12	0.4	138	150	2026-11-30 00:00:00	2026-12-01 00:00:00	0.0	Dev2	Thu thập website (sitemap, trang chính) và audit SEO on-page: title, meta, heading, ảnh, liên kết, schema	Chưa bắt đầu	150	128	feat/m04/1-1/dev1/crawler	Crawl giới hạn, sitemap/on-page, robots/canonical/HTTP, chống SSRF
-1.3	V1.2	Dev2	0	8	8	1.1	150	158	2026-12-02 00:00:00	2026-12-03 00:00:00	0.0	Dev1	Báo cáo audit SEO tiếng Việt kèm đề xuất tối ưu do AI viết	Chưa bắt đầu	150	158	feat/m04/1-3/dev2/audit-report	Báo cáo audit tiếng Việt và đề xuất, không tự ghi đè trang hiện có
-4.1	V1.2	Dev1	8	8	16	3.6, 1.3, 2.2	162	186	2026-12-04 00:00:00	2026-12-08 00:00:00	4.0	Dev2	Chạy thử thực tế trên website WordPress và Magento 2 của công ty, theo dõi bài đăng hằng ngày	Chưa bắt đầu	186	186	test/m06/4-1/dev1/pilot	Quan sát đủ 4 ngày làm việc; tổng giờ người vẫn theoD:E, không nhân thành ngày làm đủ 6h.
-4.2	V1.2	Dev1	6	6	12	4.1	186	192	2026-12-09 00:00:00	2026-12-09 00:00:00	0.0	Dev2	Sửa lỗi, tinh chỉnh prompt, hướng dẫn sử dụng cho bộ phận Marketing	Chưa bắt đầu	192	192	feat/m06/4-2/dev1/handover	Sửa lỗi, prompt, hướng dẫn và Marketing nghiệm thu
-5.1	V2	Dev2	0	18	18	4.2	192	210	2026-12-10 00:00:00	2026-12-12 00:00:00	0.0	Dev1	Tích hợp Search Console và báo cáo click, impression, CTR, vị trí trung bình theo cùng bộ lọc	Chưa bắt đầu	192	210	feat/m07/5-1/dev2/gsc	Kết nối GSC, OAuth read-only, đồng bộ và báo cáo click/impression/CTR/vị trí trung bình
-5.2	V2	Dev1	18	0	18	4.2	192	210	2026-12-10 00:00:00	2026-12-12 00:00:00	0.0	Dev2	Cập nhật bài cũ: AI đề xuất và cập nhật bài tụt hạng	Chưa bắt đầu	210	210	feat/m07/5-2/dev1/article-update	Cập nhật bài cũ có version, diff, conflict và rollback
-5.3	V2	Dev1	12	0	12	5.2	210	222	2026-12-14 00:00:00	2026-12-15 00:00:00	0.0	Dev2	Liên kết nội bộ tự động	Chưa bắt đầu	222	210	feat/m07/5-3/dev1/internal-links	Liên kết nội bộ có kiểm tra URL và duyệt
-5.4	V2	Dev2	0	18	18	5.1	210	228	2026-12-14 00:00:00	2026-12-16 00:00:00	0.0	Dev1	Phân tích đối thủ, khoảng trống nội dung; thêm API từ khóa trả phí	Chưa bắt đầu	222	228	feat/m07/5-4/dev2/competitor-gap	Đối thủ và một nguồn keyword trả phí theo ngân sách
-6.1	V2	Dev2	0	24	24	5.4	228	252	2026-12-17 00:00:00	2026-12-21 00:00:00	0.0	Dev1	Kiểm tra chất lượng nâng cao: trùng lặp với internet, kiểm tra dữ kiện, giọng văn thương hiệu	Chưa bắt đầu	222	252	feat/m07/6-1/dev2/quality-plus	Kiểm tra nội dung nâng cao có nguồn và chuyên gia khi cần
-6.2	V2	Dev1	12	0	12	5.3	222	234	2026-12-16 00:00:00	2026-12-17 00:00:00	0.0	Dev2	Hỗ trợ tiếng Anh	Chưa bắt đầu	234	252	feat/m07/6-2/dev1/english	Hỗ trợ tiếng Anh theo prompt version
-6.3	V2	Dev1	12	0	12	6.2	234	246	2026-12-18 00:00:00	2026-12-19 00:00:00	0.0	Dev2	Thông báo qua Telegram/Zalo/email; tích hợp n8n cho bước phụ trợ (tùy chọn, kiểm tra giấy phép)	Chưa bắt đầu	246	252	feat/m08/6-3/dev1/notifications	Một kênh thông báo trước; n8n tùy chọn, chưa mặc định Zalo phức tạp
-6.4	V2	Dev2	0	12	12	6.1	252	264	2026-12-22 00:00:00	2026-12-23 00:00:00	0.0	Dev1	Phân quyền theo phòng ban, nhiều thương hiệu/website	Chưa bắt đầu	246	264	feat/m08/6-4/dev2/brands-rbac	Phòng ban/thương hiệu; phân quyền từng website
-6.5	V2	Dev1	16	0	16	6.3	246	262	2026-12-21 00:00:00	2026-12-23 00:00:00	0.0	Dev2	Usage, cache/chọn model và adapter tạo ảnh AI có quota	Chưa bắt đầu	262	264	feat/m08/6-5/dev1/usage-ai-images	Usage/cache/chọn model và tạo ảnh AI qua adapter có quota
-7.1	V2	Dev1	18	0	18	6.5	262	280	2026-12-23 00:00:00	2026-12-26 00:00:00	0.0	Dev2	Giám sát, hardening và khôi phục nâng cao; nền tảng an toàn tối thiểu đã có ở V1/0.2	Chưa bắt đầu	280	264	feat/m08/7-1/dev1/hardening	Hardening/giám sát/restore nâng cao; nền tảng an toàn cơ bản đã có ở 0.2
-7.2	V2	Dev1	10	10	20	7.1, 6.4	282	312	2026-12-28 00:00:00	2027-01-02 00:00:00	5.0	Dev2	Chạy ổn định và sửa lỗi	Chưa bắt đầu	312	312	test/m08/7-2/dev1/stability	Quan sát đủ 5 ngày làm việc; tổng giờ người vẫn theoD:E, không nhân thành ngày làm đủ 6h.
+0.1											0
+0.2											0
+0.3											0
+0.4											0
+0.5											0
+3.4											0
+1.2											0
+3.1											0
+3.5											0
+2.1											0
+2.2											0
+1.4											0
+3.2											0
+3.3											0
+3.6											0
+1.1											0
+1.3											0
+4.1											4							Quan sát đủ 4 ngày làm việc; tổng giờ người vẫn theoD:E, không nhân thành ngày làm đủ 6h.
+4.2											0
+5.1											0
+5.2											0
+5.3											0
+5.4											0
+6.1											0
+6.2											0
+6.3											0
+6.4											0
+6.5											0
+7.1											0
+7.2											5							Quan sát đủ 5 ngày làm việc; tổng giờ người vẫn theoD:E, không nhân thành ngày làm đủ 6h.
 LỊCH NGÀY THEO NGUỒN LỰC
 C:E liệt kê mã việc, D:F là giờ người dự kiến trongngày, G làviệc đến hạnreview. Khoảng quan sát chỉ 2h/người/ngày theoestimate; phần giờ còn lại không tự tăng giờ dựán. Lịch70 ngày làmviệc, cần mởrộng nếu estimate kéo dài hơn.
 Ngày dự kiến	Thứ	Dev1: mã việc	Dev1: giờ	Dev2: mã việc	Dev2: giờ	Mã đến hạn kiểm tra	Theo dõi / quan sát
-2026-11-03 00:00:00	Thứ Ba	0.1 | 0.2	6	0.1 | 0.2	6	0.1
-2026-11-04 00:00:00	Thứ Tư	0.2	6	0.3	6
-2026-11-05 00:00:00	Thứ Năm	0.2	6	0.3	4	0.3
-2026-11-06 00:00:00	Thứ Sáu	0.2	6		0
-2026-11-07 00:00:00	Thứ Bảy	0.2 | 0.4	6	0.4 | 0.5	4	0.2
-2026-11-09 00:00:00	Thứ Hai	0.4	6	0.5	6
-2026-11-10 00:00:00	Thứ Ba	0.4	6	0.5 | 3.4	6	0.5
-2026-11-11 00:00:00	Thứ Tư	0.4	4	3.4	6	0.4 | 3.4
-2026-11-12 00:00:00	Thứ Năm		0	1.2	6
-2026-11-13 00:00:00	Thứ Sáu		0	1.2	6
-2026-11-14 00:00:00	Thứ Bảy	3.1	2	1.2 | 3.1	6	1.2
-2026-11-16 00:00:00	Thứ Hai	3.1	6		0
-2026-11-17 00:00:00	Thứ Ba	3.1	6		0
-2026-11-18 00:00:00	Thứ Tư	3.1 | 1.4	6	3.5	2	3.1
-2026-11-19 00:00:00	Thứ Năm	1.4	6	3.5	6	3.5
-2026-11-20 00:00:00	Thứ Sáu	1.4	6	2.1	6
-2026-11-21 00:00:00	Thứ Bảy	1.4	6	2.1 | 2.2	6	2.1
-2026-11-23 00:00:00	Thứ Hai	1.4 | 3.2	6	2.2	6	2.2 | 1.4
-2026-11-24 00:00:00	Thứ Ba	3.2	6		0
-2026-11-25 00:00:00	Thứ Tư	3.2 | 3.3	6		0	3.2
-2026-11-26 00:00:00	Thứ Năm	3.3	6		0	3.3
-2026-11-27 00:00:00	Thứ Sáu	3.6	6	3.6	2
-2026-11-28 00:00:00	Thứ Bảy	3.6	6		0	3.6
-2026-11-30 00:00:00	Thứ Hai	1.1	6		0
-2026-12-01 00:00:00	Thứ Ba	1.1	6		0	1.1
-2026-12-02 00:00:00	Thứ Tư		0	1.3	6
-2026-12-03 00:00:00	Thứ Năm		0	1.3	2	1.3
-2026-12-04 00:00:00	Thứ Sáu	4.1	2	4.1	2		Quan sát: 4.1
-2026-12-05 00:00:00	Thứ Bảy	4.1	2	4.1	2		Quan sát: 4.1
-2026-12-07 00:00:00	Thứ Hai	4.1	2	4.1	2		Quan sát: 4.1
-2026-12-08 00:00:00	Thứ Ba	4.1	2	4.1	2	4.1	Quan sát: 4.1
-2026-12-09 00:00:00	Thứ Tư	4.2	6	4.2	6	4.2
-2026-12-10 00:00:00	Thứ Năm	5.2	6	5.1	6
-2026-12-11 00:00:00	Thứ Sáu	5.2	6	5.1	6
-2026-12-12 00:00:00	Thứ Bảy	5.2	6	5.1	6	5.1 | 5.2
-2026-12-14 00:00:00	Thứ Hai	5.3	6	5.4	6
-2026-12-15 00:00:00	Thứ Ba	5.3	6	5.4	6	5.3
-2026-12-16 00:00:00	Thứ Tư	6.2	6	5.4	6	5.4
-2026-12-17 00:00:00	Thứ Năm	6.2	6	6.1	6	6.2
-2026-12-18 00:00:00	Thứ Sáu	6.3	6	6.1	6
-2026-12-19 00:00:00	Thứ Bảy	6.3	6	6.1	6	6.3
-2026-12-21 00:00:00	Thứ Hai	6.5	6	6.1	6	6.1
-2026-12-22 00:00:00	Thứ Ba	6.5	6	6.4	6
-2026-12-23 00:00:00	Thứ Tư	6.5 | 7.1	6	6.4	6	6.4 | 6.5
-2026-12-24 00:00:00	Thứ Năm	7.1	6		0
-2026-12-25 00:00:00	Thứ Sáu	7.1	6		0
-2026-12-26 00:00:00	Thứ Bảy	7.1	4		0	7.1
-2026-12-28 00:00:00	Thứ Hai	7.2	2	7.2	2		Quan sát: 7.2
-2026-12-29 00:00:00	Thứ Ba	7.2	2	7.2	2		Quan sát: 7.2
-2026-12-30 00:00:00	Thứ Tư	7.2	2	7.2	2		Quan sát: 7.2
-2026-12-31 00:00:00	Thứ Năm	7.2	2	7.2	2		Quan sát: 7.2
-2027-01-02 00:00:00	Thứ Bảy	7.2	2	7.2	2	7.2	Quan sát: 7.2
-TỔNG GIỜ TRONG LỊCH NGÀY			244		188		Đủ giờ theo estimate
+TỔNG GIỜ TRONG LỊCH NGÀY

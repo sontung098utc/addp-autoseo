@@ -12,27 +12,27 @@ Tổ chức nguồn kiến thức công ty để dùng lại	Nội dung bám đ�
 Tạo nội dung hữu ích để mở rộng hiện diện tìm kiếm	Kỳ vọng thêm truy cập organic và cơ hội tư vấn chất lượng	Theo dõi cohort bài, query/trang, CTA và lead organic nếu đo được	So sánh GSC cùng bộ lọc; chốt mục tiêu traffic/lead sau 28 ngày baseline; chưa có mức tăng % mặc định	Xem xu hướng8–12 tuần; đánh giá kinh doanh3–6 tháng sau dùng	Marketing + Quản lý
 B. KẾT QUẢ, HIỆU QUẢ VÀ CỬA SỔ ĐÁNH GIÁ
 Hiệu quả cần đo	Kết quả / cách đo	Sau khi dùng thật	Từ ngày dự kiến	Đến ngày dự kiến	Kết quả đo
-Hiệu quả thao tác	Đo độ đều và thời gian người/bài Đo: Thử giảm≥30% thời gian với cùng chất lượng; thành công đăng≥95%	14–28 ngày sau dùng thật	2026-12-12 00:00:00	2026-12-26 00:00:00	Chưa đo
-Cải thiện lỗi SEO đã sửa	Lỗi mức cao giảm trên phạm vi có owner sửa Đo: So audit cùng phạm vi, ghi lỗi mới/lỗi cũ, xác minh đã sửa	28–56 ngày sau dùng thật	2026-12-26 00:00:00	2027-01-23 00:00:00	Chưa đo
-Tín hiệu tìm kiếm	Đánh giá xu hướng index/impressions/clicks theo nhóm bài Đo: Cùng query/page/device/country và kỳ tương đương; theo cohort, có ghi mùa vụ	56–84 ngày sau dùng thật	2027-01-23 00:00:00	2027-02-20 00:00:00	Chưa đo
-Hiệu quả kinh doanh	Đánh giá giá trị giờ tiết kiệm và lead/đơn organic nếu đo được Đo: So với tổng chi phí và baseline; không quy toàn bộ doanh thu cho phần mềm	90–180 ngày sau dùng thật	2027-02-26 00:00:00	2027-05-27 00:00:00	Chưa đo
+Hiệu quả thao tác	Đo độ đều và thời gian người/bài Đo: Thử giảm≥30% thời gian với cùng chất lượng; thành công đăng≥95%	14–28 ngày sau dùng thật			Chưa đo
+Cải thiện lỗi SEO đã sửa	Lỗi mức cao giảm trên phạm vi có owner sửa Đo: So audit cùng phạm vi, ghi lỗi mới/lỗi cũ, xác minh đã sửa	28–56 ngày sau dùng thật			Chưa đo
+Tín hiệu tìm kiếm	Đánh giá xu hướng index/impressions/clicks theo nhóm bài Đo: Cùng query/page/device/country và kỳ tương đương; theo cohort, có ghi mùa vụ	56–84 ngày sau dùng thật			Chưa đo
+Hiệu quả kinh doanh	Đánh giá giá trị giờ tiết kiệm và lead/đơn organic nếu đo được Đo: So với tổng chi phí và baseline; không quy toàn bộ doanh thu cho phần mềm	90–180 ngày sau dùng thật			Chưa đo
 C. CÁCH ĐO TRƯỚC VÀ SAU
 1. Baseline	Thu 10–20 bài thủ công tương đương và 28 ngày GSC trước thay đổi nếu có quyền; ghi cả phút viết, sửa, upload, duyệt và chi phí. Chưa có dữ liệu thì để trống/Thiếu dữ liệu, không điền0 cho đẹp.
 2. Pilot và đối chiếu	20 bài pilot không tự chứng minh lợi ích lâu dài. So cùng độ khó/chất lượng, nguồn, đội thực hiện; báo cả bài phải sửa/lỗi. Rà sau 2 và4 tuần dùng thật.
 3. SEO và kinh doanh	Theo từng nhóm bài/URL, cùng bộ lọc và kỳ so sánh; ghi các thay đổi khác, mùa vụ và quảng cáo. Chỉ kết luận quan hệ quan sát được; không hứa top Google hay tăng doanh thu cố định.
 D. Ô NHẬP VÀ CÔNG THỨC GIÁ TRỊ GIỜ TIẾT KIỆM
 Ngày bắt đầu dùng thật		Chỉ điền khi Marketing xác nhận; còn trống thì cửa sổ đánh giá dùng mốc V1.1 dự kiến.
-Số bài đạt chuẩn / tháng	60	Kịch bản hiện tại, chưa phải sản lượng thực tế.
+Số bài đạt chuẩn / tháng		Kịch bản hiện tại, chưa phải sản lượng thực tế.
 Phút người / bài thủ công		Đo đủ viết, sửa, duyệt, upload; số liệu thật.
 Phút người / bài có AI		Tính cả review/sửa; không chỉ thời gianAI sinh.
 Chi phí quy đổi / giờ người		VND/giờ; quản lý cung cấp.
-Vận hành / tháng (VND)	454000	Giả định cũ, chưa gồm thuê bao code nếu còn duy trì; cập nhật đủ chi phí thực tế.
+Vận hành / tháng (VND)		Giả định cũ, chưa gồm thuê bao code nếu còn duy trì; cập nhật đủ chi phí thực tế.
 Chi phí xây dựng phân bổ / tháng		Nhập cả nhân công/chi phí xây dựng phân bổ;0 chỉ khi chủ động không phân bổ.
 Giờ tiết kiệm / tháng		Có thể âm nếuAI làm tăng thời gian; không ép về0.
 Giá trị giờ tiết kiệm (VND)		Là giá trị thời gian có thể tái phân bổ, chưa phải tiền mặt tiết kiệm.
 Chênh lệch sau chi phí phân bổ		Chỉ tính khi có đủ đầu vào; không dùng để cam kết lợi nhuận.
-Kết luận hiện tại	Chưa đủ dữ liệu	Chưa điền số đo thì chưa kết luận hiệu quả tài chính.
-Mốc lập cửa sổ đánh giá	2026-11-28 00:00:00	Dùng ngày thực tế khi có, nếu chưa có thì dùng ngàyV1.1 dự kiến.
+Kết luận hiện tại		Chưa điền số đo thì chưa kết luận hiệu quả tài chính.
+Mốc lập cửa sổ đánh giá		Dùng ngày thực tế khi có, nếu chưa có thì dùng ngàyV1.1 dự kiến.
 NGUỒN THAM KHẢO — MỞ NHÓM + KHI CẦN
 NguồnSEO	https://developers.google.com/search/docs/fundamentals/seo-starter-guide	Google nêu thay đổi có thể mất từ vài giờ đến nhiều tháng; nên chờ vài tuần để đánh giá, và không phải thay đổi nào cũng có tác động đáng kể.
 Nguồn chất lượng	https://developers.google.com/search/docs/essentials/spam-policies#scaled-content	Sản xuất hàng loạt nội dung ít giá trị để thao túng thứ hạng có thể vi phạm; số bài không thay thế chất lượng.

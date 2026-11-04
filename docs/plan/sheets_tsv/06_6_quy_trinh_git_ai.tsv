@@ -1,10 +1,10 @@
 QUY TRÌNH GITHUB, AI AGENT VÀ BÁO CÁO
 A. BỐN FILE QUY TẮC CẦN TẠO TRONG REPO
 STT	File đề xuất	Mục đích	Nội dung bắt buộc	Khi nào đọc / cập nhật	Prompt giao việc mẫu
-1.0	AGENTS.md	Quy tắc làm việc cho người và AI	Kiến trúc, allowlist file/tool, secret, scope, test, không bịa kết quả; dừng khi thiếu quyền/môi trường	Đầu mỗi phiên; đổi quy tắc phải có người review	Đọc AGENTS.md; chỉ thực hiện mã0.2 theo phạm vi; báo phần chưa kiểm chứng.
-2.0	TASKS.md	Điều phối task và người giữ việc	Mã việc khớp Sheet; owner/reviewer; dependency; nhánh/worktree; trạng thái; link PR	Nhân viên nhận việc đầu ngày; cập nhật cuối task	Kiểm tra mã1.2 đã có owner chưa; tạo task contract trước khi sửa file.
-3.0	GITHUB_WORKFLOW.md	Tránh sửa đè và kiểm soát merge	main/develop bảo vệ; nhánh task theo <loại>/<Mxx>/<mã>/<dev>/<slug>; worktree/runID riêng; PRnhỏ; reviewer khác tácgiả; release/hotfix đồngbộ lại develop.	Trước tạo nhánh/worktree, PR và merge	Tạofeat/m02/1-2/dev2/wordpress từdevelop; chỉ sửaallowlist củaIssue1.2; chạytest, push đúngnhánh và mởPRcóCI/SHA.
-4.0	reports/DAILY_REPORT_TEMPLATE.md	Chuẩn hóa báo cáo cuối phiên/ngày	Task/run/SHA/môi trường; kết quả thật; test đã/chưa chạy; giờ phát sinh; chi phí; blocker; reviewer	Cuối mỗi run và cuối ngày làm việc	Đối chiếu git diff/log và CI, lập báo cáo; thiếu bằng chứng ghi Chưa chạy, không tự xác nhận.
+1	AGENTS.md	Quy tắc làm việc cho người và AI	Kiến trúc, allowlist file/tool, secret, scope, test, không bịa kết quả; dừng khi thiếu quyền/môi trường	Đầu mỗi phiên; đổi quy tắc phải có người review	Đọc AGENTS.md; chỉ thực hiện mã0.2 theo phạm vi; báo phần chưa kiểm chứng.
+2	TASKS.md	Điều phối task và người giữ việc	Mã việc khớp Sheet; owner/reviewer; dependency; nhánh/worktree; trạng thái; link PR	Nhân viên nhận việc đầu ngày; cập nhật cuối task	Kiểm tra mã1.2 đã có owner chưa; tạo task contract trước khi sửa file.
+3	GITHUB_WORKFLOW.md	Tránh sửa đè và kiểm soát merge	main/develop bảo vệ; nhánh task theo <loại>/<Mxx>/<mã>/<dev>/<slug>; worktree/runID riêng; PRnhỏ; reviewer khác tácgiả; release/hotfix đồngbộ lại develop.	Trước tạo nhánh/worktree, PR và merge	Tạofeat/m02/1-2/dev2/wordpress từdevelop; chỉ sửaallowlist củaIssue1.2; chạytest, push đúngnhánh và mởPRcóCI/SHA.
+4	reports/DAILY_REPORT_TEMPLATE.md	Chuẩn hóa báo cáo cuối phiên/ngày	Task/run/SHA/môi trường; kết quả thật; test đã/chưa chạy; giờ phát sinh; chi phí; blocker; reviewer	Cuối mỗi run và cuối ngày làm việc	Đối chiếu git diff/log và CI, lập báo cáo; thiếu bằng chứng ghi Chưa chạy, không tự xác nhận.
 B. QUY TẮC GIAO VIỆC VÀ GHI SHEET
 Mục	Quy định
 Task contract	Mã việc; owner/reviewer; base commit; branch/worktree; runID; mục tiêu; file được/không được sửa; contract/fixture; test; quota/tool; điều kiện dừng.

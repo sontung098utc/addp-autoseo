@@ -9,8 +9,8 @@ Bảng này đồng bộ trực tiếp với Master Plan (Google Sheet). Mọi c
 
 | Mã việc | Chủ nhiệm | Reviewer | Giờ dự kiến | Phụ thuộc | Nhánh đề xuất | Trạng thái | Nội dung chính |
 | :---: | :---: | :---: | :---: | :---: | :--- | :---: | :--- |
-| **0.1** | Dev1 | Dev2 | 8h | - | `docs/m01/0-1/dev1/scope-contract` | **Đang làm** | Chốt phạm vi V1, quy trình duyệt, hợp đồng dữ liệu và các quy tắc. |
-| **0.2** | Dev1 | Dev2 | 24h | 0.1 | `chore/m01/0-2/dev1/infra-ci` | **Đang làm** | Dựng Laravel 11/12, Docker staging, MariaDB, Redis, HTTPS, CI workflow, backup. |
+| **0.1** | Dev1 | Dev2 | 8h | - | `docs/m01/0-1/dev1/scope-contract` | **Hoàn thành** | Chốt phạm vi V1, quy trình duyệt, hợp đồng dữ liệu và các quy tắc. Commit: `5f08e6e` |
+| **0.2** | Dev1 | Dev2 | 24h | 0.1 | `chore/m01/0-2/dev1/infra-ci` | **Đang làm (80%)** | Dựng Laravel 11/12, Docker staging, MariaDB, Redis, HTTPS, CI workflow, backup. |
 | **0.3** | Dev2 | Dev1 | 10h | 0.1 | `feat/m01/0-3/dev2/ai-poc` | Chưa bắt đầu | Thử nghiệm mô hình AI tiếng Việt, prompt schema JSON, đo token & chi phí. |
 | **0.4** | Dev1 | Dev2 | 22h | 0.2 | `feat/m01/0-4/dev1/auth-sites` | Chưa bắt đầu | Khung Filament + Laravel: Auth, Policies 3 vai trò, quản lý website, mã hóa credential. |
 | **0.5** | Dev2 | Dev1 | 10h | 0.1 | `feat/m01/0-5/dev2/filament` | Chưa bắt đầu | Filament panel tiếng Việt & giao diện quản lý website theo contracts/fixtures. |
