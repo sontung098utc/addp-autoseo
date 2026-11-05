@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Webapi:etc/webapi.xsd">
+    <!-- Tạo bài viết nháp -->
+    <route url="/V1/company-blog/posts" method="POST">
+        <service class="Company\BlogApi\Api\PostManagementInterface" method="saveDraft"/>
+        <resources>
+            <resource ref="Company_BlogApi::manage"/>
+        </resources>
+    </route>
+
+    <!-- Tra cứu bài viết theo publication_key để đối soát chống đăng trùng -->
+    <route url="/V1/company-blog/posts/by-key/:publicationKey" method="GET">
+        <service class="Company\BlogApi\Api\PostManagementInterface" method="getByPublicationKey"/>
+        <resources>
+            <resource ref="Company_BlogApi::manage"/>
+        </resources>
+    </route>
+
+    <!-- Xuất bản bài viết chính thức -->
+    <route url="/V1/company-blog/posts/:postId/publish" method="POST">
+        <service class="Company\BlogApi\Api\PostManagementInterface" method="publish"/>
+        <resources>
+            <resource ref="Company_BlogApi::manage"/>
+        </resources>
+    </route>
+
+    <!-- Tải media / hình ảnh bài viết -->
+    <route url="/V1/company-blog/media" method="POST">
+        <service class="Company\BlogApi\Api\MediaManagementInterface" method="upload"/>
+        <resources>
+            <resource ref="Company_BlogApi::manage"/>
+        </resources>
+    </route>
+</routes>

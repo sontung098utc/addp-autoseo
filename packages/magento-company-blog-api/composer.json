@@ -1,0 +1,19 @@
+{
+    "name": "company/module-blog-api",
+    "description": "Bridge REST API for Magento 2 Mageplaza Blog integration with AutoSEO",
+    "type": "magento2-module",
+    "version": "1.0.0",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.1",
+        "magento/framework": ">=103.0.0"
+    },
+    "autoload": {
+        "files": [
+            "registration.php"
+        ],
+        "psr-4": {
+            "Company\\BlogApi\\": ""
+        }
+    }
+}
