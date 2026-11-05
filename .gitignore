@@ -12,6 +12,10 @@ yarn-error.log
 *.pem
 *.cert
 
+# Database
+database/*.sqlite
+database/*.sqlite-journal
+
 # Cache & Storage
 /storage/*.key
 /storage/oauth-*.key
