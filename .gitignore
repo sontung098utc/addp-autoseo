@@ -35,6 +35,8 @@ database/*.sqlite-journal
 .docker-data/
 docker/mysql/data/
 
+.phpunit.result.cache
+
 # OS & IDE
 .DS_Store
 Thumbs.db

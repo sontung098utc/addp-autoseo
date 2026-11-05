@@ -103,6 +103,23 @@ class ArticleResource extends Resource
                     ->sortable(),
             ])
             ->actions([
+                Tables\Actions\Action::make('generate_ai')
+                    ->label('AI Viết bài')
+                    ->icon('heroicon-o-sparkles')
+                    ->color('primary')
+                    ->requiresConfirmation()
+                    ->modalHeading('Sinh bản thảo bài viết bằng AI')
+                    ->modalDescription('Hệ thống sẽ dựa trên từ khóa chính và cụm chủ đề để sinh dàn ý, bài viết chuẩn SEO và metadata.')
+                    ->modalSubmitActionLabel('Bắt đầu sinh')
+                    ->action(function (Article $record) {
+                        $service = new \App\Services\Content\ContentPipelineService();
+                        $version = $service->generateArticleVersion($record);
+                        \Filament\Notifications\Notification::make()
+                            ->title('Đã sinh xong bản thảo mới!')
+                            ->body("Bản thảo phiên bản #{$version->version} ({$version->title}) đã được tạo và chuyển sang chờ duyệt.")
+                            ->success()
+                            ->send();
+                    }),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
