@@ -2,9 +2,9 @@ BÁO CÁO TIẾN ĐỘ — DANH SÁCH 30 ĐẦU VIỆC NHỎ
 Cập nhật ngay trên từng việc. Khi xong: chọn Hoàn thành, điền ngày, ghi chú và bằng chứng. Nhân viên xác nhận sau kiểm tra. Giờ phát sinh ghi ở7.1_Nhat_ky_gio_cong; không nhập lặp giờ tại đây.
 Mã việc	Đầu việc nhỏ	Phụ trách	Hạn dự kiến	Trạng thái	Ngày hoàn thành	Ghi chú kết quả / vướng mắc	Bằng chứng / PR	Tiến độ đang làm
 0.1				Hoàn thành	2026-11-04	Đã hoàn thành 4 file quy chuẩn (AGENTS.md, TASKS.md, GITHUB_WORKFLOW.md, DAILY_REPORT_TEMPLATE.md) và toàn bộ 5 data schema contracts.	https://github.com/sontung098utc/addp-autoseo/commit/5f08e6e	1
-0.2				Đang làm		Đã hoàn thành khung Laravel 11, Docker compose (6 services), Dockerfile PHP 8.3 FPM, Nginx, CI GitHub Actions, script backup/restore.	https://github.com/sontung098utc/addp-autoseo/commit/5f08e6e	0.8
+0.2				Hoàn thành	2026-11-05	Dựng môi trường PHP 8.2, MariaDB 10.6, SQLite local demo, Docker compose 6 services, CI Actions.	https://github.com/sontung098utc/addp-autoseo/commit/33c4872	1
 0.3				Chưa bắt đầu				0
-0.4				Chưa bắt đầu				0
+0.4				Hoàn thành	2026-11-05	Hoàn thành Filament Admin Panel, phân quyền User, WebsiteResource, ArticleResource, PublicationResource và Seeder dữ liệu mẫu.	https://github.com/sontung098utc/addp-autoseo/commit/33c4872	1
 0.5				Chưa bắt đầu				0
 1.2				Chưa bắt đầu				0
 1.4				Chưa bắt đầu				0
