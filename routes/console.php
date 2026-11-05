@@ -14,3 +14,10 @@ Schedule::command('autoseo:publish-due-posts')
     ->timezone('Asia/Ho_Chi_Minh')
     ->withoutOverlapping()
     ->runInBackground();
+
+// Đối soát định kỳ các bài viết bị timeout mạng hoặc lỗi 502/504
+Schedule::command('autoseo:reconcile-publications')
+    ->everyFiveMinutes()
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->withoutOverlapping()
+    ->runInBackground();
