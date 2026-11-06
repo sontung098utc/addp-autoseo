@@ -6,6 +6,7 @@ RUN apk add --no-cache \
     curl \
     libpng-dev \
     libjpeg-turbo-dev \
+    libwebp-dev \
     freetype-dev \
     libzip-dev \
     icu-dev \
@@ -13,7 +14,7 @@ RUN apk add --no-cache \
     mariadb-client \
     linux-headers \
     $PHPIZE_DEPS \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install -j$(nproc) \
         pdo_mysql \
         mbstring \
