@@ -11,7 +11,7 @@ Bảng này đồng bộ trực tiếp với Master Plan (Google Sheet). Mọi c
 | :---: | :---: | :---: | :---: | :---: | :--- | :---: | :--- |
 | **0.1** | Dev1 | Dev2 | 8h | - | `docs/m01/0-1/dev1/scope-contract` | **Hoàn thành** | Chốt phạm vi V1, quy trình duyệt, hợp đồng dữ liệu và các quy tắc. Commit: `5f08e6e` |
 | **0.2** | Dev1 | Dev2 | 24h | 0.1 | `chore/m01/0-2/dev1/infra-ci` | **Hoàn thành** | Dựng Laravel 11/12, PHP 8.2, MariaDB 10.6, Docker staging, CI workflow, backup/restore. Commit: `33c4872` |
-| **0.3** | Dev2 | Dev1 | 10h | 0.1 | `feat/m01/0-3/dev2/ai-poc` | Chưa bắt đầu | Thử nghiệm mô hình AI tiếng Việt, prompt schema JSON, đo token & chi phí. |
+| **0.3** | Dev2 | Dev1 | 10h | 0.1 | `feat/m01/0-3/dev2/ai-poc` | **Hoàn thành** | PoC AI tiếng Việt, Prompt v1.0, AiPaddingFilter, TokenCostCalculator và báo cáo chi phí. Commit: `d8e4454` |
 | **0.4** | Dev1 | Dev2 | 22h | 0.2 | `feat/m01/0-4/dev1/auth-sites` | **Hoàn thành** | Khung Filament + Laravel: Auth, Policies 3 vai trò, quản lý website, mã hóa credential. Commit: `33c4872` |
 | **0.5** | Dev2 | Dev1 | 10h | 0.1 | `feat/m01/0-5/dev2/filament` | Chưa bắt đầu | Filament panel tiếng Việt & giao diện quản lý website theo contracts/fixtures. |
 | **1.2** | Dev2 | Dev1 | 16h | 0.4, 0.5 | `feat/m02/1-2/dev2/wordpress` | Chưa bắt đầu | WordPress Connector: REST API + App Password; bài, ảnh, taxonomy, SEO meta adapter. |
