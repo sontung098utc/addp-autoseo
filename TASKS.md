@@ -27,7 +27,7 @@ Bảng này đồng bộ trực tiếp với Master Plan (Google Sheet). Mọi c
 | :---: | :---: | :---: | :---: | :---: | :--- | :---: | :--- |
 | **1.4** | Dev1 | Dev2 | 24h | 0.4 | `feat/m02/1-4/dev1/magento-bridge` | **Hoàn thành** | Magento 2 Connector: Module `Company_BlogApi`, OAuth 1.0a, nháp, media, đối soát publication_key. Commit: `d5e5e4f` |
 | **3.2** | Dev1 | Dev2 | 12h | 3.1 | `feat/m05/3-2/dev1/queue-scheduler` | **Hoàn thành** | Redis Queue, Laravel Scheduler, timeout, retry/backoff, khóa theo site, đối soát needs_reconcile. Commit: `c833b7b` |
-| **3.3** | Dev1 | Dev2 | 8h | 3.1 | `feat/m03/3-3/dev1/media` | Chưa bắt đầu | Thư viện ảnh công ty: nén ảnh, alt text, ảnh đại diện, kiểm tra MIME. |
+| **3.3** | Dev1 | Dev2 | 8h | 3.1 | `feat/m03/3-3/dev1/media` | **Hoàn thành** | Thư viện ảnh công ty: MediaAsset, ImageOptimizer nén WebP, kiểm tra MIME magic bytes, UrlSafetyService chống SSRF, alt text chuẩn SEO và MediaAssetResource. Commit: `b222e68` |
 | **3.6** | Dev1 | Dev2 | 14h | 1.2, 1.4, 3.2, 3.3, 3.4, 3.5 | `feat/m05/3-6/dev1/autopublish` | Chưa bắt đầu | Worker tự đăng hằng ngày lên 2 CMS, idempotency key, nút dừng khẩn cấp. |
 
 ---
