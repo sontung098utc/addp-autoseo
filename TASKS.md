@@ -36,7 +36,7 @@ Bảng này đồng bộ trực tiếp với Master Plan (Google Sheet). Mọi c
 
 | Mã việc | Chủ nhiệm | Reviewer | Giờ dự kiến | Phụ thuộc | Nhánh đề xuất | Trạng thái | Nội dung chính |
 | :---: | :---: | :---: | :---: | :---: | :--- | :---: | :--- |
-| **1.1** | Dev1 | Dev2 | 12h | 0.4 | `feat/m04/1-1/dev1/crawler` | Chưa bắt đầu | Crawler thu thập website (sitemap, URL), audit on-page cơ bản, chống SSRF. |
+| **1.1** | Dev1 | Dev2 | 12h | 0.4 | `feat/m04/1-1/dev1/crawler` | **Hoàn thành** | Web Crawler & SEO Audit: SitemapCrawlerService, HtmlSeoExtractor, SeoAuditService chống SSRF và lệnh autoseo:audit-website. Commit: `251ada7` |
 | **1.3** | Dev2 | Dev1 | 8h | 1.1 | `feat/m04/1-3/dev2/audit-report` | Chưa bắt đầu | Báo cáo audit SEO tiếng Việt kèm khuyến nghị tối ưu từ AI. |
 | **2.1** | Dev2 | Dev1 | 8h | 0.3 | `feat/m04/2-1/dev2/keywords` | Chưa bắt đầu | Nhập từ khóa/CSV nội bộ, gom cụm AI (Topic Cluster & Search Intent). |
 | **2.2** | Dev2 | Dev1 | 10h | 2.1 | `feat/m04/2-2/dev2/content-plan` | Chưa bắt đầu | Lập kế hoạch nội dung, lịch biên tập, gán từ khóa, giao diện kéo thả. |
