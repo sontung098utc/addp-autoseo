@@ -88,7 +88,7 @@ class SeoAuditPageTest extends TestCase
         $c = Livewire::test(AuditPage::class)
             ->call('selectGroup', 'broken_link')->assertSet('groupType', 'broken_link');
         $this->assertCount(7, $c->viewData('evidenceRows'));
-        $this->assertStringContainsString('/tai-lieu/mau-don-hoc-bong.pdf', collect($c->viewData('evidenceRows'))->pluck('url')->implode(' '));
+        $this->assertStringContainsString('/tai-lieu/mau-don-hoc-bong.pdf', collect($c->viewData('evidenceRows'))->pluck('evidence')->implode(' '));
         $c->call('selectGroup', 'missing_title')->assertSee('Thiếu title');
         $c->call('selectGroup', 'khong_ton_tai')->assertSet('groupType', 'missing_title');
     }
