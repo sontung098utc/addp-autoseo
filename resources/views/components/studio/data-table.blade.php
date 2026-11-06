@@ -14,7 +14,7 @@
         'selectModel' => $selectModel,
         'selected' => array_values($selected),
     ];
-    $key = 'studio-dt-'.$id.'-'.substr(md5(json_encode($cfg['rows']).json_encode($cfg['columns']).json_encode($selectedId).json_encode($cfg['selected'])), 0, 8);
+    $key = 'studio-dt-'.$id.'-'.substr(md5(json_encode($cfg['rows']).json_encode($cfg['columns']).json_encode($selectedId)), 0, 8);
 @endphp
 <div class="ss-dt" wire:key="{{ $key }}" x-data="studioTable(@js($cfg))">
     <div class="ss-dt__bar">

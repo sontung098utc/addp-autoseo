@@ -41,6 +41,10 @@ document.addEventListener('alpine:init', () => {
       cfg.columns.filter((c) => c.filter).forEach((c) => { if (!(c.key in this.filters)) this.filters[c.key] = ''; });
       ['query', 'sortKey', 'sortDir', 'filters', 'pageSize'].forEach((p) => this.$watch(p, () => { this.page = 1; this.persist(); }, { deep: true }));
       this.$watch('visible', (v) => save('local', sk + '.cols', v), { deep: true });
+      // Máy chủ đổi/xóa lựa chọn (ví dụ sau khi "Thêm vào kế hoạch" xong) thì bảng theo kịp.
+      if (cfg.selectModel && this.$wire && this.$wire.$watch) {
+        this.$wire.$watch(cfg.selectModel, (v) => { const next = Array.isArray(v) ? [...v] : []; if (JSON.stringify(next) !== JSON.stringify(this.selected)) this.selected = next; });
+      }
     },
     persist() { save('session', 'studio.table.' + cfg.id + '.state', { query: this.query, sortKey: this.sortKey, sortDir: this.sortDir, filters: this.filters, pageSize: this.pageSize }); },
     get shownCols() { return cfg.columns.filter((c) => this.visible[c.key] !== false); },
@@ -94,7 +98,7 @@ document.addEventListener('alpine:init', () => {
     toggle(id) { this.selected = this.selected.includes(id) ? this.selected.filter((x) => x !== id) : [...this.selected, id]; this.syncSel(); },
     get allChecked() { return this.filtered.length > 0 && this.filtered.every((r) => this.selected.includes(r.id)); },
     toggleAll(on) { const ids = this.filtered.map((r) => r.id); this.selected = on ? [...new Set([...this.selected, ...ids])] : this.selected.filter((x) => !ids.includes(x)); this.syncSel(); },
-    syncSel() { if (cfg.selectModel && this.$wire) this.$wire.$set(cfg.selectModel, [...this.selected], false); },
+    syncSel() { if (cfg.selectModel && this.$wire) this.$wire.$set(cfg.selectModel, [...this.selected]); },
     toggleSort(key) { if (this.sortKey !== key) { this.sortKey = key; this.sortDir = 'asc'; } else if (this.sortDir === 'asc') this.sortDir = 'desc'; else { this.sortKey = null; this.sortDir = 'asc'; } },
     sortIcon(key) { return this.sortKey === key ? (this.sortDir === 'asc' ? '▲' : '▼') : ''; },
     ariaSort(key) { return this.sortKey === key ? (this.sortDir === 'asc' ? 'ascending' : 'descending') : 'none'; },
