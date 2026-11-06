@@ -2,11 +2,15 @@
 
 namespace App\Filament\Support\Review;
 
+use App\Models\ArticleVersion;
 use App\Models\User;
 use App\Models\Website;
 use Filament\Forms;
 use Filament\Notifications\Notification;
+use App\Services\Content\Quality\ContentQualityChecker;
+use App\Services\Content\Quality\QualityReport;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\HtmlString;
 use InvalidArgumentException;
 
 /** Phần dùng chung giữa action ở bảng bài và trang xem phiên bản. */
@@ -42,15 +46,43 @@ class ReviewActions
         Notification::make()->title($successTitle)->success()->send();
     }
 
-    /** @return array<int, Forms\Components\Component> */
-    public static function approveForm(bool $selfApproval): array
+    /** Kiểm chất lượng tại thời điểm gọi (chưa lưu lịch sử). */
+    public static function qualityFor(ArticleVersion $version): QualityReport
     {
-        return [
-            Forms\Components\Textarea::make('note')
-                ->label($selfApproval ? 'Ghi chú tự duyệt (bắt buộc)' : 'Ghi chú (không bắt buộc)')
-                ->helperText($selfApproval ? 'Bạn đang duyệt bài do chính mình tạo; hệ thống ghi log tự duyệt.' : null)
-                ->required($selfApproval),
-        ];
+        return (new ContentQualityChecker)->check($version, $version->article);
+    }
+
+    /** Lời giải thích cho nút Duyệt khi còn lỗi P0; null nếu không bị chặn. */
+    public static function blockedHint(?QualityReport $quality): ?string
+    {
+        return $quality?->hasBlocking()
+            ? 'Còn lỗi chặn duyệt (' . implode(', ', $quality->blockingCodes()) . '). Duyệt cần nhập lý do ngoại lệ, việc này được ghi log.'
+            : null;
+    }
+
+    /** @return array<int, Forms\Components\Component> */
+    public static function approveForm(bool $selfApproval, ?QualityReport $quality = null): array
+    {
+        $fields = [];
+        if ($quality?->hasBlocking()) {
+            $items = '';
+            foreach ($quality->blocking() as $r) {
+                $items .= '<li><strong>' . e($r->code) . '</strong> — ' . e($r->message) . ($r->measured ? ' (' . e($r->measured) . ', yêu cầu ' . e((string) $r->threshold) . ')' : '') . '</li>';
+            }
+            $fields[] = Forms\Components\Placeholder::make('quality_blockers')
+                ->label('Bài còn lỗi chặn duyệt (P0)')
+                ->content(new HtmlString('<ul style="list-style:disc;padding-left:1.25rem">' . $items . '</ul>'));
+            $fields[] = Forms\Components\Textarea::make('override_reason')
+                ->label('Lý do duyệt ngoại lệ (bắt buộc)')
+                ->helperText('Chỉ người có quyền duyệt được bỏ qua lỗi P0. Lý do và mã lỗi được ghi vào log audit.')
+                ->required()->minLength(ReviewWorkflow::MIN_OVERRIDE_REASON);
+        }
+        $fields[] = Forms\Components\Textarea::make('note')
+            ->label($selfApproval ? 'Ghi chú tự duyệt (bắt buộc)' : 'Ghi chú (không bắt buộc)')
+            ->helperText($selfApproval ? 'Bạn đang duyệt bài do chính mình tạo; hệ thống ghi log tự duyệt.' : null)
+            ->required($selfApproval);
+
+        return $fields;
     }
 
     /** @return array<int, Forms\Components\Component> */

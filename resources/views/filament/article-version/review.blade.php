@@ -40,6 +40,9 @@
         $record->review_status === 'rejected' => 'Bản này cần sửa. Chỉnh bản thảo rồi gửi duyệt lại.',
         default => 'Chưa có bước tiếp theo cho trạng thái này.',
     };
+    // Kiểm chất lượng tính tại thời điểm xem, chưa lưu lịch sử (task 3.5).
+    $quality = \App\Filament\Support\Review\ReviewActions::qualityFor($record);
+    $qCounts = $quality->counts();
     $dash = fn ($v) => filled($v) ? $v : '—';
 @endphp
 <div class="ss-review">
@@ -52,14 +55,58 @@
         </section>
 
         <section class="ss-review-card" aria-labelledby="ss-review-quality">
+            <style>
+                .ss-qual-counts{display:flex;gap:.5rem;flex-wrap:wrap;margin:.25rem 0 .75rem;padding:0;list-style:none}
+                .ss-qual-count{border:1px solid currentColor;border-radius:999px;padding:.1rem .6rem;font-size:.8rem;font-weight:600}
+                .ss-qual-count--P0{color:#b91c1c}.ss-qual-count--P1{color:#b45309}.ss-qual-count--P2{color:#475569}
+                .ss-qual-list{list-style:none;margin:0;padding:0;display:grid;gap:.6rem}
+                .ss-qual-item{border-left:3px solid currentColor;padding:.1rem 0 .1rem .6rem}
+                .ss-qual-item--P0{color:#b91c1c}.ss-qual-item--P1{color:#b45309}.ss-qual-item--P2{color:#475569}
+                .ss-qual-item > *{color:var(--ss-text,inherit)}
+                .ss-qual-head{font-weight:600}
+                .ss-qual-sev{font-size:.75rem;font-weight:700;margin-right:.35rem}
+                .ss-qual-measure{font-size:.85rem;opacity:.85}
+                .ss-qual-excerpt{display:block;margin-top:.15rem;font-size:.8rem;font-family:ui-monospace,monospace;overflow-wrap:anywhere;opacity:.85}
+                .ss-qual-ok{margin-top:.6rem;font-size:.85rem}
+            </style>
             <h2 class="ss-review-card__title" id="ss-review-quality">Kiểm chất lượng</h2>
-            <p>Chưa có kiểm tra chất lượng tự động (task 3.5).</p>
-            <p class="ss-review-muted">Dưới đây chỉ là kiểm tra có/không trên dữ liệu thật, không phải điểm chất lượng.</p>
-            <ul class="ss-review-list">
-                <li>Meta description: {{ filled($record->meta_description) ? 'đã có' : 'chưa có' }}</li>
-                <li>Từ khóa chính của bản: {{ filled($record->focus_keyword) ? 'đã có' : 'chưa có' }}</li>
-                <li>Ảnh đại diện: {{ $asset ? (filled($featuredAlt) ? 'có, đã có alt' : 'có, chưa có alt') : 'chưa có ảnh' }}</li>
+            @if ($quality->hasBlocking())
+                <p class="ss-qual-blocked"><strong>Còn {{ $qCounts['P0'] }} lỗi P0 — chặn duyệt.</strong> Sửa bài hoặc duyệt ngoại lệ với lý do (được ghi log).</p>
+            @endif
+            <ul class="ss-qual-counts" aria-label="Số mục chưa đạt">
+                <li class="ss-qual-count ss-qual-count--P0">P0 chưa đạt: {{ $qCounts['P0'] }}</li>
+                <li class="ss-qual-count ss-qual-count--P1">P1 chưa đạt: {{ $qCounts['P1'] }}</li>
+                <li class="ss-qual-count ss-qual-count--P2">P2 chưa đạt: {{ $qCounts['P2'] }}</li>
             </ul>
+            @if ($quality->failed())
+                <ul class="ss-qual-list">
+                    @foreach ($quality->failed() as $r)
+                        <li class="ss-qual-item ss-qual-item--{{ $r->severity }}">
+                            <span class="ss-qual-head"><span class="ss-qual-sev">{{ $r->severity }} · {{ $r->code }}</span>{{ $r->label }}</span>
+                            <div>{{ $r->message }}</div>
+                            @if ($r->measured || $r->threshold)
+                                <div class="ss-qual-measure">Đo được: {{ $dash($r->measured) }} · Ngưỡng: {{ $dash($r->threshold) }}</div>
+                            @endif
+                            @if ($r->excerpt)
+                                <code class="ss-qual-excerpt" title="Vị trí lỗi">{{ $r->excerpt }}</code>
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+            @else
+                <p>Không có mục nào chưa đạt.</p>
+            @endif
+            @if ($quality->passed())
+                <details class="ss-qual-ok">
+                    <summary>{{ count($quality->passed()) }} mục đã đạt</summary>
+                    <ul class="ss-review-list">
+                        @foreach ($quality->passed() as $r)
+                            <li>{{ $r->code }} · {{ $r->label }}: {{ $r->message }}</li>
+                        @endforeach
+                    </ul>
+                </details>
+            @endif
+            <p class="ss-review-muted">Tính tại thời điểm xem, chưa lưu lịch sử. Đây là kiểm tra theo luật trên nội dung thật, không phải điểm chất lượng; ngưỡng chưa hiệu chỉnh trên dữ liệu thật.</p>
         </section>
 
         <section class="ss-review-card" aria-labelledby="ss-review-seo">
