@@ -16,7 +16,7 @@ class ViewArticleVersion extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('approve')->label('Duyệt')->icon('heroicon-o-check')->color('success')
+            Actions\Action::make('approve')->label('Duyệt')->icon('heroicon-o-check')->color('primary')
                 ->visible(fn () => $this->record->review_status === 'needs_review')
                 ->authorize(fn () => ReviewActions::canApprove())
                 ->form(fn () => ReviewActions::approveForm((int) $this->record->article?->created_by === (int) ReviewActions::user()?->id))
@@ -25,7 +25,7 @@ class ViewArticleVersion extends ViewRecord
                     ReviewActions::run(fn () => (new ReviewWorkflow)->approve(ReviewActions::user(), $this->record, $data['note'] ?? null), 'Đã duyệt nội dung');
                     $this->record->refresh();
                 }),
-            Actions\Action::make('reject')->label('Từ chối')->icon('heroicon-o-x-mark')->color('danger')
+            Actions\Action::make('reject')->label('Từ chối')->icon('heroicon-o-x-mark')->color('danger')->outlined()
                 ->visible(fn () => $this->record->review_status === 'needs_review')
                 ->authorize(fn () => ReviewActions::canApprove())
                 ->form(ReviewActions::rejectForm())
@@ -34,7 +34,7 @@ class ViewArticleVersion extends ViewRecord
                     ReviewActions::run(fn () => (new ReviewWorkflow)->reject(ReviewActions::user(), $this->record, $data['reason'] ?? null), 'Đã từ chối bản thảo');
                     $this->record->refresh();
                 }),
-            Actions\Action::make('schedule')->label('Xếp lịch')->icon('heroicon-o-clock')
+            Actions\Action::make('schedule')->label('Xếp lịch')->icon('heroicon-o-clock')->color('primary')
                 ->visible(fn () => $this->record->review_status === 'approved' && $this->record->article?->workflow_status === 'approved')
                 ->authorize(fn () => ReviewActions::canApprove())
                 ->form(ReviewActions::scheduleForm())
