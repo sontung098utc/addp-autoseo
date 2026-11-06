@@ -33,8 +33,8 @@ class LockSensitiveFieldsTest extends TestCase
     private function website(): Website
     {
         return Website::create([
-            'name' => 'Site thử', 'cms_type' => 'wordpress', 'base_url' => 'https://example.test',
-            'store_scope' => 'default', 'status' => 'active',
+            'name' => 'Site thử', 'cms_type' => 'wordpress', 'base_url' => 'https://8.8.8.8',
+            'store_scope' => 'default',
             'encrypted_credentials' => ['application_password' => self::SECRET],
         ]);
     }
@@ -98,7 +98,7 @@ class LockSensitiveFieldsTest extends TestCase
         $this->assertArrayNotHasKey('edit', PublicationResource::getPages());
         $this->assertArrayNotHasKey('create', PublicationResource::getPages());
 
-        Livewire::test(PublicationPages\ListPublications::class)->assertSee('key-1');
+        Livewire::test(PublicationPages\ListPublications::class)->assertCanSeeTableRecords([$p]); // cột khóa xuất bản ẩn mặc định, bật được trong 'Cột hiển thị'
         $this->get(PublicationResource::getUrl('view', ['record' => $p]))->assertOk();
         $this->assertSame('key-1', $p->fresh()->publication_key);
     }
@@ -128,8 +128,8 @@ class LockSensitiveFieldsTest extends TestCase
 
         Livewire::test(WebsitePages\CreateWebsite::class)
             ->fillForm([
-                'name' => 'Mới', 'cms_type' => 'wordpress', 'base_url' => 'https://new.test',
-                'store_scope' => 'default', 'status' => 'active',
+                'name' => 'Mới', 'cms_type' => 'wordpress', 'base_url' => 'https://8.8.4.4',
+                'store_scope' => 'default',
                 'credentials_input' => ['username' => 'bot', 'application_password' => self::SECRET],
             ])
             ->call('create')

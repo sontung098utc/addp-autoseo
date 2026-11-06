@@ -14,6 +14,9 @@ class CreateArticle extends CreateRecord
     {
         unset($data['workflow_status']);
 
+        // Ghi người tạo: luật "tự duyệt phải có ghi chú + log" dựa vào created_by, nếu để trống sẽ không bao giờ kích hoạt.
+        $data['created_by'] = \Illuminate\Support\Facades\Auth::id();
+
         return $data;
     }
 }
