@@ -44,8 +44,7 @@ class QualityReviewScreenTest extends TestCase
         Livewire::test(ViewArticleVersion::class, ['record' => $v->id])
             ->assertSee('P0 chưa đạt: 3')->assertSee('Còn 3 lỗi P0')
             ->assertSee('LEN01')->assertSee('Đo được: 2 từ · Ngưỡng: ≥ 800 từ')
-            ->assertSee('HEAD01')->assertSee('KW01')
-            ->assertSee('Tính tại thời điểm xem, chưa lưu lịch sử');
+            ->assertSee('HEAD01')->assertSee('KW01');
     }
 
     public function test_block_for_clean_article_has_zero_failures(): void

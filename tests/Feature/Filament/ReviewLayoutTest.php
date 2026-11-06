@@ -51,7 +51,7 @@ class ReviewLayoutTest extends TestCase
         Livewire::test(ViewArticleVersion::class, ['record' => $v->id])
             ->assertSee('Quyết định')->assertSee('Kiểm chất lượng')->assertSee('Thẻ SEO')
             ->assertSee('AI đã tạo')->assertSee('AI đề xuất')->assertSee('gemini')->assertSee('Duyệt & lịch sử')
-            ->assertSee('Bước tiếp theo')->assertSee('audit_logs')->assertSee('Từ khóa chính: hoc bong')
+            ->assertSee('Từ khóa chính: hoc bong')
             ->assertSee('Website đích: S')->assertSee('Phiên bản v1')
             ->assertDontSee('SECRET-PW-123');
     }
@@ -71,7 +71,6 @@ class ReviewLayoutTest extends TestCase
         $v = $this->version($this->article(), 1, 'needs_review');
         Livewire::test(ViewArticleVersion::class, ['record' => $v->id])
             ->assertDontSee('Chưa có kiểm tra chất lượng tự động')
-            ->assertSee('Tính tại thời điểm xem, chưa lưu lịch sử')
             ->assertSee('P0 chưa đạt: 3')  // LEN01 (1 từ) + HEAD01 (không heading) + KW01 (từ khóa "hoc bong" vắng trong bài)
             ->assertSee('LEN01')->assertSee('Đo được: 1 từ');
     }

@@ -50,8 +50,6 @@
         <section class="ss-review-card" aria-labelledby="ss-review-decide">
             <h2 class="ss-review-card__title" id="ss-review-decide">Quyết định</h2>
             <p class="ss-review-row"><span class="ss-review-badge ss-review-badge--{{ $statusColor }}">{{ $statusLabel }}</span></p>
-            <p class="ss-review-next"><strong>Bước tiếp theo:</strong> {{ $next }}</p>
-            <p class="ss-review-muted">Duyệt và Xếp lịch là hai bước riêng; duyệt xong bài vẫn chưa được đăng.</p>
         </section>
 
         <section class="ss-review-card" aria-labelledby="ss-review-quality">
@@ -106,7 +104,6 @@
                     </ul>
                 </details>
             @endif
-            <p class="ss-review-muted">Tính tại thời điểm xem, chưa lưu lịch sử. Đây là kiểm tra theo luật trên nội dung thật, không phải điểm chất lượng; ngưỡng chưa hiệu chỉnh trên dữ liệu thật.</p>
         </section>
 
         <section class="ss-review-card" aria-labelledby="ss-review-seo">
@@ -144,7 +141,6 @@
             </dl>
             <h3 class="ss-review-sub">Các phiên bản của bài</h3>
             @include('filament.article-version.history')
-            <p class="ss-review-muted">Nhật ký chi tiết sẽ có khi Dev1 thêm bảng audit_logs.</p>
         </section>
     </div>
 

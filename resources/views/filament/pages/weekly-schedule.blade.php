@@ -36,7 +36,6 @@
         <x-filament::button color="gray" wire:click="currentWeek">Tuần này</x-filament::button>
         <x-filament::button color="gray" wire:click="nextWeek" icon="heroicon-o-chevron-right" icon-position="after">Tuần sau</x-filament::button>
         <strong>{{ $rangeLabel }}</strong>
-        <span class="ss-sched-muted">Giờ Việt Nam (UTC+7). Kéo thẻ 'Đã xếp lịch' sang ngày khác để đổi ngày (giữ nguyên giờ). Không đổi được lượt đang đăng/đã đăng/lỗi/chờ đối soát hoặc sắp đến giờ trong 10 phút. Có thể dùng nút "Đổi lịch" trên thẻ thay cho kéo thả.</span>
     </div>
 
     <div class="ss-sched-grid" x-data="{ over: null, dragId: null }">
