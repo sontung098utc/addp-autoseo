@@ -10,6 +10,7 @@ use App\Filament\Support\Demo\DemoMode;
 use App\Filament\Support\Keywords\KeywordService;
 use App\Filament\Support\Planning\PlannedArticleCreator;
 use App\Filament\Support\Schedule\VnTime;
+use App\Filament\Support\StatusPresenter;
 use App\Models\Article;
 use App\Models\Website;
 use Filament\Actions\Action;
@@ -39,8 +40,6 @@ class ContentPlanPage extends Page
     public ?int $websiteId = null;
 
     public ?string $clusterName = null;
-
-    public string $tab = 'posts';
 
     public int $weekOffset = 0;
 
@@ -75,11 +74,6 @@ class ContentPlanPage extends Page
         $this->lastResults = [];
     }
 
-    public function setTab(string $tab): void
-    {
-        $this->tab = in_array($tab, ['posts', 'kw', 'warn'], true) ? $tab : 'posts';
-    }
-
     public function previousWeek(): void
     {
         $this->weekOffset--;
@@ -93,6 +87,21 @@ class ContentPlanPage extends Page
     public function currentWeek(): void
     {
         $this->weekOffset = 0;
+    }
+
+    /** Đổi ngày từ bảng "Chưa có ngày": mở hộp thoại đổi ngày của đúng bài. */
+    public function rescheduleById(int $id): void
+    {
+        $this->guard();
+        $this->mountAction('reschedule', ['article' => $id]);
+    }
+
+    private const TONES = ['success' => 'ok', 'warning' => 'warn', 'danger' => 'danger', 'info' => 'info', 'gray' => 'muted'];
+
+    /** @return array{text:string,tone:string} */
+    public static function statusBadge(string $status): array
+    {
+        return ['text' => StatusPresenter::label($status), 'tone' => self::TONES[StatusPresenter::color($status)] ?? 'muted'];
     }
 
     private function site(): ?Website
@@ -143,7 +152,6 @@ class ContentPlanPage extends Page
             ->label('Tạo bài từ cụm')
             ->color('primary')
             ->modalHeading('Tạo bài từ cụm')
-            ->modalDescription('Chọn các từ khóa chưa có bài. Bài được tạo ở trạng thái "Đã lên kế hoạch", chưa viết nội dung, chưa tốn token. Mỗi từ khóa chính chỉ một bài trên mỗi website.')
             ->disabled(fn (): bool => $this->freeOptions() === [])
             ->tooltip(fn (): ?string => $this->freeOptions() === [] ? 'Cụm đã có bài cho mọi từ khóa (hoặc chưa chọn cụm).' : null)
             ->form([
@@ -289,12 +297,50 @@ class ContentPlanPage extends Page
         }
         $undated = array_values(array_filter($articles, fn ($a) => $a['at'] === null && in_array($a['status'], ['planned', 'drafting', 'needs_review', 'rejected', 'approved'], true)));
 
+        $intentLabel = \App\Filament\Support\Keywords\KeywordIntent::LABELS;
+        $clusterRows = array_map(function ($r) use ($intentLabel) {
+            $pct = $r['cov']['percent'];
+
+            return ['id' => $r['c']['name'], 'name' => $r['c']['name'], 'keywords' => count($r['c']['keywords']), 'posts' => $r['posts'],
+                'percent' => $pct, 'level' => $pct >= 100 ? ['text' => 'Đủ', 'tone' => 'ok'] : ($pct < 34 ? ['text' => 'Thấp', 'tone' => 'danger'] : ['text' => 'Trung bình', 'tone' => 'warn']),
+                'conflicts' => $r['conflicts'], 'intent' => $intentLabel[$r['c']['intent']] ?? $r['c']['intent'],
+                '_tone' => $r['conflicts'] ? 'danger' : null];
+        }, $rows);
+        $undatedRows = array_map(fn ($a) => ['id' => $a['id'], 'title' => $a['title'], 'keyword' => $a['keyword'], 'status' => self::statusBadge($a['status'])], $undated);
+
         return [
+            'clusterColumns' => $this->clusterColumns(), 'clusterRows' => $clusterRows,
+            'undatedColumns' => $this->undatedColumns(), 'undatedRows' => $undatedRows,
             'demo' => $demo, 'demoOn' => DemoMode::enabled(), 'sites' => $sites, 'site' => $site, 'rows' => $rows, 'detail' => $detail,
             'allConflicts' => $allConflicts, 'byId' => $byId, 'days' => $days, 'weekCount' => $weekCount, 'undated' => $undated,
             'rangeLabel' => $start->format('d/m').' – '.$start->addDays(6)->format('d/m/Y'),
             'limit' => PlanRules::DAILY_LIMIT, 'total' => count($articles),
             'norm' => fn (string $k) => PlannedArticleCreator::normalize($k),
+        ];
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function clusterColumns(): array
+    {
+        return [
+            ['key' => 'name', 'label' => 'Cụm', 'type' => 'text', 'sortable' => true],
+            ['key' => 'keywords', 'label' => 'Từ khóa', 'type' => 'number', 'sortable' => true],
+            ['key' => 'posts', 'label' => 'Bài đã có', 'type' => 'number', 'sortable' => true],
+            ['key' => 'percent', 'label' => 'Độ phủ', 'type' => 'number', 'suffix' => '%', 'sortable' => true],
+            ['key' => 'level', 'label' => 'Mức phủ', 'type' => 'badge', 'filter' => true, 'sortable' => true, 'tones' => ['Đủ' => 'ok', 'Trung bình' => 'warn', 'Thấp' => 'danger']],
+            ['key' => 'conflicts', 'label' => 'Trùng từ khóa', 'type' => 'number', 'sortable' => true],
+            ['key' => 'intent', 'label' => 'Ý định', 'type' => 'badge', 'filter' => true, 'visible' => false, 'tones' => ['Thông tin' => 'info', 'Thương mại' => 'accent', 'Giao dịch' => 'warn', 'Điều hướng' => 'muted']],
+        ];
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function undatedColumns(): array
+    {
+        return [
+            ['key' => 'title', 'label' => 'Bài', 'type' => 'text', 'sortable' => true],
+            ['key' => 'keyword', 'label' => 'Từ khóa chính', 'type' => 'text', 'sortable' => true],
+            ['key' => 'status', 'label' => 'Trạng thái', 'type' => 'badge', 'filter' => true, 'sortable' => true],
+            ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Đổi ngày', 'method' => 'rescheduleById']]],
         ];
     }
 }

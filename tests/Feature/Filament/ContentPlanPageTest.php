@@ -66,7 +66,10 @@ class ContentPlanPageTest extends TestCase
         $this->get('/admin/ke-hoach-noi-dung')->assertForbidden();
         auth()->logout();
         $this->assertFalse(ContentPlanPage::canAccess());
-        $this->actingAs($this->writer)->get('/admin/ke-hoach-noi-dung')->assertOk()->assertSee('Luật nghiệp vụ của màn này');
+        $r = $this->actingAs($this->writer)->get('/admin/ke-hoach-noi-dung')->assertOk()->assertDontSee('Dữ liệu minh họa');
+        foreach (['Lịch tuần', 'Cụm chủ đề', 'Chưa có ngày', 'Cảnh báo', 'Quy tắc'] as $tab) {
+            $r->assertSee($tab);
+        }
     }
 
     public function test_tao_bai_tu_cum_tao_dung_bai_that_va_chan_trung(): void
@@ -88,14 +91,18 @@ class ContentPlanPageTest extends TestCase
     {
         $this->article('học bổng a');
         $this->article('HỌC BỔNG  B', 'published');
-        $this->page()->assertSee('2 / 4 từ khóa có bài')->assertSee('Phủ 50%');
+        $this->page()->assertSee('2 / 4 từ khóa có bài');
+        $row = $this->page()->viewData('clusterRows')[0];
+        $this->assertSame(50, $row['percent']);
+        $this->assertSame('warn', $row['level']['tone']);
     }
 
     public function test_canh_bao_an_thit_tu_khoa(): void
     {
         $this->article('học bổng a');
         $this->article('Học bổng A', 'drafting');
-        $this->page()->assertSee('ăn thịt từ khóa')->assertSee('1 từ khóa bị trùng bài');
+        $this->page()->assertSee('Ăn thịt từ khóa')->assertSee('1 từ khóa bị trùng bài');
+        $this->assertSame(1, $this->page()->viewData('clusterRows')[0]['conflicts']);
     }
 
     public function test_gioi_han_3_bai_moi_ngay_khi_tao(): void
@@ -186,11 +193,21 @@ class ContentPlanPageTest extends TestCase
 
     public function test_trang_thai_rong_va_production(): void
     {
-        Livewire::actingAs($this->writer)->test(ContentPlanPage::class)->assertSee('Dữ liệu minh họa');
+        Livewire::actingAs($this->writer)->test(ContentPlanPage::class)->assertDontSee('Dữ liệu minh họa')->assertSee('Cụm chủ đề');
         KeywordService::make()->repo()->saveClusters([]);
         Livewire::actingAs($this->writer)->test(ContentPlanPage::class)->assertSee('Chưa có cụm chủ đề');
         $this->app['env'] = 'production';
         Cache::flush();
         Livewire::actingAs($this->writer)->test(ContentPlanPage::class)->assertSee('Chưa có cụm chủ đề')->assertDontSee('Dữ liệu minh họa')->assertDontSee('học bổng du học');
+    }
+
+    public function test_bang_chua_co_ngay_va_nut_doi_ngay_mo_hop_thoai(): void
+    {
+        $a = $this->article('x-chua-ngay');
+        $t = $this->page();
+        $rows = $t->viewData('undatedRows');
+        $this->assertSame($a->id, $rows[0]['id']);
+        $this->assertSame('rescheduleById', collect($t->viewData('undatedColumns'))->firstWhere('type', 'actions')['actions'][0]['method']);
+        $t->call('rescheduleById', $a->id)->assertActionMounted('reschedule');
     }
 }
