@@ -3,9 +3,48 @@
 namespace App\Filament\Resources\ArticleVersionResource\Pages;
 
 use App\Filament\Resources\ArticleVersionResource;
+use App\Filament\Support\Review\ReviewActions;
+use App\Filament\Support\Review\ReviewWorkflow;
+use App\Models\Website;
+use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewArticleVersion extends ViewRecord
 {
     protected static string $resource = ArticleVersionResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Actions\Action::make('approve')->label('Duyệt')->icon('heroicon-o-check')->color('success')
+                ->visible(fn () => $this->record->review_status === 'needs_review')
+                ->authorize(fn () => ReviewActions::canApprove())
+                ->form(fn () => ReviewActions::approveForm((int) $this->record->article?->created_by === (int) ReviewActions::user()?->id))
+                ->action(function (array $data) {
+                    abort_unless(ReviewActions::canApprove(), 403);
+                    ReviewActions::run(fn () => (new ReviewWorkflow)->approve(ReviewActions::user(), $this->record, $data['note'] ?? null), 'Đã duyệt nội dung');
+                    $this->record->refresh();
+                }),
+            Actions\Action::make('reject')->label('Từ chối')->icon('heroicon-o-x-mark')->color('danger')
+                ->visible(fn () => $this->record->review_status === 'needs_review')
+                ->authorize(fn () => ReviewActions::canApprove())
+                ->form(ReviewActions::rejectForm())
+                ->action(function (array $data) {
+                    abort_unless(ReviewActions::canApprove(), 403);
+                    ReviewActions::run(fn () => (new ReviewWorkflow)->reject(ReviewActions::user(), $this->record, $data['reason'] ?? null), 'Đã từ chối bản thảo');
+                    $this->record->refresh();
+                }),
+            Actions\Action::make('schedule')->label('Xếp lịch')->icon('heroicon-o-clock')
+                ->visible(fn () => $this->record->review_status === 'approved' && $this->record->article?->workflow_status === 'approved')
+                ->authorize(fn () => ReviewActions::canApprove())
+                ->form(ReviewActions::scheduleForm())
+                ->action(function (array $data) {
+                    abort_unless(ReviewActions::canApprove(), 403);
+                    ReviewActions::run(function () use ($data) {
+                        (new ReviewWorkflow)->schedule(ReviewActions::user(), $this->record, ReviewActions::parseVn($data['scheduled_at_vn']), Website::findOrFail($data['website_id']));
+                    }, 'Đã xếp lịch xuất bản');
+                    $this->record->refresh();
+                }),
+        ];
+    }
 }

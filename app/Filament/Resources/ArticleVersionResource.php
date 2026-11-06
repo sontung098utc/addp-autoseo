@@ -24,19 +24,9 @@ class ArticleVersionResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Phiên bản bài';
 
-    // TODO: chuyển sang App\Filament\Support\StatusPresenter khi PR filament-shell merge
-    private static function reviewMap(): array
-    {
-        return [
-            'needs_review' => ['Chờ duyệt', 'warning'],
-            'approved' => ['Đã duyệt', 'success'],
-            'rejected' => ['Cần sửa', 'danger'],
-        ];
-    }
-
     public static function reviewLabel(?string $status): string
     {
-        return self::reviewMap()[$status][0] ?? (string) $status;
+        return \App\Filament\Support\StatusPresenter::label($status, 'article');
     }
 
     public static function formatVnd($value): string
@@ -86,7 +76,7 @@ class ArticleVersionResource extends Resource
                 Tables\Columns\TextColumn::make('title')->label('Tiêu đề')->limit(60)->searchable(),
                 Tables\Columns\TextColumn::make('review_status')->label('Trạng thái duyệt')->badge()
                     ->formatStateUsing(fn ($state) => self::reviewLabel($state))
-                    ->color(fn ($state) => self::reviewMap()[$state][1] ?? 'gray'),
+                    ->color(fn ($state) => \App\Filament\Support\StatusPresenter::color($state, 'article')),
                 Tables\Columns\TextColumn::make('tokens_used')->label('Token')->numeric(0, ',', '.')->sortable(),
                 Tables\Columns\TextColumn::make('cost_vnd')->label('Chi phí')->formatStateUsing(fn ($state) => self::formatVnd($state))->sortable(),
                 Tables\Columns\TextColumn::make('created_at')->label('Ngày tạo')->dateTime('d/m/Y H:i')->sortable(),
@@ -129,11 +119,15 @@ class ArticleVersionResource extends Resource
             Section::make('Duyệt')->schema([
                 TextEntry::make('review_status')->label('Trạng thái')->badge()
                     ->formatStateUsing(fn ($state) => self::reviewLabel($state))
-                    ->color(fn ($state) => self::reviewMap()[$state][1] ?? 'gray'),
+                    ->color(fn ($state) => \App\Filament\Support\StatusPresenter::color($state, 'article')),
                 TextEntry::make('reviewer.name')->label('Người duyệt')->placeholder('—'),
                 TextEntry::make('reviewed_at')->label('Thời điểm duyệt')->dateTime('d/m/Y H:i')->placeholder('—'),
                 TextEntry::make('review_notes')->label('Ghi chú duyệt')->placeholder('—'),
             ])->columns(2),
+            Section::make('Lịch sử duyệt')->schema([
+                TextEntry::make('review_history_note')->hiddenLabel()
+                    ->state('Chỉ hiển thị người duyệt, thời điểm và ghi chú của bản này (ở mục Duyệt phía trên). Nhật ký chi tiết sẽ có khi Dev1 thêm bảng audit_logs.'),
+            ]),
             Section::make('Lịch sử phiên bản')->schema([
                 ViewEntry::make('history')->hiddenLabel()->view('filament.article-version.history'),
             ]),
