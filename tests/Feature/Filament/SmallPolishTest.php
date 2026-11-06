@@ -87,4 +87,28 @@ class SmallPolishTest extends TestCase
             ->assertNotified('Không đổi được lịch');
         $this->assertSame('2026-11-12 02:30:00', $p->fresh()->getRawOriginal('scheduled_at_utc'));
     }
+
+    public function test_tao_bai_ghi_nguoi_tao_va_tu_duyet_phai_co_ghi_chu(): void
+    {
+        $site = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+        $approver = $this->user('approver');
+        $this->actingAs($approver);
+
+        \Livewire\Livewire::test(\App\Filament\Resources\ArticleResource\Pages\CreateArticle::class)
+            ->fillForm(['website_id' => $site->id, 'primary_keyword' => 'kw tự tạo', 'search_intent' => 'informational'])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $article = Article::where('primary_keyword', 'kw tự tạo')->firstOrFail();
+        $this->assertSame($approver->id, $article->created_by);
+        $this->assertSame('planned', $article->workflow_status);
+
+        // Người tạo tự duyệt bài của mình phải bị buộc ghi chú (cờ self_approved bật nhờ created_by).
+        $v = ArticleVersion::create(['article_id' => $article->id, 'version' => 1, 'title' => 't', 'slug' => 's', 'html_content' => '<p>x</p>', 'review_status' => 'needs_review']);
+        $article->update(['workflow_status' => 'needs_review']);
+        $this->expectException(\InvalidArgumentException::class);
+        (new \App\Filament\Support\Audit\AuditRecorder(new class implements \App\Filament\Support\Audit\AuditSink {
+            public function write(array $entry): void {}
+        }))->record(\App\Filament\Support\Audit\AuditAction::Approve, $approver, $article, $v, null);
+    }
 }
