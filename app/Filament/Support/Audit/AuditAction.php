@@ -12,6 +12,7 @@ enum AuditAction: string
     case OverrideQualityBlock = 'override_quality';
     case RevokeWebsite = 'revoke_website';
     case EmergencyStop = 'emergency_stop';
+    case Reschedule = 'reschedule';
 
     /** Hành động bắt buộc có lý do không rỗng. */
     public function requiresReason(): bool

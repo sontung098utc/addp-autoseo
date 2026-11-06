@@ -191,6 +191,7 @@ class PublicationResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make()->label('Xem'),
                 ReconcileAction::row(),
+                \App\Filament\Support\Schedule\RescheduleAction::row(),
             ]);
     }
 

@@ -14,6 +14,6 @@ class ViewPublication extends ViewRecord
 
     protected function getHeaderActions(): array
     {
-        return [ReconcileAction::page()];
+        return [ReconcileAction::page(), \App\Filament\Support\Schedule\RescheduleAction::page()];
     }
 }

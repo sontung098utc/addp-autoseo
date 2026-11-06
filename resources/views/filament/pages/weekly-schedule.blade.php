@@ -18,6 +18,13 @@
         .ss-sched-card.ss-sched-c-danger{border-color:rgb(var(--danger-600))}
         .ss-sched-card.ss-sched-c-warning{border-color:rgb(var(--warning-600))}
         .ss-sched-card.ss-sched-c-info{border-color:rgb(var(--info-600))}
+        .ss-sched-day.is-past{opacity:.55;background:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(128,128,128,.08) 6px,rgba(128,128,128,.08) 12px)}
+        .ss-sched-day.is-over{border-color:rgb(var(--primary-600));background:rgba(var(--primary-600),.08)}
+        .ss-sched-card[draggable=true]{cursor:grab}
+        .ss-sched-card.is-dragging{opacity:.4}
+        .ss-sched-card.is-locked{cursor:not-allowed}
+        .ss-sched-wrap{position:relative}
+        .ss-sched-resched{font-size:.7rem;background:none;border:0;padding:0;text-decoration:underline;cursor:pointer;color:inherit}
         .ss-sched-time{font-weight:600}
         .ss-sched-muted{opacity:.75;font-size:.8rem}
         .ss-sched-box{border:1px solid rgba(128,128,128,.25);border-radius:.75rem;padding:1rem;margin-top:1rem}
@@ -29,25 +36,50 @@
         <x-filament::button color="gray" wire:click="currentWeek">Tuần này</x-filament::button>
         <x-filament::button color="gray" wire:click="nextWeek" icon="heroicon-o-chevron-right" icon-position="after">Tuần sau</x-filament::button>
         <strong>{{ $rangeLabel }}</strong>
-        <span class="ss-sched-muted">Giờ Việt Nam (UTC+7). Chỉ xem; kéo thả đổi giờ chưa hỗ trợ (dự kiến V1.2).</span>
+        <span class="ss-sched-muted">Giờ Việt Nam (UTC+7). Kéo thẻ 'Đã xếp lịch' sang ngày khác để đổi ngày (giữ nguyên giờ). Không đổi được lượt đang đăng/đã đăng/lỗi/chờ đối soát hoặc sắp đến giờ trong 10 phút. Có thể dùng nút "Đổi lịch" trên thẻ thay cho kéo thả.</span>
     </div>
 
-    <div class="ss-sched-grid">
+    <div class="ss-sched-grid" x-data="{ over: null, dragId: null }">
         @foreach ($days as $day)
-            <div class="ss-sched-day {{ $day['isToday'] ? 'is-today' : '' }}" data-day="{{ $day['key'] }}">
+            @php $isPast = $day['key'] < $todayKey; @endphp
+            <div class="ss-sched-day {{ $day['isToday'] ? 'is-today' : '' }} {{ $isPast ? 'is-past' : '' }}" data-day="{{ $day['key'] }}"
+                @if ($canDrag && ! $isPast)
+                    :class="{ 'is-over': over === '{{ $day['key'] }}' }"
+                    x-on:dragover.prevent="over = '{{ $day['key'] }}'"
+                    x-on:dragleave="if (over === '{{ $day['key'] }}') over = null"
+                    x-on:drop.prevent="over = null; if (dragId) { $wire.moveToDay(dragId, '{{ $day['key'] }}'); dragId = null }"
+                @endif
+                @if ($isPast) title="Ngày đã qua, không nhận thả" @endif>
                 <div class="ss-sched-dayh">{{ $day['name'] }} {{ $day['label'] }}@if ($day['isToday']) · Hôm nay @endif</div>
                 @forelse ($day['items'] as [$p, $at])
-                    <a class="ss-sched-card ss-sched-c-{{ StatusPresenter::color($p->status, 'publication') }}" href="{{ $viewUrl($p) }}" title="{{ StatusPresenter::label($p->status, 'publication') }}">
-                        <span class="ss-sched-time">{{ VnTime::format($at, 'H:i') }}</span>
-                        {{ $p->articleVersion?->article?->primary_keyword ?? '—' }}
-                        <div class="ss-sched-muted">{{ $p->website?->name }} · {{ StatusPresenter::label($p->status, 'publication') }}</div>
-                    </a>
+                    @php
+                        $reason = $reasonFor($p);
+                        $movable = $canDrag && $reason === null;
+                    @endphp
+                    <div class="ss-sched-card ss-sched-c-{{ StatusPresenter::color($p->status, 'publication') }} {{ $movable ? '' : 'is-locked' }}"
+                        tabindex="0" data-publication="{{ $p->id }}"
+                        draggable="{{ $movable ? 'true' : 'false' }}"
+                        title="{{ $movable ? 'Kéo sang ngày khác để đổi ngày (giữ nguyên giờ)' : ($reason ?? StatusPresenter::label($p->status, 'publication')) }}"
+                        @if ($movable)
+                            x-on:dragstart="dragId = {{ $p->id }}; $el.classList.add('is-dragging')"
+                            x-on:dragend="dragId = null; over = null; $el.classList.remove('is-dragging')"
+                        @endif>
+                        <a href="{{ $viewUrl($p) }}" style="text-decoration:none;color:inherit;display:block" draggable="false">
+                            <span class="ss-sched-time">{{ VnTime::format($at, 'H:i') }}</span>
+                            {{ $p->articleVersion?->article?->primary_keyword ?? '—' }}
+                            <div class="ss-sched-muted">{{ $p->website?->name }} · {{ StatusPresenter::label($p->status, 'publication') }}</div>
+                        </a>
+                        @if ($movable)
+                            <button type="button" class="ss-sched-resched" wire:click="mountAction('reschedulePublication', { publication: {{ $p->id }} })">Đổi lịch</button>
+                        @endif
+                    </div>
                 @empty
                     <div class="ss-sched-muted">Không có lượt đăng</div>
                 @endforelse
             </div>
         @endforeach
     </div>
+    <x-filament-actions::modals />
 
     <div class="ss-sched-box">
         <div class="ss-sched-h">Hàng đợi hôm nay ({{ $todayQueue->count() }})</div>
