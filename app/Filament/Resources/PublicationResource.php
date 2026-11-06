@@ -24,9 +24,49 @@ class PublicationResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
+
+    protected static function user(): ?\App\Models\User
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+
+        return $user instanceof \App\Models\User && $user->is_active ? $user : null;
+    }
+
+    public static function canViewAny(): bool
+    {
+        return static::user()?->isApprover() ?? false;
+    }
+
+    public static function canView(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return static::user()?->isApprover() ?? false;
+    }
+
+    // Lượt xuất bản chỉ do hệ thống tạo/cập nhật (idempotency), UI chỉ xem.
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
+            ->disabled()
             ->schema([
                 Forms\Components\Section::make('Thông tin xuất bản')
                     ->schema([
@@ -97,12 +137,7 @@ class PublicationResource extends Resource
                     ->url(fn ($record) => $record->published_url, true),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
+                Tables\Actions\ViewAction::make(),
             ]);
     }
 
@@ -110,8 +145,7 @@ class PublicationResource extends Resource
     {
         return [
             'index' => Pages\ListPublications::route('/'),
-            'create' => Pages\CreatePublication::route('/create'),
-            'edit' => Pages\EditPublication::route('/{record}/edit'),
+            'view' => Pages\ViewPublication::route('/{record}'),
         ];
     }
 }

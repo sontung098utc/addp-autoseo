@@ -10,10 +10,4 @@ class ListPublications extends ListRecords
 {
     protected static string $resource = PublicationResource::class;
 
-    protected function getHeaderActions(): array
-    {
-        return [
-            Actions\CreateAction::make(),
-        ];
-    }
 }
