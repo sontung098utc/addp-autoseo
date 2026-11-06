@@ -91,6 +91,7 @@ class WebsiteResource extends Resource
                                 'wordpress' => 'WordPress (REST API)',
                                 'magento2' => 'Magento 2 (Company_BlogApi)',
                             ])
+                            ->live()
                             ->required(),
                         Forms\Components\TextInput::make('base_url')
                             ->label('Địa chỉ Website (URL)')
@@ -118,12 +119,15 @@ class WebsiteResource extends Resource
                     ->description('Thông tin credentials được mã hóa tự động trước khi lưu trữ vào cơ sở dữ liệu')
                     ->schema(fn (string $operation): array => $operation === 'create'
                         ? [
-                            Forms\Components\TextInput::make('credentials_input.username')->label('Tên đăng nhập (WordPress)')->maxLength(255),
-                            Forms\Components\TextInput::make('credentials_input.application_password')->label('Application Password (WordPress)')->password()->revealable(false)->autocomplete('new-password'),
-                            Forms\Components\TextInput::make('credentials_input.consumer_key')->label('Consumer Key (Magento)')->password()->revealable(false)->autocomplete('new-password'),
-                            Forms\Components\TextInput::make('credentials_input.consumer_secret')->label('Consumer Secret (Magento)')->password()->revealable(false)->autocomplete('new-password'),
-                            Forms\Components\TextInput::make('credentials_input.access_token')->label('Access Token (Magento)')->password()->revealable(false)->autocomplete('new-password'),
-                            Forms\Components\TextInput::make('credentials_input.access_token_secret')->label('Access Token Secret (Magento)')->password()->revealable(false)->autocomplete('new-password'),
+                            Forms\Components\Placeholder::make('credentials_hint')->hiddenLabel()
+                                ->content('Chọn hệ thống CMS ở trên để nhập đúng loại credential.')
+                                ->visible(fn (Forms\Get $get): bool => ! in_array($get('cms_type'), ['wordpress', 'magento2'], true)),
+                            Forms\Components\TextInput::make('credentials_input.username')->label('Tên đăng nhập (WordPress)')->maxLength(255)->visible(fn (Forms\Get $get): bool => $get('cms_type') === 'wordpress'),
+                            Forms\Components\TextInput::make('credentials_input.application_password')->label('Application Password (WordPress)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Forms\Get $get): bool => $get('cms_type') === 'wordpress'),
+                            Forms\Components\TextInput::make('credentials_input.consumer_key')->label('Consumer Key (Magento)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Forms\Get $get): bool => $get('cms_type') === 'magento2'),
+                            Forms\Components\TextInput::make('credentials_input.consumer_secret')->label('Consumer Secret (Magento)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Forms\Get $get): bool => $get('cms_type') === 'magento2'),
+                            Forms\Components\TextInput::make('credentials_input.access_token')->label('Access Token (Magento)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Forms\Get $get): bool => $get('cms_type') === 'magento2'),
+                            Forms\Components\TextInput::make('credentials_input.access_token_secret')->label('Access Token Secret (Magento)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Forms\Get $get): bool => $get('cms_type') === 'magento2'),
                         ]
                         : [
                             Forms\Components\Placeholder::make('credentials_saved')

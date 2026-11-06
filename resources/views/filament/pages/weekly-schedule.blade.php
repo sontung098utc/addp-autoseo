@@ -49,7 +49,12 @@
                     x-on:dragleave="if (over === '{{ $day['key'] }}') over = null"
                     x-on:drop.prevent="over = null; if (dragId) { $wire.moveToDay(dragId, '{{ $day['key'] }}'); dragId = null }"
                 @endif
-                @if ($isPast) title="Ngày đã qua, không nhận thả" @endif>
+                @if ($canDrag && $isPast)
+                    {{-- Ngày đã qua: vẫn nhận thả để máy chủ từ chối và nói rõ lý do (không im lặng). --}}
+                    x-on:dragover.prevent
+                    x-on:drop.prevent="over = null; if (dragId) { $wire.moveToDay(dragId, '{{ $day['key'] }}'); dragId = null }"
+                @endif
+                @if ($isPast) title="Ngày đã qua: không thể đổi lịch sang ngày này" @endif>
                 <div class="ss-sched-dayh">{{ $day['name'] }} {{ $day['label'] }}@if ($day['isToday']) · Hôm nay @endif</div>
                 @forelse ($day['items'] as [$p, $at])
                     @php
