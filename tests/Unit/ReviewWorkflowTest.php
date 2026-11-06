@@ -41,9 +41,10 @@ class ReviewWorkflowTest extends TestCase
 
     private function make(string $status = 'needs_review', string $vs = 'needs_review', ?User $creator = null): ArticleVersion
     {
-        $a = Article::create(['website_id' => $this->site->id, 'created_by' => $creator?->id, 'primary_keyword' => 'k', 'workflow_status' => $status]);
+        $a = Article::create(['website_id' => $this->site->id, 'created_by' => $creator?->id, 'primary_keyword' => 'học bổng toàn phần', 'workflow_status' => $status]);
 
-        return ArticleVersion::create(['article_id' => $a->id, 'version' => 1, 'title' => 't', 'slug' => 's', 'html_content' => '<p>x</p>', 'review_status' => $vs]);
+        // Bản đạt kiểm chất lượng để các test duyệt không bị chặn bởi P0 (task 3.5).
+        return \Tests\Unit\QualityFixtures::version($a, 1, $vs);
     }
 
     private function future(): Carbon

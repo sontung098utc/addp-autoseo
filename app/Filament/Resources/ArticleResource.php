@@ -160,6 +160,14 @@ class ArticleResource extends Resource
             ]);
     }
 
+    /** Kiểm chất lượng bản mới nhất; null nếu bài chưa có bản nào. */
+    private static function qualityOf(Article $record): ?\App\Services\Content\Quality\QualityReport
+    {
+        $v = $record->versions()->orderByDesc('version')->first();
+
+        return $v ? ReviewActions::qualityFor($v) : null;
+    }
+
     private static function latest(Article $record): \App\Models\ArticleVersion
     {
         $v = $record->versions()->orderByDesc('version')->first();
@@ -187,10 +195,12 @@ class ArticleResource extends Resource
         return Tables\Actions\Action::make('approve')->label('Duyệt')->icon('heroicon-o-check')->color('success')
             ->visible(fn (Article $r) => $r->workflow_status === 'needs_review')
             ->authorize(fn () => ReviewActions::canApprove())
-            ->form(fn (Article $r) => ReviewActions::approveForm((int) $r->created_by === (int) ReviewActions::user()?->id))
+            ->tooltip(fn (Article $r) => ReviewActions::blockedHint(static::qualityOf($r)))
+            ->modalHeading(fn (Article $r) => static::qualityOf($r)?->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi P0' : 'Duyệt nội dung')
+            ->form(fn (Article $r) => ReviewActions::approveForm((int) $r->created_by === (int) ReviewActions::user()?->id, static::qualityOf($r)))
             ->action(function (Article $r, array $data) {
                 abort_unless(ReviewActions::canApprove(), 403);
-                ReviewActions::run(fn () => (new ReviewWorkflow)->approve(ReviewActions::user(), static::latest($r), $data['note'] ?? null), 'Đã duyệt nội dung');
+                ReviewActions::run(fn () => (new ReviewWorkflow)->approve(ReviewActions::user(), static::latest($r), $data['note'] ?? null, $data['override_reason'] ?? null), 'Đã duyệt nội dung');
             });
     }
 

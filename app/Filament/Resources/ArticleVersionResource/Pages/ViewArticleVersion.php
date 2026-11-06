@@ -19,10 +19,12 @@ class ViewArticleVersion extends ViewRecord
             Actions\Action::make('approve')->label('Duyệt')->icon('heroicon-o-check')->color('primary')
                 ->visible(fn () => $this->record->review_status === 'needs_review')
                 ->authorize(fn () => ReviewActions::canApprove())
-                ->form(fn () => ReviewActions::approveForm((int) $this->record->article?->created_by === (int) ReviewActions::user()?->id))
+                ->tooltip(fn () => ReviewActions::blockedHint(ReviewActions::qualityFor($this->record)))
+                ->modalHeading(fn () => ReviewActions::qualityFor($this->record)->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi P0' : 'Duyệt nội dung')
+                ->form(fn () => ReviewActions::approveForm((int) $this->record->article?->created_by === (int) ReviewActions::user()?->id, ReviewActions::qualityFor($this->record)))
                 ->action(function (array $data) {
                     abort_unless(ReviewActions::canApprove(), 403);
-                    ReviewActions::run(fn () => (new ReviewWorkflow)->approve(ReviewActions::user(), $this->record, $data['note'] ?? null), 'Đã duyệt nội dung');
+                    ReviewActions::run(fn () => (new ReviewWorkflow)->approve(ReviewActions::user(), $this->record, $data['note'] ?? null, $data['override_reason'] ?? null), 'Đã duyệt nội dung');
                     $this->record->refresh();
                 }),
             Actions\Action::make('reject')->label('Từ chối')->icon('heroicon-o-x-mark')->color('danger')->outlined()

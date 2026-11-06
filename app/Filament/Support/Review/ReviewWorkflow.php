@@ -9,6 +9,7 @@ use App\Models\ArticleVersion;
 use App\Models\Publication;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Content\Quality\ContentQualityChecker;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +23,13 @@ class ReviewWorkflow
 {
     public const TIMEZONE = 'Asia/Ho_Chi_Minh';
 
-    public function __construct(private readonly AuditRecorder $audit = new AuditRecorder())
+    /** Lý do ngoại lệ tối thiểu (ký tự) để duyệt bài còn lỗi P0. */
+    public const MIN_OVERRIDE_REASON = 10;
+
+    public function __construct(
+        private readonly AuditRecorder $audit = new AuditRecorder(),
+        private readonly ContentQualityChecker $quality = new ContentQualityChecker(),
+    )
     {
     }
 
@@ -52,16 +59,29 @@ class ReviewWorkflow
         });
     }
 
-    public function approve(User $actor, ArticleVersion $version, ?string $note = null): void
+    /**
+     * Duyệt bản. Nếu kiểm chất lượng còn lỗi P0 thì bắt buộc $overrideReason (>= 10 ký tự);
+     * khi đó ghi thêm log OverrideQualityBlock (kèm mã P0, không kèm nội dung) trong cùng transaction.
+     */
+    public function approve(User $actor, ArticleVersion $version, ?string $note = null, ?string $overrideReason = null): void
     {
         $this->assertApprover($actor);
 
-        DB::transaction(function () use ($actor, $version, $note) {
+        DB::transaction(function () use ($actor, $version, $note, $overrideReason) {
             [$article, $version] = $this->lock($version);
             if ($version->review_status !== 'needs_review' || $article->workflow_status !== 'needs_review') {
                 throw new InvalidArgumentException('Chỉ duyệt được bản đang ở trạng thái Chờ duyệt.');
             }
             $this->assertLatest($article, $version);
+
+            $blocking = $this->quality->check($version, $article)->blockingCodes();
+            $overrideReason = $this->clean($overrideReason);
+            if ($blocking && ($overrideReason === null || mb_strlen($overrideReason) < self::MIN_OVERRIDE_REASON)) {
+                throw new InvalidArgumentException(
+                    'Bài còn lỗi chặn duyệt (' . implode(', ', $blocking) . '). Hãy sửa bài, hoặc nhập lý do ngoại lệ tối thiểu '
+                    . self::MIN_OVERRIDE_REASON . ' ký tự để duyệt.'
+                );
+            }
 
             $note = $this->clean($note);
             $version->update([
@@ -73,6 +93,9 @@ class ReviewWorkflow
             $article->update(['workflow_status' => 'approved']);
             // Nếu tự duyệt mà thiếu ghi chú, AuditRecorder ném lỗi và transaction rollback.
             $this->audit->record(AuditAction::Approve, $actor, $article, $version, $note);
+            if ($blocking) {
+                $this->audit->record(AuditAction::OverrideQualityBlock, $actor, $article, $version, $overrideReason, ['blocking_codes' => $blocking]);
+            }
         });
     }
 
