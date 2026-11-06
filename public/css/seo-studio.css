@@ -194,12 +194,13 @@ select:not([multiple]) {
 .ss-dt { background: var(--ss-surface); border: 1px solid var(--ss-border); border-radius: 0.5rem; }
 .ss-dt__bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.625rem 0.75rem; border-bottom: 1px solid var(--ss-border); }
 .ss-dt__bar input[type=search] { min-width: 14rem; flex: 1 1 14rem; max-width: 24rem; }
-.ss-dt__bar input, .ss-dt__bar select, .ss-dt__btn { font-size: var(--ss-fs-sm); padding: 0.3125rem 0.625rem; border: 1px solid var(--ss-border-strong); border-radius: 0.375rem; background: var(--ss-surface); color: var(--ss-text); }
+.ss-dt__bar input[type=search], .ss-dt__bar select, .ss-dt__btn { font-size: var(--ss-fs-sm); padding: 0.3125rem 0.625rem; border: 1px solid var(--ss-border-strong); border-radius: 0.375rem; background: var(--ss-surface); color: var(--ss-text); }
 .ss-dt__btn { cursor: pointer; } .ss-dt__btn:hover { background: var(--ss-surface-sunk); }
 .ss-dt__spacer { flex: 1 1 auto; }
 .ss-dt__count { font-size: var(--ss-fs-sm); color: var(--ss-text-muted); font-variant-numeric: tabular-nums; }
 .ss-dt__menuwrap { position: relative; }
 .ss-dt__menu { position: absolute; right: 0; top: calc(100% + 0.25rem); z-index: 20; min-width: 13rem; max-height: 18rem; overflow: auto; background: var(--ss-surface); border: 1px solid var(--ss-border-strong); border-radius: 0.5rem; padding: 0.375rem; box-shadow: 0 6px 20px rgb(0 0 0 / 0.14); }
+.ss-dt__menu input[type=checkbox] { width: 1rem; height: 1rem; flex: none; accent-color: var(--ss-accent-fg); }
 .ss-dt__menu label { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem; font-size: var(--ss-fs-sm); cursor: pointer; border-radius: 0.25rem; } .ss-dt__menu label:hover { background: var(--ss-surface-sunk); }
 .ss-dt__scroll { overflow-x: auto; }
 .ss-dt__table { width: 100%; border-collapse: collapse; font-size: var(--ss-fs-base); }
