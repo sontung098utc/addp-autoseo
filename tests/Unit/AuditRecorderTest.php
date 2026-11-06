@@ -144,6 +144,17 @@ class AuditRecorderTest extends TestCase
         $this->assertStringNotContainsString('nội dung', json_encode($entry, JSON_UNESCAPED_UNICODE));
     }
 
+    public function test_redact_khong_che_nham_tokens_used(): void
+    {
+        $entry = (new AuditRecorder($this->sink()))->record(AuditAction::Approve, $this->user(2, 'approver'), $this->article(1), null, null, [
+            'tokens_used' => 1200,
+            'access_token' => 'abc',
+            'token' => 'abc',
+        ]);
+
+        $this->assertSame(['tokens_used' => 1200, 'access_token' => '[REDACTED]', 'token' => '[REDACTED]'], $entry['extra']);
+    }
+
     public function test_at_utc_la_utc(): void
     {
         $entry = (new AuditRecorder($this->sink()))->record(AuditAction::SubmitForReview, $this->user(2, 'writer'), $this->article());

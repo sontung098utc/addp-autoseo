@@ -87,11 +87,18 @@ class AuditRecorder
                 continue;
             }
 
+            // 'token' chỉ khớp khi là một từ riêng (access_token, x_token_y) để không che nhầm 'tokens_used'.
+            $isToken = (bool) preg_match('/(^|[_\-])token($|[_\-])/', $lower);
+            $hit = $isToken;
             foreach (self::SENSITIVE_KEYS as $needle) {
-                if (str_contains($lower, $needle)) {
-                    $data[$key] = '[REDACTED]';
-                    continue 2;
+                if ($needle !== 'token' && str_contains($lower, $needle)) {
+                    $hit = true;
+                    break;
                 }
+            }
+            if ($hit) {
+                $data[$key] = '[REDACTED]';
+                continue;
             }
 
             if (is_array($value)) {
