@@ -101,7 +101,7 @@ class CompetitorsPageTest extends TestCase
         $this->assertSame(0, CostPolicy::used(), 'Mở hộp xác nhận chưa được tính phí');
         $p->callMountedAction();
         $this->assertSame(1000, CostPolicy::used());
-        $p->assertSee('Khoảng trống nội dung');
+        $p->assertSee('data-co-section="gaps"', false);
         $this->assertNotNull(CompetitorService::snapshot($this->site));
         $this->assertCount(1, \App\Filament\Support\Demo\DemoStore::get('competitors.log'));
     }
@@ -129,7 +129,7 @@ class CompetitorsPageTest extends TestCase
 
             public function fetch(array $domains): array { throw new SourceUnavailableException('429 hết hạn mức'); }
         });
-        $p->call('doRefresh')->assertSee('Không lấy được dữ liệu')->assertSee('Dữ liệu cũ')->assertDontSee('Khoảng trống nội dung:');
+        $p->call('doRefresh')->assertSee('Không lấy được dữ liệu')->assertSee('Dữ liệu cũ')->assertDontSee('data-co-section="gaps"', false);
         $this->assertSame($before, CompetitorService::snapshot($this->site));
         $this->assertSame($used, CostPolicy::used());
         $p->set('selected', ['x'])->call('addToPlan'); // không thêm từ bản cũ
@@ -185,7 +185,9 @@ class CompetitorsPageTest extends TestCase
         $row = collect($p->instance()->gaps())->first(fn ($g) => $g['norm'] === $kw);
         if ($row) { // từ khóa này có thể không được đối thủ giả lập xếp hạng; nếu có thì phải bị đánh dấu
             $this->assertSame($art->id, $row['existing']['id']);
-            $p->assertSee('Bài #'.$art->id);
+            $st = collect($p->instance()->getViewData()['gapRows'])->firstWhere('id', $kw)['status'];
+            $this->assertSame('info', $st['tone']);
+            $this->assertStringContainsString('#'.$art->id, $st['text']);
         }
         $p->set('selected', [$kw])->call('addToPlan');
         $this->assertSame(1, Article::count());
@@ -196,7 +198,7 @@ class CompetitorsPageTest extends TestCase
         $this->page('approver', 'chua-ket-noi')->assertOk();
         $this->page('approver', 'dang-tai')->assertSee('Đang lấy dữ liệu');
         $this->page('approver', 'khong-doi-thu')->assertSee('Chưa có đối thủ nào');
-        $this->page('approver', 'ket-noi')->assertSee('3 đối thủ')->assertSee('tuyensinhhub.example');
+        $this->page('approver', 'ket-noi')->assertSee('tuyensinhhub.example');
         $e = $this->page('approver', 'loi-api')->set('newDomain', 'a.example')->call('addCompetitor')->call('doRefresh');
         $e->assertSee('Không lấy được dữ liệu')->assertSee('429');
         $this->assertSame(0, CostPolicy::used());
@@ -211,5 +213,42 @@ class CompetitorsPageTest extends TestCase
             ->assertDontSee('tuyensinhhub.example')->assertDontSee('Dữ liệu minh họa —')
             ->set('newDomain', 'a.vn')->call('addCompetitor');
         $this->assertSame([], CompetitorService::domains($this->site));
+    }
+
+    public function test_ui_has_tabs_single_primary_and_no_noise(): void
+    {
+        $html = $this->loaded()->html();
+        foreach (['Khoảng trống', 'Đối thủ', 'Nguồn và chi phí', 'Cụm gợi ý', 'Quy tắc'] as $tab) {
+            $this->assertStringContainsString($tab, $html);
+        }
+        $this->assertSame(1, substr_count($html, 'data-color="primary"') + substr_count($html, 'fi-color-primary'), 'Chỉ một nút primary');
+        $this->assertStringNotContainsString('minh họa', $html);
+        $this->assertStringNotContainsString('Luật nghiệp vụ của màn này', $html);
+        $this->assertStringContainsString('ss-page', $html);
+    }
+
+    public function test_gap_table_config_rows_columns_and_selectable_model(): void
+    {
+        $p = $this->loaded();
+        $d = $p->instance()->getViewData();
+        $keys = array_column($d['gapColumns'], 'key');
+        foreach (['keyword', 'intent', 'volume', 'difficulty', 'ranks', 'status', 'score'] as $k) {
+            $this->assertContains($k, $keys);
+        }
+        $this->assertSame(count($p->instance()->gaps()), count($d['gapRows']));
+        $this->assertStringContainsString('selectModel\\u0022:\\u0022selected\\u0022', $p->html());
+        $this->assertStringContainsString('selectable\\u0022:true', $p->html());
+        $open = collect($d['gapRows'])->first(fn ($r) => is_string($r['status']));
+        $p->set('selected', [$open['id']])->call('addToPlan');
+        $this->assertSame(1, Article::count());
+    }
+
+    public function test_selecting_existing_row_is_skipped(): void
+    {
+        $p = $this->loaded();
+        $g = collect($p->instance()->gaps())->first(fn ($g) => $g['existing'] === null);
+        Article::create(['website_id' => $this->site->id, 'created_by' => 1, 'primary_keyword' => $g['keyword'], 'workflow_status' => 'planned']);
+        $p->set('selected', [$g['norm']])->call('addToPlan');
+        $this->assertSame(1, Article::count());
     }
 }
