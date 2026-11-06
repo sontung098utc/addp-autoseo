@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dev2 · Bảng điều khiển tiến độ addp-autoseo</title>
+<style>
+:root{--bg:#fafaf9;--panel:#fff;--ink:#1b1b19;--muted:#6b6a64;--line:#e4e2db;--soft:#f3f2ee;--accent:#0f6b5c;--accent-ink:#fff;--ok:#1f7a3d;--okbg:#e6f3ea;--warn:#9a5a00;--warnbg:#fbf0dc;--bad:#b3261e;--badbg:#fbe7e5;--info:#2a5f9e;--infobg:#e6eef8;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#141413;--panel:#1c1c1a;--ink:#ecebe6;--muted:#9a988f;--line:#33322e;--soft:#252421;--accent:#3fb59f;--accent-ink:#06201b;--ok:#6fd08a;--okbg:#17301f;--warn:#e6b05a;--warnbg:#33260f;--bad:#ff8c84;--badbg:#3a1b19;--info:#8db8ee;--infobg:#17263a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:-.005em}
+a{color:var(--accent)}
+.mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header.top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+header.top h1{font-size:15px;margin:0;font-weight:650}
+header.top .sub{color:var(--muted);font-size:12.5px}
+header.top .sp{flex:1}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;padding:0 12px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:52px;z-index:19}
+nav.tabs button{border:0;background:none;color:var(--muted);padding:10px 12px;font:inherit;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+nav.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+main{padding:16px;max-width:1280px;margin:0 auto}
+h2{font-size:17px;margin:26px 0 8px;font-weight:650}
+h2:first-child{margin-top:4px}
+h3{font-size:14px;margin:18px 0 6px}
+p.lead{color:var(--muted);margin:2px 0 12px;max-width:88ch}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:5px 10px;font:inherit;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.sm{padding:2px 7px;font-size:12px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 7px;max-width:100%}
+textarea{width:100%;min-height:54px}
+input[type=checkbox]{accent-color:var(--accent)}
+.grid{display:grid;gap:10px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(420px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.kpi .v{font-size:24px;font-weight:650;line-height:1.15}
+.kpi .l{color:var(--muted);font-size:12.5px}
+.kpi .c{font-size:12.5px;margin-top:4px}
+table{border-collapse:collapse;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-weight:600;font-size:12px;color:var(--muted);background:var(--soft);position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+.tw{overflow-x:auto;border-radius:8px}
+.chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:12px;border:1px solid var(--line);background:var(--soft);white-space:nowrap}
+.chip.ok{background:var(--okbg);color:var(--ok);border-color:transparent}
+.chip.warn{background:var(--warnbg);color:var(--warn);border-color:transparent}
+.chip.bad{background:var(--badbg);color:var(--bad);border-color:transparent}
+.chip.info{background:var(--infobg);color:var(--info);border-color:transparent}
+.bar{height:6px;background:var(--soft);border-radius:3px;overflow:hidden;min-width:70px}
+.bar>i{display:block;height:100%;background:var(--accent)}
+.muted{color:var(--muted)}
+.small{font-size:12.5px}
+.alert{border-left:3px solid var(--warn);background:var(--warnbg);padding:7px 10px;margin:6px 0;border-radius:0 6px 6px 0}
+.alert.bad{border-color:var(--bad);background:var(--badbg)}
+.alert.info{border-color:var(--info);background:var(--infobg)}
+.alert.ok{border-color:var(--ok);background:var(--okbg)}
+details.task{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin:6px 0}
+details.task>summary{list-style:none;cursor:pointer;padding:9px 12px;display:grid;grid-template-columns:54px minmax(200px,1fr) 70px 130px 110px 120px;gap:10px;align-items:center}
+details.task>summary::-webkit-details-marker{display:none}
+details.task[open]>summary{border-bottom:1px solid var(--line)}
+.tbody{padding:10px 14px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.sub{display:flex;gap:8px;align-items:flex-start;padding:3px 0}
+.sub.done span{color:var(--muted);text-decoration:line-through}
+.lvl{display:inline-flex;gap:4px}
+.lvl label{border:1px solid var(--line);border-radius:5px;padding:2px 6px;font-size:12px;cursor:pointer}
+.lvl label.on{background:var(--okbg);color:var(--ok);border-color:transparent}
+.gantt{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden}
+.grow{display:grid;grid-template-columns:150px 1fr;border-bottom:1px solid var(--line);align-items:center;min-height:26px}
+.grow:last-child{border-bottom:0}
+.grow .lab{padding:3px 8px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grow .trk{position:relative;height:26px}
+.gb{position:absolute;top:6px;height:14px;border-radius:3px;background:var(--accent);opacity:.9}
+.gb.d1{background:var(--info)}.gb.late{background:var(--bad)}
+.gline{position:absolute;top:0;bottom:0;width:0;border-left:1px dashed var(--muted)}
+.gline.today{border-color:var(--accent);border-left-style:solid}
+.gline small{position:absolute;top:0;left:3px;font-size:10px;color:var(--muted);white-space:nowrap}
+pre{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto;font:12px/1.5 var(--mono);white-space:pre-wrap}
+code{font-family:var(--mono);font-size:12.5px;background:var(--soft);padding:0 4px;border-radius:3px}
+svg text{font-family:system-ui,sans-serif}
+.sevP0{color:var(--bad);font-weight:700}.sevP1{color:var(--warn);font-weight:700}.sevP2{color:var(--info);font-weight:700}
+.note{color:var(--muted);font-size:12.5px}
+@media(max-width:760px){details.task>summary{grid-template-columns:44px 1fr 60px}details.task>summary>:nth-child(n+4){display:none}.g2{grid-template-columns:1fr}.grow{grid-template-columns:90px 1fr}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Dev2 · addp-autoseo</h1>
+  <span class="sub" id="hdr-date"></span>
+  <span class="sp"></span>
+  <span class="sub" id="save-state">Lưu tự động trong trình duyệt</span>
+  <button class="btn sm" data-act="export">Xuất JSON</button>
+  <label class="btn sm" style="cursor:pointer">Nhập JSON<input type="file" id="imp" accept="application/json" hidden></label>
+</header>
+<nav class="tabs" id="tabs" role="tablist"></nav>
+<main id="view"></main>
+
+<script>
+(function(){
+'use strict';
+/* ========== tiện ích ========== */
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const iso=d=>d.toISOString().slice(0,10);
+const pd=s=>new Date(s+'T00:00:00Z');
+const addDays=(s,n)=>iso(new Date(pd(s).getTime()+n*864e5));
+const diffDays=(a,b)=>Math.round((pd(a)-pd(b))/864e5);
+const dow=s=>pd(s).getUTCDay();
+const fmt=s=>{if(!s)return '—';const d=pd(s);return String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0')};
+const fmtW=s=>s?['CN','T2','T3','T4','T5','T6','T7'][dow(s)]+' '+fmt(s):'—';
+const ser=n=>iso(new Date(Date.UTC(1899,11,30)+n*864e5));
+const n1=n=>(Math.round(n*10)/10).toString().replace('.',',');
+const HOL={'2027-01-01':'Tết Dương lịch','2027-02-04':'Tết Âm lịch','2027-02-05':'Tết Âm lịch','2027-02-08':'Tết Âm lịch','2027-02-09':'Tết Âm lịch','2027-02-10':'Tết Âm lịch','2027-04-15':'Giỗ Tổ','2027-04-30':'30/4'};
+
+/* ========== dữ liệu gốc (từ Excel 09:55 05/11 + docs/plan + code origin/develop 1e24d72) ========== */
+const MS={ 'V1.0':{due:'2026-11-19',name:'AI viết bài, duyệt, đăng nháp WordPress'},
+ 'V1.1':{due:'2026-11-28',name:'Tự đăng WordPress + Magento theo lịch'},
+ 'V1.2':{due:'2026-12-09',name:'Audit SEO, kế hoạch nội dung, pilot, bàn giao'},
+ 'V2':{due:'2027-01-02',name:'GSC, bài cũ, đối thủ, QA nâng cao, RBAC'} };
+const MSIDS={ 'V1.0':['0.3','0.5','3.4','1.2','3.5','c0.2','c0.4','c3.1'],
+ 'V1.1':['a3.3','a3.6','c3.6'],
+ 'V1.2':['2.1','2.2','1.3','a1.1','a4.1','c4.1','a4.2','c4.2'],
+ 'V2':['5.1','5.4','6.1','6.4','a5.2','a5.3','a6.2','a6.3','a6.5','a7.1','a7.2','c7.2'] };
+
+/* cổng phụ thuộc bên ngoài. hard=true: chặn bắt đầu task trong lịch dự báo */
+const GATES=[
+ {id:'G_IFACE',short:'PublisherInterface FINAL',name:'PublisherInterface FINAL + CmsError/ERR01–07 + publication_key do hệ thống cấp',who:'Dev1',exp:'2026-11-12',hard:true,impact:'1.2 không thể viết WordPressPublisher đúng hợp đồng (E9/E13/E14)'},
+ {id:'G_WP',short:'Staging WP',name:'Staging WP (URL HTTPS) + user API + Application Password + plugin SEO + quyền cài mu-plugin',who:'Quản lý / Dev1',exp:'2026-11-12',hard:false,impact:'1.2 chỉ đạt mức mock → ghi "Bị chặn tích hợp"; F-03 không nghiệm thu được'},
+ {id:'G_KEY',short:'Gemini key',name:'Gemini API key + ngân sách đo 20 bài',who:'Quản lý',exp:'2026-11-16',hard:true,impact:'0.3 hoãn: đo trên đầu vào giả cho số không có giá trị, sau phải đo lại'},
+ {id:'G_AUTH',short:'Policies/che credential',name:'Policies + authorize() Filament + che credential WebsiteResource (Q3/E1/E7)',who:'Dev1',exp:'2026-11-11',hard:false,impact:'0.5/3.4 xây màn duyệt trên nền chưa có phân quyền'},
+ {id:'G_MIGA',short:'Migration lô A',name:'Migration lô A: campaigns, approved_version_id, ai_runs',who:'Dev1',exp:'2026-11-11',hard:true,impact:'3.4 không lưu được cấu hình chiến dịch / phiên bản đã duyệt (F-09, F-10)'},
+ {id:'G_PIPE',short:'Sửa pipeline 3.1',name:'Sửa pipeline 3.1: bỏ fallback Mock im lặng, prompt_version, AiProviderFactory (Q2)',who:'Dev1',exp:'2026-11-16',hard:true,impact:'3.5 sẽ chấm trên dữ liệu AI không đáng tin (E2)'},
+ {id:'G_SRC',short:'Nguồn + allowlist',name:'Kho nguồn tài liệu/ảnh công ty + 20 từ khóa mục tiêu + tiêu chí chất lượng + baseline phút/bài (Marketing)',who:'Marketing',exp:'2026-11-16',hard:true,impact:'0.3 hoãn: không có kho nguồn thì không kiểm được "bám nguồn", không có tiêu chí/baseline thì không so được'},
+ {id:'G_MIGB',short:'Migration lô B',name:'Migration lô B: keywords, clusters, content_plans',who:'Dev1',exp:'2026-11-20',hard:true,impact:'2.1 / 2.2 không có bảng để lưu'},
+ {id:'G_MIGC',short:'Migration lô C',name:'Migration lô C: audit_reports/items + DTO AuditPageData',who:'Dev1',exp:'2026-11-24',hard:false,impact:'1.3 dùng mock DTO, chưa lưu được báo cáo'},
+ {id:'G_GSC',short:'GSC property',name:'GSC property được cấp quyền + Google Cloud OAuth project',who:'Quản lý',exp:'2026-11-30',hard:false,impact:'5.1 chỉ có mock; AC09 không kiểm được'},
+ {id:'G_MIGD',short:'Migration lô D',name:'Migration lô D: gsc_metrics, competitors',who:'Dev1',exp:'2026-12-01',hard:true,impact:'5.1 / 5.4 không có bảng'},
+ {id:'G_BUDGET',short:'Ngân sách API từ khóa',name:'Duyệt ngân sách DataForSEO (≈50 USD/tháng theo sheet 4)',who:'Quản lý',exp:'2026-11-30',hard:false,impact:'5.4 hiển thị "Chưa cấu hình", dùng nguồn nội bộ'},
+ {id:'G_MIGF',short:'Migration lô F',name:'Migration lô F: brands, departments, pivot quyền',who:'Dev1',exp:'2026-12-17',hard:true,impact:'6.4 không bắt đầu được'}
+];
+
+/* việc của Dev2. subs: [nội dung, giờ, cần môi trường ngoài?] */
+const D2=[
+{id:'x0',code:'S0.0',name:'Kickoff với Dev1: chốt Issue Conformance + hợp đồng Publisher/ERR + danh sách chờ cấp quyền',ms:'V1.0',h:2,due:'2026-11-06',branch:'docs/m01/0-1/dev2/kickoff',overhead:true,deps:[],gates:[],feats:[],
+ ac:'Có Issue Conformance (Dev1 chủ, Dev2 review); biên bản chốt 3 điểm E9/E10/E14; file DEV2_PENDING_INPUTS.md có hạn từng mục.',
+ subs:[['Họp 60 phút: Issue Conformance 0.2/0.4/3.1/1.4 → hạ về "Chờ review"',.5],['Chốt PublisherInterface FINAL: key do hệ thống cấp, thêm tham số publication_key, CmsError/ERR01–07',.5],['Chốt: publish() không tự tạo draft; job chỉ bắt CmsError (E13)',.5],['Lập docs/plan/DEV2_PENDING_INPUTS.md (staging WP, plugin SEO, mu-plugin, GSC, key Gemini, lô migration A–F)',.5]]},
+{id:'0.3',code:'0.3',name:'AI PoC tiếng Việt: prompt version, đo token/chi phí/bài',ms:'V1.0',h:10,due:ser(46331),branch:'feat/m01/0-3/dev2/ai-poc',reviewer:'Dev1',deps:[],gates:['G_KEY','G_SRC'],feats:['F-07'],
+ ac:'Báo cáo docs/evidence/0-3 có bảng số THẬT cho 20 bài (hoặc ghi "Chưa chạy — chưa có API key"); 100% đầu ra qua schema ArticleVersion + HtmlSanitizer; không fallback im lặng sang Mock; model id còn được Google hỗ trợ.',
+ subs:[['PromptRegistry + prompt_version = hash nội dung; resources/prompts/v1/{outline,article}.md',2],['AiProviderFactory theo config, bỏ env() trực tiếp; thiếu key/JSON sai → AiOutputInvalidException (bỏ fallback Mock, bỏ "?? 450")',2],['Structured output (responseSchema/JSON mode) + validate với contracts/ArticleVersion.schema.json',1],['Bộ 20 từ khóa tiếng Việt (3 ngành × 3 mức cạnh tranh) tests/Fixtures/ai/poc_keywords.json',1],['Chạy đo 20 bài thật: tokens in/out, cost VND, thời gian, % JSON hợp lệ',2.5,true],['Báo cáo + chốt model mặc định, ngưỡng ≤3.000đ/bài, kiểm model id còn hỗ trợ',1.5,true]]},
+{id:'0.5',code:'0.5',name:'Filament panel tiếng Việt + quản lý website theo contract/fixture',ms:'V1.0',h:10,due:ser(46336),branch:'feat/m01/0-5/dev2/filament',reviewer:'Dev1',deps:[],gates:['G_AUTH'],feats:['F-02'],
+ ac:'F-02: thêm website WP, credential không hiển thị rõ, bấm "Kiểm tra kết nối" trả trạng thái có log; chặn xóa khi còn Publication scheduled/publishing; test không lộ credential trong HTML.',
+ subs:[['Panel: locale vi, brandName, menu order, nhóm điều hướng',1],['Fixture 3 site theo WebsiteConnection (WP-staging, WP-prod-like, Magento-staging) + QA04',2],['WebsiteResource: che credential, seo_plugin trong capability_flags, nút Kiểm tra kết nối',3],['Badge trạng thái + tooltip lý do revoked/error; chặn xóa khi còn publication đang chạy',2],['WebsiteResourceTest (credential không lộ, URL chỉ HTTPS)',2]]},
+{id:'3.4',code:'3.4',name:'Giao diện duyệt bài + cấu hình chiến dịch (số bài/ngày/ảnh)',ms:'V1.0',h:10,due:ser(46337),branch:'feat/m03/3-4/dev2/review-ui',reviewer:'Dev1',deps:['0.5'],gates:['G_MIGA','G_AUTH'],feats:['F-09','F-10','AC01'],
+ ac:'Writer không thấy nút Duyệt; approver duyệt được; Xếp lịch chỉ bật khi approved; từ chối bắt buộc lý do; preview lịch hiển thị UTC + giờ VN; không có nút publish trực tiếp.',
+ subs:[['Chi tiết bài 2 cột: preview HTML đã sanitize trong iframe sandbox + metadata + cảnh báo',3],['State machine theo WorkflowEnum: Gửi duyệt / Duyệt (gán version) / Từ chối (lý do) / Xếp lịch + policy server-side',2.5],['Lịch sử phiên bản + diff theo đoạn',1.5],['Cấu hình chiến dịch + preview lịch (scheduled_at_utc + giờ VN)',2],['Test ArticleReviewFlow, CampaignSchedulePreview, FilamentAuthorization',1]]},
+{id:'1.2',code:'1.2',name:'WordPress Connector (REST v2 + Application Password)',ms:'V1.0',h:16,due:ser(46340),branch:'feat/m02/1-2/dev2/wordpress',reviewer:'Dev1',deps:['0.5'],gates:['G_IFACE','G_WP'],feats:['F-03','AC02','AC04','QA06','SEC04','SEC10'],
+ ac:'3 bài nháp thật trên staging WP: đọc lại title/content/ảnh/meta + URL — hoặc ghi "Bị chặn tích hợp". Contract test đủ 7 mã lỗi; publish không tự tạo draft; timeout → CmsError ERR01 → needs_reconcile; không dùng ID media/category của site khác.',
+ subs:[['WordPressClient + testConnection (Basic Auth, HTTPS bắt buộc, UA, timeout 20s, che log) · WP01–02',2.5],['Media: finfo MIME thật, ≤32MB, alt_text, hash · WP03',2.5],['createDraft dùng publication_key do hệ thống cấp, lưu remote_id ngay · WP04',3],['update + phát hiện xung đột modified_gmt (không ghi đè) · WP05',1.5],['SeoMetaAdapter (1 plugin thật) + đọc lại so khớp · WP06',2.5,true],['ErrorMapper → CmsError ERR01–07 (không ném exception thô) · WP07',1],['getByPublicationKey qua mu-plugin REST route + WordPressServiceProvider · WP08–09',1.5,true],['Contract test 7 lỗi (MockHandler) + 1 test @group live (QA06/QA07)',1.5]]},
+{id:'3.5',code:'3.5',name:'QA nội dung cơ bản (R01–R08, chặn bài lỗi)',ms:'V1.0',h:8,due:ser(46345),branch:'feat/m03/3-5/dev2/quality',reviewer:'Dev1',deps:['3.4','a3.1'],gates:['G_PIPE'],feats:['F-11','SEC05'],
+ ac:'Bài thiếu heading/trùng nội dung → về chờ review; không duyệt khi còn P0 (override cần lý do + log); mỗi rule ≥2 ca dương + 1 ca âm; HtmlSanitizerSecurityTest đỏ cho style/id/target/rel/src tùy ý (E3).',
+ subs:[['ContentQualityChecker + RuleResult{id,severity,message_vi} + config/seo.php ngưỡng',1],['R01 độ dài · R02 heading · R03 từ khóa chính · R04 meta description',2],['R05 trùng lặp nội bộ (shingle 5-gram, Jaccard>0,35)',1.5],['R06 link/allowlist domain · R07 thiếu nguồn · R08 HTML còn sót style/script/iframe',1.5],['Cổng chặn nút Duyệt + override có lý do + thẻ "Chất lượng" trên màn duyệt',1],['Bộ test từng rule + QualityGateBlocksApprovalTest',1]]},
+{id:'2.1',code:'2.1',name:'Nhập từ khóa/CSV + AI gom cụm',ms:'V1.2',h:8,due:ser(46347),branch:'feat/m04/2-1/dev2/keywords',reviewer:'Dev1',deps:['0.3'],gates:['G_MIGB'],feats:['F-05'],
+ ac:'Nhập 100 từ khóa, duyệt/sửa nhóm do AI gợi ý; không bịa search volume (null nếu CSV không có); dedupe không phân biệt dấu.',
+ subs:[['Upload CSV UTF-8/BOM, validate, preview 20 dòng, tối đa 5.000 dòng',2],['Chuẩn hóa khóa so trùng (bỏ dấu, hạ chữ, gộp khoảng trắng) + dedupe',1],['KeywordClusterer: batch 100 từ → {cluster,intent,primary,secondary[]} qua prompt v1',2.5],['UI sửa / merge / split cluster trước khi lưu',1.5],['Fixture + test (BOM, trùng không dấu, cluster sai schema)',1]]},
+{id:'2.2',code:'2.2',name:'Kế hoạch nội dung: topic cluster, lịch bài, kéo thả',ms:'V1.2',h:10,due:ser(46349),branch:'feat/m04/2-2/dev2/content-plan',reviewer:'Dev1',deps:['2.1'],gates:['G_MIGB'],feats:['F-06'],
+ ac:'Kéo lịch bài của 1 chủ đề sang tuần sau; quota bài/ngày được tôn trọng; kích hoạt chiến dịch tạo Article planned; có undo.',
+ subs:[['ContentPlanBuilder: cluster → danh sách bài theo quota/ngày; vai trò pillar|spoke',3],['Lịch kéo thả (đổi ngày/đổi cluster)',3.5],['Kích hoạt chiến dịch → tạo Article planned (+ Publication dự kiến qua Dev1)',1.5],['Undo',.5],['Test builder + kích hoạt',1.5]]},
+{id:'1.3',code:'1.3',name:'Báo cáo audit SEO tiếng Việt + đề xuất AI',ms:'V1.2',h:8,due:ser(46359),branch:'feat/m04/1-3/dev2/audit-report',reviewer:'Dev1',deps:['a1.1'],gates:['G_MIGC'],feats:['F-16','DOC02'],
+ ac:'Mỗi lỗi có URL + giá trị quan sát + rule_id + mức P0/P1/P2; đề xuất AI chỉ từ dữ liệu quan sát (có source_url), "không đủ dữ liệu" thay vì bịa; không có chức năng sửa trang.',
+ subs:[['DTO AuditPageData + dữ liệu mock (làm trước khi crawler xong)',1],['RuleEngine 18 chỉ số (SEO01–SEO18) → P0/P1/P2, version rule',3],['AiSuggestionsService (dữ liệu crawl là input, không phải lệnh; chống prompt injection)',2],['UI báo cáo theo website, lọc mức độ, xuất CSV',1.5],['Test rule + test prompt-injection trong nội dung trang',.5]]},
+{id:'5.1',code:'5.1',name:'Google Search Console (OAuth read-only)',ms:'V2',h:18,due:ser(46368),branch:'feat/m07/5-1/dev2/gsc',reviewer:'Dev1',deps:['a4.2'],gates:['G_GSC','G_MIGD'],feats:['F-17','AC09','SEO01-05'],
+ ac:'So sánh 2 kỳ cùng bộ lọc; CTR = SUM(clicks)/SUM(impressions); impressions=0 → "chưa có CTR"; lưu dataState; đối chiếu 1 mẫu API với giao diện (AC09).',
+ subs:[['OAuth read-only, refresh token mã hóa, thu hồi',4],['GscClient: Search Analytics (ngày PT, rowLimit ≤25.000, phân trang startRow)',3],['Lưu gsc_metrics upsert idempotent + sync service',3],['UI so sánh 2 kỳ × page/query/device/country + danh sách cơ hội (vị trí 8–20, CTR thấp, bài tụt)',4],['CTR/dataState/thiếu dữ liệu',1],['Test + đối chiếu AC09',3]]},
+{id:'5.4',code:'5.4',name:'Đối thủ + khoảng trống nội dung + API từ khóa trả phí',ms:'V2',h:18,due:ser(46372),branch:'feat/m07/5-4/dev2/competitor-gap',reviewer:'Dev1',deps:['5.1'],gates:['G_MIGD','G_BUDGET'],feats:['F-20'],
+ ac:'≤5 đối thủ; sitemap crawl qua crawler an toàn của Dev1; bản đồ chủ đề + khoảng trống; 1 nguồn keyword trả phí sau khi duyệt ngân sách, chưa duyệt → "Chưa cấu hình".',
+ subs:[['Nhập đối thủ + crawl sitemap qua crawler Dev1 (allowlist/SSRF)',4],['Bản đồ chủ đề + thuật toán khoảng trống so với cluster nội bộ',5],['KeywordSource interface + adapter DataForSEO (khóa theo ngân sách)',4],['UI khoảng trống → "Thêm vào kế hoạch"',3],['Test',2]]},
+{id:'6.1',code:'6.1',name:'QA nâng cao: trùng lặp internet, kiểm dữ kiện, giọng thương hiệu',ms:'V2',h:24,due:ser(46377),branch:'feat/m07/6-1/dev2/quality-plus',reviewer:'Dev1',deps:['5.4'],gates:[],feats:['F-21','AC10'],
+ ac:'Trùng lặp chỉ tra nguồn được phép (đối thủ + sitemap công ty), không scrape Google; khẳng định thiếu nguồn bị gắn cờ; giọng thương hiệu: checklist + AI chấm 1–5.',
+ subs:[['Trùng lặp: 8-gram với nguồn cho phép',6],['Trích claim → đối chiếu sources_cited → cờ thiếu nguồn',7],['Giọng thương hiệu: checklist + AI chấm',5],['Tích hợp UI duyệt',3],['Test',3]]},
+{id:'6.4',code:'6.4',name:'Phòng ban + đa thương hiệu + RBAC từng website',ms:'V2',h:12,due:ser(46379),branch:'feat/m08/6-4/dev2/brands-rbac',reviewer:'Dev1',deps:['6.1'],gates:['G_MIGF'],feats:['F-24','SEC03'],
+ ac:'Người phụ trách nhãn hàng A không xem được chiến dịch nhãn hàng B; kiểm tra phía server; test âm tính chéo brand.',
+ subs:[['Trait ScopedToWebsite + policies server-side',5],['Resource Brand/Department',3],['Test âm tính chéo brand',3],['Tài liệu',1]]},
+/* cộng tác / review */
+{id:'c0.1',code:'0.1',name:'Cộng tác chốt phạm vi & hợp đồng dữ liệu (Dev2 4h)',ms:'V1.0',h:4,due:ser(46329),branch:'docs/m01/0-1/dev1/scope-contract',collab:true,deps:[],gates:[],feats:[],ac:'Theo sheet 7: hoàn thành 04/11 (5f08e6e). Dev2 chưa có nhật ký giờ riêng.',subs:[['Đọc & đồng ý phạm vi, contract, 4 file quy chuẩn',4]]},
+{id:'c0.2',code:'R0.2',name:'Review 0.2 hạ tầng/CI (Dev2 2h) — kiểm 4 mức bằng chứng',ms:'V1.0',h:2,due:ser(46333),branch:'(review PR Dev1)',collab:true,deps:['a0.2'],gates:[],feats:['QA01','QA03','SEC01'],ac:'Ghi rõ mức đạt: code / mock / staging / người thật. Thiếu HTTPS + staging riêng → "Chưa đạt".',subs:[['Review compose/CI, backup-restore, HTTPS; ghi mức bằng chứng',2]]},
+{id:'c0.4',code:'R0.4',name:'Review 0.4 Auth/Policies/credential (Dev2 2h)',ms:'V1.0',h:2,due:ser(46337),branch:'(review PR Dev1)',collab:true,deps:['a0.4'],gates:[],feats:['F-01','AC08','SEC02','SEC03'],ac:'Xác nhận có/không: Policies, authorize(), rate limit login, che log (E1).',subs:[['Review policies/credential/log; kết luận bằng văn bản trong Issue Conformance',2]]},
+{id:'c3.1',code:'R3.1',name:'Review 3.1 pipeline AI (Dev2 2h)',ms:'V1.0',h:2,due:ser(46344),branch:'(review PR Dev1)',collab:true,deps:['a3.1'],gates:[],feats:['F-07','SPEC08'],ac:'Xác nhận E2 (fallback im lặng, token bịa), E3 (sanitizer).',subs:[['Review pipeline + sanitizer; nêu E2/E3 trong Issue',2]]},
+{id:'c3.6',code:'R3.6',name:'Review 3.6 tự đăng + ca lỗi QA07 (Dev2 2h)',ms:'V1.1',h:2,due:ser(46354),branch:'(review PR Dev1)',collab:true,deps:['a3.6'],gates:[],feats:['F-13','F-14','AC04','AC05','AC06','QA07'],ac:'Chạy bộ ca lỗi: timeout sau tạo, 2 worker, restart, thu hồi credential trên CẢ WP và Magento; không chấp nhận chỉ HTTP 200.',subs:[['Chạy QA07 trên WP + Magento, ghi publication_key/remote_id/URL',2]]},
+{id:'c4.1',code:'P4.1',name:'Pilot 4 ngày (Dev2 8h = 4 × 2h)',ms:'V1.2',h:8,due:ser(46364),branch:'test/m06/4-1/dev1/pilot',collab:true,deps:[],startWith:'a4.1',perDay:2,gates:[],feats:['AC13'],ac:'Log mỗi ngày docs/evidence/4-1/dev2-dayN.md: số bài tạo/duyệt/đăng, lỗi, khôi phục.',subs:[['Ngày 1',2],['Ngày 2',2],['Ngày 3',2],['Ngày 4',2]]},
+{id:'c4.2',code:'H4.2',name:'Bàn giao: sửa lỗi UI/connector, prompt v2, hướng dẫn Marketing (Dev2 6h)',ms:'V1.2',h:6,due:ser(46365),branch:'feat/m06/4-2/dev1/handover',collab:true,deps:['a4.2'],gates:[],feats:['AC13'],ac:'Marketing tự tạo/duyệt/dừng chiến dịch và ký nghiệm thu.',subs:[['Sửa lỗi cụm UI/connector từ pilot',2],['Prompt v2 từ log pilot',1],['HUONG_DAN_MARKETING.md + ảnh từng bước',2],['Tập huấn 1h',1]]},
+{id:'c7.2',code:'S7.2',name:'Ổn định 5 ngày (Dev2 10h = 5 × 2h)',ms:'V2',h:10,due:ser(46389),branch:'test/m08/7-2/dev1/stability',collab:true,deps:[],startWith:'a7.2',perDay:2,gates:[],feats:[],ac:'5 ngày quan sát không lỗi P0/P1; bàn giao tài liệu.',subs:[['Ngày 1',2],['Ngày 2',2],['Ngày 3',2],['Ngày 4',2],['Ngày 5',2]]},
+/* việc ngoài WBS (đề xuất) — mặc định tắt */
+{id:'X1',code:'X1',name:'[Đề xuất] Theme Filament tối thiểu theo design tokens (accent, font, badge trạng thái)',ms:'V1.0',h:6,due:'2026-11-17',branch:'feat/m01/0-5/dev2/filament-theme',extra:true,after:'0.5',deps:['0.5'],gates:[],feats:[],ac:'Giữ nhận diện "Editorial Ledger" ở mức tối thiểu, không port cmd-palette/kéo thả. Ngân sách lấy từ dự phòng 15%.',subs:[['Vite + Tailwind theme Filament: màu, font, mật độ bảng',3],['Badge trạng thái bài/publication thống nhất với mockup',2],['Chụp đối chiếu mockup ↔ Filament',1]]},
+{id:'X2',code:'X2',name:'[Đề xuất] Mockup content-plan + seo-audit (2 trang còn thiếu cho 2.2 / 1.3)',ms:'V1.2',h:4,due:'2026-11-23',branch:'docs/design/dev2/mock-plan-audit',extra:true,after:'3.5',deps:[],gates:[],feats:[],ac:'2 trang HTML dùng chung tokens/components, bám enum thật.',subs:[['content-plan.html',2],['seo-audit.html',2]]},
+{id:'X4',code:'X4',name:'[Đề xuất] Mockup search-console + competitors + ai-usage + styleguide',ms:'V2',h:6,due:'2026-11-30',branch:'docs/design/dev2/mock-v2',extra:true,after:'1.3',deps:[],gates:[],feats:[],ac:'Gỡ 4 liên kết chết còn lại trong sidebar.',subs:[['search-console.html',2],['competitors.html',1.5],['ai-usage.html (chốt VND/USD)',1.5],['styleguide.html',1]]}
+];
+
+/* việc của Dev1 (chỉ để dự báo phụ thuộc). status mặc định: todo|doing|review|done */
+const D1=[
+{id:'a0.1',code:'0.1',name:'Chốt phạm vi & contract',h:4,due:ser(46329),deps:[],st:'done'},
+{id:'a0.2',code:'0.2',name:'Hạ tầng Docker/CI/HTTPS/backup',h:22,due:ser(46333),deps:[],st:'review'},
+{id:'a0.4',code:'0.4',name:'Auth/Policies/credential',h:20,due:ser(46337),deps:[],st:'review'},
+{id:'a3.1',code:'3.1',name:'Pipeline AI + sanitizer',h:18,due:ser(46344),deps:[],st:'review'},
+{id:'a1.4',code:'1.4',name:'Magento Company_BlogApi',h:24,due:ser(46349),deps:[],st:'review'},
+{id:'a3.2',code:'3.2',name:'Queue/Scheduler/đối soát',h:12,due:ser(46351),deps:[],st:'review'},
+{id:'a3.3',code:'3.3',name:'Thư viện ảnh công ty',h:8,due:ser(46352),deps:[],st:'todo'},
+{id:'a3.6',code:'3.6',name:'Worker tự đăng 2 CMS + nút dừng',h:12,due:ser(46354),deps:['1.2','a1.4','a3.2','a3.3','3.4','3.5'],st:'todo'},
+{id:'a1.1',code:'1.1',name:'Crawler + audit on-page + chống SSRF',h:12,due:ser(46357),deps:[],st:'todo'},
+{id:'a4.1',code:'4.1',name:'Pilot 4 ngày (Dev1 8h)',h:8,due:ser(46364),deps:['a3.6','1.3','2.2'],perDay:2,st:'todo'},
+{id:'a4.2',code:'4.2',name:'Bàn giao Marketing (Dev1 6h)',h:6,due:ser(46365),deps:['a4.1'],st:'todo'},
+{id:'a5.2',code:'5.2',name:'Cập nhật bài cũ (version/diff/rollback)',h:18,due:ser(46368),deps:['a4.2'],st:'todo'},
+{id:'a5.3',code:'5.3',name:'Liên kết nội bộ',h:12,due:ser(46371),deps:['a5.2'],st:'todo'},
+{id:'a6.2',code:'6.2',name:'Tiếng Anh',h:12,due:ser(46373),deps:['a5.3'],st:'todo'},
+{id:'a6.3',code:'6.3',name:'Thông báo Telegram/Zalo/email',h:12,due:ser(46375),deps:['a6.2'],st:'todo'},
+{id:'a6.5',code:'6.5',name:'Usage/cache/ảnh AI',h:16,due:ser(46379),deps:['a6.3'],st:'todo'},
+{id:'a7.1',code:'7.1',name:'Hardening/restore drill',h:18,due:ser(46382),deps:['a6.5'],st:'todo'},
+{id:'a7.2',code:'7.2',name:'Ổn định 5 ngày (Dev1 10h)',h:10,due:ser(46389),deps:['a7.1','6.4'],perDay:2,st:'todo'}
+];
+D1.forEach(t=>{t.lane='dev1';t.gates=[];});
+D2.forEach(t=>{t.lane='dev2';});
+const ALL=D2.concat(D1), TMAP={}; ALL.forEach(t=>TMAP[t.id]=t);
+const GMAP={}; GATES.forEach(g=>GMAP[g.id]=g);
+const DEFAULT_ORDER=['x0','c0.4','0.5','X1','3.4','1.2','c0.2','c3.1','3.5','0.3','X2','a3.3','a1.1','a3.6','c3.6','2.1','2.2','1.3','X4','a4.1','c4.1','a4.2','c4.2','5.1','a5.2','5.4','a5.3','6.1','a6.2','6.4','a6.3','a6.5','a7.1','a7.2','c7.2'];
+const BASELINE_START='2026-11-03';
+
+/* ========== trạng thái (localStorage) ========== */
+const KEY='dev2-dashboard-v1';
+const DEF={v:1,settings:{daily:6,reserve:.5,todayHours:6,dev1Hours:6,dev1From:'',todayOverride:''},sub:{},st:{'c0.1':'done'},ev:{},f:{},log:[],gates:{},d1:{},order:null,extraOn:{},off:{},cap:{},open:{},qdone:{},rstat:{},fstat:{},tab:'overview'};
+let S=load();
+function load(){try{const r=JSON.parse(localStorage.getItem(KEY)||'null');if(r&&r.v===1){const m=Object.assign({},DEF,r);m.settings=Object.assign({},DEF.settings,r.settings||{});return m;}}catch(e){}return JSON.parse(JSON.stringify(DEF));}
+let saveTimer=null;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));$('#save-state').textContent='Đã lưu '+new Date().toLocaleTimeString('vi-VN');}catch(e){$('#save-state').textContent='⚠ Không lưu được (trình duyệt chặn) — hãy Xuất JSON';}}
+function $(s,r){return (r||document).querySelector(s);}
+function TODAY(){return S.settings.todayOverride||iso(new Date(Date.now()-new Date().getTimezoneOffset()*6e4));}
+GATES.forEach(g=>{if(!S.gates[g.id])S.gates[g.id]={exp:g.exp,got:false};});
+D1.forEach(t=>{if(!S.d1[t.id])S.d1[t.id]={st:t.st,rem:t.h};});
+
+/* ========== tính toán ========== */
+const isOff=s=>dow(s)===0||!!HOL[s]||!!S.off[s];
+function isWork(s){return !isOff(s);}
+function nextWork(s){let d=s,g=0;while(isOff(d)&&g++<400)d=addDays(d,1);return d;}
+function d2active(){return D2.filter(t=>!t.extra||S.extraOn[t.id]);}
+function subDone(t,i){return !!(S.sub[t.id]&&S.sub[t.id][i]);}
+function pct(t){if(t.lane==='dev1'){const s=S.d1[t.id].st;return s==='done'||s==='review'?1:Math.max(0,1-(S.d1[t.id].rem/t.h));}
+ if((S.st[t.id]||'todo')==='done')return 1;let d=0;t.subs.forEach((s,i)=>{if(subDone(t,i))d+=s[1];});return t.h?d/t.h:0;}
+function status(t){return t.lane==='dev1'?S.d1[t.id].st:(S.st[t.id]||'todo');}
+function remaining(t){if(t.lane==='dev1'){const s=S.d1[t.id];return (s.st==='done'||s.st==='review')?0:Math.max(0,+s.rem||0);}
+ if(status(t)==='done')return 0;return Math.max(0,t.h*(1-pct(t)));}
+function sat(t){const s=status(t);return s==='done'||(t.lane==='dev1'&&s==='review');}
+function tasksInOrder(){const base=S.order&&S.order.length?S.order.slice():DEFAULT_ORDER.slice();DEFAULT_ORDER.forEach(id=>{if(base.indexOf(id)<0)base.push(id);});return base.filter(id=>{const t=TMAP[id];return t&&(!t.extra||S.extraOn[id]);});}
+
+function compute(){
+ const today=TODAY();const res={};const left={dev2:{},dev1:{}};
+ const cap=(lane,day)=>{if(isOff(day))return 0;if(lane==='dev2'){if(S.cap[day]!=null&&S.cap[day]!=='')return +S.cap[day];return day===today?+S.settings.todayHours:Math.max(0,+S.settings.daily-+S.settings.reserve);}return +S.settings.dev1Hours;};
+ const lf=(lane,day)=>{if(left[lane][day]==null)left[lane][day]=cap(lane,day);return left[lane][day];};
+ function sched(id){
+  if(res[id])return res[id];const t=TMAP[id];if(!t)return null;
+  const r={id,start:null,finish:null,alloc:{},rem:remaining(t),reason:'',chain:null,earliest:today};res[id]=r;
+  let earliest=today,reason='hôm nay',chain=null;
+  const bump=(d,why,ch)=>{if(d>earliest){earliest=d;reason=why;chain=ch;}};
+  (t.deps||[]).forEach(dep=>{const dt=TMAP[dep];if(!dt||sat(dt))return;const dr=sched(dep);if(!dr||!dr.finish)return;
+    bump(dt.lane===t.lane?dr.finish:nextWork(addDays(dr.finish,1)),'đợi '+dt.code+(dt.lane==='dev1'?' (Dev1)':''),dep);});
+  (t.gates||[]).forEach(g=>{const G=GMAP[g],gs=S.gates[g];if(G.hard&&!gs.got&&gs.exp)bump(nextWork(gs.exp),'đợi '+G.short,'gate:'+g);});
+  const hold=(S.f[id]||{}).hold;if(hold)bump(hold,'tạm hoãn đến '+fmt(hold),null);
+  if(t.startWith){const sr=sched(t.startWith);if(sr&&sr.start)bump(sr.start,'cùng '+TMAP[t.startWith].code,t.startWith);}
+  if(t.lane==='dev1'&&S.settings.dev1From)bump(S.settings.dev1From,'Dev1 rảnh từ '+fmt(S.settings.dev1From),null);
+  r.earliest=earliest;
+  if(r.rem<=1e-9){r.done=true;return r;}
+  let day=nextWork(earliest),remain=r.rem,guard=0;const per=t.perDay||Infinity;
+  while(remain>1e-9&&guard++<900){const l=lf(t.lane,day);const a=Math.min(remain,l,per);
+    if(a>1e-9){r.alloc[day]=(r.alloc[day]||0)+a;left[t.lane][day]-=a;remain-=a;if(!r.start)r.start=day;r.finish=day;}
+    day=nextWork(addDays(day,1));}
+  r.reason=(r.start&&r.start>nextWork(earliest))?'đợi nguồn lực (Dev bận việc khác trước đó)':reason;r.chain=chain;
+  return r;}
+ const order=tasksInOrder();order.forEach(sched);
+ // milestone
+ const ms={};Object.keys(MS).forEach(k=>{let fin=null,missing=false;MSIDS[k].forEach(id=>{const t=TMAP[id];if(!t)return;const r=res[id];if(r&&r.finish&&(!fin||r.finish>fin))fin=r.finish;});
+  const due=MS[k].due;let rag='ok';if(fin){const d=diffDays(fin,due);rag=d<=0?'ok':d<=3?'warn':'bad';}ms[k]={fin,due,rag,slip:fin?diffDays(fin,due):0};});
+ return {today,res,ms,order};
+}
+function chainOf(res,id){const out=[];let cur=id,g=0;while(cur&&g++<20){const t=TMAP[cur];const r=res[cur];if(!t||!r)break;out.push({id:cur,code:t.code,lane:t.lane,start:r.start,finish:r.finish,reason:r.reason});
+  const c=r.chain;if(!c||String(c).indexOf('gate:')===0){if(c)out.push({gate:c.slice(5)});break;}cur=c;}return out.reverse();}
+
+/* ========== định danh tab ========== */
+const TABS=[['overview','Tổng quan'],['tasks','Công việc'],['plan','Lịch & dự báo'],['deps','Phụ thuộc & chặn'],['system','Phân tích hệ thống'],['world','Học từ thế giới'],['design','Thiết kế UI'],['report','Nhật ký & báo cáo']];
+function renderTabs(){$('#tabs').innerHTML=TABS.map(t=>'<button role="tab" data-tab="'+t[0]+'" aria-selected="'+(S.tab===t[0])+'">'+t[1]+'</button>').join('');}
+
+/* ========== nhỏ: chip/thanh ========== */
+const STL={todo:['Chưa bắt đầu',''],doing:['Đang làm','info'],blocked:['Bị chặn','bad'],review:['Chờ review','warn'],done:['Hoàn thành','ok']};
+const chip=(txt,cls)=>'<span class="chip '+(cls||'')+'">'+esc(txt)+'</span>';
+const bar=p=>'<div class="bar"><i style="width:'+Math.round(p*100)+'%"></i></div>';
+const ragChip=(r,t)=>chip(t,r);
+function hoursLogged(id){return S.log.filter(e=>e.task===id).reduce((a,e)=>a+(+e.hours||0),0);}
+function totalLogged(){return S.log.reduce((a,e)=>a+(+e.hours||0),0);}
+
+/* ========== TAB: Tổng quan ========== */
+function viewOverview(C){
+ const {today,res,ms}=C;const act=d2active().filter(t=>!t.overhead&&!t.extra);
+ const wbsH=act.reduce((a,t)=>a+t.h,0);const earned=act.reduce((a,t)=>a+t.h*pct(t),0);
+ const accepted=act.filter(t=>status(t)==='done'&&evOK(t)).reduce((a,t)=>a+t.h,0);
+ const logged=totalLogged();
+ const d2fin=d2active().map(t=>res[t.id]&&res[t.id].finish).filter(Boolean).sort().pop();
+ const over=act.filter(t=>t.due<today&&status(t)!=='done'&&!t.collab);
+ const gOpen=GATES.filter(g=>!S.gates[g.id].got);
+ const gLate=gOpen.filter(g=>S.gates[g.id].exp<today);
+ const p0=FINDINGS.filter(f=>f[1]==='P0'&&S.fstat[f[0]]!=='closed').length;
+ let h='<h2>Hôm nay · '+fmtW(today)+'/'+pd(today).getUTCFullYear()+'</h2>';
+ h+='<p class="lead">Bảng này kế thừa bản phân tích DEV2_IMPLEMENTATION_PLAN.md (05/11), đối chiếu lại với Excel (09:55), TASKS.md và code ở <code>origin/develop 1e24d72</code>. Dự báo tự tính lại mỗi khi bạn tick việc nhỏ, ghi giờ hoặc đổi ngày nhận cổng phụ thuộc.</p>';
+ h+='<div class="grid g4">';
+ h+='<div class="card kpi"><div class="l">Giờ Dev2 đã làm xong (theo việc nhỏ)</div><div class="v num">'+n1(earned)+' / '+n1(wbsH)+'h</div><div class="c">'+Math.round(earned/wbsH*100)+'% · nghiệm thu thật (đủ bằng chứng): <b class="num">'+n1(accepted)+'h</b></div></div>';
+ h+='<div class="card kpi"><div class="l">Giờ thực tế đã ghi nhật ký</div><div class="v num">'+n1(logged)+'h</div><div class="c">'+(logged>0?'Hiệu suất = '+n1(earned/logged*100)+'% (giờ xong / giờ bỏ ra)':'<span class="muted">Chưa có nhật ký — ghi ở tab "Nhật ký"</span>')+'</div></div>';
+ const lateD=d2fin?diffDays(d2fin,'2027-01-02'):0;
+ h+='<div class="card kpi"><div class="l">Dự báo xong toàn bộ phần Dev2</div><div class="v num">'+fmt(d2fin)+'</div><div class="c">'+chip(lateD<=0?'Trước hạn V2 02/01 '+(-lateD)+' ngày':'Trễ hạn V2 '+lateD+' ngày',lateD<=0?'ok':'bad')+'</div></div>';
+ h+='<div class="card kpi"><div class="l">Quá hạn / cổng chưa nhận</div><div class="v num">'+over.length+' · '+gOpen.length+'</div><div class="c">'+(gLate.length?chip(gLate.length+' cổng quá ngày hẹn','bad'):chip('Không cổng nào quá hẹn','ok'))+' · '+chip(p0+' phát hiện P0 mở',p0?'bad':'ok')+'</div></div>';
+ h+='</div>';
+ h+='<h2>Mốc bàn giao: dự báo so với hạn</h2><div class="tw"><table><thead><tr><th>Mốc</th><th>Nội dung</th><th>Hạn (Excel)</th><th>Dự báo xong</th><th>Lệch</th><th>Đường găng (việc quyết định ngày xong)</th></tr></thead><tbody>';
+ Object.keys(MS).forEach(k=>{const m=ms[k];let last=null;MSIDS[k].forEach(id=>{const r=res[id];if(r&&r.finish&&(!last||r.finish>=res[last].finish))last=id;});
+  const ch=last?chainOf(res,last).map(c=>c.gate?'<span class="chip warn">cổng '+esc(GMAP[c.gate].short)+'</span>':'<span class="chip '+(c.lane==='dev1'?'info':'')+'">'+esc(c.code)+(c.lane==='dev1'?' D1':'')+'</span>').join(' → '):'<span class="muted">đã xong</span>';
+  h+='<tr><td><b>'+k+'</b></td><td>'+esc(MS[k].name)+'</td><td class="num">'+fmt(m.due)+'</td><td class="num">'+fmt(m.fin)+'</td><td>'+ragChip(m.rag,m.fin?(m.slip<=0?'sớm '+(-m.slip)+'n':'trễ '+m.slip+'n'):'—')+'</td><td class="small">'+ch+'</td></tr>';});
+ h+='</tbody></table></div>';
+ h+='<h2>Cảnh báo tự động</h2>'+alerts(C,over,gLate);
+ h+='<h2>Việc 6 ngày làm việc tới (Dev2)</h2>'+upcoming(C);
+ return h;}
+function evOK(t){const e=S.ev[t.id]||{};if(!(e.L1&&e.L2))return false;if(!e.na3&&!e.L3)return false;return !!e.L4||!!e.na4;}
+function alerts(C,over,gLate){const {today,res}=C;let a='';
+ over.forEach(t=>{a+='<div class="alert bad"><b>'+t.code+'</b> quá hạn '+diffDays(today,t.due)+' ngày (hạn '+fmt(t.due)+', trạng thái '+STL[status(t)][0]+'). Dự báo xong '+fmt(res[t.id]&&res[t.id].finish)+'.</div>';});
+ gLate.forEach(g=>{a+='<div class="alert bad">Cổng <b>'+esc(g.short)+'</b> ('+esc(g.who)+') hẹn '+fmt(S.gates[g.id].exp)+' nhưng chưa nhận. Ảnh hưởng: '+esc(g.impact)+'.</div>';});
+ GATES.filter(g=>!S.gates[g.id].got&&!g.hard&&S.gates[g.id].exp>=today).forEach(g=>{const need=D2.filter(t=>(t.gates||[]).indexOf(g.id)>=0&&res[t.id]&&res[t.id].start&&res[t.id].start<S.gates[g.id].exp);
+  need.forEach(t=>{a+='<div class="alert">Cổng mềm <b>'+esc(g.short)+'</b> hẹn '+fmt(S.gates[g.id].exp)+', nhưng <b>'+t.code+'</b> dự kiến bắt đầu '+fmt(res[t.id].start)+' → phần tích hợp có thể rơi vào "Bị chặn tích hợp".</div>';});});
+ const r36=res['a3.6'];if(r36&&r36.start)a+='<div class="alert info">Dev1 <b>3.6</b> (tự đăng 2 CMS) chỉ bắt đầu được '+fmt(r36.start)+' — lý do: '+esc(r36.reason)+'. Phần Dev2 (1.2, 3.4, 3.5) nằm trên đường găng của V1.1.</div>';
+ const rem=tasksInOrder().map(id=>TMAP[id]).filter(t=>t.lane==='dev2'&&!t.extra).reduce((s,t)=>s+remaining(t),0);
+ a+='<div class="alert info">Còn lại <b class="num">'+n1(rem)+'h</b> việc Dev2. Công suất mặc định '+n1(+S.settings.daily-+S.settings.reserve)+'h/ngày (6h − '+n1(+S.settings.reserve)+'h dành review PR Dev1, vì 10 task Dev1 không có giờ Dev2 nhưng AC12 bắt buộc review chéo).</div>';
+ const open0=FINDINGS.filter(f=>f[1]==='P0'&&S.fstat[f[0]]!=='closed');
+ if(open0.length)a+='<div class="alert bad">'+open0.length+' phát hiện mức P0 chưa đóng: '+open0.map(f=>'<b>'+f[0]+'</b>').join(', ')+' — xem tab "Phân tích hệ thống".</div>';
+ return a||'<div class="alert ok">Không có cảnh báo.</div>';}
+function upcoming(C){const {today,res}=C;const days=[];let d=nextWork(today),g=0;while(days.length<6&&g++<30){days.push(d);d=nextWork(addDays(d,1));}
+ let h='<div class="tw"><table><thead><tr><th>Ngày</th><th>Dự kiến làm</th><th>Giờ</th><th>Đã ghi nhật ký</th></tr></thead><tbody>';
+ days.forEach(day=>{const items=[];let tot=0;Object.keys(res).forEach(id=>{const t=TMAP[id];if(t.lane!=='dev2')return;const a=res[id].alloc[day];if(a){items.push('<b>'+esc(t.code)+'</b> '+esc(t.name.slice(0,70))+' <span class="num">('+n1(a)+'h)</span>');tot+=a;}});
+  const lg=S.log.filter(e=>e.date===day).reduce((s,e)=>s+(+e.hours||0),0);
+  h+='<tr><td>'+fmtW(day)+(day===today?' '+chip('hôm nay','info'):'')+'</td><td>'+(items.join('<br>')||'<span class="muted">—</span>')+'</td><td class="num">'+n1(tot)+'</td><td class="num">'+(lg?n1(lg)+'h':'—')+'</td></tr>';});
+ return h+'</tbody></table></div>';}
+
+/* ========== TAB: Công việc ========== */
+function viewTasks(C){const {res}=C;let h='<h2>Công việc của Dev2</h2><p class="lead">Tick từng việc nhỏ khi xong (lưu ngày hoàn thành để tự điền báo cáo). Một task chỉ nên chuyển "Hoàn thành" khi đủ bằng chứng theo 4 mức: <b>L1</b> đã viết code → <b>L2</b> test giả lập đạt → <b>L3</b> tích hợp staging → <b>L4</b> người thật nghiệm thu. Thiếu môi trường: ghi N/A kèm lý do, không ghi giả.</p>';
+ h+='<div class="note" style="margin-bottom:8px">Việc ngoài WBS ("[Đề xuất]") mặc định tắt — bật ở đây để đưa vào lịch: '+D2.filter(t=>t.extra).map(t=>'<label><input type="checkbox" data-extra="'+t.id+'" '+(S.extraOn[t.id]?'checked':'')+'> '+t.code+' ('+t.h+'h)</label>').join(' &nbsp; ')+'</div>';
+ ['V1.0','V1.1','V1.2','V2'].forEach(m=>{const list=d2active().filter(t=>t.ms===m);if(!list.length)return;
+  h+='<h3>'+m+' · hạn '+fmt(MS[m].due)+' · '+MS[m].name+'</h3>';list.forEach(t=>{h+=taskRow(t,res[t.id]);});});
+ return h;}
+function taskRow(t,r){const st=status(t),p=pct(t),open=S.open[t.id];const f=S.f[t.id]||{};const e=S.ev[t.id]||{};
+ const fin=r&&r.finish;const late=fin&&fin>t.due;
+ let h='<details class="task" data-id="'+t.id+'" '+(open?'open':'')+'><summary><span class="mono"><b>'+esc(t.code)+'</b></span><span>'+esc(t.name)+(t.collab?' '+chip('cộng tác','info'):'')+(t.extra?' '+chip('ngoài WBS','warn'):'')+'</span><span class="num">'+n1(t.h)+'h</span><span>'+bar(p)+'<span class="small num">'+Math.round(p*100)+'%</span></span><span class="small">Hạn '+fmt(t.due)+'<br>'+(st==='done'?'<span class="muted">xong</span>':'DB '+chip(fmt(fin),late?'bad':'ok'))+'</span><span>'+chip(STL[st][0],STL[st][1])+'</span></summary>';
+ h+='<div class="tbody"><div><b>Việc nhỏ</b>';
+ t.subs.forEach((s,i)=>{const d=S.sub[t.id]&&S.sub[t.id][i];h+='<label class="sub '+(d?'done':'')+'"><input type="checkbox" data-sub="'+t.id+':'+i+'" '+(d?'checked':'')+'><span>'+esc(s[0])+' <span class="muted num">'+n1(s[1])+'h'+(s[2]?' · cần môi trường/quyền ngoài':'')+(d&&d!==true?' · xong '+fmt(d):'')+'</span></span></label>';});
+ h+='<p class="note"><b>Tiêu chí nghiệm thu:</b> '+esc(t.ac)+'</p>';
+ if(t.feats&&t.feats.length)h+='<p class="note">Liên quan: '+t.feats.map(x=>'<code>'+esc(x)+'</code>').join(' ')+'</p>';
+ if((t.gates||[]).length)h+='<p class="note">Cổng phụ thuộc: '+t.gates.map(g=>{const gs=S.gates[g];return chip(GMAP[g].short+(gs.got?' ✓':' · hẹn '+fmt(gs.exp)),gs.got?'ok':(GMAP[g].hard?'bad':'warn'));}).join(' ')+'</p>';
+ h+='</div><div>';
+ h+='<div class="small" style="display:grid;grid-template-columns:110px 1fr;gap:6px;align-items:center">';
+ h+='<span>Trạng thái</span><select data-st="'+t.id+'">'+['todo','doing','blocked','review','done'].map(k=>'<option value="'+k+'" '+(st===k?'selected':'')+'>'+STL[k][0]+'</option>').join('')+'</select>';
+ h+='<span>Nhánh</span><span class="mono small">'+esc(t.branch)+'</span>';
+ h+='<span>Reviewer</span><span>'+esc(t.reviewer||'Dev1')+'</span>';
+ h+='<span>Base SHA</span><input data-f="'+t.id+':base" value="'+esc(f.base||'')+'" placeholder="develop @ …">';
+ h+='<span>Commit SHA</span><input data-f="'+t.id+':sha" value="'+esc(f.sha||'')+'" placeholder="SHA hoàn thành">';
+ h+='<span>PR / CI URL</span><input data-f="'+t.id+':pr" value="'+esc(f.pr||'')+'" placeholder="https://github.com/…">';
+ h+='<span>Tạm hoãn đến</span><input type="date" data-f="'+t.id+':hold" value="'+esc(f.hold||'')+'">';
+ h+='<span>Giờ thực tế</span><span class="num">'+n1(hoursLogged(t.id))+'h <span class="muted">/ '+n1(t.h)+'h dự kiến</span></span>';
+ h+='</div>';
+ h+='<p class="small" style="margin:10px 0 4px"><b>Bằng chứng</b> (không tick nếu chưa có)</p><div class="lvl">';
+ [['L1','Đã code'],['L2','Test giả lập'],['L3','Staging'],['L4','Người nghiệm thu']].forEach(l=>{const on=e[l[0]];h+='<label class="'+(on?'on':'')+'"><input type="checkbox" hidden data-ev="'+t.id+':'+l[0]+'" '+(on?'checked':'')+'>'+l[0]+' '+l[1]+'</label>';});
+ h+='</div><div class="small" style="margin-top:6px"><label><input type="checkbox" data-ev="'+t.id+':na3" '+(e.na3?'checked':'')+'> L3 không áp dụng / bị chặn</label> &nbsp; <label><input type="checkbox" data-ev="'+t.id+':na4" '+(e.na4?'checked':'')+'> L4 không áp dụng</label></div>';
+ h+='<p class="small" style="margin:10px 0 4px"><b>Ghi chú / vướng mắc</b></p><textarea data-f="'+t.id+':note" placeholder="Kết quả, lỗi còn lại, blocker…">'+esc(f.note||'')+'</textarea>';
+ h+='</div></div></details>';return h;}
+
+/* ========== TAB: Lịch & dự báo ========== */
+function viewPlan(C){const {today,res}=C;
+ let h='<h2>Lịch & dự báo</h2><p class="lead">Bộ lập lịch xếp việc theo thứ tự ưu tiên bên dưới, tôn trọng phụ thuộc (kể cả việc của Dev1 và cổng cứng), công suất mỗi ngày và ngày nghỉ. <b>Chủ nhật và ngày lễ không phải ngày làm việc</b> (WBS gốc: 6 ngày T2–T7). Đổi cài đặt hoặc thứ tự → dự báo tính lại ngay.</p>';
+ h+='<div class="card"><b>Cài đặt công suất</b><div class="small" style="display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;align-items:center">'
+  +'<label>Giờ/ngày <input type="number" step=".5" min="0" max="12" style="width:64px" data-set="daily" value="'+S.settings.daily+'"></label>'
+  +'<label>Dành review PR Dev1 (giờ/ngày) <input type="number" step=".25" min="0" max="4" style="width:64px" data-set="reserve" value="'+S.settings.reserve+'"></label>'
+  +'<label>Giờ còn lại hôm nay <input type="number" step=".5" min="0" max="12" style="width:64px" data-set="todayHours" value="'+S.settings.todayHours+'"></label>'
+  +'<label>Dev1 giờ/ngày <input type="number" step=".5" min="0" max="12" style="width:64px" data-set="dev1Hours" value="'+S.settings.dev1Hours+'"></label>'
+  +'<label>Dev1 rảnh từ <input type="date" data-set="dev1From" value="'+esc(S.settings.dev1From)+'"></label>'
+  +'<label>Giả lập hôm nay <input type="date" data-set="todayOverride" value="'+esc(S.settings.todayOverride)+'"></label>'
+  +'</div><p class="note" style="margin:8px 0 0">Ngày nghỉ phép / ngày bận: nhập ngày + số giờ làm được (0 = nghỉ) <input type="date" id="capd"> <input type="number" id="caph" step=".5" style="width:60px" placeholder="giờ"> <button class="btn sm" data-act="setcap">Đặt</button> '+Object.keys(S.cap).sort().map(d=>'<span class="chip">'+fmt(d)+': '+S.cap[d]+'h <a href="#" data-act="delcap" data-d="'+d+'">×</a></span>').join(' ')+'</p></div>';
+ // Gantt
+ const rows=C.order.map(id=>TMAP[id]).filter(t=>res[t.id]&&res[t.id].start&&(t.lane==='dev2'||['a3.3','a1.1','a3.6','a4.1','a4.2'].indexOf(t.id)>=0));
+ const end=rows.reduce((m,t)=>res[t.id].finish>m?res[t.id].finish:m,addDays(today,14));const total=Math.max(14,diffDays(end,today)+3);
+ const L=d=>Math.max(0,diffDays(d,today))/total*100;
+ h+='<h3>Biểu đồ Gantt (xanh lá: Dev2 · xanh dương: Dev1 · đỏ: dự báo trễ hơn hạn Excel)</h3><div class="gantt">';
+ let lines='';Object.keys(MS).forEach(k=>{if(diffDays(MS[k].due,today)<=total)lines+='<div class="gline" style="left:'+L(MS[k].due)+'%"><small>'+k+'</small></div>';});
+ h+='<div class="grow" style="position:relative"><div class="lab muted">mốc</div><div class="trk">'+lines+'<div class="gline today" style="left:0"><small>hôm nay</small></div></div></div>';
+ rows.forEach(t=>{const r=res[t.id];const late=r.finish>t.due;const w=Math.max(.8,(diffDays(r.finish,r.start)+1)/total*100);
+  h+='<div class="grow"><div class="lab" title="'+esc(t.name)+'"><b>'+esc(t.code)+'</b> '+(t.lane==='dev1'?'D1 ':'')+esc(t.name.slice(0,18))+'</div><div class="trk"><div class="gb '+(t.lane==='dev1'?'d1':late?'late':'')+'" style="left:'+L(r.start)+'%;width:'+w+'%" title="'+fmt(r.start)+' → '+fmt(r.finish)+' (hạn '+fmt(t.due)+')"></div></div></div>';});
+ h+='</div>';
+ // thứ tự
+ h+='<h3>Thứ tự ưu tiên & dự báo từng việc</h3><div class="tw"><table><thead><tr><th>#</th><th>Việc</th><th>Còn lại</th><th>Bắt đầu</th><th>Xong</th><th>Hạn Excel</th><th>Lệch</th><th>Vì sao bắt đầu lúc đó</th><th></th></tr></thead><tbody>';
+ C.order.forEach((id,i)=>{const t=TMAP[id],r=res[id];const sl=r.finish?diffDays(r.finish,t.due):null;
+  h+='<tr><td class="num">'+(i+1)+'</td><td><b>'+esc(t.code)+'</b> '+(t.lane==='dev1'?chip('Dev1','info')+' ':'')+esc(t.name.slice(0,64))+'</td><td class="num">'+n1(r.rem)+'h</td><td class="num">'+fmt(r.start)+'</td><td class="num">'+fmt(r.finish)+'</td><td class="num">'+fmt(t.due)+'</td><td>'+(sl==null?(sat(t)||status(t)==='done'?chip('xong','ok'):'—'):chip(sl<=0?'sớm '+(-sl)+'n':'trễ '+sl+'n',sl<=0?'ok':sl<=3?'warn':'bad'))+'</td><td class="small muted">'+esc(r.done?'':r.reason)+'</td><td>'+(t.lane==='dev2'?'<button class="btn sm" data-mv="'+id+':-1">↑</button><button class="btn sm" data-mv="'+id+':1">↓</button>':'')+'</td></tr>';});
+ h+='</tbody></table></div><p class="note"><button class="btn sm" data-act="resetorder">Về thứ tự đề xuất</button> Thứ tự hiện tại: kickoff → review auth (cần cho Q3) → 0.5 → 3.4 → 1.2 → 3.5 → 0.3. Chuỗi 0.5→3.4→1.2→3.5 quyết định V1.1 vì Dev1 3.6 phải chờ 1.2, 3.4, 3.5. 0.3 được hoãn có chủ ý: chưa có key, kho nguồn, tiêu chí chất lượng nên đo ngay chỉ ra số không có giá trị; chỉ phần sửa lỗi nhỏ (bỏ fallback Mock, nguồn/số liệu bịa) nên xen vào khi rảnh.</p>';
+ // ngày làm việc
+ h+='<h3>14 ngày làm việc tới</h3>'+upcomingN(C,14);
+ return h;}
+function upcomingN(C,n){const {today,res}=C;const days=[];let d=nextWork(today),g=0;while(days.length<n&&g++<60){days.push(d);d=nextWork(addDays(d,1));}
+ return '<div class="tw"><table><thead><tr><th>Ngày</th><th>Dev2</th><th>Dev1</th></tr></thead><tbody>'+days.map(day=>{const a=[],b=[];Object.keys(res).forEach(id=>{const t=TMAP[id],x=res[id].alloc[day];if(!x)return;(t.lane==='dev2'?a:b).push('<b>'+esc(t.code)+'</b> <span class="num">'+n1(x)+'h</span>');});return '<tr><td>'+fmtW(day)+'</td><td class="small">'+(a.join(' · ')||'—')+'</td><td class="small">'+(b.join(' · ')||'—')+'</td></tr>';}).join('')+'</tbody></table></div>';}
+
+/* ========== TAB: Phụ thuộc & chặn ========== */
+const QS=[['Q1','Dev1','PublisherInterface FINAL + ERR01–07 + CmsError/ErrorMapper dùng chung','2026-11-12'],['Q2','Dev1','Sửa pipeline 3.1: bỏ fallback Mock, prompt_version, AiProviderFactory','2026-11-16'],['Q3','Dev1','Policies + authorize() Filament + che credential','2026-11-11'],['Q4','Dev1','Lệnh publish-due-posts thật (develop đã có từ 3.2) — merge vào main','2026-11-11'],['Q5','Quản lý/Dev1','Staging WP + Application Password + plugin SEO + GSC property + key Gemini','2026-11-11'],['Q6','Quản lý','Ngân sách DataForSEO & quota GSC','2026-11-30'],['Q7','Dev2','Chọn plugin SEO V1 (Rank Math vs Yoast) sau khi thấy staging','2026-11-12'],['Q8','Marketing','Nguồn tài liệu/ảnh công ty + domain allowlist','2026-11-14'],['Q9','Cả hai','Hạ trạng thái 0.2/0.4/3.1/1.4 (và 3.2) về "Chờ review" tới khi đủ AC08/SEC02/SEC03/QA02','2026-11-06'],['Q10','Dev1','Sửa Magento E9/E10 (key hệ thống cấp, publish không tự tạo draft)','2026-11-20'],['Q11','Dev2','Bổ sung test Magento 401/403/429/5xx/timeout (E12)','2026-11-20'],['Q12','Dev1','MỚI: thống nhất exception → CmsError để PublishArticleJob bắt đúng (E13)','2026-11-12'],['Q13','Dev1 + Quản lý','MỚI: ai có quyền cài mu-plugin lên WP công ty (E15)','2026-11-12'],['Q14','Dev1','MỚI: lịch 6 lô migration A–F (E17)','2026-11-10']];
+const RISKS=[['Staging WP/plugin SEO/Magento chưa sẵn','Cao','1.2 không nghiệm thu được','Hạn xin dữ liệu 11/11; không có thì giao mức mock + "Bị chặn tích hợp"','Quản lý/Dev1'],
+['Pipeline 3.1 lỗi (E2) + token/chi phí bịa','Cao','3.5/2.1/1.3 dựa dữ liệu sai','Issue Conformance; test đỏ chặn merge; 0.3 làm trước','Dev1/Dev2'],
+['Migration chậm (E17) — Dev2 không được sửa migrations','Cao','3.4/2.1/2.2/1.3/5.1 đứng','Lịch 6 lô A–F chốt ở kickoff; Dev2 viết model/test trên SQLite in-memory theo schema đề xuất','Dev1'],
+['Dev2 nằm trên đường găng V1.1 (3.6 chờ 1.2+3.4+3.5)','Cao','Trễ V1.1 28/11','Làm đúng thứ tự đề xuất; Dev1 làm 3.3/1.1 trong lúc chờ; cắt scope phụ trước khi cắt test','Dev2'],
+['Timeout CMS bị ghi "failed" thay vì needs_reconcile (E13)','Cao','Đăng trùng khi retry thủ công','Test đỏ trước; CmsError chung; job chỉ bắt CmsError','Dev1+Dev2'],
+['mu-plugin WP không cài được (E15)','Trung bình','Không tra cứu được theo key → không đối soát','Phương án: slug xác định kèm hash key + đối soát thủ công; ghi "Bị chặn"','Dev2'],
+['Quá tải 6h/ngày × 6 ngày + review PR Dev1 không có giờ','Trung bình','Trễ mốc','Dành 0,5h/ngày review; block 2h đầu ngày khi có PR; dùng dự phòng 15%','Dev2'],
+['Ngân sách API từ khóa/GSC chưa duyệt','Trung bình','5.4/5.1 thiếu số','Trạng thái "Chưa cấu hình"; không bịa volume','Quản lý'],
+['Model Gemini cấu hình đã bị Google ngừng (E16)','Trung bình','Gọi live 404, đo sai','0.3: xác minh model id hiện hành, thêm cảnh báo khi 404','Dev2'],
+['Xung đột allowlist (SEC07, service provider, config/services)','Thấp','Merge conflict','Một-owner-mỗi-file; PR riêng do Dev1 mở','Cả hai']];
+function viewDeps(C){const {res,today}=C;
+ let h='<h2>Cổng phụ thuộc (Dev1 / Quản lý / Marketing giao cho Dev2)</h2><p class="lead">Cổng "cứng" làm lịch dự báo dời theo ngày hẹn; cổng "mềm" chỉ phát cảnh báo. Tick "đã nhận" khi có thật.</p>';
+ h+='<div class="tw"><table><thead><tr><th>Cổng</th><th>Ai giao</th><th>Loại</th><th>Ngày hẹn</th><th>Đã nhận</th><th>Ảnh hưởng nếu trễ</th></tr></thead><tbody>';
+ GATES.forEach(g=>{const s=S.gates[g.id];const late=!s.got&&s.exp<today;h+='<tr><td>'+esc(g.name)+(late?'<br>'+chip('quá hẹn','bad'):'')+'</td><td>'+esc(g.who)+'</td><td>'+chip(g.hard?'cứng':'mềm',g.hard?'bad':'warn')+'</td><td><input type="date" data-gexp="'+g.id+'" value="'+esc(s.exp)+'"></td><td><input type="checkbox" data-gget="'+g.id+'" '+(s.got?'checked':'')+'></td><td class="small">'+esc(g.impact)+'</td></tr>';});
+ h+='</tbody></table></div>';
+ h+='<h2>Việc của Dev1 (để dự báo; sửa khi có tin mới)</h2><p class="lead">"Chờ review" = code đã có nhưng chưa đủ bằng chứng (xem E1/E13) — vẫn coi là thỏa phụ thuộc để lịch không đứng, nhưng được đánh dấu rủi ro. Dev1 3.6 / 4.1 / 7.2 phụ thuộc ngược vào việc của Dev2.</p>';
+ h+='<div class="tw"><table><thead><tr><th>Việc</th><th>Hạn Excel</th><th>Trạng thái</th><th>Giờ còn lại</th><th>Dự báo xong</th><th>Chờ việc của Dev2?</th></tr></thead><tbody>';
+ D1.forEach(t=>{const s=S.d1[t.id];const r=res[t.id];const d2dep=(t.deps||[]).filter(x=>TMAP[x]&&TMAP[x].lane==='dev2'&&!sat(TMAP[x])&&status(TMAP[x])!=='done');
+  h+='<tr><td><b>'+t.code+'</b> '+esc(t.name)+'</td><td class="num">'+fmt(t.due)+'</td><td><select data-d1="'+t.id+'">'+['todo','doing','review','done'].map(k=>'<option value="'+k+'" '+(s.st===k?'selected':'')+'>'+({todo:'Chưa bắt đầu',doing:'Đang làm',review:'Chờ review',done:'Hoàn thành'})[k]+'</option>').join('')+'</select></td><td><input type="number" step=".5" style="width:64px" data-d1rem="'+t.id+'" value="'+s.rem+'"></td><td class="num">'+fmt(r&&r.finish)+'</td><td class="small">'+(d2dep.length?d2dep.map(x=>chip(TMAP[x].code,'warn')).join(' '):'—')+'</td></tr>';});
+ h+='</tbody></table></div>';
+ h+='<h2>Việc cần quyết / bàn giao (Q1–Q14)</h2><div class="tw"><table><thead><tr><th></th><th>Mã</th><th>Ai</th><th>Nội dung</th><th>Hạn</th></tr></thead><tbody>';
+ QS.forEach(q=>{const d=S.qdone[q[0]];h+='<tr><td><input type="checkbox" data-q="'+q[0]+'" '+(d?'checked':'')+'></td><td><b>'+q[0]+'</b></td><td>'+esc(q[1])+'</td><td>'+esc(q[2])+'</td><td class="num">'+(d?chip('xong','ok'):chip(fmt(q[3]),q[3]<today?'bad':''))+'</td></tr>';});
+ h+='</tbody></table></div>';
+ h+='<h2>Sổ rủi ro</h2><div class="tw"><table><thead><tr><th>Rủi ro</th><th>Khả năng</th><th>Tác động</th><th>Biện pháp</th><th>Chủ</th><th>Tình trạng</th></tr></thead><tbody>'+RISKS.map((r,i)=>'<tr><td>'+esc(r[0])+'</td><td>'+chip(r[1],r[1]==='Cao'?'bad':r[1]==='Trung bình'?'warn':'')+'</td><td class="small">'+esc(r[2])+'</td><td class="small">'+esc(r[3])+'</td><td>'+esc(r[4])+'</td><td><select data-risk="'+i+'">'+['Mở','Đang xử lý','Đã đóng'].map(k=>'<option '+((S.rstat[i]||'Mở')===k?'selected':'')+'>'+k+'</option>').join('')+'</select></td></tr>').join('')+'</tbody></table></div>';
+ return h;}
+
+/* ========== TAB: Phân tích hệ thống ========== */
+const FINDINGS=[
+['E1','P0','Dev1','cũ · còn hiệu lực','0.2/0.4/3.1/1.4 ghi "Hoàn thành" nhưng cây file origin/develop không có app/Policies/, không authorize(), rate limit login, che log secret (AC08/SEC02/SEC03).','Issue Conformance, hạ về "Chờ review". Cần trước 11/11 vì 0.5/3.4 xây màn duyệt trên nền này.'],
+['E2','P0','Dev1+Dev2','cũ · đã xác nhận bằng code','GeminiAiProvider: thiếu key/JSON lỗi → fallback im lặng sang MockAiProvider; "tokens_used ?? 450" và dàn ý mặc định cứng ⇒ số token/chi phí do chương trình bịa, bài giả vẫn báo thành công. Vi phạm Honest Evidence.','0.3: factory theo config, AiOutputInvalidException, bỏ mọi giá trị mặc định bịa; ghi prompt_version từng bước.'],
+['E3','P1','Dev1 (test: Dev2)','cũ','HtmlSanitizer dùng strip_tags + regex, không cấm style/id/target/rel, cho src URL tùy ý (SEC05).','Dev2 viết HtmlSanitizerSecurityTest đỏ trong 3.5 (R08) để chặn merge.'],
+['E4','P2','Dev1','cũ → ĐÃ ĐÓNG ở develop','Lịch gọi autoseo:publish-due-posts nhưng lệnh chưa có. 3.2 (c833b7b) đã thêm PublishDuePostsCommand + ReconcilePublicationsCommand.','Chỉ cần merge develop→main; main local vẫn thiếu 3 commit.'],
+['E5','P1','Dev1+Dev2','cũ','WorkflowEnum.json thiếu scheduled/published/rejected cho article; contract dùng "status", DB dùng "review_status".','PR contract riêng (Dev1 mở), Dev2 review — trước 3.4.'],
+['E6','P1','Dev1','cũ','Seeder tạo 3 user mật khẩu mặc định + credential WP giả (SEC02).','Chỉ chạy khi APP_ENV=local; mật khẩu sinh ngẫu nhiên in 1 lần.'],
+['E7','P1','Dev2 (0.5)','cũ','WebsiteResource sửa encrypted_credentials bằng KeyValue thô, không che, không kiểm quyền (AC08).','0.5.3: chỉ hiện "Đã lưu — cập nhật"; admin-only.'],
+['E8','P2','Dev1','cũ','publication_key unique toàn cục (an toàn) nhưng thiếu index quota (website_id, published_at).','Xác nhận lại ở lô migration A.'],
+['E9','P0','Dev1','cũ · đã xác nhận bằng code','MagentoBridgeClient::createDraft tự sinh publication_key riêng; publish() tra theo key của Publication ⇒ hai key khác nhau, đối soát không tìm thấy bài đã tạo ⇒ nguy cơ đăng trùng (AC04/F-14).','Q10: key do hệ thống cấp, connector không tự sinh.'],
+['E10','P1','Dev1','cũ','publish() thiếu cms_post_id thì tự createDraft rồi publish; gọi 2 lần có thể tạo 2 bài.','Q10; Dev2 kiểm ở QA07.'],
+['E11','P1','Dev1+Dev2','cũ · nay có bằng chứng cụ thể = E13','Connector ném exception thô, không map ERR01–07.','ErrorMapper → CmsError (Dev2 viết cho WP; Dev1 đưa vào app/Contracts).'],
+['E12','P2','Dev2 review','cũ','Test Magento 100% mock, chỉ happy path + 404; thiếu 401/403/429/5xx/timeout, thu hồi credential.','Q11.'],
+['E13','P0','Dev1+Dev2','MỚI · đọc code @1e24d72, chưa chạy tái hiện','PublishArticleJob bắt Illuminate\\Http\\Client\\ConnectionException/RequestException, nhưng MagentoBridgeClient dùng Guzzle (GuzzleHttp\\Exception\\ConnectException/ServerException). Timeout của Magento rơi vào catch Throwable ⇒ status "failed" thay vì "needs_reconcile" ⇒ vi phạm AC04, mở đường cho đăng trùng khi retry.','Viết test đỏ trước (giả lập Guzzle ConnectException). Sửa: job chỉ bắt CmsError (Q12). WordPressPublisher của Dev2 phải ném CmsError, không exception thô.'],
+['E14','P0','Dev1 (hợp đồng)','MỚI · đọc PublisherInterface','createDraft(Website, ArticleVersion) không nhận publication_key ⇒ không connector nào gắn được key đúng lúc tạo bài; đây là gốc của E9 và làm getByPublicationKey vô dụng với WordPress.','Kickoff: thêm tham số/DTO (additive) trước 12/11; Magento sửa theo.'],
+['E15','P1','Dev2','MỚI · kiến thức WP — CẦN XÁC MINH trên staging','REST core của WP không lọc bài theo meta_key tùy ý. Bản phân tích cũ coi "mu-plugin bridge" là phương án B, nhưng tra cứu theo key bằng /wp/v2/posts?meta_key=… sẽ không chạy nếu không có bridge ⇒ mu-plugin (route autoseo/v1/by-key, permission_callback) là BẮT BUỘC cho đối soát.','Q13: ai cài được mu-plugin. Phương án dự phòng: slug xác định kèm hash key.'],
+['E16','P1','Dev2 (0.3)','MỚI · tra cứu 06/11, nguồn Google Vertex','Model mặc định gemini-1.5-flash: lịch vòng đời Vertex ghi gemini-1.5-flash-002 ngừng 24/09/2025. Chưa kiểm riêng cho API AI Studio.','0.3: xác minh model id hiện hành trước khi đo; báo lỗi rõ khi 404.'],
+['E17','P1','Dev1','MỚI · phân tích allowlist','Dev2 không được sửa database/migrations nhưng 3.4, 2.1, 2.2, 1.3, 5.1, 5.4, 6.4 cần bảng mới (campaigns, approved_version_id, keywords, clusters, content_plans, audit, gsc_metrics, competitors, brands…). WBS không có giờ Dev1 cho việc này ⇒ phụ thuộc ẩn.','Q14: 6 lô migration A–F theo bảng cổng. Lô A chậm nhất 11/11.'],
+['E18','P1','Dev2','MỚI · đối chiếu lịch','Bản kế hoạch cũ xếp 08/11 và 13/12 (Chủ nhật) làm ngày làm việc, trong khi WBS là 6 ngày T2–T7 ⇒ thiếu ~12h công suất.','Bảng này tự tính lịch thật, bỏ CN và lễ.'],
+['E19','P2','Dev2','MỚI','Chi tiết 1.2 bản cũ cộng 19h trong khi ngân sách 16h.','Đã nén về 16h; rủi ro +3h ở SEO adapter và mu-plugin — dùng dự phòng.'],
+['E20','P1','Cả hai','MỚI','10 task Dev1 (1.4, 3.2, 3.3, 1.1, 5.2, 5.3, 6.2, 6.3, 6.5, 7.1) có 0h cho Dev2 nhưng AC12 bắt buộc review chéo ⇒ 10–20h ẩn.','Dành 0,5h/ngày; đề nghị quản lý ghi nhận từ dự phòng 15% (64,8h).'],
+['E21','P2','Quản lý','MỚI · đọc workbook','Sheet 7/8 và DOC14 nhắc tab 7.1_Nhat_ky_gio_cong nhưng workbook chỉ có 13 tab, không có tab này; sheet 7 chưa cập nhật 1.4/3.2 dù develop đã merge; 3.1 "Hoàn thành" khi tiền đề 0.3 chưa bắt đầu.','Dashboard này là nhật ký giờ; tab "Nhật ký & báo cáo" sinh dòng TSV dán vào sheet 7.'],
+['E22','P2','Dev2','MỚI · đối chiếu code ↔ plan','Provider/service đăng ký: PublisherManager ném InvalidArgumentException nếu WordPress chưa bind PublisherInterface; bootstrap/providers.php, config/services.php và .github (SEC07) thuộc Dev1.','WordPressServiceProvider đặt trong app/Integrations/WordPress; Dev1 thêm 1 dòng đăng ký.']
+];
+function viewSystem(C){
+ let h='<h2>Phân tích hệ thống</h2><p class="lead">Kế thừa 12 phát hiện E1–E12 của bản cũ, kiểm lại từng điểm với code mới nhất và bổ sung E13–E22. Nhãn "đã xác nhận bằng code" = tôi đã đọc đúng dòng liên quan ở <code>origin/develop</code>; chưa chạy test tái hiện nên mọi mục "MỚI" cần một test đỏ trước khi kết luận cuối.</p>';
+ h+='<div class="tw"><table><thead><tr><th>Mã</th><th>Mức</th><th>Chủ</th><th>Nguồn / độ chắc</th><th>Phát hiện</th><th>Hành động</th><th>Đã đóng</th></tr></thead><tbody>'+FINDINGS.map(f=>'<tr><td><b>'+f[0]+'</b></td><td class="sev'+f[1]+'">'+f[1]+'</td><td>'+esc(f[2])+'</td><td class="small">'+esc(f[3])+'</td><td>'+esc(f[4])+'</td><td class="small">'+esc(f[5])+'</td><td><input type="checkbox" data-fs="'+f[0]+'" '+(S.fstat[f[0]]==='closed'?'checked':'')+'></td></tr>').join('')+'</tbody></table></div>';
+ h+='<h2>Kiến trúc đích và ranh giới trách nhiệm</h2><div class="card">'+SVG_ARCH+'<p class="note">Xanh lá = Dev2; xanh dương = Dev1; đường nét đứt = cổng phụ thuộc cần chốt hợp đồng. Mọi lỗi CMS đi qua <code>CmsError</code>, job không biết gì về Guzzle hay Laravel Http.</p></div>';
+ h+='<h2>Vòng đời bài và xuất bản</h2><div class="card">'+SVG_STATE+'<p class="note">Duyệt và Xếp lịch là hai bước tách biệt (nguyên tắc P3 của design brief). Chỉ <code>needs_reconcile → published/failed</code> sau khi tra theo <code>publication_key</code>; không bao giờ tạo bài mới.</p></div>';
+ h+='<h2>Quyết định thiết kế (ADR) cho phần Dev2</h2><div class="tw"><table><thead><tr><th>#</th><th>Quyết định</th><th>Lý do</th><th>Phương án đã loại</th><th>Task</th></tr></thead><tbody>'+ADRS.map(a=>'<tr><td><b>'+a[0]+'</b></td><td>'+esc(a[1])+'</td><td class="small">'+esc(a[2])+'</td><td class="small">'+esc(a[3])+'</td><td>'+esc(a[4])+'</td></tr>').join('')+'</tbody></table></div>';
+ h+='<h2>Đề xuất sửa hợp đồng (cần Dev1 chấp thuận ở kickoff)</h2><pre>'+esc(CONTRACT)+'</pre>';
+ h+='<h2>Mã lỗi CMS thống nhất</h2><div class="tw"><table><thead><tr><th>Mã</th><th>Khi nào</th><th>Retry tự động?</th><th>Trạng thái Publication</th></tr></thead><tbody>'+ERRS.map(e=>'<tr><td><b>'+e[0]+'</b></td><td>'+esc(e[1])+'</td><td>'+esc(e[2])+'</td><td>'+esc(e[3])+'</td></tr>').join('')+'</tbody></table></div>';
+ h+='<h2>Ma trận ca lỗi bắt buộc (QA06/QA07) — chạy trên CẢ WordPress và Magento</h2><div class="tw"><table><thead><tr><th>Ca</th><th>Kỳ vọng</th><th>Mức tối thiểu</th></tr></thead><tbody>'+CASES.map(e=>'<tr><td>'+esc(e[0])+'</td><td>'+esc(e[1])+'</td><td class="small">'+esc(e[2])+'</td></tr>').join('')+'</tbody></table></div>';
+ h+='<h2>Thay đổi so với bản phân tích trước</h2><ul>'+DIFFS.map(d=>'<li>'+esc(d)+'</li>').join('')+'</ul>';
+ return h;}
+const ADRS=[
+['A1','publication_key do hệ thống cấp (hash site+article+version), truyền xuống connector và lưu vào meta WP qua mu-plugin','Idempotency chỉ đúng khi một nguồn sự thật; E9/E14','Để connector tự sinh key (hiện trạng Magento)','1.2'],
+['A2','CmsError{code,retryable,reconcile} + ErrorMapper nằm trong app/Contracts, job chỉ bắt CmsError','Tách job khỏi thư viện HTTP; sửa E13','Bắt từng loại exception trong job','1.2'],
+['A3','Tra cứu theo key bằng route riêng /wp-json/autoseo/v1/by-key/{key} trong mu-plugin ≤40 dòng, permission_callback kiểm quyền','REST core không lọc meta tùy ý; không mở toàn bộ post meta (WP07)','?meta_key= (không chạy); tìm theo slug (dễ nhầm)','1.2'],
+['A4','SeoMetaAdapter: chọn 1 plugin thật; ghi → đọc lại → so khớp; không ghi được thì báo metadata_readback_failed','Không giả định "đọc được = ghi được" (WP06)','Giả lập đạt','1.2'],
+['A5','Chất lượng = RuleEngine có version, kết quả lưu cùng ArticleVersion (rule_set_version, RuleResult[])','Có dấu vết kiểm toán; ngưỡng cấu hình qua config/seo.php','Hard-code ngưỡng trong code','3.5'],
+['A6','AI chỉ trả JSON theo schema; server validate; lỗi thì dừng, không fallback; ghi ai_runs (prompt_hash, model, token, cost, latency, status)','Honest Evidence + chống prompt injection (SEC06)','Prompt "chỉ trả JSON" không có schema; fallback Mock','0.3'],
+['A7','Preview bài trong iframe sandbox="" với srcdoc đã sanitize; không chạy script','XSS phía trình duyệt người duyệt (SEC05)','Render trực tiếp HTML vào trang Filament','3.4'],
+['A8','Khóa chuẩn hóa từ khóa: Str::ascii + hạ chữ + gộp khoảng trắng; gom cụm 2 bước (nhóm từ vựng/embedding → LLM đặt tên, intent)','Người Việt gõ có/không dấu; giảm số lần gọi LLM','Gửi toàn bộ 5.000 từ cho LLM một lần','2.1'],
+['A9','GSC: upsert idempotent theo (property,date,query,page,device,country); CTR = ΣClicks/ΣImpressions; lưu dataState','Tránh trùng khi đồng bộ lại; đúng SEO03/SEO05','Trung bình đơn giản các CTR theo ngày','5.1'],
+['A10','Dữ liệu từ trang crawl/đối thủ luôn là dữ liệu, bọc trong delimiter + schema; AI không có tool','Prompt injection (SEC06, AGENTS.md §1.3)','Cho phép AI gọi tool theo nội dung trang','1.3/5.4']];
+const CONTRACT='// app/Contracts/PublisherInterface.php  (đề xuất, thay đổi additive)\npublic function createDraft(Website $website, ArticleVersion $version, string $publicationKey): PublisherResult;\npublic function publish(Publication $publication): PublisherResult;   // KHÔNG tự tạo draft nếu thiếu remote_id\npublic function getByPublicationKey(Website $website, string $publicationKey): ?PublisherResult; // null = chắc chắn chưa có\n\nfinal class PublisherResult { string $remoteId; ?string $url; string $state; bool $keyFound; }\n\n// app/Contracts/CmsError.php\nfinal class CmsError extends \\RuntimeException {\n  public function __construct(public string $code /*ERR01..ERR07*/, public bool $retryable, public bool $needsReconcile, string $msgVi, ?\\Throwable $prev = null) {}\n}\n\n// PublishArticleJob: catch (CmsError $e) { $e->needsReconcile ? status=needs_reconcile : ($e->retryable ? release(backoff) : status=failed) }';
+const ERRS=[['ERR01','Timeout/mất kết nối SAU khi đã gửi POST tạo/publish','KHÔNG','needs_reconcile'],['ERR02','401/403: sai/thu hồi credential, thiếu quyền','Không','failed + website.status=error/revoked'],['ERR03','404: remote_id/route không tồn tại','Không','failed'],['ERR04','429: bị giới hạn tốc độ','Có (backoff, chỉ GET/đã biết chưa tạo)','scheduled (release)'],['ERR05','5xx từ CMS','Chỉ nếu chưa gửi POST; sau POST → ERR01','needs_reconcile hoặc scheduled'],['ERR06','Payload/JSON phản hồi không hợp lệ, readback không khớp','Không','needs_reconcile (chưa biết kết quả)'],['ERR07','Không kết nối được TRƯỚC khi gửi (DNS/TLS)','Có','scheduled (release)']];
+const CASES=[['Timeout ngay sau createDraft rồi retry','Chỉ 1 bài trên CMS; trạng thái needs_reconcile → published','Test tự động + 1 lần live'],['Hai worker cùng publication_key','Một bài duy nhất','Test đồng thời (lock theo site + unique key)'],['Restart worker giữa chừng','Không mất job, không trùng','Log restart'],['Thu hồi credential giữa lúc có job','Job mới dừng, báo người dùng, site khác không ảnh hưởng','Thu hồi App Password/Integration thật trên staging'],['AI 429 / hết quota','Dừng có kiểm soát, không bịa','Mock + 1 lần thật'],['Ảnh lỗi/MIME giả','Chặn, không retry mù','Test finfo'],['ID media/category site khác (AC02)','Bị từ chối','Test âm tính'],['Quota 00:00 giờ VN (AC03)','Không vượt bài/ngày ở hai phía nửa đêm','Test ranh giới'],['Nút dừng khẩn cấp','Job mới bị khóa; job đang chạy kiểm lại trước publish','Diễn tập SEC09']];
+const DIFFS=['Bỏ 08/11 và 13/12 (Chủ nhật) khỏi ngày làm việc; lịch nay tự tính theo lịch thật + ngày lễ.','Tách công suất: 6h − 0,5h review PR Dev1 mỗi ngày (bản cũ không dành giờ review).','1.2: nén chi tiết 19h → 16h; đánh dấu 3 bước cần môi trường ngoài.','mu-plugin của WordPress chuyển từ "phương án B" thành bắt buộc (E15) — cần xác minh trên staging.','Thêm cổng migration A–F và 4 cổng bên ngoài; bản cũ chỉ nhắc "PR contract riêng".','Thêm E13 (job bắt sai loại exception) và E14 (interface thiếu key) — gốc rễ của lỗi đăng trùng.','E4 đã đóng ở develop (lệnh publish/reconcile có từ 3.2); main local vẫn chậm 3 commit.','Đưa 3 việc ngoài WBS (theme Filament, 6 mockup còn thiếu) thành đề xuất bật/tắt, kèm giờ ước tính lấy từ dự phòng.'];
+const SVG_ARCH='<svg viewBox="0 0 860 300" width="100%" role="img" aria-label="Kiến trúc đích"><defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="currentColor"/></marker></defs><g fill="none" stroke="currentColor" stroke-width="1.3" color="#6b6a64">'+
+ '<rect x="10" y="20" width="170" height="64" rx="6" stroke="#0f6b5c"/><rect x="10" y="110" width="170" height="64" rx="6" stroke="#0f6b5c"/><rect x="10" y="200" width="170" height="64" rx="6" stroke="#0f6b5c"/>'+
+ '<rect x="250" y="20" width="190" height="64" rx="6" stroke="#0f6b5c"/><rect x="250" y="110" width="190" height="64" rx="6" stroke="#0f6b5c"/><rect x="250" y="200" width="190" height="64" rx="6" stroke="#2a5f9e"/>'+
+ '<rect x="510" y="20" width="160" height="64" rx="6" stroke="#2a5f9e"/><rect x="510" y="110" width="160" height="64" rx="6" stroke="#0f6b5c"/><rect x="510" y="200" width="160" height="64" rx="6" stroke="#2a5f9e"/>'+
+ '<rect x="730" y="110" width="120" height="64" rx="6"/><rect x="730" y="20" width="120" height="64" rx="6"/>'+
+ '<path d="M180 52H250M180 142H250M180 232H250" marker-end="url(#ar)"/><path d="M440 142H510M440 232H510" marker-end="url(#ar)"/><path d="M670 142H730" marker-end="url(#ar)"/><path d="M670 52H730" marker-end="url(#ar)" stroke-dasharray="4 3"/><path d="M590 174V200" marker-end="url(#ar)" stroke-dasharray="4 3"/></g>'+
+ '<g font-size="12" fill="currentColor" color="#1b1b19" style="fill:var(--ink)"><text x="20" y="46">Filament: Website / Bài / Duyệt</text><text x="20" y="64" opacity=".7">0.5 · 3.4 (policy server-side)</text><text x="20" y="136">Chiến dịch · Kế hoạch · Từ khóa</text><text x="20" y="154" opacity=".7">2.1 · 2.2</text><text x="20" y="226">Báo cáo audit · GSC · Đối thủ</text><text x="20" y="244" opacity=".7">1.3 · 5.1 · 5.4</text>'+
+ '<text x="260" y="46">Services/Content + Quality</text><text x="260" y="64" opacity=".7">Pipeline (3.1) · RuleEngine (3.5)</text><text x="260" y="136">Services/Ai (0.3)</text><text x="260" y="154" opacity=".7">Factory · PromptRegistry · ai_runs</text><text x="260" y="226">Jobs/Queue/Scheduler (3.2, 3.6)</text><text x="260" y="244" opacity=".7">PublishArticleJob · Reconcile</text>'+
+ '<text x="520" y="46">PublisherManager + CmsError</text><text x="520" y="64" opacity=".7">Contract FINAL (Dev1, 12/11)</text><text x="520" y="136">WordPressPublisher (1.2)</text><text x="520" y="154" opacity=".7">Client · Media · Seo · ErrorMapper</text><text x="520" y="226">MagentoBridgeClient (1.4)</text><text x="520" y="244" opacity=".7">sửa E9/E10 theo hợp đồng</text>'+
+ '<text x="745" y="136">WordPress</text><text x="745" y="154" opacity=".7">+ mu-plugin by-key</text><text x="745" y="46">Hợp đồng</text><text x="745" y="64" opacity=".7">dùng chung</text></g></svg>';
+const SVG_STATE='<svg viewBox="0 0 880 210" width="100%" role="img" aria-label="Vòng đời bài"><defs><marker id="ar2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="currentColor"/></marker></defs><g fill="none" stroke="currentColor" color="#6b6a64" stroke-width="1.3">'+
+ ['planned','drafting','needs_review','approved','scheduled','publishing','published'].map((s,i)=>'<rect x="'+(8+i*124)+'" y="30" width="108" height="36" rx="6"'+(i<4?' stroke="#0f6b5c"':' stroke="#2a5f9e"')+'/>').join('')+
+ [0,1,2,3,4,5].map(i=>'<path d="M'+(116+i*124)+' 48H'+(132+i*124)+'" marker-end="url(#ar2)"/>').join('')+
+ '<rect x="256" y="130" width="108" height="36" rx="6" stroke="#b3261e"/><path d="M310 66V130" marker-end="url(#ar2)" stroke-dasharray="4 3"/><path d="M256 148H62V66" marker-end="url(#ar2)" stroke-dasharray="4 3"/>'+
+ '<rect x="628" y="130" width="108" height="36" rx="6" stroke="#b3261e"/><rect x="760" y="130" width="108" height="36" rx="6" stroke="#9a5a00"/><path d="M682 66V130" marker-end="url(#ar2)" stroke-dasharray="4 3"/><path d="M736 140H760" marker-end="url(#ar2)"/><path d="M814 130V66" marker-end="url(#ar2)" stroke-dasharray="4 3"/></g>'+
+ '<g font-size="12" style="fill:var(--ink)">'+['planned','drafting','needs_review','approved','scheduled','publishing','published'].map((s,i)=>'<text x="'+(62+i*124)+'" y="53" text-anchor="middle">'+s+'</text>').join('')+'<text x="310" y="153" text-anchor="middle">rejected</text><text x="682" y="153" text-anchor="middle">failed</text><text x="814" y="153" text-anchor="middle">needs_reconcile</text><text x="150" y="168" opacity=".7">rejected → viết lại (version mới)</text><text x="570" y="190" opacity=".7">timeout sau POST → needs_reconcile → tra publication_key → published | failed</text><text x="8" y="14" opacity=".7">Dev2: planned → approved (UI + QA) · Dev1: scheduled → published (worker)</text></g></svg>';
+
+/* ========== TAB: Học từ thế giới ========== */
+const WORLD=[
+['Chính sách spam của Google + hướng dẫn nội dung AI','Không cấm AI, nhưng tạo hàng loạt trang ít giá trị có thể vi phạm "scaled content abuse"; chính sách áp dụng cả với AI Overviews/AI Mode theo các nguồn thứ cấp (chưa kiểm trang gốc).','Cổng người duyệt bắt buộc; trần bài/ngày theo chiến dịch; R05 chặn trùng; không nghiệm thu bằng số lượng bài (đúng sheet 2, mục tiêu 5).','3.4 · 3.5 · 6.1','P0','Đã kiểm: trang Google (liên kết dưới)'],
+['Surfer / Clearscope / MarketMuse (chấm nội dung theo độ phủ thuật ngữ so với đối thủ top)','Chấm điểm nội dung bằng NLP trên SERP.','V1 chưa có SERP: dùng độ phủ từ khóa phụ + câu hỏi do người dùng nhập (mở rộng R03). V2: nguồn SERP trả phí ở 5.4.','3.5 · 5.4','P2','Kiến thức chung, chưa kiểm'],
+['Topic cluster / pillar–spoke (HubSpot) và SEO theo thực thể','Mỗi cụm có 1 bài trụ + bài vệ tinh liên kết hai chiều.','Thêm trường role pillar|spoke ở ContentPlan; 2.2 cảnh báo cụm thiếu bài trụ; 5.3 (Dev1) dùng để gợi ý link.','2.1 · 2.2','P1','Kiến thức chung'],
+['Gom cụm theo độ trùng SERP (Keyword Insights, Semrush) so với gom theo ngữ nghĩa','Hai từ khóa cùng cụm nếu top kết quả giống nhau.','V1 gom bằng từ vựng/embedding + LLM (không cần SERP); V2 thêm độ trùng SERP khi có API trả phí.','2.1 · 5.4','P2','Kiến thức chung'],
+['Screaming Frog / Sitebulb: kiểm theo mức ưu tiên, luôn kèm URL bằng chứng','Mỗi phát hiện có số URL ảnh hưởng, cách kiểm lại, xuất CSV.','1.3: mỗi lỗi có URL + giá trị quan sát + rule_id + P0/P1/P2 + "cách kiểm tra lại"; không điểm trang trí (SEO18).','1.3','P1','Kiến thức chung'],
+['Làm mới nội dung dựa trên GSC (content decay, "striking distance" vị trí 8–20)','Tìm trang tụt hạng và truy vấn có nhiều hiển thị nhưng CTR thấp.','5.1: danh sách cơ hội (vị trí 8–20, CTR thấp hơn kỳ vọng theo vị trí, bài giảm clicks 28 ngày) nuôi 5.2 của Dev1.','5.1 · 5.2','P1','Kiến thức chung'],
+['Giới hạn API Search Console','URL Inspection: 2.000 truy vấn/ngày/site và 600/phút; Search Analytics có hạn mức tải theo khoảng ngày truy vấn.','5.1 đồng bộ theo từng ngày, phân trang, backoff; dùng URL Inspection kiểm index cho 10 bài pilot/CMS (4.1) — vừa trong hạn mức.','5.1 · 4.1','P1','Đã kiểm: trang giới hạn của Google'],
+['IndexNow (Bing/Yandex…) và sitemap; Google Indexing API chỉ cho JobPosting/BroadcastEvent','Báo URL mới/đổi cho công cụ tìm kiếm hỗ trợ giao thức.','Sau publish gọi IndexNow (rẻ) — việc của Dev1/6.3; KHÔNG dùng Indexing API cho blog.','3.6 (đề xuất)','P2','Kiến thức chung, cần kiểm Bing/Cốc Cốc'],
+['Vận hành AI: version prompt, bộ kiểm thử vàng, chấm bằng LLM theo rubric, theo dõi chi phí (Langfuse/Helicone)','Đo chất lượng và chi phí từng lần chạy, so sánh phiên bản.','0.3: ai_runs + bộ 20 từ khóa cố định làm "golden set"; đổi prompt/model phải chạy lại và so số; ngưỡng ≤3.000đ/bài.','0.3 · 6.5','P0','Thực hành phổ biến'],
+['RAG có trích nguồn (kiểu Perplexity): chỉ viết điều có nguồn','Mỗi khẳng định gắn nguồn kiểm chứng được.','sources_cited phải trỏ tới source_id nội bộ; R07 chặn duyệt khi thiếu nguồn; 6.1 kiểm từng claim. V1 dùng tìm kiếm full-text (MariaDB 10.6 chưa có vector gốc).','3.5 · 6.1','P0','Thực hành phổ biến; hạn chế MariaDB cần kiểm'],
+['Tối ưu cho câu trả lời AI (GEO/AEO)','Cấu trúc trả lời ngắn đầu bài, FAQ, schema; phần lớn khuyến nghị đến từ blog thương mại.','Coi là GIẢ THUYẾT, không phải quy tắc: thêm "đoạn trả lời trực tiếp" vào prompt v1; đo bằng GSC trước khi đầu tư thêm; FAQ không chặn pilot (đúng sheet).','0.3 · 5.1','P2','Nguồn thứ cấp, chưa có dữ liệu độc lập'],
+['Đặc thù tiếng Việt','Người dùng gõ có/không dấu; slug không dấu; từ ghép nhiều âm tiết.','Chuẩn hóa không dấu khi so trùng/gom cụm (A8); slug ASCII; kiểm tra embedding đa ngôn ngữ trên 20 từ khóa ở 0.3 trước khi chọn.','2.1 · 0.3','P1','Kinh nghiệm, cần đo bằng dữ liệu thật'],
+['Quy trình tòa soạn: người quyết định, phiên bản, ghi chú, trách nhiệm','Biên tập viên chịu trách nhiệm bản xuất bản.','Đã thể hiện ở design brief (P1–P6); 3.4 phải giữ: duyệt ≠ xếp lịch, lý do từ chối bắt buộc, override ghi log.','3.4','P0','Design brief nội bộ'],
+['Yoast / Rank Math: ghi metadata SEO qua REST','Yoast cung cấp yoast_head_json (đọc); ghi cần meta được đăng ký REST; Rank Math có endpoint riêng cập nhật meta.','Chọn 1 plugin ở Q7; ghi → đọc lại → so khớp (A4). CẦN XÁC MINH trên staging, không tin tài liệu.','1.2','P0','Kiến thức chung, bắt buộc kiểm thực tế']];
+function viewWorld(){
+ let h='<h2>Học từ mô hình SEO + AI trên thế giới</h2><p class="lead">Mục tiêu: lấy cái <b>áp dụng được ngay trong ngân sách giờ hiện tại</b>, đẩy phần còn lại sang V2, và gắn nhãn độ chắc chắn rõ ràng. Cột cuối cho biết tôi đã kiểm nguồn hay chỉ là kiến thức chung — mục chưa kiểm cần xác minh trước khi đưa vào cam kết. Nhiều nguồn tìm được là blog của hãng bán công cụ nên chỉ coi là giả thuyết.</p>';
+ h+='<div class="tw"><table><thead><tr><th>Mô hình / thực hành</th><th>Họ làm gì</th><th>Áp dụng cho addp-autoseo</th><th>Task</th><th>Ưu tiên</th><th>Độ chắc chắn</th></tr></thead><tbody>'+WORLD.map(w=>'<tr><td><b>'+esc(w[0])+'</b></td><td class="small">'+esc(w[1])+'</td><td>'+esc(w[2])+'</td><td>'+esc(w[3])+'</td><td class="sev'+(w[4]==='P0'?'P0':w[4]==='P1'?'P1':'P2')+'">'+w[4]+'</td><td class="small">'+esc(w[5])+'</td></tr>').join('')+'</tbody></table></div>';
+ h+='<h2>Nguyên tắc rút ra</h2><ol><li><b>Người chịu trách nhiệm, AI đề xuất:</b> mọi đầu ra AI có nguồn, phiên bản prompt/model và người duyệt (SEO17).</li><li><b>Bằng chứng trước kết luận:</b> không số liệu nào không lấy từ API/đo thật (volume, CTR, vị trí).</li><li><b>Chất lượng trước số lượng:</b> quota bài/ngày là trần an toàn, không phải mục tiêu.</li><li><b>Đo rồi mới tối ưu:</b> mọi giả thuyết GEO/AEO phải qua GSC, cửa sổ 8–12 tuần như sheet 1.2.</li><li><b>Rẻ trước, đắt sau:</b> từ vựng/embedding trước LLM; LLM trước SERP trả phí.</li></ol>';
+ h+='<h2>Nguồn đã kiểm trong phiên này</h2><ul><li><a href="https://developers.google.com/search/docs/fundamentals/using-gen-ai-content" target="_blank" rel="noopener">Google — hướng dẫn dùng nội dung AI tạo sinh</a> (đã có trong sheet 1.2)</li><li><a href="https://developers.google.com/webmaster-tools/limits" target="_blank" rel="noopener">Google — Usage Limits của Search Console API</a>: URL Inspection 2.000/ngày/site, 600/phút</li><li><a href="https://ai.google.dev/gemini-api/docs/deprecations" target="_blank" rel="noopener">Gemini API — lịch ngừng model</a> (kiểm trực tiếp trước khi đo ở 0.3; kết quả tìm kiếm chỉ cho thấy lịch của Vertex)</li></ul>';
+ return h;}
+
+/* ========== TAB: Thiết kế UI ========== */
+const SCREENS=[['Tổng quan','dashboard.html',true,'—','Filament Dashboard + widget','Thấp'],['Chiến dịch','campaigns.html',true,'3.4','Resource + trang cấu hình','Trung bình'],['Bài viết (workshop)','article-workshop.html',true,'3.4','Editor tùy biến, sửa từng đoạn','Cao'],['Duyệt bài','article-review.html',true,'3.4 · 3.5','Page 2 cột + iframe sandbox','Trung bình'],['Lịch đăng','calendar.html',true,'2.2 · 3.6','Cần plugin lịch/kéo thả','Cao'],['Từ khóa','keywords.html',true,'2.1','Resource + import CSV','Thấp'],['Website kết nối','websites.html',true,'0.5','Resource','Thấp'],['Sơ đồ luồng','flows.html',true,'tài liệu','không cần port','—'],['Kế hoạch nội dung','content-plan.html',false,'2.2','kéo thả theo tuần','Cao'],['Audit SEO','seo-audit.html',false,'1.3','Table + filter + CSV','Thấp'],['Search Console','search-console.html',false,'5.1','Biểu đồ so sánh kỳ','Trung bình'],['Đối thủ & khoảng trống','competitors.html',false,'5.4','Table + bản đồ chủ đề','Trung bình'],['Chi phí AI','ai-usage.html',false,'6.5 (Dev1)','Widget + ngưỡng cảnh báo','Thấp'],['Thành phần UI (styleguide)','styleguide.html',false,'—','Tham chiếu theme','—']];
+function viewDesign(C){
+ const have=SCREENS.filter(s=>s[2]).length;
+ let h='<h2>Thiết kế giao diện: DeepSeek làm được 8/14, còn thiếu 6</h2><p class="lead">Brief "Editorial Ledger" (design-system/DESIGN_BRIEF.md) nhất quán và có tính nghề: trạng thái luôn nhìn thấy, duyệt ≠ xếp lịch, AI là công cụ chứ không phải người, một nút primary mỗi màn hình; kèm bộ QA (99 lượt chụp/đo tương phản/tràn ngang). Tôi đã mở trang dashboard thật trong trình duyệt: hiển thị đúng, tương phản tốt. Vấn đề không nằm ở chất lượng phần đã làm mà ở <b>khoảng cách giữa mockup HTML và Filament</b>.</p>';
+ h+='<div class="grid g4"><div class="card kpi"><div class="l">Trang đã có</div><div class="v num">'+have+' / '+SCREENS.length+'</div><div class="c">phủ đủ V1.0–V1.1 (0.5, 3.4, 2.1)</div></div><div class="card kpi"><div class="l">Liên kết chết trong sidebar</div><div class="v num">6</div><div class="c">content-plan, seo-audit, search-console, competitors, ai-usage, styleguide</div></div><div class="card kpi"><div class="l">Cần trước</div><div class="v num">2</div><div class="c">content-plan (trước 2.2) và seo-audit (trước 1.3)</div></div></div>';
+ h+='<h3>Bản đồ màn hình ↔ task</h3><div class="tw"><table><thead><tr><th>Màn hình</th><th>Mockup</th><th>Task</th><th>Cách làm trong Filament 3</th><th>Rủi ro port</th></tr></thead><tbody>'+SCREENS.map(s=>'<tr><td>'+esc(s[0])+'</td><td>'+(s[2]?chip('có','ok')+' <a href="../../../design-system/pages/'+s[1]+'" target="_blank" rel="noopener" class="small">'+s[1]+'</a>':chip('thiếu','bad')+' <span class="small mono">'+s[1]+'</span>')+'</td><td>'+esc(s[3])+'</td><td class="small">'+esc(s[4])+'</td><td>'+esc(s[5])+'</td></tr>').join('')+'</tbody></table></div>';
+ h+='<h3>Đánh giá thẳng</h3><ul>'
+ +'<li><b>Mockup dùng nhãn khác enum thật:</b> "Cần sửa" (≈ rejected), "Đã kiểm", "Sạch"… Phải chốt bảng ánh xạ nhãn tiếng Việt ↔ <code>planned/drafting/needs_review/approved/rejected/scheduled/published</code> và <code>scheduled/publishing/published/failed/needs_reconcile</code> trước khi code 3.4, nếu không UI sẽ có trạng thái mà DB không có.</li>'
+ +'<li><b>Chi phí port chưa nằm trong WBS:</b> 0.5 (10h) và 3.4 (10h) chỉ phủ phần chức năng. Theme theo tokens (màu, font, badge, mật độ bảng) ≈ 6h — đề xuất X1, lấy từ dự phòng 15%. Không port ⌘K tùy biến và kéo thả ở V1: Filament có phím tắt tìm kiếm toàn cục; lịch kéo thả để dành 2.2.</li>'
+ +'<li><b>Dữ liệu trong mockup là hư cấu</b> (tên chiến dịch, chi phí, điểm chất lượng). Chấp nhận để chốt UI, nhưng không đưa số trong mockup vào báo cáo hay tài liệu nghiệm thu.</li>'
+ +'<li><b>Câu hỏi mở của brief ảnh hưởng thiết kế còn thiếu:</b> chi phí VND hay USD (ai-usage), số thương hiệu đồng thời (6.4), có cần tiếng Anh trong giao diện (6.2), có cần mobile. Cần hỏi quản lý trước khi làm 2 trang tương ứng.</li>'
+ +'<li><b>Giữ nguyên:</b> 6 mục điều hướng, một accent teal-petrol, serif chỉ trong vùng đọc, số liệu monospace tabular — rẻ để giữ và tạo bản sắc.</li></ul>';
+ h+='<p class="note">Bật/tắt việc thiết kế ngoài WBS ở tab "Công việc" (X1, X2, X4); chúng sẽ được xếp vào lịch.</p>';
+ return h;}
+
+/* ========== TAB: Nhật ký & báo cáo ========== */
+function viewReport(C){const today=C.today;
+ let h='<h2>Ghi giờ</h2><div class="card"><div class="small" style="display:flex;flex-wrap:wrap;gap:8px;align-items:end"><label>Ngày<br><input type="date" id="lg-d" value="'+today+'"></label><label>Việc<br><select id="lg-t">'+d2active().map(t=>'<option value="'+t.id+'">'+esc(t.code)+' · '+esc(t.name.slice(0,48))+'</option>').join('')+'</select></label><label>Giờ<br><input type="number" id="lg-h" step=".25" min="0" max="16" style="width:70px"></label><label style="flex:1;min-width:220px">Ghi chú<br><input id="lg-n" style="width:100%"></label><label><input type="checkbox" id="lg-b"> có blocker</label><button class="btn pri" data-act="addlog">Thêm</button></div></div>';
+ const last=S.log.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,30);
+ h+='<div class="tw" style="margin-top:8px"><table><thead><tr><th>Ngày</th><th>Việc</th><th>Giờ</th><th>Ghi chú</th><th></th></tr></thead><tbody>'+(last.map(e=>'<tr><td>'+fmtW(e.date)+'</td><td>'+esc((TMAP[e.task]||{}).code||e.task)+'</td><td class="num">'+n1(+e.hours)+'</td><td>'+(e.blocker?chip('blocker','bad')+' ':'')+esc(e.note)+'</td><td><button class="btn sm" data-dellog="'+e.id+'">Xóa</button></td></tr>').join('')||'<tr><td colspan="5" class="muted">Chưa có nhật ký.</td></tr>')+'</tbody></table></div>';
+ const bars=[];for(let i=13;i>=0;i--){const d=addDays(today,-i);const s=S.log.filter(e=>e.date===d).reduce((a,e)=>a+(+e.hours||0),0);bars.push([d,s]);}
+ const mx=Math.max(6,...bars.map(b=>b[1]));
+ h+='<h3>Giờ ghi nhận 14 ngày gần nhất</h3><svg viewBox="0 0 560 90" width="100%" style="max-width:640px" role="img" aria-label="Giờ theo ngày">'+bars.map((b,i)=>'<rect x="'+(i*40+6)+'" y="'+(70-b[1]/mx*60)+'" width="28" height="'+(b[1]/mx*60)+'" rx="3" fill="'+(isOff(b[0])?'#9a988f':'#0f6b5c')+'"><title>'+fmt(b[0])+': '+n1(b[1])+'h</title></rect><text x="'+(i*40+20)+'" y="86" font-size="9" text-anchor="middle" style="fill:var(--muted)">'+fmt(b[0]).slice(0,5)+'</text>').join('')+'</svg>';
+ h+='<h2>Báo cáo cuối ngày (theo DAILY_REPORT_TEMPLATE.md)</h2><div class="small" style="margin-bottom:6px"><label>Ngày <input type="date" id="rp-d" value="'+(S.rpDate||today)+'"></label> <button class="btn sm" data-act="genreport">Tạo báo cáo</button> <button class="btn sm" data-act="copyreport">Sao chép</button> <span class="note">Lưu thành <code>reports/daily/YYYY-MM-DD-dev2.md</code></span></div><pre id="rp-out" style="min-height:90px">'+esc(S.rpText||'Bấm "Tạo báo cáo": tự điền việc nhỏ đã tick trong ngày, giờ từ nhật ký, nhánh/SHA/PR, mức bằng chứng và blocker.')+'</pre>';
+ h+='<h2>Dòng cho sheet 7_Bao_cao_hang_ngay</h2><p class="lead">Mỗi việc đúng một dòng. Cột: Mã việc · Trạng thái · Ngày hoàn thành · Ghi chú · Bằng chứng/PR · Tiến độ. Chỉ chọn "Hoàn thành" khi người thật đã kiểm chứng.</p><button class="btn sm" data-act="copytsv">Sao chép TSV (việc Dev2)</button><pre id="tsv" style="max-height:220px">'+esc(sheet7Tsv())+'</pre>';
+ h+='<h2>Sao lưu</h2><p class="lead">Dữ liệu nằm trong localStorage của trình duyệt này. Xóa dữ liệu trình duyệt sẽ mất — hãy <b>Xuất JSON</b> cuối mỗi tuần và lưu vào <code>reports/daily/</code> hoặc Git riêng.</p><button class="btn sm" data-act="reset">Xóa toàn bộ dữ liệu bảng này</button>';
+ return h;}
+function sheet7Tsv(){const rows=[];d2active().filter(t=>!t.extra&&!t.overhead).forEach(t=>{const st=status(t),f=S.f[t.id]||{};const lab=({todo:'Chưa bắt đầu',doing:'Đang làm',blocked:'Bị chặn',review:'Chờ review',done:'Hoàn thành'})[st];
+ const doneDate=st==='done'?(lastSubDate(t)||''):'';rows.push([t.code,lab,doneDate,(f.note||'').replace(/\s+/g,' '),[f.pr,f.sha].filter(Boolean).join(' '),Math.round(pct(t)*100)/100].join('\t'));});return rows.join('\n');}
+function lastSubDate(t){const m=S.sub[t.id]||{};let d='';Object.keys(m).forEach(k=>{if(typeof m[k]==='string'&&m[k]>d)d=m[k];});return d;}
+function genReport(date){const ents=S.log.filter(e=>e.date===date);const ids=[];ents.forEach(e=>{if(ids.indexOf(e.task)<0)ids.push(e.task);});
+ d2active().forEach(t=>{(S.sub[t.id]?Object.keys(S.sub[t.id]):[]).forEach(k=>{if(S.sub[t.id][k]===date&&ids.indexOf(t.id)<0)ids.push(t.id);});});
+ if(!ids.length)return 'Không có nhật ký hoặc việc nhỏ nào được tick trong ngày '+date+'.';
+ return ids.map(id=>{const t=TMAP[id];if(!t)return '';const f=S.f[id]||{},e=S.ev[id]||{};const hrs=S.log.filter(x=>x.date===date&&x.task===id).reduce((a,x)=>a+(+x.hours||0),0);
+  const done=t.subs.filter((s,i)=>S.sub[id]&&S.sub[id][i]===date),todo=t.subs.filter((s,i)=>!(S.sub[id]&&S.sub[id][i])).slice(0,4);
+  const blk=ents.filter(x=>x.task===id&&x.blocker).map(x=>x.note);const gts=(t.gates||[]).filter(g=>!S.gates[g].got).map(g=>GMAP[g].short);
+  const live=e.L3?'[x] Đã test Live | [ ] Test Mock | [ ] Chưa chạy':e.L2?'[ ] Đã test Live | [x] Test Mock | [ ] Chưa chạy':'[ ] Đã test Live | [ ] Test Mock | [x] Chưa chạy';
+  return ['# BÁO CÁO NGÀY '+date+' — Dev2 — Task '+t.code,'','## 1. Thông tin phiên','* Ngày làm việc: '+date,'* Nhân sự: Dev2','* Mã công việc: '+t.code,'* Nhánh Git: '+t.branch,'* Base Commit SHA: '+(f.base||'…'),'* Commit SHA hoàn thành: '+(f.sha||'…'),'* Pull Request URL: '+(f.pr||'…'),'','## 2. Nội dung đã thực hiện',done.map(s=>'* [x] '+s[0]).join('\n')||'* (chưa tick việc nhỏ nào hôm nay)',todo.map(s=>'* [ ] '+s[0]).join('\n'),'','## 3. Bằng chứng kiểm thử','* Mức: '+['L1 code','L2 mock','L3 staging','L4 người thật'].filter((x,i)=>e['L'+(i+1)]).join(' → ')+(e.L1||e.L2||e.L3||e.L4?'':'(chưa đạt mức nào)'),'* Trạng thái CMS/dịch vụ ngoài: '+live,'* Lệnh kiểm thử / kết quả: …','','## 4. Chi phí & thời gian','* Giờ công thực tế phiên này: '+n1(hrs)+' giờ','* Chi phí API phát sinh: …','','## 5. Khó khăn & điểm nghẽn',(blk.concat(gts.map(g=>'Chờ cổng: '+g)).map(x=>'* '+x).join('\n'))||'* Không','','## 6. Xác nhận reviewer','* Reviewer: Dev1','* Đánh giá: [ ] Đồng ý nghiệm thu | [ ] Yêu cầu sửa đổi','* Ghi chú: …'].join('\n');}).join('\n\n---\n\n');}
+
+/* ========== vẽ ========== */
+function render(){const C=compute();window.__C=C;$('#hdr-date').textContent='Hôm nay '+fmtW(C.today)+'/'+pd(C.today).getUTCFullYear();renderTabs();
+ const scroll=window.scrollY;const v={overview:viewOverview,tasks:viewTasks,plan:viewPlan,deps:viewDeps,system:viewSystem,world:viewWorld,design:viewDesign,report:viewReport}[S.tab]||viewOverview;
+ $('#view').innerHTML=v(C);window.scrollTo(0,scroll);}
+function touch(){save();render();}
+
+/* ========== sự kiện ========== */
+document.addEventListener('click',e=>{
+ const tb=e.target.closest('[data-tab]');if(tb){S.tab=tb.dataset.tab;save();render();window.scrollTo(0,0);return;}
+ const a=e.target.closest('[data-act]');
+ if(a){const act=a.dataset.act;
+  if(act==='export'){const b=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});const u=URL.createObjectURL(b);const l=document.createElement('a');l.href=u;l.download='dev2-dashboard-'+TODAY()+'.json';l.click();setTimeout(()=>URL.revokeObjectURL(u),500);}
+  else if(act==='reset'){if(confirm('Xóa toàn bộ tiến độ, nhật ký và cài đặt? Hãy Xuất JSON trước.')){S=JSON.parse(JSON.stringify(DEF));GATES.forEach(g=>{S.gates[g.id]={exp:g.exp,got:false};});D1.forEach(t=>{S.d1[t.id]={st:t.st,rem:t.h};});touch();}}
+  else if(act==='resetorder'){S.order=null;touch();}
+  else if(act==='setcap'){const d=$('#capd').value,h=$('#caph').value;if(d&&h!==''){S.cap[d]=+h;touch();}}
+  else if(act==='delcap'){e.preventDefault();delete S.cap[a.dataset.d];touch();}
+  else if(act==='addlog'){const d=$('#lg-d').value,t=$('#lg-t').value,h=parseFloat($('#lg-h').value);if(!d||!t||!(h>=0)){alert('Cần ngày, việc và số giờ.');return;}S.log.push({id:Date.now()+''+Math.random().toString(36).slice(2,6),date:d,task:t,hours:h,note:$('#lg-n').value,blocker:$('#lg-b').checked});touch();}
+  else if(act==='genreport'){S.rpDate=$('#rp-d').value;S.rpText=genReport(S.rpDate);touch();}
+  else if(act==='copyreport'||act==='copytsv'){const txt=act==='copytsv'?sheet7Tsv():(S.rpText||'');copyText(txt);}
+  return;}
+ const dl=e.target.closest('[data-dellog]');if(dl){S.log=S.log.filter(x=>x.id!==dl.dataset.dellog);touch();return;}
+ const mv=e.target.closest('[data-mv]');if(mv){const p=mv.dataset.mv.split(':');const o=tasksInOrder();const i=o.indexOf(p[0]);const dir=+p[1];
+  // đổi chỗ với việc Dev2 kế cận
+  let j=i+dir;while(j>=0&&j<o.length&&TMAP[o[j]].lane!=='dev2')j+=dir;if(j<0||j>=o.length)return;const t=o[i];o[i]=o[j];o[j]=t;S.order=o;touch();return;}
+ const sm=e.target.closest('details.task>summary');if(sm){const d=sm.parentElement;setTimeout(()=>{S.open[d.dataset.id]=d.open;save();},0);}
+});
+document.addEventListener('change',e=>{const t=e.target;
+ if(t.id==='imp'){const f=t.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const o=JSON.parse(r.result);if(o.v!==1)throw 0;S=Object.assign({},DEF,o);S.settings=Object.assign({},DEF.settings,o.settings||{});GATES.forEach(g=>{if(!S.gates[g.id])S.gates[g.id]={exp:g.exp,got:false};});D1.forEach(x=>{if(!S.d1[x.id])S.d1[x.id]={st:x.st,rem:x.h};});touch();}catch(err){alert('Tệp JSON không hợp lệ.');}};r.readAsText(f);return;}
+ const g=k=>t.dataset[k];
+ if(g('sub')){const p=g('sub').split(':');S.sub[p[0]]=S.sub[p[0]]||{};S.sub[p[0]][p[1]]=t.checked?TODAY():false;
+  const task=TMAP[p[0]];if(t.checked&&(S.st[p[0]]||'todo')==='todo')S.st[p[0]]='doing';touch();}
+ else if(g('st')){S.st[g('st')]=t.value;if(t.value==='done'){const task=TMAP[g('st')];S.sub[task.id]=S.sub[task.id]||{};task.subs.forEach((s,i)=>{if(!S.sub[task.id][i])S.sub[task.id][i]=TODAY();});}touch();}
+ else if(g('f')){const p=g('f').split(':');S.f[p[0]]=S.f[p[0]]||{};S.f[p[0]][p[1]]=t.value;touch();}
+ else if(g('ev')){const p=g('ev').split(':');S.ev[p[0]]=S.ev[p[0]]||{};S.ev[p[0]][p[1]]=t.checked;touch();}
+ else if(g('extra')){S.extraOn[g('extra')]=t.checked;touch();}
+ else if(g('set')){S.settings[g('set')]=t.type==='number'?(t.value===''?0:+t.value):t.value;touch();}
+ else if(g('gexp')){S.gates[g('gexp')].exp=t.value;touch();}
+ else if(g('gget')){S.gates[g('gget')].got=t.checked;touch();}
+ else if(g('d1')){S.d1[g('d1')].st=t.value;if(t.value==='done'||t.value==='review')S.d1[g('d1')].rem=0;touch();}
+ else if(g('d1rem')){S.d1[g('d1rem')].rem=+t.value;touch();}
+ else if(g('q')){S.qdone[g('q')]=t.checked;touch();}
+ else if(g('risk')){S.rstat[g('risk')]=t.value;touch();}
+ else if(g('fs')){S.fstat[g('fs')]=t.checked?'closed':'';touch();}
+});
+function copyText(txt){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).catch(()=>fallback());}else fallback();function fallback(){const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}ta.remove();}}
+render();
+})();
+</script>
+</body>
+</html>
