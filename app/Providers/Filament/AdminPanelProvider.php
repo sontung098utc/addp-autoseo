@@ -47,9 +47,11 @@ class AdminPanelProvider extends PanelProvider
             ->globalSearchKeyBindings(['ctrl+k', 'command+k'])
             ->unsavedChangesAlerts()
             ->sidebarCollapsibleOnDesktop()
+            ->maxContentWidth(\Filament\Support\Enums\MaxWidth::Full)
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => '<link rel="stylesheet" href="' . e(asset('css/seo-studio.css')) . '">',
+                fn (): string => '<link rel="stylesheet" href="' . e(asset('css/seo-studio.css')) . '">'
+                    . '<script src="' . e(asset('js/studio-ui.js')) . '"></script>',
             )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
