@@ -110,3 +110,15 @@
 .ss-review-diff .diff-ins, .ss-review-diff ins { background: var(--ss-review-ins-bg); color: var(--ss-review-ins-fg); text-decoration: none; }
 .ss-review-diff .diff-del, .ss-review-diff del { background: var(--ss-review-del-bg); color: var(--ss-review-del-fg); }
 .ss-review-diff .diff-num, .ss-review-num { background: var(--ss-review-num-bg); color: var(--ss-review-num-fg); font-weight: 600; padding: 0 0.25rem; border-radius: 0.25rem; }
+
+/* Ô chọn gốc (select): CSS riêng của từng trang hay đặt `background: transparent`, làm mất vị trí/chế độ lặp của mũi tên
+   xổ xuống nên mũi tên lặp kín ô và đè lên chữ. Đặt lại ở đây (độ ưu tiên cao hơn một lớp đơn) và chừa chỗ cho mũi tên. */
+select:not([multiple]) {
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 1.25em 1.25em;
+  padding-right: 2rem;
+  min-width: 9rem;
+  max-width: 100%;
+  text-overflow: ellipsis;
+}

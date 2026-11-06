@@ -95,7 +95,7 @@
                             Có <span class="ai-num">{{ Vnd::int($summary['versions']) }}</span> phiên bản (<span class="ai-num">{{ Vnd::int($summary['articles']) }}</span> bài) nhưng chưa phiên bản nào ghi chi phí.
                         @else
                             AI tốn <span class="ai-num">{{ Vnd::format($summary['cost']) }}</span> cho <span class="ai-num">{{ Vnd::int($summary['articles']) }}</span> bài (<span class="ai-num">{{ Vnd::int($summary['versions']) }}</span> phiên bản, <span class="ai-num">{{ Vnd::int($summary['tokens']) }}</span> token)
-                            @if ($avg !== null) · trung bình <span class="ai-num">{{ Vnd::format($avg) }}/bài</span>, {{ $avgExceeds ? 'vượt' : 'trong' }} ngưỡng {{ Vnd::format($th['article']) }}/bài.@else.@endif
+                            @if ($avg !== null) · trung bình <span class="ai-num">{{ Vnd::format($avg) }}/bài</span> (tính trên <span class="ai-num">{{ Vnd::int($summary['articles_with_cost']) }}</span> bài có ghi chi phí), {{ $avgExceeds ? 'vượt' : 'trong' }} ngưỡng {{ Vnd::format($th['article']) }}/bài.@else.@endif
                         @endif
                         @if ($summary['regen_articles'] > 0) {{ $summary['regen_articles'] }} bài phải sinh lại (tổng {{ $summary['extra_versions'] }} phiên bản sinh lại).@endif
                     </p>
