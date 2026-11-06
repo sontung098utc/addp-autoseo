@@ -55,3 +55,7 @@ dump_clean.py
 extract_plan.py
 sheet.csv
 sheets_list.txt
+
+/public/storage
+/storage/app/*
+!/storage/app/.gitkeep

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Article;
 use App\Models\ArticleVersion;
+use App\Models\MediaAsset;
 use App\Models\Publication;
 use App\Models\User;
 use App\Models\Website;
@@ -87,20 +88,22 @@ class DatabaseSeeder extends Seeder
             'last_synced_at' => now(),
         ]);
 
-        // 3. Tạo bài viết mẫu
-        $article1 = Article::create([
-            'website_id' => $wpSite->id,
-            'created_by' => $writer->id,
+        // 3. Tạo bài viết mẫu nếu chưa có
+        $article1 = Article::firstOrCreate([
             'primary_keyword' => 'giải pháp tự động hóa marketing 2026',
+            'website_id' => $wpSite->id,
+        ], [
+            'created_by' => $writer->id,
             'secondary_keywords' => ['auto seo', 'tăng trưởng organic traffic', 'phần mềm seo nội bộ'],
             'search_intent' => 'informational',
             'topic_cluster' => 'Marketing Automation',
             'workflow_status' => 'approved',
         ]);
 
-        $version1 = ArticleVersion::create([
+        $version1 = ArticleVersion::firstOrCreate([
             'article_id' => $article1->id,
             'version' => 1,
+        ], [
             'title' => 'Xu Hướng Tự Động Hóa Marketing & Tối Ưu SEO Trong Năm 2026',
             'slug' => 'xu-huong-tu-dong-hoa-marketing-seo-2026',
             'outline' => [
@@ -128,14 +131,57 @@ class DatabaseSeeder extends Seeder
             'review_notes' => 'Bài viết chuẩn SEO, các đề mục rõ ràng, đã kiểm tra văn phong công ty.',
         ]);
 
-        Publication::create([
+        Publication::firstOrCreate([
+            'publication_key' => 'site1-article1-v1',
+        ], [
             'website_id' => $wpSite->id,
             'article_version_id' => $version1->id,
-            'publication_key' => 'site1-article1-v1',
             'scheduled_at_utc' => now()->addHours(2),
             'timezone' => 'Asia/Ho_Chi_Minh',
             'status' => 'scheduled',
             'attempt_count' => 0,
+        ]);
+
+        // 4. Tạo ảnh mẫu trong thư viện media công ty
+        $sampleDir = storage_path('app/public/media/2026/11');
+        if (! is_dir($sampleDir)) {
+            mkdir($sampleDir, 0755, true);
+        }
+
+        $imgFile1 = $sampleDir . '/marketing_automation_banner.webp';
+        $thumbFile1 = $sampleDir . '/marketing_automation_banner_thumb.webp';
+        if (! file_exists($imgFile1)) {
+            $img = imagecreatetruecolor(800, 450);
+            $bg = imagecolorallocate($img, 30, 64, 175);
+            imagefilledrectangle($img, 0, 0, 800, 450, $bg);
+            imagewebp($img, $imgFile1, 85);
+            imagedestroy($img);
+
+            $thumb = imagecreatetruecolor(360, 202);
+            $thumbBg = imagecolorallocate($thumb, 30, 64, 175);
+            imagefilledrectangle($thumb, 0, 0, 360, 202, $thumbBg);
+            imagewebp($thumb, $thumbFile1, 80);
+            imagedestroy($thumb);
+        }
+
+        MediaAsset::firstOrCreate([
+            'file_name' => 'marketing_automation_banner.webp',
+        ], [
+            'website_id' => $wpSite->id,
+            'uploaded_by' => $admin->id,
+            'disk' => 'public',
+            'file_path' => 'media/2026/11/marketing_automation_banner.webp',
+            'thumbnail_path' => 'media/2026/11/marketing_automation_banner_thumb.webp',
+            'original_name' => 'marketing_automation_banner.png',
+            'mime_type' => 'image/webp',
+            'file_size' => file_exists($imgFile1) ? filesize($imgFile1) : 45000,
+            'width' => 800,
+            'height' => 450,
+            'sha256' => file_exists($imgFile1) ? hash_file('sha256', $imgFile1) : hash('sha256', 'banner1'),
+            'title' => 'Banner Tự Động Hóa Marketing 2026',
+            'alt_text' => 'Hình ảnh giải pháp tự động hóa marketing 2026 - Banner tổng quan',
+            'caption' => 'Mô hình tự động hóa quy trình phân phối nội dung đa kênh',
+            'is_featured' => true,
         ]);
     }
 }
