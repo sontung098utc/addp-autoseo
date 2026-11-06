@@ -147,6 +147,9 @@ class PublicationResource extends Resource
                     ->description(fn (Publication $r): ?string => $r->articleVersion?->title)
                     ->searchable()
                     ->wrap()
+                    // Cột nội dung là cột quan trọng nhất: cho rộng, các cột phụ bên dưới gọn lại.
+                    ->extraHeaderAttributes(['style' => 'min-width:22rem'])
+                    ->extraCellAttributes(['style' => 'min-width:22rem'])
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('website.name')
                     ->label('Website')
@@ -168,11 +171,15 @@ class PublicationResource extends Resource
                 Tables\Columns\TextColumn::make('attempt_count')
                     ->label('Số lần thử')
                     ->numeric()
-                    ->alignCenter(),
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])
+                    ->extraCellAttributes(['style' => 'width:1%']),
                 Tables\Columns\TextColumn::make('last_error')
                     ->label('Lỗi')
                     ->formatStateUsing(fn (?string $state): string => ErrorMasker::short($state, 60))
                     ->tooltip(fn (Publication $r): ?string => $r->last_error ? ErrorMasker::mask($r->last_error) : null)
+                    ->wrap()
+                    ->extraCellAttributes(['style' => 'max-width:16rem'])
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('published_url')
                     ->label('Link bài')
