@@ -22,8 +22,6 @@ use Livewire\Attributes\Url;
  */
 class AuditPage extends Page
 {
-    public const PER_PAGE = 5;
-
     public const DEMO_STATES = ['dang-quet', 'quet-loi', 'chua-quet', 'chua-ket-noi', 'ngoai-allowlist'];
 
     protected static ?string $navigationIcon = 'heroicon-o-magnifying-glass-circle';
@@ -43,8 +41,6 @@ class AuditPage extends Page
     public ?int $websiteId = null;
 
     public ?string $groupType = null;
-
-    public int $urlPage = 1;
 
     #[Url(as: 'demo')]
     public ?string $demo = null;
@@ -74,7 +70,6 @@ class AuditPage extends Page
             $this->websiteId = $this->activeWebsites()->first()?->id;
         }
         $this->groupType = null;
-        $this->urlPage = 1;
         $this->briefOpen = false;
         $this->demo = null;
     }
@@ -85,12 +80,6 @@ class AuditPage extends Page
             return;
         }
         $this->groupType = $type;
-        $this->urlPage = 1;
-    }
-
-    public function setUrlPage(int $page): void
-    {
-        $this->urlPage = max(1, $page);
     }
 
     public function rescan(): void
@@ -119,7 +108,6 @@ class AuditPage extends Page
         }
         $this->demo = null;
         $this->groupType = null;
-        $this->urlPage = 1;
         Notification::make()->title('Đã quét lại (dữ liệu mẫu)')->body('Phân tích chạy lại trên bộ trang mẫu; mốc quét đã cập nhật.')->success()->send();
     }
 
@@ -209,6 +197,58 @@ class AuditPage extends Page
         return $run['groups'][0];
     }
 
+    /** @param array<string, mixed>|null $run @return list<array<string, mixed>> */
+    private function groupRows(?array $run): array
+    {
+        $tones = ['P0' => 'danger', 'P1' => 'warn', 'P2' => 'muted'];
+
+        return array_map(fn ($g) => [
+            'id' => $g['type'],
+            'severity' => ['text' => $g['severity'], 'tone' => $tones[$g['severity']] ?? 'muted'],
+            'label' => $g['label'],
+            'sub' => $g['sub'],
+            'urls' => $g['urls'],
+            'delta' => $g['delta'],
+            '_tone' => $g['severity'] === 'P0' ? 'danger' : null,
+        ], $run['groups'] ?? []);
+    }
+
+    /** @param array<string, mixed>|null $group @return list<array<string, mixed>> */
+    private function evidenceRows(?array $group): array
+    {
+        $rows = [];
+        foreach ($group['items'] ?? [] as $i => $it) {
+            $rows[] = ['id' => $i + 1, 'url' => $it['url'], 'measured' => (string) $it['measured'], 'evidence' => (string) $it['evidence']];
+        }
+
+        return $rows;
+    }
+
+    /** @param list<array<string, mixed>> $briefs @return list<array<string, mixed>> */
+    private function briefRows(array $briefs): array
+    {
+        return array_map(fn ($b) => [
+            'id' => $b['id'],
+            'title' => $b['title'],
+            'by' => $b['created_by_name'],
+            'at' => VnTime::format($b['created_at'], 'd/m/Y H:i'),
+        ], $briefs);
+    }
+
+    /** Số URL-lỗi và chênh lệch so với lần quét trước theo mức (P0/P1/P2). @param array<string, mixed>|null $run @return array<string, array{n:int, delta:int|null}> */
+    private function sevStats(?array $run): array
+    {
+        $out = ['P0' => ['n' => 0, 'delta' => null], 'P1' => ['n' => 0, 'delta' => null], 'P2' => ['n' => 0, 'delta' => null]];
+        foreach ($run['groups'] ?? [] as $g) {
+            $out[$g['severity']]['n'] += $g['urls'];
+            if ($g['delta'] !== null) {
+                $out[$g['severity']]['delta'] = ($out[$g['severity']]['delta'] ?? 0) + $g['delta'];
+            }
+        }
+
+        return $out;
+    }
+
     /** @return array<string, mixed> */
     public function getViewData(): array
     {
@@ -229,9 +269,6 @@ class AuditPage extends Page
         }
         $scanning = $state === 'dang-quet';
         $canRescan = $guard['ok'] && ! $scanning;
-        $items = $group['items'] ?? [];
-        $pages = max(1, (int) ceil(count($items) / self::PER_PAGE));
-        $page = min(max(1, $this->urlPage), $pages);
         $nextAt = $guard['next_at'] ?? null;
 
         return [
@@ -247,9 +284,10 @@ class AuditPage extends Page
             'scanning' => $scanning,
             'canBrief' => $canAct && $group !== null && ! $scanning,
             'stale' => in_array($state, ['dang-quet', 'quet-loi'], true),
-            'pageItems' => array_slice($items, ($page - 1) * self::PER_PAGE, self::PER_PAGE),
-            'pageNo' => $page,
-            'pageCount' => $pages,
+            'groupRows' => $this->groupRows($run),
+            'evidenceRows' => $this->evidenceRows($group),
+            'briefRows' => $this->briefRows($site ? $service->briefs($site) : []),
+            'sevStats' => $this->sevStats($run),
             'fixSteps' => $group ? IssueCatalog::fixSteps($group['type'], $group['items']) : [],
             'nextAtLabel' => $nextAt ? 'Quét lại được từ '.VnTime::format($nextAt, 'H:i d/m/Y').' (giờ VN).' : null,
             'briefs' => $site ? $service->briefs($site) : [],

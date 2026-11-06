@@ -60,7 +60,7 @@ class SeoAuditPageTest extends TestCase
     {
         $this->as('writer');
         $c = Livewire::test(AuditPage::class)->assertSuccessful()
-            ->assertSee('Lần quét gần nhất')->assertSee('Liên kết gãy (404)')->assertSee('Dữ liệu minh họa');
+            ->assertSee('Liên kết gãy (404)')->assertDontSee('Dữ liệu minh họa')->assertDontSee('Lỗi SEO on-page');
         $c->call('rescan');
         $this->assertCount(0, SeoAuditService::make()->briefs());
         $c->call('createBrief')->assertSet('briefOpen', false);
@@ -82,15 +82,34 @@ class SeoAuditPageTest extends TestCase
         $this->get('/admin/audit-website')->assertOk()->assertSee('Audit website');
     }
 
-    public function test_chon_nhom_loi_va_phan_trang_url(): void
+    public function test_chon_nhom_loi_va_bang_bang_chung(): void
     {
         $this->as('approver');
         $c = Livewire::test(AuditPage::class)
-            ->call('selectGroup', 'broken_link')->assertSet('groupType', 'broken_link')
-            ->assertSee('Hiển thị 5 / 7 dòng')->assertSee('trang 1/2');
-        $c->call('setUrlPage', 2)->assertSee('Hiển thị 2 / 7 dòng')->assertSee('trang 2/2');
-        $c->call('selectGroup', 'missing_title')->assertSet('urlPage', 1)->assertSee('Thiếu title');
+            ->call('selectGroup', 'broken_link')->assertSet('groupType', 'broken_link');
+        $this->assertCount(7, $c->viewData('evidenceRows'));
+        $this->assertStringContainsString('/tai-lieu/mau-don-hoc-bong.pdf', collect($c->viewData('evidenceRows'))->pluck('evidence')->implode(' '));
+        $c->call('selectGroup', 'missing_title')->assertSee('Thiếu title');
         $c->call('selectGroup', 'khong_ton_tai')->assertSet('groupType', 'missing_title');
+    }
+
+    public function test_giao_dien_tab_bang_kpi_va_nut_primary_duy_nhat(): void
+    {
+        $this->as('approver');
+        $c = Livewire::test(AuditPage::class)->assertSee('Nhóm lỗi')->assertSee('Brief đã tạo')->assertSee('Quy tắc')
+            ->assertSee('Tạo brief từ lỗi')->assertDontSee('Luật nghiệp vụ của màn này');
+        $rows = $c->viewData('groupRows');
+        $this->assertNotEmpty($rows);
+        foreach ($rows as $r) {
+            $this->assertIsString($r['id']);
+            $this->assertContains($r['severity']['tone'], ['danger', 'warn', 'muted']);
+            $this->assertSame($r['severity']['text'] === 'P0' ? 'danger' : ($r['severity']['text'] === 'P1' ? 'warn' : 'muted'), $r['severity']['tone']);
+        }
+        $html = $c->html();
+        $this->assertStringContainsString('good\u0022:\u0022down', str_replace('&quot;', '\u0022', $html));
+        $this->assertSame(1, substr_count($html, 'fi-btn-color-primary'), 'đúng một nút primary');
+        $stats = $c->viewData('sevStats');
+        $this->assertSame(array_sum(array_column($rows, 'urls')), $stats['P0']['n'] + $stats['P1']['n'] + $stats['P2']['n']);
     }
 
     public function test_quet_lai_thanh_cong_roi_bi_chan_6_gio(): void
@@ -171,7 +190,8 @@ class SeoAuditPageTest extends TestCase
         $this->assertCount(1, $saved);
         $this->assertSame($u->id, $saved[0]['created_by']);
         $this->assertSame(7, $saved[0]['urls']);
-        $c->call('closeBrief')->assertSet('briefOpen', false)->assertSee('Brief đã tạo (1)');
+        $c->call('closeBrief')->assertSet('briefOpen', false)->assertSee('Brief đã tạo');
+        $this->assertCount(1, $c->viewData('briefRows'));
     }
 
     public function test_trang_thai_minh_hoa_va_nhan_cu(): void
