@@ -70,3 +70,36 @@
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* ---- Màn Duyệt bài (ArticleVersion view): chỉ class .ss-review-* ---- */
+.ss-review { --ss-review-ins-bg: #DDF1E7; --ss-review-ins-fg: #0A4A38; --ss-review-del-bg: #FBE4E1; --ss-review-del-fg: #7A1C14; --ss-review-num-bg: #FFF0C7; --ss-review-num-fg: #5C3D00;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: start; }
+.dark .ss-review { --ss-review-ins-bg: #14352B; --ss-review-ins-fg: #BFEBDA; --ss-review-del-bg: #3D1D1A; --ss-review-del-fg: #F6C9C3; --ss-review-num-bg: #3F3210; --ss-review-num-fg: #F4DDA0; }
+.ss-review__side, .ss-review__main { display: grid; gap: 1rem; min-width: 0; align-content: start; }
+@media (min-width: 1024px) {
+  .ss-review { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  .ss-review__main { grid-column: 1; grid-row: 1; }
+  .ss-review__side { grid-column: 2; grid-row: 1; position: sticky; top: 5rem; max-height: calc(100vh - 6rem); overflow-y: auto; }
+}
+.ss-review-card { border: 1px solid var(--ss-border); border-radius: 0.5rem; padding: 1rem; background: transparent; font-size: 0.875rem; line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
+.ss-review-card__title { margin: 0 0 0.5rem; font-size: 0.9375rem; font-weight: 600; }
+.ss-review-sub { margin: 0.75rem 0 0.25rem; font-size: 0.8125rem; font-weight: 600; }
+.ss-review-muted { margin: 0.5rem 0 0; font-size: 0.8125rem; opacity: 0.8; }
+.ss-review-next { margin: 0.5rem 0 0; }
+.ss-review-list { margin: 0.5rem 0 0; padding-left: 1.25rem; list-style: disc; }
+.ss-review-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0.25rem 0.75rem; margin: 0; }
+.ss-review-dl dt { opacity: 0.8; }
+.ss-review-dl dd { margin: 0; }
+.ss-review-head__title { margin: 0; font-size: 1.25rem; font-weight: 600; line-height: 1.3; }
+.ss-review-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; margin: 0.5rem 0 0; font-size: 0.8125rem; }
+.ss-review-badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--ss-border); }
+.ss-review-badge--warning { background: var(--ss-review-num-bg); color: var(--ss-review-num-fg); }
+.ss-review-badge--success { background: var(--ss-review-ins-bg); color: var(--ss-review-ins-fg); }
+.ss-review-badge--danger { background: var(--ss-review-del-bg); color: var(--ss-review-del-fg); }
+.ss-review-frame { border: 1px solid var(--ss-border); border-radius: 0.5rem; background: #fff; }
+.ss-review-diff summary { cursor: pointer; font-weight: 600; margin: 0.5rem 0; }
+.ss-review-diff .diff-block { padding: 0.375rem 0.5rem; border-bottom: 1px solid var(--ss-border); }
+.ss-review-diff .diff-tag { font: 500 0.6875rem/1 ui-monospace, monospace; opacity: 0.7; text-transform: uppercase; margin-right: 0.25rem; }
+.ss-review-diff .diff-ins, .ss-review-diff ins { background: var(--ss-review-ins-bg); color: var(--ss-review-ins-fg); text-decoration: none; }
+.ss-review-diff .diff-del, .ss-review-diff del { background: var(--ss-review-del-bg); color: var(--ss-review-del-fg); }
+.ss-review-diff .diff-num, .ss-review-num { background: var(--ss-review-num-bg); color: var(--ss-review-num-fg); font-weight: 600; padding: 0 0.25rem; border-radius: 0.25rem; }
