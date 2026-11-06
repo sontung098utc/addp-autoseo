@@ -31,7 +31,7 @@ document.addEventListener('alpine:init', () => {
   }));
 
   Alpine.data('studioTable', (cfg) => ({
-    cfg, query: '', sortKey: null, sortDir: 'asc', filters: {}, visible: {}, page: 1, pageSize: cfg.pageSize || 25, menu: false,
+    cfg, selected: [...(cfg.selected || [])], query: '', sortKey: null, sortDir: 'asc', filters: {}, visible: {}, page: 1, pageSize: cfg.pageSize || 25, menu: false,
     init() {
       const sk = 'studio.table.' + cfg.id;
       this.visible = store('local', sk + '.cols', null) || Object.fromEntries(cfg.columns.map((c) => [c.key, c.visible !== false]));
@@ -91,6 +91,10 @@ document.addEventListener('alpine:init', () => {
     get pages() { return Math.max(1, Math.ceil(this.filtered.length / this.pageSize)); },
     get pageRows() { const p = Math.min(this.page, this.pages); return this.filtered.slice((p - 1) * this.pageSize, p * this.pageSize); },
     get countText() { return this.filtered.length === cfg.rows.length ? cfg.rows.length + ' dòng' : this.filtered.length + ' / ' + cfg.rows.length + ' dòng'; },
+    toggle(id) { this.selected = this.selected.includes(id) ? this.selected.filter((x) => x !== id) : [...this.selected, id]; this.syncSel(); },
+    get allChecked() { return this.filtered.length > 0 && this.filtered.every((r) => this.selected.includes(r.id)); },
+    toggleAll(on) { const ids = this.filtered.map((r) => r.id); this.selected = on ? [...new Set([...this.selected, ...ids])] : this.selected.filter((x) => !ids.includes(x)); this.syncSel(); },
+    syncSel() { if (cfg.selectModel && this.$wire) this.$wire.$set(cfg.selectModel, [...this.selected], false); },
     toggleSort(key) { if (this.sortKey !== key) { this.sortKey = key; this.sortDir = 'asc'; } else if (this.sortDir === 'asc') this.sortDir = 'desc'; else { this.sortKey = null; this.sortDir = 'asc'; } },
     sortIcon(key) { return this.sortKey === key ? (this.sortDir === 'asc' ? '▲' : '▼') : ''; },
     ariaSort(key) { return this.sortKey === key ? (this.sortDir === 'asc' ? 'ascending' : 'descending') : 'none'; },

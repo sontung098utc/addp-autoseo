@@ -90,4 +90,16 @@ class StudioUiKitTest extends TestCase
         $this->actingAs(User::create(['name' => 'a', 'email' => 'b@x.vn', 'password' => 'secret123', 'role' => 'admin', 'is_active' => true]));
         $this->assertFalse(UiKitPage::canAccess());
     }
+
+    public function test_bang_chon_nhieu_dong_xuat_cau_hinh_chon(): void
+    {
+        $html = Blade::render(
+            '<x-studio.data-table id="g" :columns="$c" :rows="$r" :selectable="true" select-model="picked" :selected="[2]" />',
+            ['c' => [['key' => 'k', 'label' => 'Từ khóa', 'type' => 'text']], 'r' => [['id' => 1, 'k' => 'a'], ['id' => 2, 'k' => 'b']]]
+        );
+
+        $this->assertStringContainsString('&quot;selectable&quot;:true', $html);
+        $this->assertStringContainsString('&quot;selectModel&quot;:&quot;picked&quot;', $html);
+        $this->assertStringContainsString('aria-label="Chọn tất cả các dòng đang lọc"', $html);
+    }
 }

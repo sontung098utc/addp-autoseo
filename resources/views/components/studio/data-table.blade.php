@@ -1,7 +1,7 @@
 {{-- Bảng dữ liệu có tìm kiếm, lọc theo cột, sắp xếp, chọn cột hiển thị, phân trang. Dữ liệu truyền dạng JSON và hiển thị bằng x-text (không HTML thô).
      columns: [key,label,type(text|number|badge|link|delta|mono|actions),align,sortable,filter,visible,searchable,tones,good,unit,decimals,suffix,actions]
      rows: mảng assoc, mỗi dòng nên có 'id'; badge: chuỗi hoặc {text,tone}; link: {text,href}; delta: số; '_tone' tô viền trái (ok|warn|danger|info). --}}
-@props(['id', 'columns' => [], 'rows' => [], 'pageSize' => 25, 'search' => 'Tìm trong bảng', 'selectMethod' => null, 'selectedId' => null, 'empty' => 'Không có dữ liệu'])
+@props(['id', 'columns' => [], 'rows' => [], 'pageSize' => 25, 'search' => 'Tìm trong bảng', 'selectMethod' => null, 'selectedId' => null, 'empty' => 'Không có dữ liệu', 'selectable' => false, 'selectModel' => null, 'selected' => []])
 @php
     $cfg = [
         'id' => (string) $id,
@@ -10,8 +10,11 @@
         'pageSize' => (int) $pageSize,
         'selectMethod' => $selectMethod,
         'selectedId' => $selectedId,
+        'selectable' => (bool) $selectable,
+        'selectModel' => $selectModel,
+        'selected' => array_values($selected),
     ];
-    $key = 'studio-dt-'.$id.'-'.substr(md5(json_encode($cfg['rows']).json_encode($cfg['columns']).json_encode($selectedId)), 0, 8);
+    $key = 'studio-dt-'.$id.'-'.substr(md5(json_encode($cfg['rows']).json_encode($cfg['columns']).json_encode($selectedId).json_encode($cfg['selected'])), 0, 8);
 @endphp
 <div class="ss-dt" wire:key="{{ $key }}" x-data="studioTable(@js($cfg))">
     <div class="ss-dt__bar">
@@ -24,6 +27,7 @@
         </template>
         <button type="button" class="ss-dt__btn" x-show="hasFilters()" x-cloak x-on:click="reset()">Xóa lọc</button>
         <span class="ss-dt__spacer"></span>
+        <span class="ss-dt__count" x-show="cfg.selectable && selected.length" x-cloak x-text="'Đã chọn ' + selected.length"></span>
         <span class="ss-dt__count" x-text="countText"></span>
         <div class="ss-dt__menuwrap" x-on:click.outside="menu = false" x-on:keydown.escape="menu = false">
             <button type="button" class="ss-dt__btn" aria-haspopup="true" x-bind:aria-expanded="menu ? 'true' : 'false'" x-on:click="menu = !menu">Cột hiển thị</button>
@@ -35,6 +39,7 @@
     <div class="ss-dt__scroll">
         <table class="ss-dt__table">
             <thead><tr>
+                <th scope="col" x-show="cfg.selectable" x-cloak style="width:2rem"><input type="checkbox" x-bind:checked="allChecked" x-on:change="toggleAll($event.target.checked)" aria-label="Chọn tất cả các dòng đang lọc"></th>
                 <template x-for="c in shownCols" :key="c.key">
                     <th scope="col" x-bind:class="{ 'is-right': c.align === 'right', 'is-center': c.align === 'center' }" x-bind:aria-sort="c.sortable ? ariaSort(c.key) : null">
                         <template x-if="c.sortable"><button type="button" class="ss-dt__sortbtn" x-on:click="toggleSort(c.key)"><span x-text="c.label"></span><span aria-hidden="true" x-text="sortIcon(c.key)"></span></button></template>
@@ -45,6 +50,7 @@
             <tbody>
                 <template x-for="(row, i) in pageRows" :key="row.id ?? i">
                     <tr x-bind:class="rowClass(row)" x-on:click="selectRow(row)" x-bind:style="cfg.selectMethod ? 'cursor:pointer' : ''">
+                        <td x-show="cfg.selectable" x-cloak><input type="checkbox" x-bind:checked="selected.includes(row.id)" x-on:change="toggle(row.id)" x-on:click.stop aria-label="Chọn dòng"></td>
                         <template x-for="c in shownCols" :key="c.key">
                             <td x-bind:class="{ 'is-right': c.align === 'right' || c.type === 'number' || c.type === 'delta', 'is-center': c.align === 'center' }">
                                 <template x-if="c.type === 'badge'"><span class="ss-badge" x-bind:class="'ss-badge--' + badgeTone(row, c)" x-text="fmt(row, c)"></span></template>
