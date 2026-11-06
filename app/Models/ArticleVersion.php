@@ -60,4 +60,17 @@ class ArticleVersion extends Model
     {
         return $this->hasMany(Publication::class);
     }
+
+    public function mediaAssets(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(MediaAsset::class, 'article_version_media')
+            ->withPivot(['is_featured', 'position', 'custom_alt'])
+            ->withTimestamps();
+    }
+
+    public function getFeaturedMediaAssetAttribute(): ?MediaAsset
+    {
+        return $this->mediaAssets()->wherePivot('is_featured', true)->first()
+            ?: $this->mediaAssets()->orderByPivot('position')->first();
+    }
 }
