@@ -3,10 +3,9 @@
 namespace App\Filament\Resources\PublicationResource\Pages;
 
 use App\Filament\Resources\PublicationResource;
-use Filament\Actions;
-use Filament\Resources\Pages\CreateRecord;
+use Filament\Resources\Pages\ViewRecord;
 
-class CreatePublication extends CreateRecord
+class ViewPublication extends ViewRecord
 {
     protected static string $resource = PublicationResource::class;
 }

@@ -24,6 +24,39 @@ class ArticleResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+
+    protected static function user(): ?\App\Models\User
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+
+        return $user instanceof \App\Models\User && $user->is_active ? $user : null;
+    }
+
+    public static function canViewAny(): bool
+    {
+        return static::user()?->isWriter() ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return static::user()?->isWriter() ?? false;
+    }
+
+    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return static::user()?->isWriter() ?? false;
+    }
+
+    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return static::user()?->isAdmin() ?? false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return static::user()?->isAdmin() ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -51,19 +84,6 @@ class ArticleResource extends Resource
                             ->required(),
                         Forms\Components\TextInput::make('topic_cluster')
                             ->label('Cụm chủ đề (Topic Cluster)'),
-                        Forms\Components\Select::make('workflow_status')
-                            ->label('Trạng thái vòng đời')
-                            ->options([
-                                'planned' => 'Đã lên kế hoạch',
-                                'drafting' => 'Đang sinh nội dung (AI)',
-                                'needs_review' => 'Chờ duyệt nội dung',
-                                'approved' => 'Đã duyệt (Sẵn sàng xếp lịch)',
-                                'rejected' => 'Từ chối (Cần sửa)',
-                                'scheduled' => 'Đã lên lịch xuất bản',
-                                'published' => 'Đã xuất bản thành công',
-                            ])
-                            ->default('planned')
-                            ->required(),
                     ])->columns(2),
             ]);
     }

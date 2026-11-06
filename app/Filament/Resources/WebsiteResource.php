@@ -24,6 +24,39 @@ class WebsiteResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
+    protected static function user(): ?\App\Models\User
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+
+        return $user instanceof \App\Models\User && $user->is_active ? $user : null;
+    }
+
+    public static function canViewAny(): bool
+    {
+        return static::user()?->isAdmin() ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return static::user()?->isAdmin() ?? false;
+    }
+
+    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return static::user()?->isAdmin() ?? false;
+    }
+
+    // Tạm khóa hoàn toàn việc xóa website; "Thu hồi kết nối" làm ở PR sau.
+    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -64,13 +97,20 @@ class WebsiteResource extends Resource
 
                 Forms\Components\Section::make('Xác thực bảo mật (Mã hóa AES-256)')
                     ->description('Thông tin credentials được mã hóa tự động trước khi lưu trữ vào cơ sở dữ liệu')
-                    ->schema([
-                        Forms\Components\KeyValue::make('encrypted_credentials')
-                            ->label('Tham số xác thực')
-                            ->keyLabel('Khóa (Key)')
-                            ->valueLabel('Giá trị bảo mật')
-                            ->reorderable(),
-                    ]),
+                    ->schema(fn (string $operation): array => $operation === 'create'
+                        ? [
+                            Forms\Components\TextInput::make('credentials_input.username')->label('Tên đăng nhập (WordPress)')->maxLength(255),
+                            Forms\Components\TextInput::make('credentials_input.application_password')->label('Application Password (WordPress)')->password()->revealable(false)->autocomplete('new-password'),
+                            Forms\Components\TextInput::make('credentials_input.consumer_key')->label('Consumer Key (Magento)')->password()->revealable(false)->autocomplete('new-password'),
+                            Forms\Components\TextInput::make('credentials_input.consumer_secret')->label('Consumer Secret (Magento)')->password()->revealable(false)->autocomplete('new-password'),
+                            Forms\Components\TextInput::make('credentials_input.access_token')->label('Access Token (Magento)')->password()->revealable(false)->autocomplete('new-password'),
+                            Forms\Components\TextInput::make('credentials_input.access_token_secret')->label('Access Token Secret (Magento)')->password()->revealable(false)->autocomplete('new-password'),
+                        ]
+                        : [
+                            Forms\Components\Placeholder::make('credentials_saved')
+                                ->label('Tham số xác thực')
+                                ->content(fn (?\Illuminate\Database\Eloquent\Model $record): string => $record && ! empty($record->encrypted_credentials) ? '•••• đã lưu' : 'Chưa có'),
+                        ]),
             ]);
     }
 
@@ -114,11 +154,6 @@ class WebsiteResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
             ]);
     }
 
