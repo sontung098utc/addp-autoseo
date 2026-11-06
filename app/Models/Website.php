@@ -39,4 +39,19 @@ class Website extends Model
     {
         return $this->hasMany(Publication::class);
     }
+
+    public function crawledUrls(): HasMany
+    {
+        return $this->hasMany(CrawledUrl::class);
+    }
+
+    public function seoAudits(): HasMany
+    {
+        return $this->hasMany(SeoAudit::class);
+    }
+
+    public function latestSeoAudit(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(SeoAudit::class)->latestOfMany();
+    }
 }
