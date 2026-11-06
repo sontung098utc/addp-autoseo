@@ -98,8 +98,8 @@ class StudioUiKitTest extends TestCase
             ['c' => [['key' => 'k', 'label' => 'Từ khóa', 'type' => 'text']], 'r' => [['id' => 1, 'k' => 'a'], ['id' => 2, 'k' => 'b']]]
         );
 
-        $this->assertStringContainsString('&quot;selectable&quot;:true', $html);
-        $this->assertStringContainsString('&quot;selectModel&quot;:&quot;picked&quot;', $html);
+        $this->assertStringContainsString('\\u0022selectable\\u0022:true', $html);
+        $this->assertStringContainsString('\\u0022selectModel\\u0022:\\u0022picked\\u0022', $html);
         $this->assertStringContainsString('aria-label="Chọn tất cả các dòng đang lọc"', $html);
     }
 }
