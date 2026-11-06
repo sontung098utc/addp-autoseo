@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Publication;
+use App\Services\Publishing\EmergencyStopService;
 use App\Services\Publishing\PublisherManager;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -38,12 +39,25 @@ class PublishArticleJob implements ShouldQueue
     {
     }
 
-    public function handle(PublisherManager $publisherManager): void
+    public function handle(PublisherManager $publisherManager, ?EmergencyStopService $emergencyStop = null): void
     {
+        $emergencyStop = $emergencyStop ?? app(EmergencyStopService::class);
         $publication = $this->publication->fresh();
 
         if (! $publication) {
             Log::warning("[PublishArticleJob] Publication ID {$this->publication->id} không tồn tại.");
+            return;
+        }
+
+        // Kiểm tra Dừng khẩn cấp: Nếu đang dừng, trả bài về trạng thái scheduled
+        if ($emergencyStop->isStopped($publication->website_id)) {
+            $info = $emergencyStop->getStopInfo($publication->website_id);
+            $reason = $info['reason'] ?? 'Dừng khẩn cấp';
+            Log::warning("[PublishArticleJob] Xuất bản bài #{$publication->id} bị hủy do hệ thống đang DỪNG KHẨN CẤP ({$reason}). Trả trạng thái về scheduled.");
+            $publication->update([
+                'status' => 'scheduled',
+                'last_error' => "Tạm dừng khẩn cấp: {$reason}",
+            ]);
             return;
         }
 

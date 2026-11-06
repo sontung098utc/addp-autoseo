@@ -78,13 +78,13 @@ class MagentoBridgeClient implements PublisherInterface
         ];
     }
 
-    public function createDraft(Website $website, ArticleVersion $version): array
+    public function createDraft(Website $website, ArticleVersion $version, ?string $publicationKey = null): array
     {
         $baseUrl = rtrim($website->base_url, '/');
         $store = $website->store_scope ?: 'default';
         $endpoint = "{$baseUrl}/rest/{$store}/V1/company-blog/posts";
 
-        $publicationKey = "magento-{$website->id}-art{$version->article_id}-v{$version->version}";
+        $publicationKey = $publicationKey ?? "magento-{$website->id}-art{$version->article_id}-v{$version->version}";
 
         $postPayload = [
             'post' => [
@@ -128,7 +128,7 @@ class MagentoBridgeClient implements PublisherInterface
             if ($existing) {
                 $remoteId = $existing['remote_id'];
             } else {
-                $draft = $this->createDraft($website, $publication->articleVersion);
+                $draft = $this->createDraft($website, $publication->articleVersion, $publication->publication_key);
                 $remoteId = $draft['remote_id'];
             }
         }

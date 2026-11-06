@@ -174,14 +174,31 @@ class SchedulePublicationTest extends TestCase
         $this->assertSame(['index', 'view'], array_keys(PublicationResource::getPages()));
     }
 
-    public function test_nut_tam_dung_bi_vo_hieu_va_co_chu_thich(): void
+    public function test_nut_tam_dung_kich_hoat_dung_khan_cap_va_chan_writer(): void
     {
-        $this->actingAs($this->user('approver'));
+        $approver = $this->user('approver');
+        $writer = $this->user('writer');
+
+        // 1. Writer bị cấm vào trang lịch đăng
+        $this->actingAs($writer);
+        Livewire::test(ListPublications::class)->assertForbidden();
+
+        // 2. Approver nhìn thấy nút và có thể kích hoạt dừng khẩn cấp kèm lý do
+        $this->actingAs($approver);
         Livewire::test(ListPublications::class)
-            ->assertActionDisabled('pause')
-            ->assertSee('Tạm dừng lịch đăng');
-        $action = collect(Livewire::test(ListPublications::class)->instance()->getCachedHeaderActions())->first(fn ($a) => $a->getName() === 'pause');
-        $this->assertStringContainsString('Chưa hỗ trợ - chờ task 3.6', $action->getTooltip());
+            ->assertActionVisible('pause')
+            ->callAction('pause', ['reason' => 'Bảo trì hệ thống CMS'])
+            ->assertHasNoActionErrors();
+
+        $this->assertTrue(app(\App\Services\Publishing\EmergencyStopService::class)->isStopped());
+
+        // 3. Sau khi dừng, nút chuyển sang Khôi phục
+        Livewire::test(ListPublications::class)
+            ->assertActionVisible('resume')
+            ->callAction('resume')
+            ->assertHasNoActionErrors();
+
+        $this->assertFalse(app(\App\Services\Publishing\EmergencyStopService::class)->isStopped());
     }
 
     public function test_badge_menu(): void

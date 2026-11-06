@@ -3,11 +3,16 @@
     use App\Filament\Support\Schedule\ReconcileRequest;
     use App\Filament\Support\Schedule\ScheduleExplainer;
     use App\Filament\Support\StatusPresenter;
+    use App\Services\Publishing\EmergencyStopService;
 
     $p = $this->getRecord();
     $explain = ScheduleExplainer::explain($p->status);
     $steps = ScheduleExplainer::timeline($p);
     $reconcileWhy = ReconcileRequest::reasonUnavailable(auth()->user(), $p);
+
+    $emergencyService = app(EmergencyStopService::class);
+    $isStopped = $emergencyService->isStopped($p->website_id);
+    $stopInfo = $isStopped ? $emergencyService->getStopInfo($p->website_id) : null;
 @endphp
 <x-filament-panels::page>
     <style>
@@ -21,6 +26,7 @@
         .ss-sched-dot.is-error{background:rgb(var(--danger-600))}
         .ss-sched-dot.is-warning{background:rgb(var(--warning-600))}
         .ss-sched-muted{opacity:.75;font-size:.875rem}
+        .ss-sched-emergency{background:rgba(239,68,68,.1);border-color:rgb(var(--danger-500));color:rgb(var(--danger-500));font-weight:600;padding:.75rem;border-radius:.5rem;margin-top:.75rem}
     </style>
 
     <div class="ss-sched-box">
@@ -30,7 +36,13 @@
         @if ($reconcileWhy)
             <p class="ss-sched-muted">Nút "Đối soát ngay" đang ẩn: {{ $reconcileWhy }}</p>
         @endif
-        <p class="ss-sched-muted">Nút "Tạm dừng lịch đăng": chưa hỗ trợ - chờ task 3.6.</p>
+        @if ($isStopped)
+            <div class="ss-sched-emergency">
+                ⛔ Lịch đăng đang TẠM DỪNG KHẨN CẤP: {{ $stopInfo['reason'] ?? 'Toàn hệ thống đang tạm hoãn xuất bản' }}
+            </div>
+        @else
+            <p class="ss-sched-muted">Nút "Tạm dừng lịch đăng": Quản trị viên/Trưởng nhóm có thể kích hoạt tại trang danh sách lịch đăng.</p>
+        @endif
     </div>
 
     <div class="ss-sched-box">
