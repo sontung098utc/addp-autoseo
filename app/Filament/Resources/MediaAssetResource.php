@@ -22,7 +22,9 @@ class MediaAssetResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Thư viện ảnh công ty';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?string $navigationGroup = 'Cài đặt';
+
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
