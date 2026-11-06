@@ -142,10 +142,10 @@ class DashboardTest extends TestCase
         $this->user('writer')->update(['email' => 'writer@company.local']);
         DashboardDemoData::seed();
         DashboardDemoData::seed();
-        $this->assertSame(5, Article::where('primary_keyword', 'like', '[Mẫu] %')->count());
-        $this->assertSame(3, Publication::where('publication_key', 'like', 'demo-%')->count());
+        $this->assertSame(5, Article::where('primary_keyword', 'like', '[Mẫu TQ] %')->count());
+        $this->assertSame(3, Publication::where('publication_key', 'like', 'demo-tq-%')->count());
         DashboardDemoData::purge();
-        $this->assertSame(0, Article::where('primary_keyword', 'like', '[Mẫu] %')->count());
+        $this->assertSame(0, Article::where('primary_keyword', 'like', '[Mẫu TQ] %')->count());
         $this->assertSame(0, Publication::count());
 
         $this->app['env'] = 'production';
