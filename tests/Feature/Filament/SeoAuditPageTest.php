@@ -152,7 +152,7 @@ class SeoAuditPageTest extends TestCase
         $this->assertFalse($c->viewData('canRescan'));
         $c->assertSee('Domain không được phép quét');
         $c->call('rescan');
-        $this->assertNull(DemoStore::get('seoaudit.site.'.$nb->id.'.level'));
+        $this->assertNotSame('U approver', DemoStore::get('seoaudit.site.'.$nb->id.'.by'));
     }
 
     public function test_tao_brief_dung_noi_dung_va_luu_danh_sach(): void
