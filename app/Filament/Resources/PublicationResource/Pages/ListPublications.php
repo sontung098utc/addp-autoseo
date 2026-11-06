@@ -50,10 +50,10 @@ class ListPublications extends ListRecords
         $nowUtc = VnTime::dbString(now());
         $count = fn (callable $scope): int => $scope(Publication::query())->count();
 
-        $today = fn (Builder $q) => $q->where('scheduled_at_utc', '>=', $start)->where('scheduled_at_utc', '<', $end);
-        $upcoming = fn (Builder $q) => $q->where('status', 'scheduled')->where('scheduled_at_utc', '>=', $nowUtc);
-        $attention = fn (Builder $q) => $q->whereIn('status', ['failed', 'needs_reconcile']);
-        $done = fn (Builder $q) => $q->where('status', 'published');
+        $today = fn (Builder $query) => $query->where('scheduled_at_utc', '>=', $start)->where('scheduled_at_utc', '<', $end);
+        $upcoming = fn (Builder $query) => $query->where('status', 'scheduled')->where('scheduled_at_utc', '>=', $nowUtc);
+        $attention = fn (Builder $query) => $query->whereIn('status', ['failed', 'needs_reconcile']);
+        $done = fn (Builder $query) => $query->where('status', 'published');
 
         return [
             'today' => Tab::make('Hôm nay')->badge($count($today))->modifyQueryUsing($today),
