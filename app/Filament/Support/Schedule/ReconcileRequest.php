@@ -26,12 +26,35 @@ final class ReconcileRequest
         return null;
     }
 
+    /** Connector của CMS đã được đăng ký trong PublisherManager chưa (không gọi mạng). */
+    private static function connectorAvailable(Publication $p): bool
+    {
+        if (! $p->website) {
+            return false;
+        }
+
+        try {
+            app(\App\Services\Publishing\PublisherManager::class)->getPublisher($p->website);
+
+            return true;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
     /** @return array{ok: bool, message: string} */
     public static function request(Publication $p, ?User $user): array
     {
         $fresh = $p->fresh() ?? $p;
         if ($reason = self::reasonUnavailable($user, $fresh)) {
             return ['ok' => false, 'message' => $reason];
+        }
+
+        // Chưa có connector cho CMS này (ví dụ WordPress: task 1.2) thì đối soát không thể chạy: nói thẳng, không giả vờ.
+        if (! self::connectorAvailable($fresh)) {
+            $cms = $fresh->website?->cms_type ?? 'CMS';
+
+            return ['ok' => false, 'message' => "Chưa hỗ trợ đối soát cho website này: connector {$cms} chưa được cài đặt (WordPress: task 1.2). Lượt đăng giữ nguyên \"Chờ đối soát\", không đăng lại."];
         }
 
         Log::info('publication.reconcile_requested', ['publication_id' => $fresh->id, 'actor_id' => $user->id]);
