@@ -89,4 +89,14 @@ class ReviewActionsTest extends TestCase
         $v2 = $this->make();
         Livewire::test(ViewArticleVersion::class, ['record' => $v2->id])->assertActionHidden('approve')->assertActionHidden('reject');
     }
+
+    public function test_canh_bao_khi_website_chua_co_connector(): void
+    {
+        // WordPress chưa có connector (task 1.2) => cảnh báo trung thực ở form Xếp lịch.
+        $this->assertFalse(\App\Filament\Support\Review\ReviewActions::connectorAvailable($this->site));
+
+        // Khi connector được đăng ký thì không còn cảnh báo.
+        $this->app->instance(\App\Contracts\PublisherInterface::class, $this->createMock(\App\Contracts\PublisherInterface::class));
+        $this->assertTrue(\App\Filament\Support\Review\ReviewActions::connectorAvailable($this->site));
+    }
 }
