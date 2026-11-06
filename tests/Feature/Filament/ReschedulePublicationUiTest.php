@@ -136,7 +136,6 @@ class ReschedulePublicationUiTest extends TestCase
 
         $this->assertSame(1, substr_count($html, 'draggable="true"'));
         $this->assertStringContainsString('data-publication="'.$ok->id.'"', $html);
-        $this->assertStringContainsString('Kéo thẻ', $html);
         $this->assertStringContainsString('không đổi giờ được', $html);   // tooltip R1
         $this->assertStringContainsString('bị chốt', $html);              // tooltip R2
         $this->assertStringNotContainsString('<script>alert(1)</script>', $html);

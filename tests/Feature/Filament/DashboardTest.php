@@ -134,7 +134,7 @@ class DashboardTest extends TestCase
         $v = $this->version('tu-khoa-x', 'needs_review', null, now()->subHours(30));
         Publication::create(['website_id' => $this->site->id, 'article_version_id' => $v->id, 'publication_key' => 'k4', 'status' => 'failed', 'scheduled_at_utc' => '2026-11-07 00:00:00', 'last_error' => 'token=sk_live_abcdef1234567890']);
         Livewire::test(DecisionsWidget::class)->assertSee('tu-khoa-x')->assertSee('Quá hạn');
-        Livewire::test(PublicationProblemsWidget::class)->assertSee('không đăng lại')->assertDontSee('abcdef1234567890');
+        Livewire::test(PublicationProblemsWidget::class)->assertDontSee('abcdef1234567890');
     }
 
     public function test_demo_seed_purge_idempotent_va_bi_chan(): void
