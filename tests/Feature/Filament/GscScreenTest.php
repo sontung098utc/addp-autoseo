@@ -39,15 +39,40 @@ class GscScreenTest extends TestCase
         $this->actingAs($this->user('approver', false))->get('/admin/search-console')->assertStatus(403);
     }
 
-    public function test_approver_sees_data_and_tabs_switch(): void
+    public function test_approver_sees_tabs_tables_and_kpis(): void
     {
         $this->actingAs($this->user('approver'));
-        Livewire::test(SearchConsolePage::class)
-            ->assertSee('Dữ liệu minh họa')->assertSee('Clicks theo ngày')->assertSee('Cơ hội và bài tụt hạng')
-            ->assertSee('giày chạy bộ nam')
-            ->call('setTab', 'device')->assertSet('tab', 'device')->assertSee('Máy tính bảng')
-            ->call('setTab', 'country')->assertSee('Việt Nam')
+        $c = Livewire::test(SearchConsolePage::class)
+            ->assertDontSee('Dữ liệu minh họa')->assertDontSee('(minh họa)')
+            ->assertSee('Tổng quan')->assertSee('Truy vấn')->assertSee('Thiết bị')->assertSee('Quốc gia')->assertSee('Cơ hội')->assertSee('Đề xuất')->assertSee('Quy tắc')
+            ->assertSee('Clicks theo ngày')
             ->call('setDays', 14)->assertSet('days', 14);
+        $dv = $c->viewData('dimRows');
+        $this->assertSame(['query', 'page', 'device', 'country'], array_keys($dv));
+        $this->assertContains('giày chạy bộ nam', array_column($dv['query'], 'key'));
+        $this->assertContains('Máy tính bảng', array_column($dv['device'], 'key'));
+        $this->assertContains('Việt Nam', array_column($dv['country'], 'key'));
+        $row = $dv['query'][0];
+        foreach (['id', 'key', 'clicks', 'impressions', 'ctr', 'position', 'd_clicks', 'd_position'] as $k) {
+            $this->assertArrayHasKey($k, $row);
+        }
+        $this->assertStringStartsWith('query|', $row['id']);
+        $opps = $c->viewData('oppRows');
+        $this->assertNotEmpty($opps);
+        $this->assertContains($opps[0]['type']['tone'], ['danger', 'warn', 'info']);
+        $html = $c->html();
+        $this->assertSame(1, substr_count($html, 'fi-btn-color-primary'), 'đúng một nút primary');
+        $this->assertStringContainsString('Tạo đề xuất cập nhật', $html);
+        // Vị trí: giảm số là tốt; clicks: tăng là tốt
+        $this->assertMatchesRegularExpression('/d_position[^}]*good[^}]*down/', html_entity_decode($html));
+        $this->assertMatchesRegularExpression('/d_clicks[^}]*good[^}]*up/', html_entity_decode($html));
+    }
+
+    public function test_row_selection_by_table_id(): void
+    {
+        $this->actingAs($this->user('approver'));
+        Livewire::test(SearchConsolePage::class)->call('selectRowId', 'query|review nike pegasus')
+            ->assertSet('selDim', 'query')->assertSet('selKey', 'review nike pegasus')->assertSee('AI đề xuất');
     }
 
     public function test_create_proposal_flow_for_approver(): void
@@ -55,13 +80,13 @@ class GscScreenTest extends TestCase
         $u = $this->user('approver');
         $this->actingAs($u);
         $lw = Livewire::test(SearchConsolePage::class);
-        $lw->call('selectItem', 'query', 'review nike pegasus')->assertSee('AI đề xuất (minh họa)')->call('createProposal');
+        $lw->call('selectItem', 'query', 'review nike pegasus')->assertSee('AI đề xuất')->call('createProposal');
         $all = UpdateProposals::all();
         $this->assertCount(1, $all);
         $this->assertSame('Chờ duyệt', $all[0]['status']);
         $this->assertSame($u->id, $all[0]['created_by']);
         $this->assertStringContainsString('Tụt hạng', implode(' ', $all[0]['reasons']));
-        $lw->assertSee('Chờ duyệt');
+        $this->assertSame('Chờ duyệt', $lw->viewData('proposalRows')[0]['status']['text']);
     }
 
     public function test_writer_cannot_create_proposal_server_side(): void
