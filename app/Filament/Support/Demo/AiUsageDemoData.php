@@ -10,12 +10,12 @@ use Carbon\CarbonImmutable;
 use LogicException;
 
 /**
- * Dữ liệu MẪU chỉ để xem thử màn Chi phí AI. Bản ghi mẫu luôn có tiền tố '[Mẫu] ' ở từ khóa bài và tên website;
+ * Dữ liệu MẪU chỉ để xem thử màn Chi phí AI. Bản ghi mẫu luôn có tiền tố '[Mẫu AI] ' (riêng, không trùng tiền tố '[Mẫu] ' của các lớp mẫu khác) ở từ khóa bài và tên website;
  * purge() chỉ xóa đúng các bản ghi đó. Chi phí tính bằng TokenCostCalculator như pipeline thật.
  */
 final class AiUsageDemoData
 {
-    public const PREFIX = '[Mẫu] ';
+    public const PREFIX = '[Mẫu AI] ';
 
     private const MODELS = ['gemini-1.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gpt-4o-mini'];
 
