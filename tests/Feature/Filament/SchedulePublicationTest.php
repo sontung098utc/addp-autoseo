@@ -84,9 +84,26 @@ class SchedulePublicationTest extends TestCase
         $this->assertSame(5, $tabs['all']->getBadge());
     }
 
+    public function test_doi_soat_noi_that_ro_khi_chua_co_connector(): void
+    {
+        Bus::fake();
+        $p = $this->pub('needs_reconcile', '2026-11-05 01:00:00'); // website wordpress, chưa có connector (task 1.2)
+        $approver = $this->user('approver');
+        $this->actingAs($approver);
+
+        $r = ReconcileRequest::request($p, $approver);
+
+        $this->assertFalse($r['ok']);
+        $this->assertStringContainsString('Chưa hỗ trợ đối soát', $r['message']);
+        $this->assertStringContainsString('task 1.2', $r['message']);
+        Bus::assertNotDispatched(ReconcilePublicationJob::class);
+        $this->assertSame('needs_reconcile', $p->fresh()->status); // không đổi trạng thái, không đăng lại
+    }
+
     public function test_doi_soat_chay_voi_needs_reconcile_va_khong_tao_moi(): void
     {
         Bus::fake();
+        $this->app->instance(\App\Contracts\PublisherInterface::class, $this->createMock(\App\Contracts\PublisherInterface::class));
         $p = $this->pub('needs_reconcile', '2026-11-05 01:00:00');
         $this->actingAs($this->user('approver'));
         $pubs = Publication::count();
