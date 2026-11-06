@@ -10,13 +10,13 @@ use App\Models\Website;
 use RuntimeException;
 
 /**
- * Dữ liệu mẫu CHỈ để xem thử/test. Bản ghi mẫu: từ khóa bắt đầu '[Mẫu] ', publication_key bắt đầu 'demo-'.
+ * Dữ liệu mẫu CHỈ để xem thử/test. Bản ghi mẫu: từ khóa bắt đầu '[Mẫu TQ] ', publication_key bắt đầu 'demo-tq-' (tiền tố riêng, không trùng các lớp mẫu khác).
  * Chạy: php artisan tinker --execute="App\Filament\Support\Demo\DashboardDemoData::seed();"
  * Xóa:  php artisan tinker --execute="App\Filament\Support\Demo\DashboardDemoData::purge();"
  */
 final class DashboardDemoData
 {
-    public const PREFIX = '[Mẫu] ';
+    public const PREFIX = '[Mẫu TQ] ';
 
     private static function guard(): void
     {
@@ -57,7 +57,7 @@ final class DashboardDemoData
         $ok = $make('đã duyệt', 'approved', 'approved', $writer?->id, ['reviewed_by' => $approver?->id, 'reviewed_at' => now()->subHours(5)]);
 
         $pub = fn (string $key, string $status, array $x = []) => Publication::create([
-            'website_id' => $site->id, 'article_version_id' => $ok->id, 'publication_key' => 'demo-' . $key, 'status' => $status, 'timezone' => 'Asia/Ho_Chi_Minh', 'scheduled_at_utc' => now()->utc()->subHour()->format('Y-m-d H:i:s'),
+            'website_id' => $site->id, 'article_version_id' => $ok->id, 'publication_key' => 'demo-tq-' . $key, 'status' => $status, 'timezone' => 'Asia/Ho_Chi_Minh', 'scheduled_at_utc' => now()->utc()->subHour()->format('Y-m-d H:i:s'),
         ] + $x);
         $pub('failed', 'failed', ['last_error' => 'HTTP 401 Authorization: Bearer abcdef1234567890abcdef1234567890']);
         $pub('reconcile', 'needs_reconcile', ['last_error' => 'Timeout sau khi gửi bài. token=sk_live_abcdef1234567890']);
@@ -67,11 +67,12 @@ final class DashboardDemoData
     public static function purge(): void
     {
         self::guard();
-        Publication::where('publication_key', 'like', 'demo-%')->delete();
+        Publication::where('publication_key', 'like', 'demo-tq-%')->delete();
         $ids = Article::where('primary_keyword', 'like', self::PREFIX . '%')->pluck('id');
         ArticleVersion::whereIn('article_id', $ids)->delete();
         Article::whereIn('id', $ids)->delete();
-        Website::where('base_url', 'https://demo-khong-lich.test')->delete();
-        Website::where('base_url', 'https://demo-seo.test')->delete();
+        // Website mẫu có thể dùng chung với lớp mẫu khác: chỉ xóa khi không còn bài/lượt đăng nào (tránh xóa dây chuyền).
+        Website::whereIn('base_url', ['https://demo-khong-lich.test', 'https://demo-seo.test'])
+            ->doesntHave('articles')->doesntHave('publications')->delete();
     }
 }
