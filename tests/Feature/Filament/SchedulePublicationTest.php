@@ -87,7 +87,14 @@ class SchedulePublicationTest extends TestCase
     public function test_doi_soat_noi_that_ro_khi_chua_co_connector(): void
     {
         Bus::fake();
-        $p = $this->pub('needs_reconcile', '2026-11-05 01:00:00'); // website wordpress, chưa có connector (task 1.2)
+        // CMS chưa có connector (WordPress đã có từ task 1.2; cms_type là enum nên giả lập bằng manager)
+        $this->app->instance(\App\Services\Publishing\PublisherManager::class, new class extends \App\Services\Publishing\PublisherManager {
+            public function getPublisher(\App\Models\Website $website): \App\Contracts\PublisherInterface
+            {
+                throw new \InvalidArgumentException('Nền tảng CMS không được hỗ trợ (giả lập: cột cms_type là enum nên không lưu được giá trị lạ).');
+            }
+        });
+        $p = $this->pub('needs_reconcile', '2026-11-05 01:00:00');
         $approver = $this->user('approver');
         $this->actingAs($approver);
 

@@ -145,6 +145,12 @@ class WebsiteUiTest extends TestCase
     {
         $this->as('admin');
         $w = $this->site();
+        $this->app->instance(\App\Services\Publishing\PublisherManager::class, new class extends \App\Services\Publishing\PublisherManager {
+            public function getPublisher(\App\Models\Website $website): \App\Contracts\PublisherInterface
+            {
+                throw new \InvalidArgumentException('Nền tảng CMS không được hỗ trợ (giả lập: cột cms_type là enum nên không lưu được giá trị lạ).');
+            }
+        });
         Livewire::test(ListWebsites::class)->callTableAction('testConnection', $w)
             ->assertNotified('Chưa hỗ trợ kiểm tra kết nối cho CMS này');
         $this->assertNull($w->fresh()->last_synced_at);

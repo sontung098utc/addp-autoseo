@@ -93,10 +93,17 @@ class ReviewActionsTest extends TestCase
 
     public function test_canh_bao_khi_website_chua_co_connector(): void
     {
-        // WordPress chưa có connector (task 1.2) => cảnh báo trung thực ở form Xếp lịch.
+        // CMS không được hỗ trợ (WordPress đã có connector từ task 1.2) => cảnh báo trung thực ở form Xếp lịch.
+        $this->app->instance(\App\Services\Publishing\PublisherManager::class, new class extends \App\Services\Publishing\PublisherManager {
+            public function getPublisher(\App\Models\Website $website): \App\Contracts\PublisherInterface
+            {
+                throw new \InvalidArgumentException('Nền tảng CMS không được hỗ trợ (giả lập: cột cms_type là enum nên không lưu được giá trị lạ).');
+            }
+        });
         $this->assertFalse(\App\Filament\Support\Review\ReviewActions::connectorAvailable($this->site));
 
         // Khi connector được đăng ký thì không còn cảnh báo.
+        $this->app->forgetInstance(\App\Services\Publishing\PublisherManager::class);
         $this->app->instance(\App\Contracts\PublisherInterface::class, $this->createMock(\App\Contracts\PublisherInterface::class));
         $this->assertTrue(\App\Filament\Support\Review\ReviewActions::connectorAvailable($this->site));
     }
