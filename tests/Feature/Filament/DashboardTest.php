@@ -137,6 +137,33 @@ class DashboardTest extends TestCase
         Livewire::test(PublicationProblemsWidget::class)->assertDontSee('abcdef1234567890');
     }
 
+    public function test_khoi_quyet_dinh_chi_hien_10_dong_va_co_lien_ket_xem_tat_ca(): void
+    {
+        $this->actingAs($this->user('approver'));
+        foreach (range(1, 12) as $i) {
+            $this->version("kw-{$i}", 'needs_review', null, now()->subHours(30 + $i));
+        }
+
+        $html = Livewire::test(DecisionsWidget::class)->html();
+
+        $this->assertSame(10, substr_count($html, 'class="ss-dash-row"') - 1, '10 dòng việc + 1 dòng "xem tất cả"');
+        $this->assertStringContainsString('Cần bạn quyết định (12)', $html);
+        $this->assertStringContainsString('Đang hiện 10 / 12 việc', $html);
+        $this->assertStringContainsString('Xem tất cả 12 việc', $html);
+        $this->assertStringContainsString('tableFilters', $html);
+    }
+
+    public function test_khoi_quyet_dinh_khong_hien_xem_tat_ca_khi_du_it(): void
+    {
+        $this->actingAs($this->user('approver'));
+        $this->version('chi-mot', 'needs_review', null, now()->subHours(3));
+
+        $html = Livewire::test(DecisionsWidget::class)->html();
+
+        $this->assertStringNotContainsString('Xem tất cả', $html);
+        $this->assertStringContainsString('Cần bạn quyết định (1)', $html);
+    }
+
     public function test_demo_seed_purge_idempotent_va_bi_chan(): void
     {
         $this->user('writer')->update(['email' => 'writer@company.local']);
