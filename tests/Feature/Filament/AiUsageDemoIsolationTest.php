@@ -33,4 +33,15 @@ class AiUsageDemoIsolationTest extends TestCase
         $this->assertNotNull(Article::find($other->id), 'purge() không được xóa dữ liệu mẫu của màn khác');
         $this->assertSame(1, ArticleVersion::where('article_id', $other->id)->count());
     }
+
+    public function test_mau_chi_phi_ai_khong_lam_phinh_hang_cho_duyet(): void
+    {
+        $site = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+
+        AiUsageDemoData::seed();
+
+        $this->assertSame(0, ArticleVersion::where('review_status', 'needs_review')->count(), 'mẫu Chi phí AI không được tạo bản chờ duyệt');
+        $this->assertSame(0, Article::where('workflow_status', 'needs_review')->count());
+        $this->assertGreaterThan(0, ArticleVersion::count());
+    }
 }
