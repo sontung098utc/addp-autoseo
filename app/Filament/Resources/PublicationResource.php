@@ -139,8 +139,37 @@ class PublicationResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->persistFiltersInSession()
+            ->persistSortInSession()
+            ->persistSearchInSession()
+            ->persistColumnSearchesInSession()
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
             ->modifyQueryUsing(fn (\Illuminate\Database\Eloquent\Builder $query) => $query->with(['website', 'articleVersion.article']))
             ->defaultSort('scheduled_at_utc', 'asc')
+            ->filters([
+                Tables\Filters\SelectFilter::make('status')->label('Trạng thái')
+                    ->options(fn (): array => collect(['scheduled', 'publishing', 'published', 'failed', 'needs_reconcile'])
+                        ->mapWithKeys(fn (string $v): array => [$v => StatusPresenter::label($v, 'publication')])->all()),
+                Tables\Filters\SelectFilter::make('website_id')->label('Website')->relationship('website', 'name'),
+                Tables\Filters\Filter::make('scheduled_range')->label('Khoảng ngày đăng')
+                    ->form([
+                        Forms\Components\DatePicker::make('from')->label('Từ ngày (giờ VN)'),
+                        Forms\Components\DatePicker::make('until')->label('Đến ngày (giờ VN)'),
+                    ])
+                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
+                        return $query
+                            ->when($data['from'] ?? null, fn ($q, $d) => $q->where('scheduled_at_utc', '>=', \Carbon\Carbon::parse($d, 'Asia/Ho_Chi_Minh')->startOfDay()->utc()))
+                            ->when($data['until'] ?? null, fn ($q, $d) => $q->where('scheduled_at_utc', '<', \Carbon\Carbon::parse($d, 'Asia/Ho_Chi_Minh')->addDay()->startOfDay()->utc()));
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $out = [];
+                        if ($data['from'] ?? null) { $out[] = 'Từ '.\Carbon\Carbon::parse($data['from'])->format('d/m/Y'); }
+                        if ($data['until'] ?? null) { $out[] = 'Đến '.\Carbon\Carbon::parse($data['until'])->format('d/m/Y'); }
+
+                        return $out;
+                    }),
+            ])
             ->columns([
                 Tables\Columns\TextColumn::make('articleVersion.article.primary_keyword')
                     ->label('Bài / từ khóa')
@@ -151,7 +180,7 @@ class PublicationResource extends Resource
                     ->extraHeaderAttributes(['style' => 'min-width:22rem'])
                     ->extraCellAttributes(['style' => 'min-width:22rem'])
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('website.name')
+                Tables\Columns\TextColumn::make('website.name')->toggleable()->sortable()
                     ->label('Website')
                     ->badge()
                     ->color('gray'),
@@ -161,32 +190,32 @@ class PublicationResource extends Resource
                     ->description(fn (Publication $r): string => VnTime::formatUtc(VnTime::fromRaw($r, 'scheduled_at_utc')))
                     ->tooltip('Hệ thống lưu giờ UTC, hiển thị theo giờ Việt Nam (UTC+7).')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('status')
+                Tables\Columns\TextColumn::make('status')->sortable()
                     ->label('Trạng thái')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => StatusPresenter::label($state, 'publication'))
                     ->color(fn (string $state): string => StatusPresenter::color($state, 'publication'))
                     ->icon(fn (string $state): string => StatusPresenter::icon($state, 'publication'))
                     ->tooltip(fn (Publication $r): string => ScheduleExplainer::explain($r->status)['why']),
-                Tables\Columns\TextColumn::make('attempt_count')
+                Tables\Columns\TextColumn::make('attempt_count')->toggleable()->sortable()
                     ->label('Số lần thử')
                     ->numeric()
                     ->alignCenter()
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])
                     ->extraCellAttributes(['style' => 'width:1%']),
-                Tables\Columns\TextColumn::make('last_error')
+                Tables\Columns\TextColumn::make('last_error')->toggleable()
                     ->label('Lỗi')
                     ->formatStateUsing(fn (?string $state): string => ErrorMasker::short($state, 60))
                     ->tooltip(fn (Publication $r): ?string => $r->last_error ? ErrorMasker::mask($r->last_error) : null)
                     ->wrap()
                     ->extraCellAttributes(['style' => 'max-width:16rem'])
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('published_url')
+                Tables\Columns\TextColumn::make('published_url')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Link bài')
                     ->limit(30)
                     ->url(fn (Publication $r) => $r->published_url, true)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('publication_key')
+                Tables\Columns\TextColumn::make('publication_key')->toggleable(isToggledHiddenByDefault: true)->sortable()
                     ->label('Khóa xuất bản')
                     ->fontFamily('mono')
                     ->size('xs')

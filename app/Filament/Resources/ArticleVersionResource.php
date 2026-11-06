@@ -86,17 +86,23 @@ class ArticleVersionResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->persistFiltersInSession()
+            ->persistSortInSession()
+            ->persistSearchInSession()
+            ->persistColumnSearchesInSession()
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
             ->defaultSort('created_at', 'desc')
             ->columns([
                 Tables\Columns\TextColumn::make('article.primary_keyword')->label('Bài / từ khóa chính')->searchable(),
                 Tables\Columns\TextColumn::make('version')->label('Phiên bản')->formatStateUsing(fn ($state) => 'v' . $state)->sortable(),
-                Tables\Columns\TextColumn::make('title')->label('Tiêu đề')->limit(60)->searchable(),
-                Tables\Columns\TextColumn::make('review_status')->label('Trạng thái duyệt')->badge()
+                Tables\Columns\TextColumn::make('title')->toggleable()->sortable()->label('Tiêu đề')->limit(60)->searchable(),
+                Tables\Columns\TextColumn::make('review_status')->sortable()->label('Trạng thái duyệt')->badge()
                     ->formatStateUsing(fn ($state) => self::reviewLabel($state))
                     ->color(fn ($state) => \App\Filament\Support\StatusPresenter::color($state, 'article')),
-                Tables\Columns\TextColumn::make('tokens_used')->label('Token')->numeric(0, ',', '.')->sortable(),
-                Tables\Columns\TextColumn::make('cost_vnd')->label('Chi phí')->formatStateUsing(fn ($state) => self::formatVnd($state))->sortable(),
-                Tables\Columns\TextColumn::make('created_at')->label('Ngày tạo')->dateTime('d/m/Y H:i')->sortable(),
+                Tables\Columns\TextColumn::make('tokens_used')->toggleable()->label('Token')->numeric(0, ',', '.')->sortable(),
+                Tables\Columns\TextColumn::make('cost_vnd')->toggleable()->label('Chi phí')->formatStateUsing(fn ($state) => self::formatVnd($state))->sortable(),
+                Tables\Columns\TextColumn::make('created_at')->toggleable()->label('Ngày tạo')->dateTime('d/m/Y H:i')->sortable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('review_status')->label('Trạng thái duyệt')

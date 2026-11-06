@@ -98,7 +98,7 @@ class LockSensitiveFieldsTest extends TestCase
         $this->assertArrayNotHasKey('edit', PublicationResource::getPages());
         $this->assertArrayNotHasKey('create', PublicationResource::getPages());
 
-        Livewire::test(PublicationPages\ListPublications::class)->assertSee('key-1');
+        Livewire::test(PublicationPages\ListPublications::class)->assertCanSeeTableRecords([$p]); // cột khóa xuất bản ẩn mặc định, bật được trong 'Cột hiển thị'
         $this->get(PublicationResource::getUrl('view', ['record' => $p]))->assertOk();
         $this->assertSame('key-1', $p->fresh()->publication_key);
     }

@@ -63,6 +63,12 @@ class MediaAssetResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->persistFiltersInSession()
+            ->persistSortInSession()
+            ->persistSearchInSession()
+            ->persistColumnSearchesInSession()
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\ImageColumn::make('file_path')
                     ->label('Xem trước')
@@ -72,24 +78,24 @@ class MediaAssetResource extends Resource
                     ->label('Tiêu đề')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('alt_text')
+                Tables\Columns\TextColumn::make('alt_text')->toggleable()
                     ->label('Thẻ Alt SEO')
                     ->limit(35)
                     ->searchable(),
-                Tables\Columns\TextColumn::make('website.name')
+                Tables\Columns\TextColumn::make('website.name')->toggleable()->sortable()
                     ->label('Website')
                     ->badge()
                     ->default('Dùng chung'),
-                Tables\Columns\TextColumn::make('mime_type')
+                Tables\Columns\TextColumn::make('mime_type')->toggleable(isToggledHiddenByDefault: true)->sortable()
                     ->label('Định dạng')
                     ->badge(),
-                Tables\Columns\TextColumn::make('file_size')
+                Tables\Columns\TextColumn::make('file_size')->toggleable(isToggledHiddenByDefault: true)->sortable()
                     ->label('Kích thước')
                     ->formatStateUsing(fn ($record) => $record?->human_file_size ?? ''),
                 Tables\Columns\IconColumn::make('is_featured')
                     ->label('Đại diện')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('created_at')
+                Tables\Columns\TextColumn::make('created_at')->toggleable()
                     ->label('Ngày tải lên')
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),

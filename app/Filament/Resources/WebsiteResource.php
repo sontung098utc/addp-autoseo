@@ -140,13 +140,19 @@ class WebsiteResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->persistFiltersInSession()
+            ->persistSortInSession()
+            ->persistSearchInSession()
+            ->persistColumnSearchesInSession()
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->label('Tên website')
                     ->searchable()
                     ->sortable()
                     ->weight('bold'),
-                Tables\Columns\TextColumn::make('cms_type')
+                Tables\Columns\TextColumn::make('cms_type')->toggleable()->sortable()
                     ->label('CMS')
                     ->badge()
                     ->color('gray')
@@ -155,19 +161,19 @@ class WebsiteResource extends Resource
                         'magento2' => 'Magento 2',
                         default => (string) $state,
                     }),
-                Tables\Columns\TextColumn::make('base_url')
+                Tables\Columns\TextColumn::make('base_url')->toggleable()->sortable()
                     ->label('Địa chỉ URL')
                     ->copyable()
                     ->searchable(),
-                Tables\Columns\TextColumn::make('store_scope')
+                Tables\Columns\TextColumn::make('store_scope')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Store Scope'),
-                Tables\Columns\TextColumn::make('status')
+                Tables\Columns\TextColumn::make('status')->sortable()
                     ->label('Trạng thái')
                     ->badge()
                     ->formatStateUsing(fn (?string $state): string => StatusPresenter::label($state, 'website'))
                     ->color(fn (?string $state): string => StatusPresenter::color($state, 'website'))
                     ->icon(fn (?string $state): string => StatusPresenter::icon($state, 'website')),
-                Tables\Columns\TextColumn::make('last_synced_at')
+                Tables\Columns\TextColumn::make('last_synced_at')->toggleable()
                     ->label('Đồng bộ gần nhất')
                     ->dateTime('d/m/Y H:i')
                     ->placeholder('Chưa đồng bộ')

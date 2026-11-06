@@ -97,34 +97,47 @@ class ArticleResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->persistFiltersInSession()
+            ->persistSortInSession()
+            ->persistSearchInSession()
+            ->persistColumnSearchesInSession()
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\TextColumn::make('primary_keyword')
                     ->label('Từ khóa chính')
                     ->searchable()
                     ->sortable()
                     ->weight('bold'),
-                Tables\Columns\TextColumn::make('website.name')
+                Tables\Columns\TextColumn::make('website.name')->toggleable()
                     ->label('Website')
                     ->badge()
                     ->color('info')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('topic_cluster')
+                Tables\Columns\TextColumn::make('topic_cluster')->toggleable()->sortable()
                     ->label('Cụm chủ đề')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('search_intent')
+                Tables\Columns\TextColumn::make('search_intent')->toggleable()->sortable()
                     ->label('Ý định'),
-                Tables\Columns\TextColumn::make('workflow_status')
+                Tables\Columns\TextColumn::make('workflow_status')->sortable()
                     ->label('Trạng thái')
                     ->badge()
                     ->formatStateUsing(fn (?string $state) => StatusPresenter::label($state, 'article'))
                     ->color(fn (?string $state) => StatusPresenter::color($state, 'article'))
                     ->icon(fn (?string $state) => StatusPresenter::icon($state, 'article')),
-                Tables\Columns\TextColumn::make('created_at')
+                Tables\Columns\TextColumn::make('created_at')->toggleable()
                     ->label('Ngày tạo')
                     ->dateTime('d/m/Y')
                     ->sortable(),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('workflow_status')->label('Trạng thái')
+                    ->options(fn (): array => collect(['planned', 'drafting', 'needs_review', 'rejected', 'approved', 'scheduled', 'published'])
+                        ->mapWithKeys(fn (string $v): array => [$v => StatusPresenter::label($v, 'article')])->all()),
+                Tables\Filters\SelectFilter::make('website_id')->label('Website')->relationship('website', 'name'),
+                Tables\Filters\SelectFilter::make('search_intent')->label('Ý định')->options([
+                    'informational' => 'Thông tin', 'commercial' => 'Thương mại', 'transactional' => 'Giao dịch', 'navigational' => 'Điều hướng',
+                ]),
                 Tables\Filters\Filter::make('needs_review')
                     ->label('Chờ duyệt')
                     ->query(fn ($query) => $query->where('workflow_status', 'needs_review')),
