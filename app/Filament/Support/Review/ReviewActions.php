@@ -97,6 +97,14 @@ class ReviewActions
         return [
             Forms\Components\Select::make('website_id')->label('Website đích')
                 ->options(fn () => Website::where('status', 'active')->orderBy('name')->pluck('name', 'id'))
+                ->live()
+                ->helperText(function (Forms\Get $get): ?string {
+                    $site = $get('website_id') ? Website::find($get('website_id')) : null;
+
+                    return $site && ! static::connectorAvailable($site)
+                        ? "Cảnh báo: connector {$site->cms_type} chưa được cài đặt (WordPress: task 1.2). Vẫn xếp lịch được, nhưng đến giờ lượt đăng sẽ báo Lỗi vì chưa có cách gửi bài."
+                        : null;
+                })
                 ->required(),
             Forms\Components\DateTimePicker::make('scheduled_at_vn')
                 ->label('Thời điểm xuất bản (giờ Việt Nam)')
@@ -111,6 +119,18 @@ class ReviewActions
                     return 'Tương ứng ' . Carbon::parse($v, ReviewWorkflow::TIMEZONE)->utc()->format('d/m/Y H:i') . ' UTC';
                 }),
         ];
+    }
+
+    /** Connector của CMS đã được đăng ký chưa (không gọi mạng). */
+    public static function connectorAvailable(Website $site): bool
+    {
+        try {
+            app(\App\Services\Publishing\PublisherManager::class)->getPublisher($site);
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /** Đổi giá trị form (đã là chuỗi giờ VN) sang Carbon wall-clock giờ VN. */
