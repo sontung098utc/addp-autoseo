@@ -42,6 +42,7 @@
     38 => 'Termwind\\Laravel\\TermwindServiceProvider',
     39 => 'RyanChandler\\BladeCaptureDirective\\BladeCaptureDirectiveServiceProvider',
     40 => 'App\\Providers\\Filament\\AdminPanelProvider',
+    41 => 'App\\Integrations\\WordPress\\WordPressServiceProvider',
   ),
   'eager' => 
   array (
@@ -72,6 +73,7 @@
     24 => 'Termwind\\Laravel\\TermwindServiceProvider',
     25 => 'RyanChandler\\BladeCaptureDirective\\BladeCaptureDirectiveServiceProvider',
     26 => 'App\\Providers\\Filament\\AdminPanelProvider',
+    27 => 'App\\Integrations\\WordPress\\WordPressServiceProvider',
   ),
   'deferred' => 
   array (

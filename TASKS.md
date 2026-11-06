@@ -14,10 +14,10 @@ Bảng này đồng bộ trực tiếp với Master Plan (Google Sheet). Mọi c
 | **0.3** | Dev2 | Dev1 | 10h | 0.1 | `feat/m01/0-3/dev2/ai-poc` | **Hoàn thành** | PoC AI tiếng Việt, Prompt v1.0, AiPaddingFilter, TokenCostCalculator và báo cáo chi phí. Commit: `d8e4454` |
 | **0.4** | Dev1 | Dev2 | 22h | 0.2 | `feat/m01/0-4/dev1/auth-sites` | **Hoàn thành** | Khung Filament + Laravel: Auth, Policies 3 vai trò, quản lý website, mã hóa credential. Commit: `33c4872` |
 | **0.5** | Dev2 | Dev1 | 10h | 0.1 | `feat/m01/0-5/dev2/filament` | **Hoàn thành** | Filament panel SEO Studio, StatusPresenter, khóa trường nhạy cảm P0, kế hoạch cải tạo giao diện. Commit: `9e4d748` |
-| **1.2** | Dev2 | Dev1 | 16h | 0.4, 0.5 | `feat/m02/1-2/dev2/wordpress` | Chưa bắt đầu | WordPress Connector: REST API + App Password; bài, ảnh, taxonomy, SEO meta adapter. |
+| **1.2** | Dev2 | Dev1 | 16h | 0.4, 0.5 | `feat/m02/1-2/dev2/wordpress` | **Hoàn thành** | WordPress Connector: REST API + App Password; bài, ảnh, taxonomy, SEO meta adapter. Commit: `77fb0a9` |
 | **3.1** | Dev1 | Dev2 | 20h | 0.3, 0.4 | `feat/m03/3-1/dev1/content-pipeline` | **Hoàn thành** | Pipeline sinh dàn ý, bài viết tiếng Việt và metadata từ tài liệu công ty. Commit: `402a440` |
 | **3.4** | Dev2 | Dev1 | 10h | 0.5, 0.1 | `feat/m03/3-4/dev2/review-ui` | **Hoàn thành** | Giao diện duyệt bài: ArticleVersionResource chỉ-đọc, ParagraphDiff so sánh phiên bản, AuditRecorder tự duyệt/duyệt bài. Commit: `dd23b02` |
-| **3.5** | Dev2 | Dev1 | 8h | 3.1, 3.4 | `feat/m03/3-5/dev2/quality` | Chưa bắt đầu | Bộ kiểm tra chất lượng cơ bản: độ dài, heading, từ khóa chính, trùng lặp nội bộ. |
+| **3.5** | Dev2 | Dev1 | 8h | 3.1, 3.4 | `feat/m03/3-5/dev2/quality` | **Hoàn thành** | Bộ kiểm tra chất lượng: 9 quy tắc (độ dài, heading, từ khóa, an toàn, meta, ảnh, trùng lặp), chặn P0 khi duyệt. Commit: `77fb0a9` |
 
 ---
 
@@ -37,9 +37,9 @@ Bảng này đồng bộ trực tiếp với Master Plan (Google Sheet). Mọi c
 | Mã việc | Chủ nhiệm | Reviewer | Giờ dự kiến | Phụ thuộc | Nhánh đề xuất | Trạng thái | Nội dung chính |
 | :---: | :---: | :---: | :---: | :---: | :--- | :---: | :--- |
 | **1.1** | Dev1 | Dev2 | 12h | 0.4 | `feat/m04/1-1/dev1/crawler` | **Hoàn thành** | Web Crawler & SEO Audit: SitemapCrawlerService, HtmlSeoExtractor, SeoAuditService chống SSRF và lệnh autoseo:audit-website. Commit: `251ada7` |
-| **1.3** | Dev2 | Dev1 | 8h | 1.1 | `feat/m04/1-3/dev2/audit-report` | Chưa bắt đầu | Báo cáo audit SEO tiếng Việt kèm khuyến nghị tối ưu từ AI. |
-| **2.1** | Dev2 | Dev1 | 8h | 0.3 | `feat/m04/2-1/dev2/keywords` | Chưa bắt đầu | Nhập từ khóa/CSV nội bộ, gom cụm AI (Topic Cluster & Search Intent). |
-| **2.2** | Dev2 | Dev1 | 10h | 2.1 | `feat/m04/2-2/dev2/content-plan` | Chưa bắt đầu | Lập kế hoạch nội dung, lịch biên tập, gán từ khóa, giao diện kéo thả. |
+| **1.3** | Dev2 | Dev1 | 8h | 1.1 | `feat/m04/1-3/dev2/audit-report` | **Hoàn thành** | Báo cáo audit SEO tiếng Việt kèm khuyến nghị tối ưu từ AI (AuditPage, AuditReport, BriefBuilder). Commit: `77fb0a9` |
+| **2.1** | Dev2 | Dev1 | 8h | 0.3 | `feat/m04/2-1/dev2/keywords` | **Hoàn thành** | Nhập từ khóa/CSV nội bộ, gom cụm AI (Topic Cluster & Search Intent, KeywordsPage). Commit: `77fb0a9` |
+| **2.2** | Dev2 | Dev1 | 10h | 2.1 | `feat/m04/2-2/dev2/content-plan` | **Hoàn thành** | Lập kế hoạch nội dung, lịch biên tập kéo thả tuần (ContentPlanPage, WeeklySchedule). Commit: `77fb0a9` |
 | **4.1** | Dev1 | Dev2 | 16h | 3.6, 1.3, 2.2 | `test/m06/4-1/dev1/pilot` | Chưa bắt đầu | Chạy thử thực tế 4 ngày (mỗi người 2h/ngày), xuất bản tối thiểu 10 bài/CMS. |
 | **4.2** | Dev1 | Dev2 | 12h | 4.1 | `feat/m06/4-2/dev1/handover` | Chưa bắt đầu | Sửa lỗi pilot, tinh chỉnh prompt, viết hướng dẫn và Marketing nghiệm thu. |
 
