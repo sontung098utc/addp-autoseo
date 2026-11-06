@@ -8,12 +8,14 @@
   --ss-paper-100: #FAFAF9; --ss-paper-200: #F3F2EF;
   --ss-ink-950: #12141A; --ss-ink-900: #1B1E26; --ss-ink-800: #2A2F3A;
   --ss-slate-100: #E3E1DC; --ss-ink-border: #3A3F4A;
+  --ss-slate-350: #7E828B; --ss-ink-border-strong: #727888; /* 3.85:1 trên trắng; 3.77:1 trên nền tối */
 }
 
 /* ---- Tầng 2: semantic (sáng) ---- */
 :root {
   --ss-bg: var(--ss-paper-100);
   --ss-border: var(--ss-slate-100);
+  --ss-border-strong: var(--ss-slate-350);
   --ss-focus: var(--ss-teal-600);
   --ss-accent-soft: var(--ss-teal-50);
   --ss-shadow: 0 1px 2px rgb(18 20 26 / 0.06);
@@ -22,6 +24,7 @@
 .dark {
   --ss-bg: var(--ss-ink-950);
   --ss-border: var(--ss-ink-border);
+  --ss-border-strong: var(--ss-ink-border-strong);
   --ss-focus: var(--ss-teal-150);
   --ss-accent-soft: #132823;
   --ss-shadow: none;
@@ -45,10 +48,14 @@
 .dark .fi-body { background-color: var(--ss-ink-950); }
 
 /* Viền hairline 1px, bóng nhẹ, bỏ gradient */
-.fi-section, .fi-ta-ctn, .fi-wi-stats-overview-stat, .fi-fo-field-wrp .fi-input-wrp {
+.fi-section, .fi-ta-ctn, .fi-wi-stats-overview-stat {
   box-shadow: var(--ss-shadow);
   background-image: none;
 }
+
+/* Viền ô nhập: Filament vẽ vòng viền bằng box-shadow nên KHÔNG ghi đè box-shadow ở đây.
+   Thiết kế: viền điều khiển dùng border-strong (>= 3:1), viền hairline chỉ dành cho thẻ/bảng. */
+.fi-input-wrp { --tw-ring-color: var(--ss-border-strong); background-image: none; }
 .fi-section, .fi-ta-ctn { border: 1px solid var(--ss-border); --tw-ring-shadow: 0 0 #0000; }
 .fi-btn { background-image: none; }
 
