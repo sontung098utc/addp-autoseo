@@ -97,7 +97,7 @@ class AiUsagePageTest extends TestCase
         $this->version('k1', 2, 2000.0, null, [], null, Article::find($a->article_id));
         $this->version('k2', 1, 600.0);
         // 2 bài, 3 phiên bản, tổng 3.600, TB/bài 1.800
-        $this->as('approver')->assertSee('3.600 ₫')->assertSee('1.800 ₫/bài')->assertSee('MỌI phiên bản')
+        $this->as('approver')->assertSee('3.600 ₫')->assertSee('1.800 ₫')->assertSee('MỌI phiên bản')
             ->assertDontSee('▲ Trung bình');
     }
 
@@ -125,10 +125,15 @@ class AiUsagePageTest extends TestCase
         $this->version('now', 1, 111.0);
         $this->version('old', 1, 222.0, $now->startOfMonth()->subDays(3));
         $this->version('other', 1, 333.0, null, [], $other);
-        $c = $this->as('approver')->assertSee('Tiêu đề now')->assertSee('Tiêu đề other')->assertDontSee('Tiêu đề old');
-        $c->set('period', 'thang-truoc')->assertSee('Tiêu đề old')->assertDontSee('Tiêu đề now');
-        $c->set('period', 'thang-nay')->set('websiteId', (string) $other->id)->assertSee('Tiêu đề other')->assertDontSee('Tiêu đề now');
-        $c->set('websiteId', '')->assertSee('Tiêu đề now');
+        $titles = fn ($c) => array_map(fn ($r) => $r['title']['text'], $c->instance()->getViewData()['topRows']);
+        $c = $this->as('approver');
+        $this->assertEqualsCanonicalizing(['Tiêu đề now', 'Tiêu đề other'], $titles($c));
+        $c->set('period', 'thang-truoc');
+        $this->assertSame(['Tiêu đề old'], $titles($c));
+        $c->set('period', 'thang-nay')->set('websiteId', (string) $other->id);
+        $this->assertSame(['Tiêu đề other'], $titles($c));
+        $c->set('websiteId', '');
+        $this->assertContains('Tiêu đề now', $titles($c));
         $c->set('period', 'tuy-chon')->set('customFrom', '2026-12-31')->set('customTo', '2026-01-01')->assertSee('Khoảng ngày không hợp lệ');
     }
 
@@ -136,9 +141,9 @@ class AiUsagePageTest extends TestCase
     {
         $this->version('rẻ', 1, 100.0);
         $dear = $this->version('đắt', 1, 5000.0);
-        $c = $this->as('approver');
-        $c->assertSeeInOrder(['Tiêu đề đắt', 'Tiêu đề rẻ']);
-        $c->assertSee(ArticleVersionResource::getUrl('view', ['record' => $dear->id]), false);
+        $rows = $this->as('approver')->instance()->getViewData()['topRows'];
+        $this->assertSame(['Tiêu đề đắt', 'Tiêu đề rẻ'], array_map(fn ($r) => $r['title']['text'], $rows));
+        $this->assertSame(ArticleVersionResource::getUrl('view', ['record' => $dear->id]), $rows[0]['title']['href']);
     }
 
     public function test_set_threshold_through_drawer_as_approver_and_admin(): void
@@ -171,21 +176,21 @@ class AiUsagePageTest extends TestCase
     public function test_db_strings_are_escaped(): void
     {
         $this->version('x', 1, 100.0, null, ['title' => '<script>alert(1)</script>', 'ai_model' => '<img src=x onerror=1>']);
-        $this->as('approver')->assertDontSee('<script>alert(1)</script>', false)->assertDontSee('<img src=x', false)->assertSee('&lt;script&gt;', false);
+        $this->as('approver')->assertDontSee('<script>alert(1)</script>', false)->assertDontSee('<img src=x', false)->assertSee('u003Cscript', false);
     }
 
     public function test_unrecorded_cost_is_labelled_not_zero(): void
     {
         $this->version('ok', 1, 500.0);
         $this->version('thieu', 1, 0.0, null, ['tokens_used' => 0]);
-        $this->as('approver')->assertSee('1 phiên bản chưa ghi chi phí');
+        $this->as('approver')->assertSee('Phiên bản chưa ghi chi phí')->assertSee('data-ai="summary"', false);
+        $this->assertSame(1, $this->as('approver')->instance()->getViewData()['summary']['unrecorded']);
     }
 
-    public function test_sample_banner_only_with_sample_rows(): void
+    public function test_no_sample_banner_noise(): void
     {
-        $this->as('approver')->assertDontSee('Dữ liệu minh họa');
         AiUsageDemoData::seed();
-        $this->as('approver')->assertSee('Dữ liệu minh họa');
+        $this->as('approver')->assertDontSee('Dữ liệu minh họa')->assertDontSee('minh họa');
     }
 
     public function test_demo_seed_purge_idempotent_and_guarded(): void
@@ -211,6 +216,44 @@ class AiUsagePageTest extends TestCase
     public function test_demo_seed_with_sample_data_renders_all_tables(): void
     {
         AiUsageDemoData::seed();
-        $this->as('approver')->set('period', '30-ngay')->assertOk()->assertSee('Theo model')->assertSee('Theo phiên bản prompt')->assertSee('Bài tốn nhất');
+        $this->as('approver')->set('period', '30-ngay')->assertOk()->assertSee('Theo model')->assertSee('Theo prompt')->assertSee('Bài tốn nhất');
+    }
+
+    public function test_tabs_single_primary_and_no_lede(): void
+    {
+        $this->version('k1', 1, 3412.0);
+        $html = $this->as('approver')->html();
+        foreach (['Tổng quan', 'Theo model', 'Theo prompt', 'Bài tốn nhất', 'Ngưỡng', 'Quy tắc'] as $t) {
+            $this->assertStringContainsString($t, $html);
+        }
+        $this->assertStringNotContainsString('AI đang tốn bao nhiêu', $html);
+        $this->assertStringNotContainsString('Luật nghiệp vụ của màn này', $html);
+        $this->assertStringContainsString('ss-page', $html);
+    }
+
+    public function test_table_rows_and_threshold_badges(): void
+    {
+        $this->version('rẻ', 1, 100.0);
+        $this->version('đắt', 1, 5000.0);
+        $d = $this->as('approver')->instance()->getViewData();
+        $this->assertSame('danger', $d['topRows'][0]['over']['tone']);
+        $this->assertSame('ok', $d['topRows'][1]['over']['tone']);
+        $this->assertCount(1, $d['modelRows']);
+        $this->assertEquals(5100, $d['modelRows'][0]['cost']);
+    }
+
+    public function test_kpi_delta_vs_previous_period(): void
+    {
+        $now = CarbonImmutable::now('Asia/Ho_Chi_Minh');
+        $this->version('moi', 1, 3000.0);
+        $this->version('cu', 1, 1000.0, $now->subDays(40));
+        $d = $this->as('approver')->set('period', '30-ngay')->instance()->getViewData();
+        $this->assertEquals(200.0, $d['deltas']['cost']); // chi phí tăng 200%: giao diện tô đỏ vì good="down"
+    }
+
+    public function test_delta_null_without_previous_data(): void
+    {
+        $this->version('k', 1, 500.0);
+        $this->assertNull($this->as('approver')->instance()->getViewData()['deltas']['cost']);
     }
 }

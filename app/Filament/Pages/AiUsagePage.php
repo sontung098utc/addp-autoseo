@@ -113,7 +113,6 @@ class AiUsagePage extends Page
                 ->color('primary')
                 ->slideOver()
                 ->modalHeading('Đặt ngưỡng cảnh báo')
-                ->modalDescription('Vượt ngưỡng thì hiện banner cho người có quyền xem chi phí. Hệ thống không tự dừng sinh bài. Ngưỡng đang lưu tạm, sẽ chuyển sang bảng cấu hình khi Dev1 thêm.')
                 ->modalSubmitActionLabel('Lưu ngưỡng')
                 ->fillForm(fn (): array => UsageThresholds::get())
                 ->form([
@@ -143,13 +142,15 @@ class AiUsagePage extends Page
         return $u;
     }
 
-    protected function getViewData(): array
+    public function getViewData(): array
     {
         [$from, $to, $label, $rangeError] = $this->range();
         $rows = UsageReader::rows($this->siteId());
         $agg = new UsageAggregator($rows);
         $th = UsageThresholds::get();
         $summary = $agg->summary($from, $to);
+        $span = (int) $from->diffInDays($to);
+        $prev = $agg->summary($from->subDays($span), $from);
 
         $monthAgg = $this->siteId() === null ? $agg : new UsageAggregator(UsageReader::rows());
         $monthCost = $monthAgg->monthCost(VnTime::now());
@@ -189,7 +190,86 @@ class AiUsagePage extends Page
             'byPrompt' => $summary ? $agg->groupBy('prompt', $from, $to) : [],
             'bySite' => $summary ? $agg->groupBy('website', $from, $to) : [],
             'hasDemo' => AiUsageDemoData::hasSample(),
+            'deltas' => $this->deltas($summary, $prev),
+            'modelRows' => $this->groupRows($summary ? $agg->groupBy('model', $from, $to) : [], $th['article'], true),
+            'promptRows' => $this->groupRows($summary ? $agg->groupBy('prompt', $from, $to) : [], $th['article']),
+            'siteRows' => $this->groupRows($summary ? $agg->groupBy('website', $from, $to) : [], $th['article']),
+            'topRows' => $this->topRows(array_slice($articles, 0, 10), $th['article']),
+            'dayRows' => $this->dayRows($days),
         ];
+    }
+
+    /** Thay đổi so với kỳ liền trước cùng độ dài; null khi không tính được. Chi phí: % ; số bài/phiên bản: số tuyệt đối. */
+    private function deltas(?array $cur, ?array $prev): array
+    {
+        $pct = fn ($a, $b) => ($a === null || $b === null || (float) $b == 0.0) ? null : round(($a - $b) / $b * 100, 1);
+        if (! $cur || ! $prev) {
+            return ['cost' => null, 'avg' => null, 'regen' => null, 'unrecorded' => null];
+        }
+
+        return [
+            'cost' => $pct($cur['cost'], $prev['cost']),
+            'avg' => $pct($cur['avg_per_article'], $prev['avg_per_article']),
+            'regen' => $cur['regen_articles'] - $prev['regen_articles'],
+            'unrecorded' => $cur['unrecorded'] - $prev['unrecorded'],
+        ];
+    }
+
+    private static function overBadge(?float $v, ?int $limit): array|string
+    {
+        if ($v === null) {
+            return '—';
+        }
+
+        return UsageThresholds::exceeds($v, $limit) ? ['text' => '▲ Vượt ngưỡng', 'tone' => 'danger'] : ['text' => 'Trong ngưỡng', 'tone' => 'ok'];
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function groupRows(array $groups, ?int $limit, bool $withProvider = false): array
+    {
+        $rows = [];
+        foreach ($groups as $i => $g) {
+            $rows[] = [
+                'id' => $i,
+                'label' => $g['label'],
+                'provider' => $g['provider'] ?? '',
+                'articles' => $g['articles'],
+                'versions' => $g['versions'],
+                'tokens' => $g['tokens'],
+                'cost' => $g['cost'] === null ? null : round($g['cost']),
+                'share' => $g['share'] === null ? null : round($g['share'] * 100, 1),
+                'avg' => $g['avg_per_article'] === null ? null : round($g['avg_per_article']),
+                'over' => self::overBadge($g['avg_per_article'], $limit),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function topRows(array $articles, ?int $limit): array
+    {
+        $rows = [];
+        foreach ($articles as $a) {
+            $rows[] = [
+                'id' => $a['article_id'],
+                'title' => ['text' => $a['title'], 'href' => \App\Filament\Resources\ArticleVersionResource::getUrl('view', ['record' => $a['version_id']])],
+                'website' => $a['website'],
+                'models' => implode(', ', $a['models']) ?: 'không rõ model',
+                'cost' => round($a['cost']),
+                'versions' => $a['versions'],
+                'tokens' => $a['tokens'],
+                'over' => self::overBadge($a['cost'], $limit),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function dayRows(array $days): array
+    {
+        return array_map(fn ($d) => ['id' => $d['date']->format('Y-m-d'), 'date' => $d['date']->format('d/m/Y'), 'versions' => $d['versions'], 'tokens' => $d['tokens'], 'cost' => $d['versions'] > 0 ? round($d['cost']) : null], $days);
     }
 
     public function describeChart(array $days, float $peak, ?CarbonImmutable $peakDay, ?float $pace): string

@@ -58,14 +58,6 @@ class CompetitorsPage extends Page
     /** @var array<string,string> từ khóa chuẩn hóa => tên cụm (khi chọn cả cụm) */
     public array $clusterPick = [];
 
-    public string $intentFilter = '';
-
-    public int $minVolume = 0;
-
-    public bool $hideExisting = false;
-
-    public string $sortBy = 'score';
-
     /** @var list<array{keyword:string, ok:bool, message:string}> */
     public array $results = [];
 
@@ -264,6 +256,11 @@ class CompetitorsPage extends Page
 
                 continue;
             }
+            if ($g['existing'] !== null) {
+                $this->results[] = ['keyword' => $g['keyword'], 'ok' => false, 'message' => 'Bị chặn vì trùng: đã có bài #'.$g['existing']['id'].' dùng từ khóa này.'];
+
+                continue;
+            }
             try {
                 $a = $creator->create($user, $site, $g['keyword'], $this->clusterPick[$n] ?? null, $g['intent']);
                 $created++;
@@ -299,6 +296,88 @@ class CompetitorsPage extends Page
         return GapCalculator::calculate($rows, GapCalculator::existingFor($site), count($domains));
     }
 
+    /** @return list<array<string,mixed>> */
+    private function gapColumns(): array
+    {
+        return [
+            ['key' => 'keyword', 'label' => 'Từ khóa', 'type' => 'text', 'sortable' => true],
+            ['key' => 'intent', 'label' => 'Ý định', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'tones' => ['Thông tin' => 'info', 'Thương mại' => 'accent', 'Giao dịch' => 'warn', 'Điều hướng' => 'muted']],
+            ['key' => 'volume', 'label' => 'Volume / tháng', 'type' => 'number', 'sortable' => true],
+            ['key' => 'difficulty', 'label' => 'Độ khó', 'type' => 'number', 'sortable' => true],
+            ['key' => 'ranks', 'label' => 'Đối thủ xếp hạng', 'type' => 'text'],
+            ['key' => 'status', 'label' => 'Trong kế hoạch', 'type' => 'badge', 'sortable' => true, 'tones' => ['Chưa có bài' => 'muted']],
+            ['key' => 'score', 'label' => 'Điểm ưu tiên', 'type' => 'badge', 'sortable' => true],
+            ['key' => 'reason', 'label' => 'Lý do điểm', 'type' => 'text', 'visible' => false],
+        ];
+    }
+
+    /**
+     * Dòng bảng khoảng trống (mảng thuần). id = từ khóa chuẩn hóa, khớp $selected.
+     *
+     * @param  list<array<string,mixed>>  $all
+     * @return list<array<string,mixed>>
+     */
+    private function gapRows(array $all): array
+    {
+        $rows = [];
+        foreach ($all as $g) {
+            $ranks = [];
+            foreach ($g['ranks'] as $dom => $pos) {
+                $ranks[] = $dom.' #'.$pos;
+            }
+            $score = $g['score']['score'] ?? null;
+            $rows[] = [
+                'id' => $g['norm'],
+                'keyword' => $g['keyword'],
+                'intent' => self::INTENTS[$g['intent']] ?? (string) $g['intent'],
+                'volume' => $g['volume'],
+                'difficulty' => $g['difficulty'],
+                'ranks' => implode('; ', $ranks),
+                'status' => $g['existing']
+                    ? ['text' => ($g['existing']['status'] === 'planned' ? 'Đã lên kế hoạch' : 'Đã có bài').' #'.$g['existing']['id'], 'tone' => 'info']
+                    : 'Chưa có bài',
+                'score' => $score === null ? ['text' => '—', 'tone' => 'muted'] : ['text' => (string) $score, 'tone' => $score >= 70 ? 'ok' : ($score >= 40 ? 'accent' : 'muted')],
+                'reason' => $g['score']['reason'] ?? 'Đã có trong hệ thống nên không chấm điểm.',
+            ];
+        }
+
+        return $rows;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function clusterRows(array $all): array
+    {
+        $rows = [];
+        foreach (ClusterSuggester::suggest($all) as $i => $c) {
+            $rows[] = ['id' => $i, 'name' => $c['name'], 'count' => count($c['keywords']), 'volume' => $c['volume'], 'keywords' => implode('; ', $c['keywords'])];
+        }
+
+        return $rows;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function domainRows(array $domains, array $perDomain): array
+    {
+        $rows = [];
+        foreach ($domains as $d) {
+            $p = $perDomain[$d] ?? ['ranked' => 0, 'in_system' => 0, 'gap' => 0];
+            $rows[] = ['id' => $d, 'domain' => $d, 'ranked' => $p['ranked'], 'in_system' => $p['in_system'], 'overlap' => $p['ranked'] ? round(100 * $p['in_system'] / $p['ranked'], 1) : null, 'gap' => $p['gap']];
+        }
+
+        return $rows;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function logRows(): array
+    {
+        $rows = [];
+        foreach ((array) DemoStore::get('competitors.log', []) as $i => $l) {
+            $rows[] = ['id' => $i, 'at' => Carbon::parse($l['at'])->setTimezone('Asia/Ho_Chi_Minh')->format('d/m/Y H:i'), 'by' => $l['by'], 'website' => $l['website'], 'rows' => $l['rows'], 'cost' => $l['cost_vnd']];
+        }
+
+        return $rows;
+    }
+
     /** @return array<string, mixed> */
     public function getViewData(): array
     {
@@ -307,23 +386,6 @@ class CompetitorsPage extends Page
         $snap = $site ? CompetitorService::snapshot($site) : null;
         $domains = $site ? CompetitorService::domains($site) : [];
         $all = $this->gaps();
-
-        $rows = array_values(array_filter($all, function (array $g): bool {
-            return ($this->intentFilter === '' || $g['intent'] === $this->intentFilter)
-                && $g['volume'] >= $this->minVolume
-                && ! ($this->hideExisting && $g['existing'] !== null);
-        }));
-        usort($rows, function (array $a, array $b): int {
-            if (($a['existing'] === null) !== ($b['existing'] === null)) {
-                return $a['existing'] === null ? -1 : 1;
-            }
-
-            return match ($this->sortBy) {
-                'volume' => $b['volume'] <=> $a['volume'],
-                'difficulty' => $a['difficulty'] <=> $b['difficulty'],
-                default => ($b['score']['score'] ?? 0) <=> ($a['score']['score'] ?? 0),
-            };
-        });
 
         $perDomain = [];
         foreach ($domains as $d) {
@@ -341,7 +403,11 @@ class CompetitorsPage extends Page
             'websites' => Website::where('status', 'active')->orderBy('name')->get(['id', 'name']),
             'domains' => $domains,
             'perDomain' => $perDomain,
-            'rows' => $rows,
+            'gapColumns' => $this->gapColumns(),
+            'gapRows' => $this->gapRows($all),
+            'clusterRows' => $this->clusterRows($all),
+            'domainRows' => $this->domainRows($domains, $perDomain),
+            'logRows' => $this->logRows(),
             'totalGaps' => count($all),
             'openCount' => count(array_filter($all, fn ($g) => $g['existing'] === null)),
             'clusters' => ClusterSuggester::suggest($all),
@@ -352,12 +418,10 @@ class CompetitorsPage extends Page
             'vndPer1000' => CostPolicy::VND_PER_1000_ROWS,
             'fetchedLabel' => $fetchedAt?->setTimezone('Asia/Ho_Chi_Minh')->format('d/m/Y H:i'),
             'staleDays' => $fetchedAt ? (int) $fetchedAt->diffInDays(now()) : null,
-            'log' => (array) DemoStore::get('competitors.log', []),
+            'logCount' => count((array) DemoStore::get('competitors.log', [])),
             'formula' => PriorityScorer::FORMULA,
             'maxCompetitors' => CompetitorDomain::MAX_COMPETITORS,
             'canWrite' => $user instanceof User && $user->isWriter(),
-            'intents' => self::INTENTS,
-            'ghost' => range(1, 5),
         ];
     }
 }
