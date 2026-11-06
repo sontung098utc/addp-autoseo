@@ -43,18 +43,6 @@ class KeywordsPage extends Page
 
     public string $newIntent = 'informational';
 
-    public string $search = '';
-
-    public string $filterCluster = '';
-
-    public string $filterIntent = '';
-
-    public string $filterSource = '';
-
-    public string $sortBy = 'alpha';
-
-    public int $limit = 50;
-
     public ?string $renaming = null;
 
     public string $renameTo = '';
@@ -244,9 +232,14 @@ class KeywordsPage extends Page
         $this->splitting = null;
     }
 
-    public function showMore(): void
+    /** Sửa tên cụm theo id dòng trong bảng (vị trí trong danh sách cụm). */
+    public function startRenameById(int $id): void
     {
-        $this->limit += 50;
+        $this->guard();
+        $c = KeywordService::make()->repo()->clusters()[$id] ?? null;
+        if ($c !== null) {
+            $this->startRename($c['name']);
+        }
     }
 
     /** @return array<string,mixed> */
@@ -255,36 +248,75 @@ class KeywordsPage extends Page
         $demo = DemoMode::state(request()->query('demo'), ['trong'], '');
         $repo = KeywordService::make()->repo();
         $all = $demo === 'trong' ? [] : $repo->all();
-        $rows = array_values(array_filter($all, function ($r) {
-            if ($this->search !== '' && mb_stripos($r['keyword'].' '.($r['cluster'] ?? ''), $this->search) === false) {
-                return false;
-            }
-            if ($this->filterCluster === '__none') {
-                if ($r['cluster'] !== null) {
-                    return false;
-                }
-            } elseif ($this->filterCluster !== '' && $r['cluster'] !== $this->filterCluster) {
-                return false;
-            }
-
-            return ($this->filterIntent === '' || $r['intent'] === $this->filterIntent) && ($this->filterSource === '' || $r['source'] === $this->filterSource);
-        }));
-        usort($rows, match ($this->sortBy) {
-            'volume' => fn ($a, $b) => ($b['volume'] ?? -1) <=> ($a['volume'] ?? -1) ?: $a['keyword'] <=> $b['keyword'],
-            'newest' => fn ($a, $b) => $b['id'] <=> $a['id'],
-            default => fn ($a, $b) => mb_strtolower($a['keyword']) <=> mb_strtolower($b['keyword']),
-        });
         $clusters = $demo === 'trong' ? [] : $repo->clusters();
 
         return [
             'total' => count($all),
             'clustered' => count(array_filter($all, fn ($r) => $r['cluster'] !== null)),
-            'filteredCount' => count($rows),
-            'rows' => array_slice($rows, 0, $this->limit),
+            'kwColumns' => $this->keywordColumns(),
+            'kwRows' => $this->keywordRows($all),
+            'clusterColumns' => $this->clusterColumns(),
+            'clusterRows' => $this->clusterRows($clusters),
             'clusters' => $clusters,
             'proposals' => $repo->proposals(),
             'intents' => KeywordIntent::LABELS,
             'demoOn' => DemoMode::enabled(),
         ];
+    }
+
+    private const SOURCES = ['csv' => 'CSV', 'tay' => 'Tay', 'ai' => 'AI'];
+
+    /** @return list<array<string,mixed>> */
+    public function keywordColumns(): array
+    {
+        return [
+            ['key' => 'keyword', 'label' => 'Từ khóa', 'type' => 'text', 'sortable' => true],
+            ['key' => 'intent', 'label' => 'Ý định', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'tones' => ['Thông tin' => 'info', 'Thương mại' => 'accent', 'Giao dịch' => 'warn', 'Điều hướng' => 'muted']],
+            ['key' => 'cluster', 'label' => 'Cụm chủ đề', 'type' => 'text', 'sortable' => true, 'filter' => true],
+            ['key' => 'volume', 'label' => 'Volume CSV', 'type' => 'number', 'sortable' => true],
+            ['key' => 'source', 'label' => 'Nguồn', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'visible' => false, 'tones' => ['CSV' => 'muted', 'Tay' => 'muted', 'AI' => 'accent']],
+            ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Xóa', 'method' => 'deleteKeyword', 'tone' => 'danger']]],
+        ];
+    }
+
+    /**
+     * @param  list<array<string,mixed>>  $all
+     * @return list<array<string,mixed>>
+     */
+    public function keywordRows(array $all): array
+    {
+        return array_map(fn ($r) => [
+            'id' => $r['id'],
+            'keyword' => $r['keyword'],
+            'intent' => KeywordIntent::LABELS[$r['intent']] ?? $r['intent'],
+            'cluster' => $r['cluster'] ?? 'Chưa gom cụm',
+            'volume' => $r['volume'],
+            'source' => self::SOURCES[$r['source']] ?? $r['source'],
+        ], $all);
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function clusterColumns(): array
+    {
+        return [
+            ['key' => 'name', 'label' => 'Cụm', 'type' => 'text', 'sortable' => true],
+            ['key' => 'count', 'label' => 'Số từ khóa', 'type' => 'number', 'sortable' => true],
+            ['key' => 'intent', 'label' => 'Ý định', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'tones' => ['Thông tin' => 'info', 'Thương mại' => 'accent', 'Giao dịch' => 'warn', 'Điều hướng' => 'muted']],
+            ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Sửa tên', 'method' => 'startRenameById']]],
+        ];
+    }
+
+    /**
+     * @param  list<array<string,mixed>>  $clusters
+     * @return list<array<string,mixed>>
+     */
+    public function clusterRows(array $clusters): array
+    {
+        $out = [];
+        foreach (array_values($clusters) as $i => $c) {
+            $out[] = ['id' => $i, 'name' => $c['name'], 'count' => count($c['keywords']), 'intent' => KeywordIntent::LABELS[$c['intent']] ?? $c['intent']];
+        }
+
+        return $out;
     }
 }

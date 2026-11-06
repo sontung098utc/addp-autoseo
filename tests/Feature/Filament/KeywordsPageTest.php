@@ -36,9 +36,23 @@ class KeywordsPageTest extends TestCase
         $this->get('/admin/tu-khoa')->assertRedirect();
     }
 
-    public function test_writer_mo_trang_thay_banner_va_du_lieu_mau(): void
+    public function test_writer_mo_trang_thay_du_tab_va_khong_banner(): void
     {
-        $this->actingAs($this->user('writer'))->get('/admin/tu-khoa')->assertOk()->assertSee('Dữ liệu minh họa')->assertSee('học bổng du học Nhật Bản')->assertSee('Luật nghiệp vụ của màn này');
+        $r = $this->actingAs($this->user('writer'))->get('/admin/tu-khoa')->assertOk()->assertDontSee('Dữ liệu minh họa');
+        foreach (['Danh sách', 'Nhập từ khóa', 'Gom cụm', 'Cụm đã nhận', 'Quy tắc'] as $tab) {
+            $r->assertSee($tab);
+        }
+    }
+
+    public function test_bang_chua_dung_dong_va_cot(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $d = Livewire::test(KeywordsPage::class)->viewData('kwRows');
+        $this->assertContains('học bổng du học Nhật Bản', array_column($d, 'keyword'));
+        $this->assertSame(['id', 'keyword', 'intent', 'cluster', 'volume', 'source'], array_keys($d[0]));
+        $cols = Livewire::test(KeywordsPage::class)->viewData('kwColumns');
+        $this->assertSame('deleteKeyword', collect($cols)->firstWhere('type', 'actions')['actions'][0]['method']);
+        $this->assertIsArray(Livewire::test(KeywordsPage::class)->viewData('clusterRows'));
     }
 
     public function test_xem_truoc_khong_luu_den_khi_xac_nhan(): void
@@ -86,12 +100,11 @@ class KeywordsPageTest extends TestCase
         $this->assertCount(count($p2) - 1, $svc->repo()->proposals());
     }
 
-    public function test_xoa_tu_khoa_va_loc(): void
+    public function test_xoa_tu_khoa(): void
     {
         $this->actingAs($this->user('writer'));
         $first = KeywordService::make()->repo()->all()[0];
-        Livewire::test(KeywordsPage::class)->set('search', 'ielts')->assertSee('luyện thi IELTS online')->assertDontSee('học bổng du học Nhật Bản')
-            ->set('search', '')->call('deleteKeyword', $first['id']);
+        Livewire::test(KeywordsPage::class)->call('deleteKeyword', $first['id']);
         $this->assertNull(collect(KeywordService::make()->repo()->all())->firstWhere('id', $first['id']));
     }
 
@@ -116,6 +129,6 @@ class KeywordsPageTest extends TestCase
     {
         $this->actingAs($this->user('writer'));
         $this->app['env'] = 'production';
-        Livewire::test(KeywordsPage::class)->assertSee('Chưa có từ khóa')->assertDontSee('học bổng du học Nhật Bản')->assertDontSee('Dữ liệu minh họa');
+        Livewire::test(KeywordsPage::class)->assertSee('Chưa có từ khóa')->assertDontSee('Dữ liệu minh họa')->assertViewHas('kwRows', []);
     }
 }
