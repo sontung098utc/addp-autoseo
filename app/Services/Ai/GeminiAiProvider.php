@@ -13,7 +13,7 @@ class GeminiAiProvider implements AiProviderInterface
     protected Client $httpClient;
     protected ?string $apiKey;
     protected string $model;
-    protected string $promptVersion = 'v1.0-gemini-seo-vn';
+    protected string $promptVersion = 'v1.0-seo-vietnamese-article';
 
     public function __construct(?string $apiKey = null, ?string $model = null)
     {
@@ -84,7 +84,6 @@ class GeminiAiProvider implements AiProviderInterface
 
         $data = json_decode($response['text'], true);
         if (!$data || !isset($data['html_content'])) {
-            // Nếu parse lỗi JSON, fallback sang mock an toàn
             Log::warning("Gemini trả về không đúng định dạng JSON: " . substr($response['text'], 0, 200));
             return (new MockAiProvider())->generateArticle($article, $outline, $options);
         }
@@ -111,13 +110,9 @@ class GeminiAiProvider implements AiProviderInterface
 
     public function calculateCostVnd(int $promptTokens, int $completionTokens, string $model): float
     {
-        // Tỷ giá Gemini 1.5 Flash: $0.075 / 1M prompt token, $0.30 / 1M output token (USD/VND = 26.000)
-        $promptCostUsd = ($promptTokens / 1000000) * 0.075;
-        $completionCostUsd = ($completionTokens / 1000000) * 0.30;
-        $totalUsd = $promptCostUsd + $completionCostUsd;
-
-        $costVnd = $totalUsd * 26000;
-        return round(max(50.0, $costVnd), 2);
+        $calculator = new TokenCostCalculator();
+        $result = $calculator->calculate($promptTokens, $completionTokens, $model);
+        return $result['total_cost_vnd'];
     }
 
     protected function callGeminiApi(string $systemInstruction, string $userContent): array
@@ -139,29 +134,24 @@ class GeminiAiProvider implements AiProviderInterface
                 ],
             ],
             'generationConfig' => [
-                'responseMimeType' => 'application/json',
                 'temperature' => 0.4,
+                'response_mime_type' => 'application/json',
             ],
         ];
 
-        try {
-            $res = $this->httpClient->post($url, [
-                'json' => $payload,
-            ]);
+        $res = $this->httpClient->post($url, [
+            'json' => $payload,
+        ]);
 
-            $body = json_decode((string) $res->getBody(), true);
-            $candidateText = $body['candidates'][0]['content']['parts'][0]['text'] ?? '';
-            $usage = $body['usageMetadata'] ?? [];
+        $body = json_decode((string) $res->getBody(), true);
+        $text = $body['candidates'][0]['content']['parts'][0]['text'] ?? '{}';
+        $usage = $body['usageMetadata'] ?? [];
 
-            return [
-                'text' => $candidateText,
-                'prompt_tokens' => $usage['promptTokenCount'] ?? 1000,
-                'candidate_tokens' => $usage['candidatesTokenCount'] ?? 1500,
-                'total_tokens' => $usage['totalTokenCount'] ?? 2500,
-            ];
-        } catch (\Throwable $e) {
-            Log::error("Lỗi gọi Gemini API: " . $e->getMessage());
-            throw $e;
-        }
+        return [
+            'text' => $text,
+            'prompt_tokens' => $usage['promptTokenCount'] ?? 1000,
+            'candidate_tokens' => $usage['candidatesTokenCount'] ?? 1500,
+            'total_tokens' => $usage['totalTokenCount'] ?? 2500,
+        ];
     }
 }
