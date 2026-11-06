@@ -44,6 +44,8 @@ final class AiUsageDemoData
             $article = Article::create([
                 'website_id' => $sites[$i % count($sites)]->id,
                 'primary_keyword' => self::PREFIX.'từ khóa '.($i + 1),
+                // Bài mẫu đã xong, để không làm phình hàng chờ duyệt / Tổng quan của các màn khác.
+                'workflow_status' => 'published',
             ]);
             $versions = $i % 7 === 0 ? 3 : ($i % 5 === 0 ? 2 : 1);
             $model = self::MODELS[$i % 4];
@@ -56,7 +58,7 @@ final class AiUsageDemoData
                 $row = new ArticleVersion([
                     'article_id' => $article->id, 'version' => $v,
                     'title' => self::PREFIX.'Bài mẫu số '.($i + 1).($v > 1 ? ' (sinh lại lần '.$v.')' : ''),
-                    'slug' => 'mau-'.($i + 1).'-v'.$v, 'html_content' => '<p>Nội dung mẫu</p>',
+                    'slug' => 'mau-'.($i + 1).'-v'.$v, 'html_content' => '<p>Nội dung mẫu</p>', 'review_status' => 'approved',
                     'ai_provider' => str_starts_with($model, 'gpt') ? 'openai' : 'google', 'ai_model' => $model, 'prompt_version' => $prompt,
                     'tokens_used' => $missing ? 0 : $in + $out,
                     'cost_vnd' => $missing ? 0 : $calc->calculate($in, $out, $model)['total_cost_vnd'],
