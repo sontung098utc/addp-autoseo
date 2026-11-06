@@ -61,8 +61,8 @@ class ReviewLayoutTest extends TestCase
         $this->actingAs($this->user('approver'));
         $v = $this->version($this->article(), 1, 'needs_review');
         Livewire::test(ViewArticleVersion::class, ['record' => $v->id])
-            ->assertOk()->assertSee('Chưa có bản đã duyệt để so sánh')->assertSee('Meta description: chưa có')
-            ->assertSee('chưa có ảnh');
+            ->assertOk()->assertSee('Chưa có bản đã duyệt để so sánh')->assertSee('META01')->assertSee('Chưa có meta description')
+            ->assertSee('Bài chưa có ảnh nào để kiểm tra alt');
     }
 
     public function test_quality_block_is_honest(): void
@@ -70,7 +70,10 @@ class ReviewLayoutTest extends TestCase
         $this->actingAs($this->user('approver'));
         $v = $this->version($this->article(), 1, 'needs_review');
         Livewire::test(ViewArticleVersion::class, ['record' => $v->id])
-            ->assertSee('Chưa có kiểm tra chất lượng tự động');
+            ->assertDontSee('Chưa có kiểm tra chất lượng tự động')
+            ->assertSee('Tính tại thời điểm xem, chưa lưu lịch sử')
+            ->assertSee('P0 chưa đạt: 3')  // LEN01 (1 từ) + HEAD01 (không heading) + KW01 (từ khóa "hoc bong" vắng trong bài)
+            ->assertSee('LEN01')->assertSee('Đo được: 1 từ');
     }
 
     public function test_diff_counts_and_number_changes(): void
