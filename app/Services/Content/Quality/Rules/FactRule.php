@@ -60,6 +60,7 @@ class FactRule implements QualityRule
     private static function sources(mixed $raw): array
     {
         $flat = [];
+        $raw = is_array($raw) ? $raw : [$raw];
         array_walk_recursive($raw, function ($x) use (&$flat) {
             if (is_scalar($x) && trim((string) $x) !== '') {
                 $flat[] = trim((string) $x);
