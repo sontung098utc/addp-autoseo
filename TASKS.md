@@ -13,10 +13,10 @@ Bảng này đồng bộ trực tiếp với Master Plan (Google Sheet). Mọi c
 | **0.2** | Dev1 | Dev2 | 24h | 0.1 | `chore/m01/0-2/dev1/infra-ci` | **Hoàn thành** | Dựng Laravel 11/12, PHP 8.2, MariaDB 10.6, Docker staging, CI workflow, backup/restore. Commit: `33c4872` |
 | **0.3** | Dev2 | Dev1 | 10h | 0.1 | `feat/m01/0-3/dev2/ai-poc` | **Hoàn thành** | PoC AI tiếng Việt, Prompt v1.0, AiPaddingFilter, TokenCostCalculator và báo cáo chi phí. Commit: `d8e4454` |
 | **0.4** | Dev1 | Dev2 | 22h | 0.2 | `feat/m01/0-4/dev1/auth-sites` | **Hoàn thành** | Khung Filament + Laravel: Auth, Policies 3 vai trò, quản lý website, mã hóa credential. Commit: `33c4872` |
-| **0.5** | Dev2 | Dev1 | 10h | 0.1 | `feat/m01/0-5/dev2/filament` | Chưa bắt đầu | Filament panel tiếng Việt & giao diện quản lý website theo contracts/fixtures. |
+| **0.5** | Dev2 | Dev1 | 10h | 0.1 | `feat/m01/0-5/dev2/filament` | **Hoàn thành** | Filament panel SEO Studio, StatusPresenter, khóa trường nhạy cảm P0, kế hoạch cải tạo giao diện. Commit: `9e4d748` |
 | **1.2** | Dev2 | Dev1 | 16h | 0.4, 0.5 | `feat/m02/1-2/dev2/wordpress` | Chưa bắt đầu | WordPress Connector: REST API + App Password; bài, ảnh, taxonomy, SEO meta adapter. |
 | **3.1** | Dev1 | Dev2 | 20h | 0.3, 0.4 | `feat/m03/3-1/dev1/content-pipeline` | **Hoàn thành** | Pipeline sinh dàn ý, bài viết tiếng Việt và metadata từ tài liệu công ty. Commit: `402a440` |
-| **3.4** | Dev2 | Dev1 | 10h | 0.5, 0.1 | `feat/m03/3-4/dev2/review-ui` | Chưa bắt đầu | Giao diện duyệt bài (xem, sửa, duyệt, từ chối), cấu hình số bài/ảnh/chiến dịch. |
+| **3.4** | Dev2 | Dev1 | 10h | 0.5, 0.1 | `feat/m03/3-4/dev2/review-ui` | **Hoàn thành** | Giao diện duyệt bài: ArticleVersionResource chỉ-đọc, ParagraphDiff so sánh phiên bản, AuditRecorder tự duyệt/duyệt bài. Commit: `dd23b02` |
 | **3.5** | Dev2 | Dev1 | 8h | 3.1, 3.4 | `feat/m03/3-5/dev2/quality` | Chưa bắt đầu | Bộ kiểm tra chất lượng cơ bản: độ dài, heading, từ khóa chính, trùng lặp nội bộ. |
 
 ---
