@@ -33,8 +33,8 @@ class LockSensitiveFieldsTest extends TestCase
     private function website(): Website
     {
         return Website::create([
-            'name' => 'Site thử', 'cms_type' => 'wordpress', 'base_url' => 'https://example.test',
-            'store_scope' => 'default', 'status' => 'active',
+            'name' => 'Site thử', 'cms_type' => 'wordpress', 'base_url' => 'https://8.8.8.8',
+            'store_scope' => 'default',
             'encrypted_credentials' => ['application_password' => self::SECRET],
         ]);
     }
@@ -128,8 +128,8 @@ class LockSensitiveFieldsTest extends TestCase
 
         Livewire::test(WebsitePages\CreateWebsite::class)
             ->fillForm([
-                'name' => 'Mới', 'cms_type' => 'wordpress', 'base_url' => 'https://new.test',
-                'store_scope' => 'default', 'status' => 'active',
+                'name' => 'Mới', 'cms_type' => 'wordpress', 'base_url' => 'https://8.8.4.4',
+                'store_scope' => 'default',
                 'credentials_input' => ['username' => 'bot', 'application_password' => self::SECRET],
             ])
             ->call('create')
