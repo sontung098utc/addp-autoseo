@@ -33,7 +33,7 @@
     </style>
 
     @if ($hasDemo)
-        <x-demo-banner source="dữ liệu thật" real="mọi con số ở màn này tính từ bảng article_versions; các bản ghi bắt đầu bằng “[Mẫu] ” chỉ là dữ liệu xem thử"/>
+        <x-demo-banner source="dữ liệu thật" real="mọi con số ở màn này tính từ bảng article_versions; các bản ghi bắt đầu bằng “[Mẫu AI] ” chỉ là dữ liệu xem thử"/>
     @endif
 
     <p class="ai-muted">AI đang tốn bao nhiêu, ở model nào, ở bài nào và đã chạm ngưỡng cảnh báo chưa. Số liệu lấy THẬT từ các phiên bản bài do AI sinh. Chỉ Quản trị và Người duyệt xem và đặt được ngưỡng.</p>
