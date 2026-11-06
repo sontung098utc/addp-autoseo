@@ -8,7 +8,6 @@ use App\Models\Publication;
 use Filament\Actions\Action;
 use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
-use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 
 class ListPublications extends ListRecords
@@ -16,16 +15,6 @@ class ListPublications extends ListRecords
     protected static string $resource = PublicationResource::class;
 
     protected static ?string $title = 'Lịch đăng bài';
-
-    public function getSubheading(): string|Htmlable|null
-    {
-        $n = PublicationResource::needsAttentionCount();
-        $head = $n > 0
-            ? "Có {$n} lượt đăng cần xử lý (lỗi hoặc chờ đối soát). Xem tab \"Cần xử lý\"."
-            : 'Không có lượt đăng nào cần xử lý.';
-
-        return $head.' Giờ hiển thị theo giờ Việt Nam; hệ thống lưu UTC. Trạng thái do hệ thống quản lý nên không sửa/xóa tay.';
-    }
 
     protected function getHeaderActions(): array
     {
