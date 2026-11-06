@@ -1,0 +1,72 @@
+/* SEO Studio – "Editorial Ledger": lớp ghi đè nhẹ lên Filament (không Vite/Tailwind).
+   Nguồn giá trị: design-system/assets/css/tokens.css (primitive -> semantic). */
+
+/* ---- Tầng 1: primitive ---- */
+:root {
+  --ss-teal-700: #0F6B5C; --ss-teal-600: #0D6153; --ss-teal-300: #3FA893; --ss-teal-150: #6ECBB6;
+  --ss-teal-50: #E7F1EE;
+  --ss-paper-100: #FAFAF9; --ss-paper-200: #F3F2EF;
+  --ss-ink-950: #12141A; --ss-ink-900: #1B1E26; --ss-ink-800: #2A2F3A;
+  --ss-slate-100: #E3E1DC; --ss-ink-border: #3A3F4A;
+}
+
+/* ---- Tầng 2: semantic (sáng) ---- */
+:root {
+  --ss-bg: var(--ss-paper-100);
+  --ss-border: var(--ss-slate-100);
+  --ss-focus: var(--ss-teal-600);
+  --ss-accent-soft: var(--ss-teal-50);
+  --ss-shadow: 0 1px 2px rgb(18 20 26 / 0.06);
+}
+/* ---- Tầng 2: semantic (tối) ---- */
+.dark {
+  --ss-bg: var(--ss-ink-950);
+  --ss-border: var(--ss-ink-border);
+  --ss-focus: var(--ss-teal-150);
+  --ss-accent-soft: #132823;
+  --ss-shadow: none;
+}
+
+/* ---- Ghi đè biến Filament ---- */
+:root {
+  --font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --gray-50: 250, 250, 249;
+  --gray-100: 243, 242, 239;
+  --gray-200: 227, 225, 220;
+  --gray-950: 18, 20, 26;
+}
+.dark {
+  --gray-900: 27, 30, 38;
+  --gray-950: 18, 20, 26;
+  --gray-800: 42, 47, 58;
+}
+
+.fi-body { background-color: var(--ss-bg); }
+.dark .fi-body { background-color: var(--ss-ink-950); }
+
+/* Viền hairline 1px, bóng nhẹ, bỏ gradient */
+.fi-section, .fi-ta-ctn, .fi-wi-stats-overview-stat, .fi-fo-field-wrp .fi-input-wrp {
+  box-shadow: var(--ss-shadow);
+  background-image: none;
+}
+.fi-section, .fi-ta-ctn { border: 1px solid var(--ss-border); --tw-ring-shadow: 0 0 #0000; }
+.fi-btn { background-image: none; }
+
+/* Dark: nút primary dùng nền teal-600 (chữ trắng đạt tương phản) */
+.dark .fi-btn.fi-color-primary:not(.fi-outlined) { background-color: rgb(15 107 92); }
+
+/* Trạng thái active của sidebar */
+.fi-sidebar-item-active > .fi-sidebar-item-button { background-color: var(--ss-accent-soft); }
+
+/* Số liệu căn đều trong bảng */
+.fi-ta-table td, .fi-ta-table th, .fi-wi-stats-overview-stat-value { font-variant-numeric: tabular-nums; }
+
+/* Focus ring teal */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ss-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
