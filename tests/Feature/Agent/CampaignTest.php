@@ -181,7 +181,7 @@ class CampaignTest extends TestCase
         $this->actingAs($this->user('approver'));
 
         $this->get('/admin/doi-ai/tong-quan')->assertOk()
-            ->assertSee('Cách dùng: 4 bước')->assertSee('Đường đi của một bài')->assertSee('Dev1 cần (AG-B06)')
+            ->assertSee('Hoàn tất cài đặt: còn')->assertSee('Đường đi của một bài')->assertSee('Dev1 cần (AG-B06)')
             ->assertSee('1 phiên chạy thật');
     }
 

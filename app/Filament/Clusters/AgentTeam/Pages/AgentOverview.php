@@ -7,15 +7,19 @@ use App\Filament\Resources\AgentRunResource;
 use App\Filament\Resources\ArticleVersionResource;
 use App\Filament\Resources\CampaignResource;
 use App\Filament\Resources\PublicationResource;
+use App\Filament\Resources\WebsiteResource;
 use App\Filament\Support\Agent\AgentFlowBlueprint;
 use App\Models\AgentRun;
 use App\Models\AgentRunStep;
 use App\Models\ArticleVersion;
 use App\Models\Campaign;
+use App\Models\CrawledUrl;
 use App\Models\Publication;
+use App\Models\Website;
 use App\Services\Agent\Settings\AgentAi;
 use Filament\Pages\Page;
 use Filament\Pages\SubNavigationPosition;
+use Illuminate\Support\Facades\Schema;
 
 /** Tab "Tổng quan" của Đội AI: bước cần làm, vòng đời một bài (số liệu thật), việc cần bạn, bản đồ chặng. */
 class AgentOverview extends Page
@@ -60,12 +64,7 @@ class AgentOverview extends Page
             return $b;
         }, AgentFlowBlueprint::stages());
 
-        $steps = [
-            ['n' => 1, 'title' => 'Kết nối AI', 'done' => $ai['connected'], 'note' => $ai['connected'] ? 'Đang dùng model '.$ai['model'].' ('.($ai['source'] === 'db' ? 'khóa trong hệ thống' : 'khóa từ biến môi trường').')' : 'Chưa có khóa AI. Không có khóa thì lượt tự động không chạy.', 'url' => AgentConnection::getUrl()],
-            ['n' => 2, 'title' => 'Tạo chiến dịch', 'done' => Campaign::query()->exists(), 'note' => 'Chọn website, nhập từ khóa và giới hạn bài mỗi ngày.', 'url' => CampaignResource::getUrl('index')],
-            ['n' => 3, 'title' => 'Bật chạy', 'done' => $active->isNotEmpty(), 'note' => $active->isNotEmpty() ? $active->count().' chiến dịch đang chạy, hệ thống tự giao việc 15 phút một lần.' : 'Chưa có chiến dịch nào ở trạng thái "Đang chạy".', 'url' => CampaignResource::getUrl('index')],
-            ['n' => 4, 'title' => 'Duyệt bản nháp', 'done' => null, 'note' => $drafts > 0 ? "{$drafts} bản nháp đang chờ bạn duyệt." : 'Chưa có bản nháp nào chờ duyệt.', 'url' => ArticleVersionResource::getUrl('index')],
-        ];
+        $steps = $this->setupSteps($ai);
 
         $life = [
             ['label' => 'Từ khóa chưa giao', 'n' => $active->sum(fn ($c) => CampaignResource::remaining($c)), 'url' => CampaignResource::getUrl('index'), 'who' => 'Chiến dịch'],
@@ -78,6 +77,7 @@ class AgentOverview extends Page
         return [
             'ai' => $ai,
             'steps' => $steps,
+            'stepsLeft' => collect($steps)->where('state', '!=', 'done')->count(),
             'life' => $life,
             'nodes' => $nodes,
             'total' => array_sum($byStatus),
@@ -85,6 +85,44 @@ class AgentOverview extends Page
             'statusMap' => AgentRunResource::STATUS,
             'attention' => AgentRun::query()->with('article')->whereIn('status', ['held', 'failed'])->latest('id')->limit(5)->get(),
             'runsUrl' => AgentRunResource::getUrl('index'),
+        ];
+    }
+
+    /**
+     * "Hoàn tất cài đặt" 5 bước. state: done (có dữ liệu thật) | todo (chưa làm) | default (đang dùng mặc định, chưa chọn).
+     * Bước chưa có dữ liệu (hồ sơ doanh nghiệp AG-K11, nguồn AI AG-A03) luôn là todo, không tick giả.
+     *
+     * @param  array<string, mixed>  $ai
+     * @return list<array<string, mixed>>
+     */
+    private function setupSteps(array $ai): array
+    {
+        $sites = Website::query()->where('status', 'active')->count();
+        $crawled = CrawledUrl::query()->count();
+        $firstRun = AgentRun::query()->exists();
+
+        // Cột campaigns.mode do AG-S02 thêm. Chưa có cột thì chỉ báo mặc định, không tự thêm.
+        $hasMode = Schema::hasColumn('campaigns', 'mode');
+        $modeChosen = $hasMode && Campaign::query()->whereNotNull('mode')->exists();
+
+        return [
+            ['n' => 1, 'title' => 'Nối website', 'state' => $sites > 0 ? 'done' : 'todo',
+                'note' => $sites > 0 ? "{$sites} website đang hoạt động." : 'Chưa có website nào ở trạng thái hoạt động.',
+                'url' => WebsiteResource::getUrl('index')],
+            ['n' => 2, 'title' => 'Hồ sơ doanh nghiệp', 'state' => 'todo',
+                'note' => 'Chưa làm. Chức năng hồ sơ doanh nghiệp (AG-K11) chưa có.',
+                'url' => null],
+            ['n' => 3, 'title' => 'Nguồn AI được dùng', 'state' => 'todo',
+                'note' => 'Chưa làm. Chọn nguồn (AG-A03) chưa có. Hiện có: '
+                    .($crawled > 0 ? "trang website sẵn sàng ({$crawled} trang đã quét)" : 'trang website chưa quét')
+                    .'; Search Console chưa kết nối (đang là dữ liệu minh họa).',
+                'url' => null],
+            ['n' => 4, 'title' => 'Chọn chế độ', 'state' => $modeChosen ? 'done' : 'default',
+                'note' => $modeChosen ? 'Đã chọn chế độ cho chiến dịch.' : 'Cân bằng (mặc định).',
+                'url' => CampaignResource::getUrl('index')],
+            ['n' => 5, 'title' => 'Chạy thử 1 bài có xem trước', 'state' => $firstRun ? 'done' : 'todo',
+                'note' => $firstRun ? 'Đã có phiên chạy. Bấm để xem.' : 'Chưa có phiên chạy nào.'.($ai['connected'] ? '' : ' Cần khóa AI trước.'),
+                'url' => AgentRunResource::getUrl('index')],
         ];
     }
 }
