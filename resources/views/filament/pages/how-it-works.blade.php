@@ -29,6 +29,24 @@
         @endforeach
     </div>
 
+    <x-filament::section heading="Luồng của đội AI: đã có gì, Dev1 cần xây gì" description="Bản thiết kế sống của lát dọc đầu tiên (AG-S01). Mỗi chặng ghi phần đã làm và điểm nối còn thiếu.">
+        <div data-testid="flow-blueprint">
+            @foreach ($flow as $i => $b)
+                <div style="display:grid;grid-template-columns:2rem 1fr;gap:.6rem;padding:.55rem 0;border-bottom:1px solid rgba(128,128,128,.18)">
+                    <div style="opacity:.6">{{ $i + 1 }}</div>
+                    <div>
+                        <x-studio.chip domain="readiness" :value="$b['readiness']" /> <strong class="text-sm">{{ $b['title'] }}</strong>
+                        <span class="text-xs" style="opacity:.6"> · {{ $b['role'] }}</span>
+                        <div class="text-xs" style="opacity:.8">{{ $b['what'] }}</div>
+                        <div class="text-xs" style="opacity:.8"><strong>Đã có:</strong> {{ $b['built'] }}</div>
+                        <div class="text-xs" style="color:#b45309"><strong>Dev1 cần ({{ $b['task'] }}):</strong> {{ $b['dev1'] }}</div>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+        <div class="mt-2 text-xs" style="opacity:.7">Xem một phiên chạy thật ở mục "Phiên chạy của đội AI" (menu Chiến dịch).</div>
+    </x-filament::section>
+
     <x-filament::section heading="Tự động hóa AI" description="Phần đang được đề xuất — chưa có trong hệ thống.">
         @foreach ($automation as $f)
             <div style="margin:.4rem 0">

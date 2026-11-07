@@ -164,6 +164,26 @@ class ArticleResource extends Resource
                             ->success()
                             ->send();
                     }),
+                Tables\Actions\Action::make('run_agent')
+                    ->label('Giao đội AI')
+                    ->icon('heroicon-o-cpu-chip')
+                    ->color('primary')
+                    ->visible(fn (Article $record) => (\Illuminate\Support\Facades\Auth::user()?->isApprover() ?? false) && in_array($record->workflow_status, ['planned', 'drafting', 'rejected'], true))
+                    ->requiresConfirmation()
+                    ->modalHeading('Giao bài này cho đội AI')
+                    ->modalDescription('Đội AI sẽ kiểm an toàn, phân hạng rủi ro, lập dàn ý, viết, tự chấm và sửa (tối đa 3 vòng). Kết quả luôn là BẢN NHÁP chờ người duyệt; không có gì được tự đăng.')
+                    ->modalSubmitActionLabel('Giao việc')
+                    ->action(function (Article $record) {
+                        abort_unless(\Illuminate\Support\Facades\Auth::user()?->isApprover(), 403);
+                        $key = env('GOOGLE_AI_API_KEY');
+                        $ai = ! empty($key) ? new \App\Services\Ai\GeminiAiProvider($key) : new \App\Services\Ai\MockAiProvider();
+                        $run = (new \App\Services\Agent\Run\AgentRunOrchestrator($ai))->run($record, \Illuminate\Support\Facades\Auth::user());
+                        $n = \Filament\Notifications\Notification::make()->title('Phiên chạy #'.$run->id.': '.(\App\Filament\Resources\AgentRunResource::STATUS[$run->status][0] ?? $run->status))
+                            ->body($run->outcome_reason ?: 'Đã có bản nháp chờ duyệt.')
+                            ->actions([\Filament\Notifications\Actions\Action::make('xem')->label('Xem diễn biến')->url(\App\Filament\Resources\AgentRunResource::getUrl('view', ['record' => $run]))]);
+                        in_array($run->status, ['ready_for_review'], true) ? $n->success() : $n->warning();
+                        $n->send();
+                    }),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
