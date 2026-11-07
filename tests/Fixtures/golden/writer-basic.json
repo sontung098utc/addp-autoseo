@@ -1,0 +1,9 @@
+{
+  "playbook": "writer/article-draft@1",
+  "cases": [
+    {"id": "w01-bai-tot", "input": {"mutate": "none"}, "expect_blocking": [], "note": "Bài đủ dài, đủ H2, an toàn: không được trượt P0 nào."},
+    {"id": "w02-qua-ngan", "input": {"mutate": "short"}, "expect_blocking": ["KW01", "LEN01"], "note": "Dưới ngưỡng độ dài; bài ngắn cũng không đủ chỗ cho từ khóa nên KW01 trượt theo (đã đo thật)."},
+    {"id": "w03-co-script", "input": {"mutate": "script"}, "expect_blocking": ["SAFE01"], "note": "HTML có thẻ script phải bị chặn."},
+    {"id": "w04-thieu-tu-khoa", "input": {"mutate": "nokeyword"}, "expect_blocking": ["KW01"], "note": "Từ khóa chính không xuất hiện: luật KW01 chặn (P0)."}
+  ]
+}
