@@ -8,6 +8,8 @@ use Filament\Resources\Pages\ListRecords;
 
 class ListWebsites extends ListRecords
 {
+    protected static ?string $title = 'Website kết nối';
+
     protected static string $resource = WebsiteResource::class;
 
     protected function getHeaderActions(): array

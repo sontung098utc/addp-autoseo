@@ -25,7 +25,7 @@ class PublicationResource extends Resource
 
     protected static ?string $modelLabel = 'Lượt xuất bản';
 
-    protected static ?string $pluralModelLabel = 'Lịch xuất bản bài';
+    protected static ?string $pluralModelLabel = 'Lịch xuất bản';
 
     protected static ?string $navigationGroup = 'Lịch đăng';
 

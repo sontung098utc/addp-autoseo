@@ -24,7 +24,7 @@ class ArticleResource extends Resource
 
     protected static ?string $modelLabel = 'Bài viết';
 
-    protected static ?string $pluralModelLabel = 'Danh sách Bài viết';
+    protected static ?string $pluralModelLabel = 'Chiến dịch & Bài viết';
 
     protected static ?string $navigationGroup = 'Chiến dịch';
 

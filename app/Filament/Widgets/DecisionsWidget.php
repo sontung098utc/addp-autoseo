@@ -14,6 +14,8 @@ class DecisionsWidget extends Widget
 
     protected static bool $isDiscovered = false;
 
+    protected static bool $isLazy = false;
+
     protected int|string|array $columnSpan = 'full';
 
     protected function getViewData(): array
