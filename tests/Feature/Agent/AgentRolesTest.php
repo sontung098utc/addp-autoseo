@@ -34,17 +34,27 @@ class AgentRolesTest extends TestCase
 
     public function test_playbook_thieu_hien_chua_co_va_playbook_co_that_thi_hien_dung(): void
     {
+        // Playbook CHƯA tồn tại (thư mục rỗng) thì hiện 'chưa có', không ném lỗi.
+        $empty = sys_get_temp_dir().'/pb_empty_'.uniqid();
+        mkdir($empty);
+        $missing = collect((new RoleRegistry(null, new \App\Services\Ai\Playbook\PlaybookLoader($empty)))->skills((new RoleRegistry())->find('manager')))->firstWhere('ref', 'manager/seo-orchestrator');
+        rmdir($empty);
+        $this->assertFalse($missing['exists']);
+        $this->assertNull($missing['status']);
+
+        // Sau khi AG-S10 thêm playbook thật: có, vẫn là nháp, xuất xứ claude-seo.
         $reg = new RoleRegistry();
         $manager = collect($reg->skills($reg->find('manager')))->firstWhere('ref', 'manager/seo-orchestrator');
-        $this->assertFalse($manager['exists']);
-        $this->assertNull($manager['status']);
+        $this->assertTrue($manager['exists']);
+        $this->assertSame('draft', $manager['status']);
+        $this->assertStringStartsWith('claude-seo/', $manager['lineage']['source']);
 
         $editor = collect($reg->skills($reg->find('editor')))->keyBy('ref');
         $this->assertTrue($editor['editor/qa-review']['exists']);
         $this->assertSame('claude-seo/seo-content', $editor['editor/qa-review']['lineage']['source']);
 
         $this->actingAs($this->user('admin'));
-        Livewire::test(AgentRoles::class)->mountAction('detail', ['role' => 'manager'])->assertSee('Chưa có')->assertSee('manager/seo-orchestrator');
+        Livewire::test(AgentRoles::class)->mountAction('detail', ['role' => 'manager'])->assertSee('manager/seo-orchestrator');
     }
 
     public function test_rubric_refs_deu_la_ma_luat_that(): void
@@ -111,7 +121,7 @@ class AgentRolesTest extends TestCase
         $this->get('/admin/doi-ai/vai-tro')->assertOk()->assertSee('Chuyên viên Audit')->assertSee('Biên tập / QA nội dung')->assertSee('Đang phát triển')->assertDontSee('Đang hoạt động');
         Livewire::test(AgentRoles::class)->mountAction('detail', ['role' => 'editor'])
             ->assertSee('Mục tiêu')->assertSee('Rubric')->assertSee('LEN01')->assertSee('Rào chắn')->assertSee('Điều kiện đạt')->assertSee('Xuất xứ')
-            ->assertSee('editor/eeat-check')->assertSee('Chưa có');
+            ->assertSee('editor/eeat-check');
     }
 
     public function test_bien_tap_vien_bi_chan(): void
