@@ -27,7 +27,7 @@ class RoleMatrixTest extends TestCase
         return [
             'Website kết nối' => ['class' => R\WebsiteResource::class, 'admin' => 'YC', 'approver' => '-', 'writer' => '-'],
             'Bài viết' => ['class' => R\ArticleResource::class, 'admin' => 'YCD', 'approver' => 'YC', 'writer' => 'YC'],
-            'Duyệt bài (phiên bản)' => ['class' => R\ArticleVersionResource::class, 'admin' => 'Y', 'approver' => 'Y', 'writer' => 'Y'],
+            'Xem bản bài (không còn menu)' => ['class' => R\ArticleVersionResource::class, 'admin' => 'Y', 'approver' => 'Y', 'writer' => 'Y'],
             'Lịch xuất bản' => ['class' => R\PublicationResource::class, 'admin' => 'Y', 'approver' => 'Y', 'writer' => '-'],
             'Thư viện ảnh (CHƯA có Policy)' => ['class' => R\MediaAssetResource::class, 'admin' => 'YCD', 'approver' => 'YCD', 'writer' => 'YCD'],
             'Tổng quan' => ['class' => P\Dashboard::class, 'admin' => 'Y', 'approver' => 'Y', 'writer' => 'Y'],

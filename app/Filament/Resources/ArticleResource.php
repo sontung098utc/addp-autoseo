@@ -3,10 +3,14 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ArticleResource\Pages;
+use App\Filament\Support\Agent\RunActivity;
+use App\Filament\Support\Review\ArticleRows;
 use App\Filament\Support\Review\ReviewActions;
 use App\Filament\Support\Review\ReviewWorkflow;
 use App\Filament\Support\StatusPresenter;
+use App\Models\AgentRun;
 use App\Models\Article;
+use App\Models\Campaign;
 use App\Models\Website;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -94,107 +98,202 @@ class ArticleResource extends Resource
             ]);
     }
 
+    public static function getNavigationBadge(): ?string
+    {
+        if (! static::canViewAny()) {
+            return null;
+        }
+        $n = Article::query()->where('workflow_status', 'needs_review')->count();
+
+        return $n > 0 ? (string) $n : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'warning';
+    }
+
+    /** Mã tab (cũng là giá trị workflow_status trừ 'all') theo thứ tự hiển thị. */
+    public const TAB_STATUSES = ['planned', 'drafting', 'needs_review', 'rejected', 'approved', 'scheduled', 'published'];
+
+    public const TAB_LABELS = [
+        'planned' => 'Kế hoạch', 'drafting' => 'Đang viết', 'needs_review' => 'Chờ duyệt', 'rejected' => 'Cần sửa',
+        'approved' => 'Đã duyệt', 'scheduled' => 'Đã lên lịch', 'published' => 'Đã đăng',
+    ];
+
+    /** Nút chính (duy nhất) của dòng theo trạng thái: submit_review | approve | schedule | view_version | null. */
+    public static function primaryActionFor(Article $r): string
+    {
+        $canApprove = ReviewActions::canApprove();
+        $hasVersion = $r->latestVersion !== null || $r->versions()->exists();
+
+        return match ($r->workflow_status) {
+            'needs_review' => $canApprove ? 'approve' : 'view_version',
+            'approved' => $canApprove ? 'schedule' : 'view_version',
+            'planned', 'drafting', 'rejected' => ($hasVersion && ReviewActions::canSubmit()) ? 'submit_review' : 'view_version',
+            default => 'view_version',
+        };
+    }
+
+    private static function narrow(Tables\Columns\Column $c): Tables\Columns\Column
+    {
+        return $c->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%;white-space:nowrap']);
+    }
+
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with(['website', 'latestVersion']))
+            ->poll(fn () => RunActivity::anyRunning() ? RunActivity::POLL_LIVE.'s' : RunActivity::POLL_IDLE.'s')
             ->persistFiltersInSession()
             ->persistSortInSession()
             ->persistSearchInSession()
             ->persistColumnSearchesInSession()
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
+            ->defaultSort('id', 'desc')
             ->columns([
                 Tables\Columns\TextColumn::make('primary_keyword')
-                    ->label('Từ khóa chính')
-                    ->searchable()
+                    ->label('Bài / từ khóa')
+                    ->searchable(query: fn ($query, string $search) => $query
+                        ->where('primary_keyword', 'like', "%{$search}%")
+                        ->orWhereHas('latestVersion', fn ($v) => $v->where('title', 'like', "%{$search}%")))
                     ->sortable()
-                    ->weight('bold'),
-                Tables\Columns\TextColumn::make('website.name')->toggleable()
-                    ->label('Website')
-                    ->badge()
-                    ->color('info')
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('topic_cluster')->toggleable()->sortable()
-                    ->label('Cụm chủ đề')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('search_intent')->toggleable()->sortable()
-                    ->label('Ý định'),
-                Tables\Columns\TextColumn::make('workflow_status')->sortable()
+                    ->weight('bold')
+                    ->wrap()
+                    ->lineClamp(2)
+                    ->tooltip(fn (Article $r) => $r->primary_keyword)
+                    ->description(fn (Article $r) => $r->latestVersion?->title ? \Illuminate\Support\Str::limit($r->latestVersion->title, 80) : null)
+                    ->extraHeaderAttributes(['style' => 'min-width:20rem'])
+                    ->extraCellAttributes(['style' => 'min-width:20rem']),
+                static::narrow(Tables\Columns\TextColumn::make('workflow_status')->sortable()
                     ->label('Trạng thái')
                     ->badge()
-                    ->formatStateUsing(fn (?string $state) => StatusPresenter::label($state, 'article'))
+                    ->formatStateUsing(function (?string $state, Article $r) {
+                        $label = StatusPresenter::label($state, 'article');
+                        $live = ArticleRows::liveRun($r);
+
+                        return $live ? ($state === 'drafting' ? 'Đang viết' : $label).' · '.(ArticleRows::stageLabel($live) ?? 'AI') : $label;
+                    })
                     ->color(fn (?string $state) => StatusPresenter::color($state, 'article'))
-                    ->icon(fn (?string $state) => StatusPresenter::icon($state, 'article')),
-                Tables\Columns\TextColumn::make('created_at')->toggleable()
-                    ->label('Ngày tạo')
-                    ->dateTime('d/m/Y')
-                    ->sortable(),
+                    ->icon(fn (?string $state, Article $r) => ArticleRows::liveRun($r) ? 'heroicon-o-arrow-path' : StatusPresenter::icon($state, 'article'))
+                    ->extraAttributes(fn (Article $r) => ArticleRows::liveRun($r) ? ['class' => 'ss-badge-live', 'data-running' => '1'] : [])),
+                static::narrow(Tables\Columns\TextColumn::make('campaign_name')
+                    ->label('Chiến dịch')
+                    ->state(fn (Article $r) => ArticleRows::campaignName($r) ?? '—')
+                    ->limit(24)
+                    ->tooltip(fn (Article $r) => ArticleRows::campaignName($r))),
+                static::narrow(Tables\Columns\TextColumn::make('last_run')
+                    ->label('Phiên gần nhất')
+                    ->state(function (Article $r) {
+                        $run = ArticleRows::lastRun($r);
+                        if (! $run) {
+                            return '—';
+                        }
+                        $score = ArticleRows::score($run);
+
+                        return (AgentRunResource::STATUS[$run->status][0] ?? $run->status).($score !== null ? ' · '.$score.' điểm' : '');
+                    })
+                    ->url(fn (Article $r) => ($run = ArticleRows::lastRun($r)) && AgentRunResource::canViewAny() ? AgentRunResource::getUrl('view', ['record' => $run]) : null)
+                    ->color(fn (Article $r) => ArticleRows::lastRun($r) ? 'primary' : null)),
+                static::narrow(Tables\Columns\TextColumn::make('updated_at')->label('Cập nhật')->since()->sortable()
+                    ->tooltip(fn (Article $r) => $r->updated_at?->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y H:i'))),
+                Tables\Columns\TextColumn::make('website.name')->toggleable(isToggledHiddenByDefault: true)
+                    ->label('Website')->badge()->color('info')->sortable(),
+                Tables\Columns\TextColumn::make('topic_cluster')->toggleable(isToggledHiddenByDefault: true)->sortable()
+                    ->label('Cụm chủ đề')->searchable(),
+                Tables\Columns\TextColumn::make('search_intent')->toggleable(isToggledHiddenByDefault: true)->sortable()
+                    ->label('Ý định'),
+                Tables\Columns\TextColumn::make('created_at')->toggleable(isToggledHiddenByDefault: true)
+                    ->label('Ngày tạo')->dateTime('d/m/Y')->sortable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('workflow_status')->label('Trạng thái')
-                    ->options(fn (): array => collect(['planned', 'drafting', 'needs_review', 'rejected', 'approved', 'scheduled', 'published'])
-                        ->mapWithKeys(fn (string $v): array => [$v => StatusPresenter::label($v, 'article')])->all()),
                 Tables\Filters\SelectFilter::make('website_id')->label('Website')->relationship('website', 'name'),
+                Tables\Filters\SelectFilter::make('campaign_id')->label('Chiến dịch')
+                    ->options(fn () => Campaign::query()->orderBy('name')->pluck('name', 'id')->all())
+                    ->query(fn ($query, array $data) => filled($data['value'] ?? null)
+                        ? $query->whereIn('articles.id', AgentRun::query()->where('campaign_id', $data['value'])->select('article_id'))
+                        : $query),
+                Tables\Filters\TernaryFilter::make('ai_running')->label('Phiên AI đang chạy')
+                    ->placeholder('Tất cả')->trueLabel('Đang có phiên chạy')->falseLabel('Không có phiên chạy')
+                    ->queries(
+                        true: fn ($query) => $query->whereIn('articles.id', AgentRun::query()->where('status', 'running')->select('article_id')),
+                        false: fn ($query) => $query->whereNotIn('articles.id', AgentRun::query()->where('status', 'running')->whereNotNull('article_id')->select('article_id')),
+                        blank: fn ($query) => $query,
+                    ),
                 Tables\Filters\SelectFilter::make('search_intent')->label('Ý định')->options([
                     'informational' => 'Thông tin', 'commercial' => 'Thương mại', 'transactional' => 'Giao dịch', 'navigational' => 'Điều hướng',
                 ]),
-                Tables\Filters\Filter::make('needs_review')
-                    ->label('Chờ duyệt')
-                    ->query(fn ($query) => $query->where('workflow_status', 'needs_review')),
             ])
             ->actions([
                 static::submitAction(),
                 static::approveAction(),
-                static::rejectAction(),
                 static::scheduleAction(),
-                Tables\Actions\Action::make('generate_ai')
-                    ->label('AI Viết bài')
-                    ->icon('heroicon-o-sparkles')
-                    ->color('primary')
-                    ->requiresConfirmation()
-                    ->modalHeading('Sinh bản thảo bài viết bằng AI')
-                    ->modalDescription('Hệ thống sẽ dựa trên từ khóa chính và cụm chủ đề để sinh dàn ý, bài viết chuẩn SEO và metadata.')
-                    ->modalSubmitActionLabel('Bắt đầu sinh')
-                    ->action(function (Article $record) {
-                        $service = new \App\Services\Content\ContentPipelineService();
-                        $version = $service->generateArticleVersion($record);
-                        \Filament\Notifications\Notification::make()
-                            ->title('Đã sinh xong bản thảo mới!')
-                            ->body("Bản thảo phiên bản #{$version->version} ({$version->title}) đã được tạo và chuyển sang chờ duyệt.")
-                            ->success()
-                            ->send();
-                    }),
-                Tables\Actions\Action::make('run_agent')
-                    ->label('Giao đội AI')
-                    ->icon('heroicon-o-cpu-chip')
-                    ->color('primary')
-                    ->visible(fn (Article $record) => (\Illuminate\Support\Facades\Auth::user()?->isApprover() ?? false) && in_array($record->workflow_status, ['planned', 'drafting', 'rejected'], true))
-                    ->requiresConfirmation()
-                    ->modalHeading('Giao bài này cho đội AI')
-                    ->modalDescription('Đội AI sẽ kiểm an toàn, phân hạng rủi ro, lập dàn ý, viết, tự chấm và sửa (tối đa 3 vòng). Kết quả luôn là BẢN NHÁP chờ người duyệt; không có gì được tự đăng.')
-                    ->modalSubmitActionLabel('Giao việc')
-                    ->action(function (Article $record) {
-                        abort_unless(\Illuminate\Support\Facades\Auth::user()?->isApprover(), 403);
-                        $ai = \App\Services\Agent\Settings\AgentAi::forInteractiveUse();
-                        if ($ai === null) {
-                            \Filament\Notifications\Notification::make()->title('Chưa kết nối AI')->body('Vào Đội AI → Kết nối AI để nhập khóa trước khi giao việc.')->warning()->send();
+                static::viewVersionAction(),
+                Tables\Actions\ActionGroup::make([
+                    static::rejectAction(),
+                    Tables\Actions\Action::make('generate_ai')
+                        ->label('AI Viết bài')
+                        ->icon('heroicon-o-sparkles')
+                        ->requiresConfirmation()
+                        ->modalHeading('Sinh bản thảo bài viết bằng AI')
+                        ->modalDescription('Hệ thống sẽ dựa trên từ khóa chính và cụm chủ đề để sinh dàn ý, bài viết chuẩn SEO và metadata.')
+                        ->modalSubmitActionLabel('Bắt đầu sinh')
+                        ->action(function (Article $record) {
+                            $service = new \App\Services\Content\ContentPipelineService();
+                            $version = $service->generateArticleVersion($record);
+                            \Filament\Notifications\Notification::make()
+                                ->title('Đã sinh xong bản thảo mới!')
+                                ->body("Bản thảo phiên bản #{$version->version} ({$version->title}) đã được tạo và chuyển sang chờ duyệt.")
+                                ->success()
+                                ->send();
+                        }),
+                    Tables\Actions\Action::make('run_agent')
+                        ->label('Giao đội AI')
+                        ->icon('heroicon-o-cpu-chip')
+                        ->visible(fn (Article $record) => (\Illuminate\Support\Facades\Auth::user()?->isApprover() ?? false)
+                            && in_array($record->workflow_status, ['planned', 'drafting', 'rejected'], true)
+                            && ArticleRows::liveRun($record) === null)
+                        ->requiresConfirmation()
+                        ->modalHeading('Giao bài này cho đội AI')
+                        ->modalDescription('Đội AI sẽ kiểm an toàn, phân hạng rủi ro, lập dàn ý, viết, tự chấm và sửa (tối đa 3 vòng). Kết quả luôn là BẢN NHÁP chờ người duyệt; không có gì được tự đăng.')
+                        ->modalSubmitActionLabel('Giao việc')
+                        ->action(function (Article $record) {
+                            abort_unless(\Illuminate\Support\Facades\Auth::user()?->isApprover(), 403);
+                            // Chống giao trùng: đã có phiên đang chạy thật thì không tạo phiên thứ hai.
+                            if (ArticleRows::liveRun($record) !== null) {
+                                \Filament\Notifications\Notification::make()->title('Bài này đang có phiên chạy')->body('Đợi phiên hiện tại xong rồi hãy giao lại.')->warning()->send();
 
-                            return;
-                        }
-                        $run = (new \App\Services\Agent\Run\AgentRunOrchestrator($ai, policy: \App\Services\Agent\Settings\AgentAi::policy()))->run($record, \Illuminate\Support\Facades\Auth::user());
-                        $n = \Filament\Notifications\Notification::make()->title('Phiên chạy #'.$run->id.': '.(\App\Filament\Resources\AgentRunResource::STATUS[$run->status][0] ?? $run->status))
-                            ->body($run->outcome_reason ?: 'Đã có bản nháp chờ duyệt.')
-                            ->actions([\Filament\Notifications\Actions\Action::make('xem')->label('Xem diễn biến')->url(\App\Filament\Resources\AgentRunResource::getUrl('view', ['record' => $run]))]);
-                        in_array($run->status, ['ready_for_review'], true) ? $n->success() : $n->warning();
-                        $n->send();
-                    }),
-                Tables\Actions\EditAction::make(),
-            ])
+                                return;
+                            }
+                            $ai = \App\Services\Agent\Settings\AgentAi::forInteractiveUse();
+                            if ($ai === null) {
+                                \Filament\Notifications\Notification::make()->title('Chưa kết nối AI')->body('Vào Đội AI → Kết nối AI để nhập khóa trước khi giao việc.')->warning()->send();
+
+                                return;
+                            }
+                            $run = (new \App\Services\Agent\Run\AgentRunOrchestrator($ai, policy: \App\Services\Agent\Settings\AgentAi::policy()))->run($record, \Illuminate\Support\Facades\Auth::user());
+                            $n = \Filament\Notifications\Notification::make()->title('Phiên chạy #'.$run->id.': '.(AgentRunResource::STATUS[$run->status][0] ?? $run->status))
+                                ->body($run->outcome_reason ?: 'Đã có bản nháp chờ duyệt.')
+                                ->actions([\Filament\Notifications\Actions\Action::make('xem')->label('Xem diễn biến')->url(AgentRunResource::getUrl('view', ['record' => $run]))]);
+                            in_array($run->status, ['ready_for_review'], true) ? $n->success() : $n->warning();
+                            $n->send();
+                        }),
+                    Tables\Actions\EditAction::make(),
+                ])->label('⋯')->icon('heroicon-m-ellipsis-horizontal')->iconButton()->tooltip('Thao tác khác'),
+            ], position: Tables\Enums\ActionsPosition::AfterColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    private static function viewVersionAction(): Tables\Actions\Action
+    {
+        return Tables\Actions\Action::make('view_version')->label('Xem')->icon('heroicon-o-eye')->color('gray')
+            ->visible(fn (Article $r) => static::primaryActionFor($r) === 'view_version' && $r->versions()->exists())
+            ->url(fn (Article $r) => ArticleVersionResource::getUrl('view', ['record' => $r->versions()->orderByDesc('version')->firstOrFail()]));
     }
 
     /** Kiểm chất lượng bản mới nhất; null nếu bài chưa có bản nào. */
@@ -218,7 +317,7 @@ class ArticleResource extends Resource
     private static function submitAction(): Tables\Actions\Action
     {
         return Tables\Actions\Action::make('submit_review')->label('Gửi duyệt')->icon('heroicon-o-paper-airplane')
-            ->visible(fn (Article $r) => in_array($r->workflow_status, ['planned', 'rejected', 'drafting'], true))
+            ->visible(fn (Article $r) => static::primaryActionFor($r) === 'submit_review')
             ->authorize(fn () => ReviewActions::canSubmit())
             ->requiresConfirmation()
             ->action(function (Article $r) {
@@ -230,7 +329,7 @@ class ArticleResource extends Resource
     private static function approveAction(): Tables\Actions\Action
     {
         return Tables\Actions\Action::make('approve')->label('Duyệt')->icon('heroicon-o-check')->color('success')
-            ->visible(fn (Article $r) => $r->workflow_status === 'needs_review')
+            ->visible(fn (Article $r) => static::primaryActionFor($r) === 'approve')
             ->authorize(fn () => ReviewActions::canApprove())
             ->tooltip(fn (Article $r) => ReviewActions::blockedHint(static::qualityOf($r)))
             ->modalHeading(fn (Article $r) => static::qualityOf($r)?->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi P0' : 'Duyệt nội dung')
@@ -256,7 +355,7 @@ class ArticleResource extends Resource
     private static function scheduleAction(): Tables\Actions\Action
     {
         return Tables\Actions\Action::make('schedule')->label('Xếp lịch')->icon('heroicon-o-clock')
-            ->visible(fn (Article $r) => $r->workflow_status === 'approved')
+            ->visible(fn (Article $r) => static::primaryActionFor($r) === 'schedule')
             ->authorize(fn () => ReviewActions::canApprove())
             ->form(ReviewActions::scheduleForm())
             ->action(function (Article $r, array $data) {

@@ -32,7 +32,7 @@ class PanelSmokeTest extends TestCase
         $this->urls = [
             '/admin',
             '/admin/articles', '/admin/articles/create', "/admin/articles/{$art->id}/edit",
-            '/admin/article-versions', "/admin/article-versions/{$v->id}",
+            "/admin/article-versions/{$v->id}", '/admin/articles?activeTab=needs_review',
             '/admin/websites', '/admin/websites/create', "/admin/websites/{$site->id}/edit",
             '/admin/publications', "/admin/publications/{$pub->id}", '/admin/lich-tuan',
             '/admin/media-assets', '/admin/media-assets/create',

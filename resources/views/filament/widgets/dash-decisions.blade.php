@@ -14,7 +14,7 @@
 @endforelse
 @if ($total > $limit)
 <div class="ss-dash-row" style="border-bottom:0"><span class="ss-dash-sub">Đang hiện {{ $limit }} / {{ $total }} việc, quá hạn xếp trước.</span>
-<a href="{{ $isApprover ? \App\Filament\Resources\ArticleVersionResource::getUrl('index', ['tableFilters' => ['review_status' => ['value' => 'needs_review']]]) : \App\Filament\Resources\ArticleResource::getUrl('index') }}">Xem tất cả {{ $total }} việc</a></div>
+<a href="{{ $isApprover ? \App\Filament\Resources\ArticleResource::getUrl('index', ['activeTab' => 'needs_review']) : \App\Filament\Resources\ArticleResource::getUrl('index') }}">Xem tất cả {{ $total }} việc</a></div>
 @endif
 </x-filament::section>
 </x-filament-widgets::widget>
