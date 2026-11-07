@@ -17,7 +17,7 @@ class ListPublications extends ListRecords
 {
     protected static string $resource = PublicationResource::class;
 
-    protected static ?string $title = 'Lịch đăng bài';
+    protected static ?string $title = 'Lịch xuất bản';
 
     public function getSubheading(): ?string
     {

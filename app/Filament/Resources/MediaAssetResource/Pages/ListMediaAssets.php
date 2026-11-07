@@ -8,6 +8,8 @@ use Filament\Resources\Pages\ListRecords;
 
 class ListMediaAssets extends ListRecords
 {
+    protected static ?string $title = 'Thư viện ảnh';
+
     protected static string $resource = MediaAssetResource::class;
 
     protected function getHeaderActions(): array

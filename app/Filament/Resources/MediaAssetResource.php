@@ -20,7 +20,7 @@ class MediaAssetResource extends Resource
 
     protected static ?string $modelLabel = 'Ảnh tư liệu';
 
-    protected static ?string $pluralModelLabel = 'Thư viện ảnh công ty';
+    protected static ?string $pluralModelLabel = 'Thư viện ảnh';
 
     protected static ?string $navigationGroup = 'Cài đặt';
 
