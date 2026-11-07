@@ -35,6 +35,8 @@ return [
     'on_fail' => 'Hiện chưa có vòng sửa riêng cho dàn ý; lỗi AI tạm thời được thử lại theo chính sách phiên chạy.',
     'topic_class' => 'Theo hạng rủi ro của chủ đề (do RiskClassifier quyết định)',
     'on_timeout' => 'Phiên chạy dừng và trả bài về trạng thái cũ.',
+    // AG-S14: được phép TẮT từ tab Vai trò (bước dàn ý bị bỏ qua, người viết tự bố cục). Vai trò không có khóa này là bắt buộc.
+    'can_disable' => true,
     'skills' => [
         'brief/content-brief',
         'strategist/content-plan',

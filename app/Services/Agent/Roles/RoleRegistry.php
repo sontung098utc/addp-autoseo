@@ -27,6 +27,20 @@ final class RoleRegistry
     private const REQUIRED = ['key', 'name', 'goal', 'tools_allowed', 'tools_denied', 'model_tier', 'human_gate', 'rubric_refs', 'guardrails',
         'pass_condition', 'on_fail', 'topic_class', 'on_timeout', 'skills', 'orchestrator_steps', 'origin'];
 
+    /** AG-S14: bước của phiên chạy thuộc vai trò nào (khóa vai trò, hoặc 'system' = hệ thống). Có test đối chiếu với AgentRunOrchestrator. */
+    public const STEP_ROLE = [
+        'guard' => 'system', 'handoff' => 'system', 'retry' => 'system', 'failover' => 'system', 'decision' => 'system',
+        'risk' => 'editor', 'brief' => 'strategist', 'write' => 'writer', 'repair' => 'writer', 'grade' => 'editor',
+    ];
+
+    /** AG-S14: playbook (kỹ năng) mỗi bước dùng, khai báo tường minh. editor/eeat-check chỉ là gợi ý định tính, KHÔNG nạp vào bước nào. */
+    public const STEP_PLAYBOOK = [
+        'brief' => 'brief/content-brief', 'write' => 'writer/article-draft', 'repair' => 'editor/qa-review', 'grade' => 'editor/qa-review',
+    ];
+
+    /** Vai trò không được tắt dù ai yêu cầu: cổng an toàn (chấm luật) và bước viết. */
+    public const LOCKED = ['editor', 'writer'];
+
     /** @var list<array<string, mixed>>|null */
     private ?array $roles = null;
 
@@ -65,6 +79,18 @@ final class RoleRegistry
         }
 
         return null;
+    }
+
+    /** Tên tiếng Việt của vai trò; 'system' là Hệ thống. */
+    public function roleName(string $key): string
+    {
+        return $key === 'system' ? 'Hệ thống' : ($this->find($key)['name'] ?? $key);
+    }
+
+    /** Vai trò có được tắt không: phải khai báo can_disable và không nằm trong LOCKED. */
+    public function isSwitchable(string $key): bool
+    {
+        return ! in_array($key, self::LOCKED, true) && (bool) ($this->find($key)['can_disable'] ?? false);
     }
 
     /**

@@ -5,6 +5,8 @@ namespace App\Filament\Clusters\AgentTeam\Pages;
 use App\Filament\Clusters\AgentTeam;
 use App\Models\User;
 use App\Services\Agent\Roles\RoleRegistry;
+use App\Services\Agent\Roles\RoleSwitches;
+use Filament\Notifications\Notification;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
@@ -13,7 +15,7 @@ use Illuminate\Support\Facades\Auth;
 
 /**
  * Tab "Vai trò" của Đội AI (AG-S09): xem sổ vai trò, mức sẵn sàng THẬT, rubric, rào chắn, tự động hóa, xuất xứ và kỹ năng.
- * v1 CHỈ XEM (nút "Sửa rubric" của bản mẫu chưa làm; sau này chỉ admin). Chi tiết dài nằm trong cửa sổ trượt, không nhồi trang chính.
+ * Xem là chính (nút "Sửa rubric" của bản mẫu chưa làm). AG-S14: công tắc bật/tắt vai trò KHÔNG bắt buộc (hiện chỉ Chiến lược), chỉ admin đổi, ghi audit. Chi tiết dài nằm trong cửa sổ trượt, không nhồi trang chính.
  */
 class AgentRoles extends Page
 {
@@ -38,6 +40,21 @@ class AgentRoles extends Page
         $u = Auth::user();
 
         return $u instanceof User && $u->is_active && $u->isApprover();
+    }
+
+    public function toggleRole(string $key): void
+    {
+        $user = Auth::user();
+        $switches = new RoleSwitches();
+        try {
+            abort_unless($user instanceof User, 403);
+            $switches->set($key, ! $switches->isEnabled($key), $user);
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()->title($e->getMessage())->danger()->send();
+
+            return;
+        }
+        Notification::make()->title($switches->isEnabled($key) ? 'Đã bật vai trò' : 'Đã tắt vai trò')->success()->send();
     }
 
     public function detailAction(): Action
@@ -75,7 +92,12 @@ class AgentRoles extends Page
     protected function getViewData(): array
     {
         $reg = new RoleRegistry();
+        $off = (new RoleSwitches($reg))->disabled();
+        $user = Auth::user();
 
-        return ['cards' => array_map(fn (array $r) => $r + ['skill_counts' => $reg->skillCounts($r)], $reg->all()), 'skillsUrl' => self::skillsTabUrl()];
+        return [
+            'cards' => array_map(fn (array $r) => $r + ['skill_counts' => $reg->skillCounts($r), 'switchable' => $reg->isSwitchable($r['key']), 'is_off' => in_array($r['key'], $off, true)], $reg->all()),
+            'skillsUrl' => self::skillsTabUrl(), 'canSwitch' => $user instanceof User && $user->isAdmin(),
+        ];
     }
 }
