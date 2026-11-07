@@ -53,6 +53,20 @@ class AdminPanelProvider extends PanelProvider
                 fn (): string => '<link rel="stylesheet" href="' . e(asset('css/seo-studio.css')) . '">'
                     . '<script src="' . e(asset('js/studio-ui.js')) . '"></script>',
             )
+            ->renderHook(
+                PanelsRenderHook::CONTENT_START,
+                function (): string {
+                    $user = \Illuminate\Support\Facades\Auth::user();
+                    if (! $user || ! $user->is_active) {
+                        return '';
+                    }
+
+                    return view('filament.hooks.stop-banner', [
+                        'stop' => \App\Filament\Support\Stop\StopBanner::data(),
+                        'canOpenSchedule' => $user->isApprover(),
+                    ])->render();
+                },
+            )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
