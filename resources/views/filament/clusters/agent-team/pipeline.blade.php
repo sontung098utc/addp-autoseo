@@ -1,8 +1,6 @@
 <x-filament-panels::page>
     <div data-testid="pipeline" class="space-y-3">
-        <p class="text-sm" style="opacity:.75">
-            Trạng thái mỗi giai đoạn được tính từ sổ tính năng và các phiên chạy thật, không tô tay. Giai đoạn chưa chạy trong phiên của đội AI không bao giờ hiện "Đang hoạt động".
-        </p>
+        <div class="text-sm" style="opacity:.85">9 giai đoạn <x-studio.hint text="Trạng thái mỗi giai đoạn được tính từ sổ tính năng và các phiên chạy thật, không tô tay. Giai đoạn chưa chạy trong phiên của đội AI không bao giờ hiện 'Đang hoạt động'." /></div>
         <div class="space-y-2">
             @foreach ($stages as $s)
                 <div data-stage="{{ $s['id'] }}" style="display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;border:1px solid rgba(128,128,128,.35);border-radius:.6rem;padding:.6rem .8rem">
@@ -25,13 +23,13 @@
                 </div>
             @endforeach
         </div>
-        <p class="text-xs" style="opacity:.7" data-testid="pipeline-controls">
+        <div class="text-xs" data-testid="pipeline-controls">
             @if ($controls)
                 {{-- Nút điều khiển chỉ được thêm ở đây khi job nền và API pipeline có thật. --}}
             @else
-                <strong>Chạy lại / Tạm dừng pipeline: chưa nối.</strong> Cần job nền và API pipeline (AG-B10). Chưa có nút giả.
+                <span style="opacity:.8">Chạy lại / Tạm dừng: chưa có</span> <x-studio.hint tone="warning" text="Chạy lại / Tạm dừng pipeline: chưa nối. Cần job nền và API pipeline (AG-B10). Chưa có nút giả." />
             @endif
-        </p>
+        </div>
     </div>
     <x-filament-actions::modals />
 </x-filament-panels::page>

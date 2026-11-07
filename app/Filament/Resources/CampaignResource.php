@@ -83,13 +83,13 @@ class CampaignResource extends Resource
                 Forms\Components\TextInput::make('name')->label('Tên chiến dịch')->required()->maxLength(120),
                 Forms\Components\Select::make('website_id')->label('Website')->relationship('website', 'name')->required(),
                 Forms\Components\TagsInput::make('keywords')->label('Từ khóa cần viết')->required()
-                    ->helperText('Mỗi từ khóa một bài. Hệ thống giao lần lượt, bỏ qua từ khóa website đã có bài.'),
+                    ->hintIcon('heroicon-o-information-circle', 'Mỗi từ khóa một bài, giao lần lượt; từ khóa website đã có bài sẽ bị bỏ qua.'),
                 Forms\Components\TextInput::make('daily_limit')->label('Tối đa bài mỗi ngày')->numeric()->minValue(1)->maxValue(50)->default(3)->required()
-                    ->helperText('Rào chắn nội dung hàng loạt: quá giới hạn thì hệ thống dừng giao việc tới ngày mai (giờ Việt Nam).'),
+                    ->hintIcon('heroicon-o-information-circle', 'Chống sản xuất hàng loạt: quá giới hạn thì dừng giao bài tới ngày mai (giờ Việt Nam).'),
                 Forms\Components\Select::make('status')->label('Trạng thái')->options(['paused' => 'Tạm dừng', 'active' => 'Đang chạy'])->default('paused')->required()
-                    ->helperText('Đang chạy: hệ thống tự giao việc theo lịch. Kết quả luôn là bản nháp chờ người duyệt.'),
+                    ->hintIcon('heroicon-o-information-circle', 'Đang chạy: hệ thống tự giao bài theo lịch. Kết quả luôn là bản nháp chờ người duyệt, chưa có gì tự đăng.'),
             ])->columns(2),
-            Forms\Components\Section::make('Chế độ')->description('Chọn một chế độ là đủ. AI tự chạy; kết quả luôn là bản nháp, chưa có gì tự đăng.')->schema([
+            Forms\Components\Section::make('Chế độ')->schema([
                 Forms\Components\Radio::make('mode')->hiddenLabel()->default('balanced')->required()
                     ->options([
                         'cautious' => 'Thận trọng · ít tự động nhất',
@@ -102,12 +102,13 @@ class CampaignResource extends Resource
                         'autonomous' => 'AI tự đăng chủ đề an toàn, kiểm mẫu sau đăng, tự gỡ khi lỗi. Cần: văn bản chính sách của bạn + connector hỗ trợ gỡ bài.',
                     ])
                     ->disableOptionWhen(fn (string $value) => $value === 'autonomous')
-                    ->in(['cautious', 'balanced'])
-                    ->helperText('Tự chủ đang khóa: cần văn bản chính sách của bạn + connector hỗ trợ gỡ bài.'),
-                Forms\Components\Select::make('source')->label('Nguồn bài cần viết')->options(['plan' => 'Ưu tiên bài đã lên kế hoạch, hết thì dùng từ khóa nhập tay', 'keywords' => 'Chỉ dùng danh sách từ khóa nhập tay'])->default('plan')->required(),
+                    ->in(['cautious', 'balanced']),
+                Forms\Components\Select::make('source')->label('Nguồn từ khóa')->options(['plan' => 'Kế hoạch nội dung (hết thì dùng danh sách nhập tay)', 'keywords' => 'Danh sách nhập tay'])->default('plan')->required()
+                    ->hintIcon('heroicon-o-information-circle', 'Kế hoạch nội dung: lấy bài đã lên kế hoạch trước. Danh sách nhập tay: chỉ dùng các từ khóa bạn nhập ở trên.'),
                 Forms\Components\TextInput::make('daily_cost_cap_vnd')->label('Trần chi phí AI mỗi ngày (đ)')->numeric()->minValue(0)->maxValue(100000000)->default(150000)->required()
-                    ->helperText('Chạm trần thì chiến dịch dừng giao việc tới ngày mai (giờ Việt Nam).'),
-                Forms\Components\TextInput::make('daily_draft_cap')->label('Trần bài đẩy nháp mỗi ngày')->numeric()->minValue(1)->maxValue(50)->default(5)->required(),
+                    ->hintIcon('heroicon-o-information-circle', 'Chạm trần thì chiến dịch dừng giao bài tới ngày mai (giờ Việt Nam).'),
+                Forms\Components\TextInput::make('daily_draft_cap')->label('Trần bài đẩy nháp mỗi ngày')->numeric()->minValue(1)->maxValue(50)->default(5)->required()
+                    ->hintIcon('heroicon-o-information-circle', 'Số bản nháp tối đa được đẩy sang hàng chờ duyệt mỗi ngày.'),
             ])->columns(2),
         ]);
     }
@@ -115,11 +116,11 @@ class CampaignResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with('website'))
+            ->modifyQueryUsing(fn ($query) => $query->with('website')->withCount(['runs as runs_total', 'runs as runs_review' => fn ($q) => $q->where('status', 'ready_for_review'), 'runs as runs_held' => fn ($q) => $q->where('status', 'held')]))
             ->defaultSort('id', 'desc')
             ->poll(fn () => RunActivity::anyRunning() ? '3s' : '20s')
             ->columns([
-                Tables\Columns\TextColumn::make('name')->label('Chiến dịch')->searchable()->wrap()->description(fn (Campaign $r) => $r->website?->name)
+                Tables\Columns\TextColumn::make('name')->label('Chiến dịch')->searchable()->wrap()->description(fn (Campaign $r) => $r->website?->name.' · Đã giao '.(int) $r->runs_total.' bài · '.(int) $r->runs_review.' chờ duyệt · '.(int) $r->runs_held.' giữ nháp')
                     ->extraHeaderAttributes(['style' => 'min-width:20rem'])->extraCellAttributes(['style' => 'min-width:20rem']),
                 Tables\Columns\TextColumn::make('status')->label('Trạng thái')->badge()
                     ->formatStateUsing(fn (string $state) => $state === 'active' ? 'Đang chạy' : 'Tạm dừng')
@@ -137,9 +138,10 @@ class CampaignResource extends Resource
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
             ])
             ->actions([
+                Tables\Actions\EditAction::make()->label('Sửa'),
                 Tables\Actions\Action::make('tick')->label('Chạy một nhịp ngay')->icon('heroicon-o-play')
                     ->visible(fn (Campaign $r) => $r->status === 'active' && static::allowed())
-                    ->requiresConfirmation()->modalDescription('Giao từ khóa kế tiếp cho đội AI ngay bây giờ, vẫn trong giới hạn bài/ngày. Kết quả là bản nháp chờ duyệt.')
+                    ->requiresConfirmation()->modalDescription('Chọn bài kế tiếp và tạo một phiên chạy cho bài đó ngay bây giờ, vẫn trong giới hạn bài/ngày. Kết quả là bản nháp chờ duyệt.')
                     ->action(function (Campaign $r) {
                         abort_unless(static::allowed(), 403);
                         $res = (new CampaignRunner(static::providerFactory()))->tick($r);
@@ -147,7 +149,6 @@ class CampaignResource extends Resource
                         $res['result'] === 'ran' ? $n->success() : $n->warning();
                         $n->send();
                     }),
-                Tables\Actions\EditAction::make()->label('Sửa'),
             ]);
     }
 

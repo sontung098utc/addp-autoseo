@@ -5,7 +5,10 @@ namespace App\Filament\Resources\CampaignResource\Pages;
 use App\Filament\Resources\CampaignResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\HtmlString;
 
 class ListCampaigns extends ListRecords
 {
@@ -13,9 +16,11 @@ class ListCampaigns extends ListRecords
 
     protected static ?string $title = 'Chiến dịch của đội AI';
 
-    public function getSubheading(): ?string
+    public const CONCEPT = 'Chiến dịch = mục tiêu sản xuất: website nào, lấy từ khóa từ đâu, chế độ, hạn mức mỗi ngày. Mỗi nhịp hệ thống chọn bài kế tiếp và tạo MỘT phiên chạy cho bài đó. Chiến dịch không phải chuỗi phiên. Kết quả luôn là bản nháp chờ duyệt, chưa có gì tự đăng.';
+
+    public function getHeading(): string|Htmlable
     {
-        return 'Đặt từ khóa và giới hạn bài mỗi ngày; hệ thống tự giao từng bài cho đội AI. Kết quả luôn là bản nháp chờ người duyệt, chưa có gì tự đăng.';
+        return new HtmlString(e(static::$title).' '.Blade::render('<x-studio.hint :text="$t" />', ['t' => self::CONCEPT]));
     }
 
     protected function getHeaderActions(): array

@@ -1,6 +1,6 @@
 <div class="grid gap-4 mt-6 md:grid-cols-2">
     <div>
-        <h2 class="text-base font-semibold mb-2">Đang chờ bạn bổ sung (không chặn việc khác)</h2>
+        <h2 class="text-base font-semibold mb-2">Đang chờ bạn bổ sung <x-studio.hint text="Không chặn các việc khác; hết hạn thì hệ thống tự bỏ qua." /></h2>
         <x-filament::section>
             @forelse ($waits as $w)
                 <div class="flex items-start justify-between gap-3 py-2">
@@ -19,14 +19,13 @@
         </x-filament::section>
     </div>
     <div>
-        <h2 class="text-base font-semibold mb-2">Hạn mức hôm nay</h2>
+        <h2 class="text-base font-semibold mb-2">Hạn mức hôm nay <x-studio.hint text="Cộng các chiến dịch đang chạy. Giới hạn bài/ngày chống đăng hàng loạt. 'Bài đẩy nháp' đếm bài đạt luật và vào hàng chờ duyệt; việc đẩy lên CMS chưa nối (AG-S04)." /></h2>
         <x-filament::section>
             @php($b = $budget)
             <div class="flex justify-between text-sm"><span>Chi phí AI</span><b>{{ number_format($b['cost'], 0, ',', '.') }} đ / {{ number_format($b['cost_cap'], 0, ',', '.') }} đ</b></div>
             <div class="h-1.5 rounded bg-gray-200 my-2"><div class="h-1.5 rounded bg-primary-600" style="width: {{ $b['cost_pct'] }}%"></div></div>
             <div class="flex justify-between text-sm"><span>Bài đẩy nháp</span><b>{{ $b['drafts'] }} / {{ $b['draft_cap'] }}</b></div>
             <div class="h-1.5 rounded bg-gray-200 my-2"><div class="h-1.5 rounded bg-primary-600" style="width: {{ $b['draft_pct'] }}%"></div></div>
-            <div class="text-xs text-gray-500 mt-2">Cộng các chiến dịch đang chạy. Giới hạn bài/ngày giúp tránh đăng hàng loạt. "Bài đẩy nháp" đang đếm bài đạt luật và vào hàng chờ duyệt; việc đẩy lên CMS chưa nối (AG-S04).</div>
         </x-filament::section>
     </div>
 </div>
