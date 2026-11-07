@@ -4,6 +4,9 @@
     $roles = ['system' => 'Hệ thống', 'strategist' => 'Chiến lược', 'writer' => 'Người viết', 'editor' => 'Biên tập'];
     [$sLabel, $sColor] = $statusMap[$run->status] ?? [$run->status, 'gray'];
     $byStage = $run->steps->groupBy('stage');
+    $timeline = \App\Services\Agent\Run\RunScorer::timeline($run->steps);
+    $decisions = $run->steps->where('stage', 'decision');
+    $retries = $run->steps->where('stage', 'retry');
 @endphp
 <x-filament-panels::page>
     <div class="space-y-4" data-testid="agent-run">
@@ -26,7 +29,7 @@
         </x-filament::section>
 
         <x-filament::section heading="Luồng đã đi qua" description="Mỗi ô là một chặng; màu cho biết chặng đó thực tế đã diễn ra thế nào trong phiên này.">
-            <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.4rem" data-testid="stage-rail">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(8rem,1fr));gap:.4rem" data-testid="stage-rail">
                 @foreach ($blueprint as $code => $b)
                     @php $ran = $byStage->get($code); $worst = $ran?->contains('status', 'failed') ? 'failed' : ($ran?->contains('status', 'blocked') ? 'blocked' : ($ran?->contains('status', 'warn') ? 'warn' : ($ran ? 'ok' : 'skipped'))); @endphp
                     <div style="border:1px solid rgba(128,128,128,.3);border-radius:.5rem;padding:.5rem;{{ $ran ? '' : 'opacity:.5' }}">
@@ -38,6 +41,24 @@
             </div>
         </x-filament::section>
 
+        @if ($timeline !== [])
+            <x-filament::section heading="Điểm chất lượng qua các vòng" description="Điểm 0-100 suy ra từ kết quả chấm của luật (công thức: 100 trừ 20 mỗi lỗi P0, 5 mỗi P1, 2 mỗi P2). Chỉ để theo dõi cải thiện: đạt hay không do luật P0 quyết định, không do điểm.">
+                <div data-testid="score-timeline" style="font-size:1rem;font-weight:600">{{ \App\Services\Agent\Run\RunScorer::format($timeline) }}</div>
+                <div class="text-xs" style="opacity:.7">Mốc tham khảo {{ \App\Services\Agent\Run\RunScorer::REFERENCE_THRESHOLD }}/100.@if ($retries->isNotEmpty()) Đã tự thử lại {{ $retries->count() }} lần khi nhà cung cấp AI lỗi tạm thời.@endif</div>
+            </x-filament::section>
+        @endif
+
+        <x-filament::section heading="Quyết định tự động" description="Những lần hệ thống tự quyết định thay vì chờ người, kèm dữ kiện." data-testid="auto-decisions">
+            @forelse ($decisions as $d)
+                <div style="padding:.5rem 0;border-bottom:1px solid rgba(128,128,128,.18)">
+                    <div style="font-weight:600;font-size:.88rem">{{ $d->title }}</div>
+                    <div style="font-size:.82rem;opacity:.85">{{ $d->detail }}</div>
+                </div>
+            @empty
+                <p class="text-sm" style="opacity:.75">Phiên này hệ thống không phải tự quyết định điều gì đặc biệt.</p>
+            @endforelse
+        </x-filament::section>
+
         <x-filament::section heading="Nhật ký từng bước" description="Mỗi bước ghi rõ lý do hệ thống làm như vậy.">
             @foreach ($run->steps as $s)
                 <div style="display:grid;grid-template-columns:2rem 1fr auto;gap:.75rem;padding:.6rem 0;border-bottom:1px solid rgba(128,128,128,.18)" data-step="{{ $s->stage }}">
@@ -45,6 +66,7 @@
                     <div>
                         <div style="font-weight:600;font-size:.88rem">{{ $s->title }} <span style="font-weight:400;opacity:.6;font-size:.75rem">· {{ $roles[$s->role] ?? $s->role }}@if($s->model) · {{ $s->model }}@endif</span></div>
                         <div style="font-size:.82rem;opacity:.85">{{ $s->detail }}</div>
+                        @if (isset($s->data['score']))<div style="font-size:.75rem;opacity:.8">Điểm {{ $s->data['score'] }}/100</div>@endif
                         @if (! empty($s->data['failed']))
                             <ul style="font-size:.75rem;margin:.3rem 0 0 1rem;list-style:disc;opacity:.8">
                                 @foreach ($s->data['failed'] as $f)<li><strong>{{ $f['code'] }}</strong> ({{ $f['severity'] }}): {{ $f['message'] }}</li>@endforeach
