@@ -53,3 +53,8 @@ docker-compose exec app php artisan migrate --seed
 * [GITHUB_WORKFLOW.md](GITHUB_WORKFLOW.md): Quy ước phân nhánh Git, mở PR và kiểm duyệt chéo.
 * [DAILY_REPORT_TEMPLATE.md](reports/DAILY_REPORT_TEMPLATE.md): Biểu mẫu báo cáo phiên và giờ công.
 * [Contracts](contracts/): Đặc tả JSON Schema cho dữ liệu hệ thống (`WebsiteConnection`, `ContentBrief`, `ArticleVersion`, `Publication`).
+* [Kiến trúc Auto-SEO Agent Platform](docs/seo-agent/AUTO_SEO_AGENT_ARCHITECTURE.md): Baseline hiện có, phạm vi theo kế hoạch gốc và các cải thiện đề xuất để phát triển thành hệ thống AI SEO/Marketing có điều phối Agent.
+* [Kế hoạch trải nghiệm người dùng](docs/seo-agent/USER_EXPERIENCE_ROADMAP.md): Lộ trình giao diện theo hành trình Marketing, trạng thái tính năng và kiến trúc workflow n8n.
+* [Phương án áp dụng M09 (Giai đoạn 0–4)](docs/seo-agent/APPLY_PLAN_V1.md): Rà soát hiện trạng, tồn đọng, cổng chất lượng và danh mục task áp dụng định hướng tự động hóa AI.
+* [Phân tích thiết kế](docs/seo-agent/AI_AUTOMATION_DESIGN_ANALYSIS.md) và [Kế hoạch chia việc](docs/seo-agent/AI_AUTOMATION_EXECUTION_PLAN.md): Học từ claude-seo, đội AI SEO tự động, thang tin cậy.
+* [Kịch bản thử nghiệm khả dụng](docs/seo-agent/USABILITY_TEST_SCRIPT.md): Thử mẫu giao diện với người dùng thật trước khi xây.
