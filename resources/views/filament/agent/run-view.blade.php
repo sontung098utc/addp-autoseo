@@ -34,6 +34,7 @@
                 {{ $run->repair_rounds }} vòng sửa · {{ number_format($run->tokens_used, 0, ',', '.') }} token · {{ number_format($run->cost_vnd, 0, ',', '.') }} ₫
                 @if ($run->finalVersion) · Bản nháp v{{ $run->finalVersion->version }}: <a class="underline" href="{{ \App\Filament\Resources\ArticleVersionResource::getUrl('view', ['record' => $run->finalVersion]) }}">xem bài</a>@endif
             </div>
+            @include('filament.agent.cms-draft-line', ['version' => $run->finalVersion])
             @if ($run->ai_mode !== 'real')
                 <div class="mt-2 text-xs" style="color:#b45309">Phiên này dùng AI giả lập nên nội dung chỉ để kiểm luồng, không phản ánh chất lượng AI thật.</div>
             @endif

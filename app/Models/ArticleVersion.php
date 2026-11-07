@@ -32,6 +32,10 @@ class ArticleVersion extends Model
         'reviewed_by',
         'reviewed_at',
         'review_notes',
+        'cms_draft_id',
+        'cms_draft_url',
+        'cms_draft_pushed_at',
+        'cms_draft_status',
     ];
 
     protected function casts(): array
@@ -43,6 +47,7 @@ class ArticleVersion extends Model
             'tokens_used' => 'integer',
             'cost_vnd' => 'decimal:2',
             'reviewed_at' => 'datetime',
+            'cms_draft_pushed_at' => 'datetime',
         ];
     }
 

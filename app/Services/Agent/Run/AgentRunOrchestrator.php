@@ -8,6 +8,7 @@ use App\Models\AgentRunStep;
 use App\Models\Article;
 use App\Models\ArticleVersion;
 use App\Models\User;
+use App\Services\Agent\Handoff\CmsDraftHandoff;
 use App\Services\Agent\Risk\RiskClassifier;
 use App\Services\Ai\MockAiProvider;
 use App\Services\Ai\Playbook\InvalidPlaybook;
@@ -41,6 +42,8 @@ final class AgentRunOrchestrator
         private ?PlaybookLoader $playbooks = null,
         /** Bộ ngủ tiêm được để test không chờ thật; nhận số giây. */
         private ?\Closure $sleep = null,
+        /** AG-S04: điểm nối bàn giao nháp lên CMS. Mặc định null = tắt (chỉ CampaignRunner bật). */
+        private ?CmsDraftHandoff $handoff = null,
     ) {
         $this->sleep ??= fn (int $seconds) => sleep($seconds);
         $this->stop ??= app(EmergencyStopService::class);
@@ -155,9 +158,19 @@ final class AgentRunOrchestrator
         }
         if ($passed) {
             $article->update(['workflow_status' => 'needs_review']);
-            $this->step($run, 'handoff', 'system', 'ok', 'Chuyển người duyệt', 'Đạt mọi luật bắt buộc. Bản nháp v'.$version->version.' đã vào hàng chờ duyệt; chưa xuất bản vì bậc tin cậy '.$this->policy->trustTier.'.', ['version' => $version->version]);
+            $push = $this->handoff?->push($run, $version, $site, true, $assess->level);
+            $pushed = $push?->status === 'pushed';
+            $pushFailed = $push?->status === 'failed';
+            $extra = $pushed ? " Đã đẩy nháp lên {$push->cms}".($push->url ? ": link xem trước {$push->url}" : '').' (không công khai).' : ($push?->note ? ' '.$push->note : '');
+            $this->step($run, 'handoff', 'system', $pushFailed ? 'warn' : 'ok', 'Chuyển người duyệt', 'Đạt mọi luật bắt buộc. Bản nháp v'.$version->version.' đã vào hàng chờ duyệt; chưa xuất bản vì bậc tin cậy '.$this->policy->trustTier.'.'.$extra,
+                ['version' => $version->version] + ($push && $push->status !== 'skipped' ? ['cms_draft' => ['status' => $push->status, 'cms' => $push->cms, 'url' => $push->url, 'remote_id' => $push->remoteId]] : []));
 
-            return $this->finish($run, 'ready_for_review', $assess->level === 'high' ? 'Đạt luật nhưng chủ đề rủi ro cao: cần người có chuyên môn duyệt.' : null);
+            $reasonOut = $assess->level === 'high' ? 'Đạt luật nhưng chủ đề rủi ro cao: cần người có chuyên môn duyệt.' : null;
+            if ($pushFailed) {
+                $reasonOut = trim(($reasonOut ?? '').' '.$push->note);
+            }
+
+            return $this->finish($run, 'ready_for_review', $reasonOut);
         }
 
         $article->update(['workflow_status' => 'drafting']);

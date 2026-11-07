@@ -110,6 +110,15 @@ class PublishArticleJob implements ShouldQueue
                 'last_error' => null,
             ]);
 
+            // AG-S04: bài được đăng bằng cách nâng chính bản nháp => đánh dấu nháp đã đăng (lỗi ghi phụ không làm hỏng lượt đăng).
+            if (! empty($result['promoted_draft_id'])) {
+                try {
+                    $publication->articleVersion?->forceFill(['cms_draft_status' => 'promoted'])->save();
+                } catch (Throwable $e) {
+                    Log::warning("[PublishArticleJob] Không đánh dấu nháp đã đăng cho Publication #{$publication->id}: {$e->getMessage()}");
+                }
+            }
+
             Log::info("[PublishArticleJob] Xuất bản thành công Publication #{$publication->id} lên {$website->cms_type} (Remote ID: " . ($result['remote_id'] ?? 'N/A') . ").");
         } catch (ConnectionException $e) {
             // Lỗi mạng hoặc timeout từ CMS sau khi gửi bài -> Căn cứ Quy tắc 4 AGENTS.md:
