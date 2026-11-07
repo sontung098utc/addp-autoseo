@@ -21,6 +21,8 @@ class AgentTeam extends Cluster
 
     protected static ?string $slug = 'doi-ai';
 
+    protected static ?string $clusterBreadcrumb = 'Đội AI';
+
     protected static SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
     public static function canAccess(): bool

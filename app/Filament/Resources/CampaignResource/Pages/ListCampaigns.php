@@ -10,7 +10,7 @@ class ListCampaigns extends ListRecords
 {
     protected static string $resource = CampaignResource::class;
 
-    protected static ?string $title = 'Chiến dịch tự động';
+    protected static ?string $title = 'Chiến dịch của đội AI';
 
     public function getSubheading(): ?string
     {
