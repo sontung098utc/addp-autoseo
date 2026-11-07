@@ -7,8 +7,6 @@ use App\Filament\Support\Schedule\VnTime;
 use App\Models\AgentRun;
 use App\Models\Campaign;
 use App\Services\Agent\Run\CampaignRunner;
-use App\Services\Ai\DemoScriptedAiProvider;
-use App\Services\Ai\GeminiAiProvider;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -25,15 +23,19 @@ class CampaignResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-rocket-launch';
 
-    protected static ?string $navigationLabel = 'Chiến dịch tự động';
+    protected static ?string $navigationLabel = 'Chiến dịch';
+
+    protected static ?string $cluster = \App\Filament\Clusters\AgentTeam::class;
+
+    protected static ?string $slug = 'chien-dich';
+
+    protected static \Filament\Pages\SubNavigationPosition $subNavigationPosition = \Filament\Pages\SubNavigationPosition::Top;
 
     protected static ?string $modelLabel = 'Chiến dịch';
 
     protected static ?string $pluralModelLabel = 'Chiến dịch tự động';
 
-    protected static ?string $navigationGroup = 'Chiến dịch';
-
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 2;
 
     protected static function allowed(): bool
     {
@@ -70,14 +72,7 @@ class CampaignResource extends Resource
     /** Bộ cấp AI cho lượt chạy từ giao diện: AI thật nếu có khóa; chỉ môi trường local mới được dùng bản giả lập kịch bản. */
     public static function providerFactory(): \Closure
     {
-        return function () {
-            $key = env('GOOGLE_AI_API_KEY');
-            if (! empty($key)) {
-                return new GeminiAiProvider($key);
-            }
-
-            return app()->environment('local') ? new DemoScriptedAiProvider() : null;
-        };
+        return fn () => \App\Services\Agent\Settings\AgentAi::forInteractiveUse();
     }
 
     public static function form(Form $form): Form

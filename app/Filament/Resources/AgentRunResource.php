@@ -26,15 +26,19 @@ class AgentRunResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-cpu-chip';
 
-    protected static ?string $navigationLabel = 'Phiên chạy của đội AI';
+    protected static ?string $navigationLabel = 'Phiên chạy';
+
+    protected static ?string $cluster = \App\Filament\Clusters\AgentTeam::class;
+
+    protected static ?string $slug = 'phien-chay';
+
+    protected static \Filament\Pages\SubNavigationPosition $subNavigationPosition = \Filament\Pages\SubNavigationPosition::Top;
 
     protected static ?string $modelLabel = 'Phiên chạy';
 
     protected static ?string $pluralModelLabel = 'Phiên chạy của đội AI';
 
-    protected static ?string $navigationGroup = 'Chiến dịch';
-
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 3;
 
     public static function canViewAny(): bool
     {

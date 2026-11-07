@@ -60,7 +60,7 @@ final class CampaignRunner
 
         $article = Article::create(['website_id' => $c->website_id, 'created_by' => $c->created_by, 'primary_keyword' => $keyword, 'workflow_status' => 'planned']);
         try {
-            $run = (new AgentRunOrchestrator($ai, stop: $this->stop))->run($article, null, 'schedule', $c->id);
+            $run = (new AgentRunOrchestrator($ai, stop: $this->stop, policy: \App\Services\Agent\Settings\AgentAi::policy()))->run($article, null, 'schedule', $c->id);
         } catch (\Throwable $e) {
             // Không để lại bài mồ côi làm mất lượt của từ khóa này ở nhịp sau.
             if (! AgentRun::query()->where('article_id', $article->id)->exists()) {

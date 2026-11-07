@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\Campaign;
 use App\Services\Agent\Run\CampaignRunner;
 use App\Services\Ai\DemoScriptedAiProvider;
-use App\Services\Ai\GeminiAiProvider;
 use Illuminate\Console\Command;
 
 /** AG-S01: một nhịp cho mọi chiến dịch đang chạy. Điểm vào tạm theo lịch; Dev1 thay bằng job hàng đợi (AG-B10). */
@@ -22,9 +21,7 @@ class AgentTickCommand extends Command
             if ($demo) {
                 return new DemoScriptedAiProvider();
             }
-            $key = env('GOOGLE_AI_API_KEY');
-
-            return ! empty($key) ? new GeminiAiProvider($key) : null;
+            return \App\Services\Agent\Settings\AgentAi::real();
         });
 
         $q = Campaign::query()->with('website')->where('status', 'active');

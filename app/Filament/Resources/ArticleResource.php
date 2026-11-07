@@ -175,9 +175,13 @@ class ArticleResource extends Resource
                     ->modalSubmitActionLabel('Giao việc')
                     ->action(function (Article $record) {
                         abort_unless(\Illuminate\Support\Facades\Auth::user()?->isApprover(), 403);
-                        $key = env('GOOGLE_AI_API_KEY');
-                        $ai = ! empty($key) ? new \App\Services\Ai\GeminiAiProvider($key) : new \App\Services\Ai\MockAiProvider();
-                        $run = (new \App\Services\Agent\Run\AgentRunOrchestrator($ai))->run($record, \Illuminate\Support\Facades\Auth::user());
+                        $ai = \App\Services\Agent\Settings\AgentAi::forInteractiveUse();
+                        if ($ai === null) {
+                            \Filament\Notifications\Notification::make()->title('Chưa kết nối AI')->body('Vào Đội AI → Kết nối AI để nhập khóa trước khi giao việc.')->warning()->send();
+
+                            return;
+                        }
+                        $run = (new \App\Services\Agent\Run\AgentRunOrchestrator($ai, policy: \App\Services\Agent\Settings\AgentAi::policy()))->run($record, \Illuminate\Support\Facades\Auth::user());
                         $n = \Filament\Notifications\Notification::make()->title('Phiên chạy #'.$run->id.': '.(\App\Filament\Resources\AgentRunResource::STATUS[$run->status][0] ?? $run->status))
                             ->body($run->outcome_reason ?: 'Đã có bản nháp chờ duyệt.')
                             ->actions([\Filament\Notifications\Actions\Action::make('xem')->label('Xem diễn biến')->url(\App\Filament\Resources\AgentRunResource::getUrl('view', ['record' => $run]))]);

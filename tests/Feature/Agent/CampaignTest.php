@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Agent;
 
-use App\Filament\Pages\AgentFlowMapPage;
 use App\Filament\Resources\CampaignResource;
 use App\Filament\Resources\CampaignResource\Pages\ListCampaigns;
 use App\Models\AgentRun;
@@ -148,14 +147,14 @@ class CampaignTest extends TestCase
 
         $this->actingAs($this->user('writer'));
         $this->get(CampaignResource::getUrl('index'))->assertForbidden();
-        $this->get('/admin/luong-doi-ai')->assertForbidden();
+        $this->get('/admin/doi-ai/tong-quan')->assertForbidden();
     }
 
     public function test_nguoi_duyet_thay_danh_sach_chien_dich(): void
     {
         $c = $this->campaign();
         $this->actingAs($this->user('approver'));
-        $this->get(CampaignResource::getUrl('index'))->assertOk()->assertSee('Chiến dịch tự động')->assertSee('0 / 2');
+        $this->get(CampaignResource::getUrl('index'))->assertOk()->assertSee('Chiến dịch')->assertSee('0 / 2');
     }
 
     public function test_nut_chay_mot_nhip_giao_viec_va_cap_nhat_dem_trong_ngay(): void
@@ -181,8 +180,8 @@ class CampaignTest extends TestCase
         $this->runner()->tick($this->campaign());
         $this->actingAs($this->user('approver'));
 
-        $this->get('/admin/luong-doi-ai')->assertOk()
-            ->assertSee('Bản đồ luồng đội AI')->assertSee('Chiến dịch')->assertSee('Người duyệt')->assertSee('Dev1 cần (AG-B06)')
+        $this->get('/admin/doi-ai/tong-quan')->assertOk()
+            ->assertSee('Cách dùng: 4 bước')->assertSee('Đường đi của một bài')->assertSee('Dev1 cần (AG-B06)')
             ->assertSee('1 phiên chạy thật');
     }
 
@@ -190,6 +189,6 @@ class CampaignTest extends TestCase
     {
         $this->actingAs($this->user('admin'));
 
-        $this->get('/admin/luong-doi-ai')->assertOk()->assertSee('Chưa có phiên chạy nào')->assertSee('chưa có số liệu');
+        $this->get('/admin/doi-ai/tong-quan')->assertOk()->assertSee('0 phiên chạy thật')->assertSee('chưa có số liệu');
     }
 }

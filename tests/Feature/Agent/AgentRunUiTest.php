@@ -50,7 +50,7 @@ class AgentRunUiTest extends TestCase
         $run = $this->realRun();
         $this->actingAs($this->user('approver'));
 
-        $this->get(AgentRunResource::getUrl('index'))->assertOk()->assertSee('Phiên chạy của đội AI')->assertSee('tối ưu seo cho website')->assertSee('AI giả lập');
+        $this->get(AgentRunResource::getUrl('index'))->assertOk()->assertSee('Phiên chạy')->assertSee('tối ưu seo cho website')->assertSee('AI giả lập');
         $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()
             ->assertSee('Luồng đã đi qua')->assertSee('Nhật ký từng bước')->assertSee('Dev1 cần')
             ->assertSee('AI giả lập')->assertSee('chỉ tạo bản nháp');
@@ -80,8 +80,12 @@ class AgentRunUiTest extends TestCase
         $a = $this->article();
         $this->actingAs($this->user('approver'));
 
+        // Không có khóa AI thật và không ở local: nút KHÔNG chạy, chỉ báo "chưa kết nối AI".
         Livewire::test(ListArticles::class)->callTableAction('run_agent', $a)->assertHasNoTableActionErrors();
+        $this->assertSame(0, AgentRun::count());
 
+        $this->app->detectEnvironment(fn () => 'local');
+        Livewire::test(ListArticles::class)->callTableAction('run_agent', $a)->assertHasNoTableActionErrors();
         $this->assertSame(1, AgentRun::count());
         $this->assertSame(0, \App\Models\Publication::count());
     }

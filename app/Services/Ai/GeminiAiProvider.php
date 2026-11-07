@@ -111,6 +111,23 @@ class GeminiAiProvider implements AiProviderInterface
         ];
     }
 
+    /** Kiểm tra kết nối bằng một lời gọi rất nhỏ. Không bao giờ ném lỗi và không để lộ khóa trong thông báo. */
+    public function ping(): array
+    {
+        if (empty($this->apiKey)) {
+            return ['ok' => false, 'message' => 'Chưa có khóa API.'];
+        }
+        try {
+            $this->callGeminiApi('Chỉ trả lời đúng JSON {"ok":true}.', 'ping');
+
+            return ['ok' => true, 'message' => "Kết nối được model {$this->model}."];
+        } catch (\Throwable $e) {
+            $msg = \App\Filament\Support\Schedule\ErrorMasker::mask($e->getMessage());
+
+            return ['ok' => false, 'message' => mb_substr($msg !== '' ? $msg : class_basename($e), 0, 200)];
+        }
+    }
+
     /** Playbook là file của chính hệ thống (đã qua bộ nạp kiểm định), được thêm vào chỉ dẫn hệ thống. */
     protected function playbookBlock(array $options): string
     {

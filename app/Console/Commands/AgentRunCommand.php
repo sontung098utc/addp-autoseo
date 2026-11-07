@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\Article;
 use App\Services\Agent\Run\AgentRunOrchestrator;
 use App\Services\Ai\DemoScriptedAiProvider;
-use App\Services\Ai\GeminiAiProvider;
 use App\Services\Ai\MockAiProvider;
 use Illuminate\Console\Command;
 
@@ -24,9 +23,8 @@ class AgentRunCommand extends Command
 
             return self::FAILURE;
         }
-        $key = env('GOOGLE_AI_API_KEY');
-        $ai = $this->option('demo') ? new DemoScriptedAiProvider() : (! empty($key) ? new GeminiAiProvider($key) : new MockAiProvider());
-        $run = (new AgentRunOrchestrator($ai))->run($article, null, 'manual');
+        $ai = $this->option('demo') ? new DemoScriptedAiProvider() : (\App\Services\Agent\Settings\AgentAi::real() ?? new MockAiProvider());
+        $run = (new AgentRunOrchestrator($ai, policy: \App\Services\Agent\Settings\AgentAi::policy()))->run($article, null, 'manual');
         $this->info("Phiên #{$run->id}: {$run->status}".($run->outcome_reason ? " — {$run->outcome_reason}" : ''));
 
         return self::SUCCESS;
