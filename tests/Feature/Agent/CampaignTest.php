@@ -66,7 +66,7 @@ class CampaignTest extends TestCase
 
     public function test_bo_qua_tu_khoa_da_co_bai_va_het_tu_khoa_thi_dung(): void
     {
-        $c = $this->campaign(['keywords' => ['A b c', 'x y z']]);
+        $c = $this->campaign(['keywords' => ['A b c', 'x y z'], 'source' => 'keywords']);
         Article::create(['website_id' => $c->website_id, 'primary_keyword' => 'a B C', 'workflow_status' => 'planned']);
 
         $this->assertSame('x y z', $this->runner()->nextKeyword($c));
@@ -190,5 +190,131 @@ class CampaignTest extends TestCase
         $this->actingAs($this->user('admin'));
 
         $this->get('/admin/doi-ai/tong-quan')->assertOk()->assertSee('0 phiên chạy thật')->assertSee('chưa có số liệu');
+    }
+
+    // ---- AG-S02 ----
+
+    public function test_mac_dinh_can_bang_nguon_ke_hoach_han_muc(): void
+    {
+        $c = $this->campaign()->refresh();
+        $this->assertSame(['balanced', 150000, 5, 'plan'], [$c->mode, $c->daily_cost_cap_vnd, $c->daily_draft_cap, $c->source]);
+        $this->assertSame('balanced', $this->runner()->tick($c)['run']->refresh()->trust_mode);
+    }
+
+    public function test_nguon_plan_uu_tien_bai_planned_chua_co_phien(): void
+    {
+        $c = $this->campaign();
+        $planned = Article::create(['website_id' => $c->website_id, 'primary_keyword' => 'bài từ kế hoạch', 'workflow_status' => 'planned']);
+
+        $r = $this->runner()->tick($c);
+        $this->assertSame('ran', $r['result']);
+        $this->assertSame($planned->id, $r['run']->article_id);
+        $this->assertSame(1, Article::count());
+
+        $r2 = $this->runner()->tick($c); // hết bài planned -> dùng từ khóa nhập tay
+        $this->assertSame('dịch vụ thiết kế website', $r2['run']->article->primary_keyword);
+    }
+
+    public function test_nguon_keywords_bo_qua_bai_planned(): void
+    {
+        $c = $this->campaign(['source' => 'keywords', 'keywords' => ['từ khóa tay']]);
+        Article::create(['website_id' => $c->website_id, 'primary_keyword' => 'bài từ kế hoạch', 'workflow_status' => 'planned']);
+
+        $this->assertSame('từ khóa tay', $this->runner()->tick($c)['run']->article->primary_keyword);
+    }
+
+    public function test_tran_chi_phi_ngay_chan_va_ngay_sau_chay_lai(): void
+    {
+        $c = $this->campaign(['daily_cost_cap_vnd' => 1000]);
+        $now = CarbonImmutable::parse('2026-11-07 03:00:00', 'UTC');
+        $this->assertSame('ran', $this->runner()->tick($c, $now)['result']);
+        AgentRun::query()->update(['cost_vnd' => 1000, 'started_at' => $now]);
+
+        $r = $this->runner()->tick($c, $now->addHour());
+        $this->assertSame('cost_cap', $r['result']);
+        $this->assertStringContainsString('trần', $r['message']);
+        $this->assertSame(1, AgentRun::count());
+        $this->assertSame('ran', $this->runner()->tick($c, $now->addDay())['result']);
+    }
+
+    public function test_tran_bai_nhap_moi_ngay(): void
+    {
+        $c = $this->campaign(['daily_draft_cap' => 1, 'daily_limit' => 5]);
+        $now = CarbonImmutable::parse('2026-11-07 03:00:00', 'UTC');
+        $this->runner()->tick($c, $now);
+        AgentRun::query()->update(['status' => 'ready_for_review', 'started_at' => $now]);
+
+        $this->assertSame('draft_cap', $this->runner()->tick($c, $now->addHour())['result']);
+    }
+
+    public function test_che_do_tu_chu_bi_khoa_o_runner_va_form(): void
+    {
+        $c = $this->campaign(['mode' => 'autonomous']);
+        $r = $this->runner()->tick($c);
+
+        $this->assertSame('mode_locked', $r['result']);
+        $this->assertStringContainsString('Tự chủ', $r['message']);
+        $this->assertSame(0, AgentRun::count());
+
+        $this->actingAs($this->user('approver'));
+        Livewire::test(CampaignResource\Pages\CreateCampaign::class)
+            ->fillForm(['name' => 'X', 'website_id' => $c->website_id, 'keywords' => ['a'], 'daily_limit' => 1, 'status' => 'paused', 'mode' => 'autonomous', 'source' => 'plan', 'daily_cost_cap_vnd' => 1000, 'daily_draft_cap' => 1])
+            ->call('create')->assertHasFormErrors(['mode']);
+    }
+
+    public function test_cho_bo_sung_ghi_24h_het_han_tu_bo_qua_va_ghi_gioi_han(): void
+    {
+        $c = $this->campaign(['keywords' => []]);
+        $now = CarbonImmutable::parse('2026-11-07 03:00:00', 'UTC');
+        $this->assertSame('no_keywords', $this->runner()->tick($c, $now)['result']);
+        $this->runner()->tick($c, $now->addHour()); // không tạo trùng
+        $wait = \App\Models\CampaignWait::firstOrFail();
+        $this->assertSame(1, \App\Models\CampaignWait::count());
+        $this->assertSame('open', $wait->status);
+        $this->assertTrue($wait->expires_at->equalTo($now->addDay()));
+
+        $this->runner()->tick($c, $now->addDay()->addMinute());
+        $wait->refresh();
+        $this->assertSame('expired', $wait->status);
+        $this->assertStringContainsString('24 giờ', $wait->limit_note);
+        $this->assertSame(1, \App\Models\CampaignWait::count()); // không tái tạo trong 24h
+    }
+
+    public function test_bo_sung_du_lieu_thi_muc_cho_duoc_giai_quyet(): void
+    {
+        $c = $this->campaign(['keywords' => []]);
+        $this->runner()->tick($c);
+        $c->update(['keywords' => ['mới']]);
+        $this->runner()->tick($c);
+
+        $this->assertSame('resolved', \App\Models\CampaignWait::first()->status);
+    }
+
+    public function test_giao_dien_hien_cho_bo_sung_han_muc_va_nut_bo_qua_chi_nguoi_duyet(): void
+    {
+        $c = $this->campaign(['keywords' => []]);
+        $this->runner()->tick($c);
+        $wait = \App\Models\CampaignWait::first();
+
+        $this->actingAs($this->user('approver'));
+        $this->get(CampaignResource::getUrl('index'))->assertOk()
+            ->assertSee('Đang chờ bạn bổ sung')->assertSee('Hạn mức hôm nay')->assertSee('150.000');
+        Livewire::test(ListCampaigns::class)->call('dismissWait', $wait->id);
+        $this->assertSame('dismissed', $wait->refresh()->status);
+    }
+
+    public function test_bien_tap_vien_khong_xem_duoc_cho_bo_sung(): void
+    {
+        $this->campaign();
+        $this->actingAs($this->user('writer'));
+        $this->get(CampaignResource::getUrl('index'))->assertForbidden();
+        Livewire::test(ListCampaigns::class)->assertForbidden();
+    }
+
+    public function test_form_hien_ba_the_che_do(): void
+    {
+        $this->actingAs($this->user('admin'));
+        $this->get(CampaignResource::getUrl('create'))->assertOk()
+            ->assertSee('Thận trọng')->assertSee('Cân bằng')->assertSee('Tự chủ')->assertSee('connector hỗ trợ gỡ bài');
     }
 }

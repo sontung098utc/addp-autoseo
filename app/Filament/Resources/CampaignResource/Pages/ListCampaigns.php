@@ -5,6 +5,7 @@ namespace App\Filament\Resources\CampaignResource\Pages;
 use App\Filament\Resources\CampaignResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Contracts\View\View;
 
 class ListCampaigns extends ListRecords
 {
@@ -20,5 +21,21 @@ class ListCampaigns extends ListRecords
     protected function getHeaderActions(): array
     {
         return [CreateAction::make()->label('Tạo chiến dịch')];
+    }
+
+    public function getFooter(): ?View
+    {
+        return view('filament.agent.campaign-panels', [
+            'waits' => CampaignResource::openWaits(),
+            'expired' => CampaignResource::recentExpired(),
+            'budget' => CampaignResource::budget(),
+        ]);
+    }
+
+    /** Bỏ qua một mục chờ bổ sung (chỉ người duyệt/admin). */
+    public function dismissWait(int $id): void
+    {
+        abort_unless(CampaignResource::canViewAny(), 403);
+        \App\Models\CampaignWait::query()->where('status', 'open')->whereKey($id)->update(['status' => 'dismissed']);
     }
 }

@@ -8,7 +8,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Campaign extends Model
 {
-    protected $fillable = ['website_id', 'created_by', 'name', 'status', 'keywords', 'daily_limit', 'last_tick_at'];
+    protected $fillable = ['website_id', 'created_by', 'name', 'status', 'keywords', 'daily_limit', 'last_tick_at', 'mode', 'daily_cost_cap_vnd', 'daily_draft_cap', 'source'];
+
+    /** Khớp mặc định ở migration để mô hình mới tạo chưa nạp lại vẫn có giá trị đúng. */
+    protected $attributes = ['mode' => 'balanced', 'daily_cost_cap_vnd' => 150000, 'daily_draft_cap' => 5, 'source' => 'plan'];
 
     protected function casts(): array
     {
@@ -23,6 +26,11 @@ class Campaign extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function waits(): HasMany
+    {
+        return $this->hasMany(CampaignWait::class);
     }
 
     public function runs(): HasMany
