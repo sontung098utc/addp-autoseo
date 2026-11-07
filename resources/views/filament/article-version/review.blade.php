@@ -45,6 +45,7 @@
     $qCounts = $quality->counts();
     $dash = fn ($v) => filled($v) ? $v : '—';
 @endphp
+@include('filament.agent.cms-draft-line', ['version' => $record])
 <div class="ss-review">
     <div class="ss-review__side">
         <section class="ss-review-card" aria-labelledby="ss-review-decide">
