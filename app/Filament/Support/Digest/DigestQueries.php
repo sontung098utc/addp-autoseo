@@ -2,7 +2,7 @@
 
 namespace App\Filament\Support\Digest;
 
-use App\Filament\Resources\ArticleVersionResource;
+use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\PublicationResource;
 use App\Filament\Resources\WebsiteResource;
 use App\Filament\Support\AiUsage\Vnd;
@@ -154,13 +154,13 @@ final class DigestQueries
             $groups[] = self::group('publication_problems', 'Lượt đăng lỗi hoặc chờ đối soát', $problems, 'Cần kiểm tra trước khi đăng lại; hệ thống không tự đăng lại.', PublicationResource::getUrl('index'), 'danger');
         }
         if ($overdue > 0) {
-            $groups[] = self::group('overdue_review', 'Bài chờ duyệt quá '.DashboardQueries::OVERDUE_AFTER_HOURS.' giờ', $overdue, 'Đang giữ cả chuỗi phía sau.', ArticleVersionResource::getUrl('index'), 'warning');
+            $groups[] = self::group('overdue_review', 'Bài chờ duyệt quá '.DashboardQueries::OVERDUE_AFTER_HOURS.' giờ', $overdue, 'Đang giữ cả chuỗi phía sau.', ArticleResource::getUrl('index', ['activeTab' => 'needs_review']), 'warning');
         }
         if ($badSites > 0) {
             $groups[] = self::group('website_issue', 'Website không hoạt động', $badSites, 'Lượt đăng vào website này sẽ báo lỗi khi tới giờ.', WebsiteResource::getUrl('index'), 'warning');
         }
         if ($queue > 0) {
-            $groups[] = self::group('review_queue', 'Bài đang chờ duyệt', $queue, 'Chưa quá hạn.', ArticleVersionResource::getUrl('index'), 'info');
+            $groups[] = self::group('review_queue', 'Bài đang chờ duyệt', $queue, 'Chưa quá hạn.', ArticleResource::getUrl('index', ['activeTab' => 'needs_review']), 'info');
         }
 
         return $groups;
@@ -172,7 +172,7 @@ final class DigestQueries
         $needFix = DashboardQueries::decisions($user, $now)->where('kind', '!=', 'review')->count();
 
         return $needFix > 0
-            ? [self::group('needs_fix', 'Bài cần bạn sửa', $needFix, 'Đã bị từ chối, xem lý do và chỉnh lại.', ArticleVersionResource::getUrl('index'), 'warning')]
+            ? [self::group('needs_fix', 'Bài cần bạn sửa', $needFix, 'Đã bị từ chối, xem lý do và chỉnh lại.', ArticleResource::getUrl('index', ['activeTab' => 'rejected']), 'warning')]
             : [];
     }
 

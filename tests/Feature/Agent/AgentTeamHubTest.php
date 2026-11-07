@@ -119,7 +119,7 @@ class AgentTeamHubTest extends TestCase
         $html = $this->get('/admin')->assertOk()->getContent();
         $this->assertStringNotContainsString('Chiến dịch &amp; Bài viết', $html);
         $this->assertSame(1, preg_match_all('/>\s*Bài viết\s*</u', $html));
-        $this->assertSame(1, preg_match_all('/>\s*Duyệt bài\s*</u', $html));
+        $this->assertSame(0, preg_match_all('/>\s*Duyệt bài\s*</u', $html));
         $this->get('/admin/articles')->assertOk()->assertDontSee('Chiến dịch &amp; Bài viết', false);
     }
 

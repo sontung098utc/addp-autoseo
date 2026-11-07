@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\ArticleVersionResource;
 use App\Filament\Resources\ArticleVersionResource\Pages\ViewArticleVersion;
 use App\Models\Article;
@@ -145,13 +146,14 @@ class ReviewLayoutTest extends TestCase
     public function test_navigation_badge_counts_and_hides(): void
     {
         $this->actingAs($this->user('approver'));
-        $this->assertNull(ArticleVersionResource::getNavigationBadge());
+        $this->assertNull(ArticleResource::getNavigationBadge());
         $this->version($this->article(), 1, 'needs_review');
         $this->version($this->article(), 1, 'needs_review');
-        $this->version($this->article(), 1, 'approved');
-        $this->assertSame('2', ArticleVersionResource::getNavigationBadge());
-        $this->assertSame('warning', ArticleVersionResource::getNavigationBadgeColor());
-        $this->assertSame('Chiến dịch', ArticleVersionResource::getNavigationGroup());
-        $this->assertSame('Duyệt bài', ArticleVersionResource::getNavigationLabel());
+        $this->version($this->article('approved'), 1, 'approved');
+        $this->assertSame('2', ArticleResource::getNavigationBadge());
+        $this->assertSame('warning', ArticleResource::getNavigationBadgeColor());
+        $this->assertSame('Chiến dịch', ArticleResource::getNavigationGroup());
+        $this->assertSame('Bài viết', ArticleResource::getNavigationLabel());
+        $this->assertFalse(ArticleVersionResource::shouldRegisterNavigation());
     }
 }

@@ -150,7 +150,7 @@ class DashboardTest extends TestCase
         $this->assertStringContainsString('Cần bạn quyết định (12)', $html);
         $this->assertStringContainsString('Đang hiện 10 / 12 việc', $html);
         $this->assertStringContainsString('Xem tất cả 12 việc', $html);
-        $this->assertStringContainsString('tableFilters', $html);
+        $this->assertStringContainsString('activeTab=needs_review', $html);
     }
 
     public function test_khoi_quyet_dinh_khong_hien_xem_tat_ca_khi_du_it(): void
