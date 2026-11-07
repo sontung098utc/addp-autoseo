@@ -78,6 +78,7 @@
                     <div style="opacity:.6;font-size:.8rem">{{ $s->seq }}</div>
                     <div>
                         <div style="font-weight:600;font-size:.88rem">{{ $s->title }} <span style="font-weight:400;opacity:.6;font-size:.75rem">· {{ $roles[$s->role] ?? $s->role }}@if($s->model) · {{ $s->model }}@endif</span></div>
+                        <div data-testid="step-role-skill" style="font-size:.72rem;opacity:.7">Vai trò: {{ $s->data['role_name'] ?? ($roles[$s->role] ?? $s->role) }} · Kỹ năng: {{ $s->data['skill_label'] ?? 'Chỉ dẫn mặc định' }}@if (! empty($s->data['skill'])) · {{ $s->data['skill']['status'] }} · {{ $s->data['skill']['checksum'] }}@endif@if (! empty($s->data['skill_note'])) · {{ $s->data['skill_note'] }}@endif</div>
                         <div style="font-size:.82rem;opacity:.85">{{ $s->detail }}</div>
                         @if (isset($s->data['score']))<div style="font-size:.75rem;opacity:.8">Điểm {{ $s->data['score'] }}/100</div>@endif
                         @if (! empty($s->data['failed']))

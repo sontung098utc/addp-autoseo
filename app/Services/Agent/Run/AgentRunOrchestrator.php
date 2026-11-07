@@ -14,6 +14,8 @@ use App\Services\Agent\Ai\CostCapExceeded;
 use App\Services\Agent\Ai\RoutedAiProvider;
 use App\Services\Agent\Handoff\CmsDraftHandoff;
 use App\Services\Agent\Risk\RiskClassifier;
+use App\Services\Agent\Roles\RoleRegistry;
+use App\Services\Agent\Roles\RoleSwitches;
 use App\Services\Ai\AiProviderError;
 use App\Services\Ai\AiSchemaError;
 use App\Services\Ai\MockAiProvider;
@@ -52,6 +54,9 @@ final class AgentRunOrchestrator
         private ?CmsDraftHandoff $handoff = null,
         /** AG-S11: bộ định tuyến model theo loại việc. Null (và $ai không phải RoutedAiProvider) = hành vi cũ, một nhà cung cấp cho mọi bước. */
         private ?AiModelRouter $router = null,
+        /** AG-S14: sổ vai trò (tên, kỹ năng) và công tắc vai trò. Null = đọc từ resources/agents/roles và agent_settings. */
+        private ?RoleRegistry $roles = null,
+        private ?RoleSwitches $switches = null,
     ) {
         if ($this->router === null && $this->ai instanceof RoutedAiProvider) {
             $this->router = $this->ai->router();
@@ -59,14 +64,24 @@ final class AgentRunOrchestrator
         $this->sleep ??= fn (int $seconds) => sleep($seconds);
         $this->stop ??= app(EmergencyStopService::class);
         $this->playbooks ??= new PlaybookLoader(resource_path('playbooks'));
+        $this->roles ??= new RoleRegistry();
+        $this->switches ??= new RoleSwitches($this->roles);
     }
 
     private string $trigger = 'manual';
+
+    /** AG-S14: kỹ năng đã chọn cho từng bước (stage => [Playbook|null, ghi chú]); step() ghi vào dữ liệu mỗi bước. */
+    private array $skills = [];
+
+    /** @var list<string> vai trò đang tắt (đã lọc: chỉ vai trò được phép tắt) tại thời điểm bắt đầu phiên */
+    private array $disabledRoles = [];
 
     public function run(Article $article, ?User $actor = null, string $trigger = 'manual', ?int $campaignId = null): AgentRun
     {
         $this->seq = 0;
         $this->trigger = $trigger;
+        $this->skills = [];
+        $this->disabledRoles = $this->switches->disabled();
         $run = AgentRun::create([
             'website_id' => $article->website_id, 'article_id' => $article->id, 'campaign_id' => $campaignId, 'triggered_by' => $actor?->id, 'trigger' => $trigger,
             'status' => 'running', 'trust_tier' => $this->policy->trustTier, 'ai_mode' => $this->router ? 'real' : (($this->ai instanceof MockAiProvider || $this->ai instanceof \App\Services\Ai\DemoScriptedAiProvider) ? 'mock' : 'real'),
@@ -128,7 +143,7 @@ final class AgentRunOrchestrator
             ['level' => $assess->level]);
 
         if ($this->router) {
-            foreach (['outline', 'write'] as $task) {
+            foreach (($this->roleOff('strategist') ? ['write'] : ['outline', 'write']) as $task) {
                 if (($why = $this->router->why($task)) !== null) {
                     throw new AiRouteUnavailable($task, $why);
                 }
@@ -137,13 +152,22 @@ final class AgentRunOrchestrator
 
         $article->update(['workflow_status' => 'drafting']);
 
-        // 3. Dàn ý.
-        [$briefPb, $briefNote] = $this->usePlaybook('brief', 'content-brief');
-        $briefOptions = $briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : [];
-        $outline = $this->callAi($run, 'outline', 'lập dàn ý', fn (AiProviderInterface $ai) => $ai->generateOutline($article, $briefOptions));
-        $this->step($run, 'brief', 'strategist', 'ok', 'Lập dàn ý ('.count($outline['outline'] ?? []).' mục)', 'Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. '.$briefNote,
-            ['outline' => $outline['outline'] ?? [], 'playbook' => $this->pbData($briefPb)] + $this->providerData($outline), $outline['model'] ?? null, (int) ($outline['tokens_used'] ?? 0), (float) ($outline['cost_vnd'] ?? 0));
-        [$editorPb, $editorNote] = $this->usePlaybook('editor', 'qa-review');
+        // 3. Dàn ý (vai trò Chiến lược; tắt được: bỏ bước này, người viết tự bố cục, các bước sau không phụ thuộc).
+        $this->skills['write'] = $this->usePlaybook('writer', 'article-draft');
+        if ($this->roleOff('strategist')) {
+            $outline = ['outline' => []];
+            $this->skills['brief'] = [null, 'Vai trò Chiến lược đang tắt.'];
+            $this->step($run, 'brief', 'strategist', 'skipped', 'Bỏ qua bước dàn ý', 'Vai trò Chiến lược đang bị tắt trên tab Vai trò nên không lập dàn ý riêng; người viết tự bố cục theo từ khóa. Cổng an toàn (chấm luật) vẫn chạy đủ.', ['outline' => []]);
+        } else {
+            $this->skills['brief'] = $this->usePlaybook('brief', 'content-brief');
+            [$briefPb, $briefNote] = $this->skills['brief'];
+            $briefOptions = ($briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : []) + $this->roleOptions('strategist');
+            $outline = $this->callAi($run, 'outline', 'lập dàn ý', fn (AiProviderInterface $ai) => $ai->generateOutline($article, $briefOptions));
+            $this->step($run, 'brief', 'strategist', 'ok', 'Lập dàn ý ('.count($outline['outline'] ?? []).' mục)', 'Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. '.$briefNote,
+                ['outline' => $outline['outline'] ?? [], 'playbook' => $this->pbData($briefPb)] + $this->providerData($outline), $outline['model'] ?? null, (int) ($outline['tokens_used'] ?? 0), (float) ($outline['cost_vnd'] ?? 0));
+        }
+        $this->skills['grade'] = $this->skills['repair'] = $this->usePlaybook('editor', 'qa-review');
+        [$editorPb, $editorNote] = $this->skills['grade'];
 
         // 4. Viết.
         $attrs = $this->write($run, $article, $outline['outline'] ?? [], [], 'write', 'Viết bản đầu', null);
@@ -224,10 +248,13 @@ final class AgentRunOrchestrator
     private function write(AgentRun $run, Article $article, array $outline, array $feedback, string $stage, string $title, ?Playbook $editorPb): array
     {
         $options = $feedback === [] ? [] : ['feedback' => $feedback];
-        if ($feedback !== [] && $editorPb) {
-            $options['playbook'] = $editorPb->body;
-            $options['playbook_ref'] = $editorPb->ref();
+        // Viết bản đầu dùng kỹ năng của người viết (writer/article-draft); sửa dùng bộ chấm editor/qa-review (STEP_PLAYBOOK).
+        $pb = $feedback === [] ? ($this->skills['write'][0] ?? null) : $editorPb;
+        if ($pb) {
+            $options['playbook'] = $pb->body;
+            $options['playbook_ref'] = $pb->ref();
         }
+        $options += $this->roleOptions('writer');
         $r = $this->callAi($run, $stage, $title, fn (AiProviderInterface $ai) => $ai->generateArticle($article, $outline, $options));
         $html = HtmlSanitizer::clean($r['html_content'] ?? '');
         // Nhà cung cấp thật có thể rơi về bản giả lập một cách im lặng (thiếu khóa, JSON hỏng). Không được gọi đó là AI thật.
@@ -239,7 +266,7 @@ final class AgentRunOrchestrator
         $this->step($run, $stage, 'writer', $silentMock ? 'warn' : 'ok', $title, ($silentMock ? 'Nhà cung cấp AI đã rơi về bản giả lập (thiếu khóa hoặc phản hồi hỏng); nội dung không phải AI thật. ' : '').($feedback === []
             ? 'Viết theo dàn ý; HTML được làm sạch trước khi chấm.'
             : 'Gửi lại cho AI '.count($feedback).' lỗi chặn cần sửa: '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
-            ['words' => str_word_count(strip_tags($html)) ?: mb_strlen(strip_tags($html))] + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
+            ['words' => str_word_count(strip_tags($html)) ?: mb_strlen(strip_tags($html)), 'playbook' => $this->pbData($pb)] + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
 
         return [
             'article_id' => $article->id, 'title' => $r['title'] ?? $article->primary_keyword, 'slug' => $r['slug'] ?? 'bai-viet', 'outline' => $outline,
@@ -276,6 +303,8 @@ final class AgentRunOrchestrator
     /**
      * Nạp playbook của một vai trò. Chạy thủ công được dùng bản nháp (người đang xem); chạy tự động (lịch) CHỈ dùng bản active.
      *
+     * AG-S14: ánh xạ bước → playbook khai báo ở RoleRegistry::STEP_PLAYBOOK; thiếu/hỏng/chưa active (lượt lịch) thì dùng chỉ dẫn mặc định và ghi lý do.
+     *
      * @return array{0: ?Playbook, 1: string} playbook (hoặc null) và ghi chú giải thích
      */
     private function usePlaybook(string $role, string $key): array
@@ -293,6 +322,17 @@ final class AgentRunOrchestrator
         }
 
         return [$pb, "Dùng playbook {$pb->ref()}".($pb->isRunnable() ? '.' : ' (bản nháp, chỉ cho lượt thủ công).')];
+    }
+
+    private function roleOff(string $key): bool
+    {
+        return in_array($key, $this->disabledRoles, true);
+    }
+
+    /** Tùy chọn vai trò truyền cho adapter AI: khóa + tên tiếng Việt, để prompt có dòng "Bạn đang đóng vai". */
+    private function roleOptions(string $key): array
+    {
+        return ['role' => $key, 'role_name' => $this->roles->roleName($key)];
     }
 
     /** @return array<string, string>|null */
@@ -403,6 +443,12 @@ final class AgentRunOrchestrator
     private function step(AgentRun $run, string $stage, string $role, string $status, string $title, string $detail, array $data = [], ?string $model = null, int $tokens = 0, float $cost = 0.0): AgentRunStep
     {
         $now = now();
+        // AG-S14: mọi bước ghi vai trò (khóa + tên) và kỹ năng; bước không dùng playbook ghi rõ "Chỉ dẫn mặc định" kèm lý do nếu có.
+        [$pb, $skillNote] = $this->skills[$stage] ?? [null, ''];
+        $data += [
+            'role_key' => $role, 'role_name' => $this->roles->roleName($role),
+            'skill' => $this->pbData($pb), 'skill_label' => $pb ? $pb->ref().($pb->isRunnable() ? '' : ' (bản nháp)') : 'Chỉ dẫn mặc định',
+        ] + ($pb === null && $skillNote !== '' ? ['skill_note' => $skillNote] : []);
 
         return AgentRunStep::create([
             'agent_run_id' => $run->id, 'seq' => ++$this->seq, 'stage' => $stage, 'role' => $role, 'status' => $status, 'title' => $title,
