@@ -8,10 +8,7 @@
             {{ $total }} kỹ năng học từ claude-seo (MIT) · {{ $drafts }} đang là nháp
             @if ($errors > 0) · <span style="color:#b91c1c">{{ $errors }} file lỗi</span>@endif
             · <a href="#" wire:click.prevent="mountAction('notice')" style="text-decoration:underline" data-testid="skills-notice-link">Xem ghi công (NOTICE)</a>
-        </p>
-        <p class="text-xs" style="opacity:.7">
-            Chỉ để xem: sửa kỹ năng là sửa file trong <code>resources/playbooks</code> và mở PR. Chạy thử chưa nối: cần bộ mẫu AG-K09 với model thật.
-            Kỹ năng ở trạng thái nháp chỉ dùng cho lượt chạy thủ công, lượt tự động bỏ qua.
+            <x-studio.hint text="Chỉ để xem: sửa kỹ năng là sửa file trong resources/playbooks và mở PR. Chạy thử chưa nối: cần bộ mẫu AG-K09 với model thật. Kỹ năng nháp chỉ dùng cho lượt chạy thủ công, lượt tự động bỏ qua." />
         </p>
 
         <div style="display:flex;gap:.5rem;flex-wrap:wrap">
