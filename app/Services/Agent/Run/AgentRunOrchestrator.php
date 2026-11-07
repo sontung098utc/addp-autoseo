@@ -8,8 +8,14 @@ use App\Models\AgentRunStep;
 use App\Models\Article;
 use App\Models\ArticleVersion;
 use App\Models\User;
+use App\Services\Agent\Ai\AiModelRouter;
+use App\Services\Agent\Ai\AiRouteUnavailable;
+use App\Services\Agent\Ai\CostCapExceeded;
+use App\Services\Agent\Ai\RoutedAiProvider;
 use App\Services\Agent\Handoff\CmsDraftHandoff;
 use App\Services\Agent\Risk\RiskClassifier;
+use App\Services\Ai\AiProviderError;
+use App\Services\Ai\AiSchemaError;
 use App\Services\Ai\MockAiProvider;
 use App\Services\Ai\Playbook\InvalidPlaybook;
 use App\Services\Ai\Playbook\Playbook;
@@ -44,7 +50,12 @@ final class AgentRunOrchestrator
         private ?\Closure $sleep = null,
         /** AG-S04: điểm nối bàn giao nháp lên CMS. Mặc định null = tắt (chỉ CampaignRunner bật). */
         private ?CmsDraftHandoff $handoff = null,
+        /** AG-S11: bộ định tuyến model theo loại việc. Null (và $ai không phải RoutedAiProvider) = hành vi cũ, một nhà cung cấp cho mọi bước. */
+        private ?AiModelRouter $router = null,
     ) {
+        if ($this->router === null && $this->ai instanceof RoutedAiProvider) {
+            $this->router = $this->ai->router();
+        }
         $this->sleep ??= fn (int $seconds) => sleep($seconds);
         $this->stop ??= app(EmergencyStopService::class);
         $this->playbooks ??= new PlaybookLoader(resource_path('playbooks'));
@@ -58,7 +69,7 @@ final class AgentRunOrchestrator
         $this->trigger = $trigger;
         $run = AgentRun::create([
             'website_id' => $article->website_id, 'article_id' => $article->id, 'campaign_id' => $campaignId, 'triggered_by' => $actor?->id, 'trigger' => $trigger,
-            'status' => 'running', 'trust_tier' => $this->policy->trustTier, 'ai_mode' => ($this->ai instanceof MockAiProvider || $this->ai instanceof \App\Services\Ai\DemoScriptedAiProvider) ? 'mock' : 'real',
+            'status' => 'running', 'trust_tier' => $this->policy->trustTier, 'ai_mode' => $this->router ? 'real' : (($this->ai instanceof MockAiProvider || $this->ai instanceof \App\Services\Ai\DemoScriptedAiProvider) ? 'mock' : 'real'),
             'started_at' => now(),
         ]);
         $previousStatus = $article->workflow_status;
@@ -70,6 +81,20 @@ final class AgentRunOrchestrator
             $article->update(['workflow_status' => $previousStatus]);
 
             return $this->finish($run, 'failed', 'Nhà cung cấp AI lỗi tạm thời, đã hết '.$this->policy->maxRetries.' lần thử lại. Chưa có bản nháp nào được tạo.');
+        } catch (AiRouteUnavailable $e) {
+            $this->step($run, 'guard', 'system', 'blocked', 'Chưa cấu hình AI cho bước này', $e->getMessage().' Tác vụ không chạy và hệ thống không dùng AI giả lập thay thế. Vào Đội AI → Tích hợp AI để nhập khóa hoặc chọn model.', ['task' => $e->task]);
+            $article->update(['workflow_status' => $previousStatus]);
+
+            return $this->finish($run, 'blocked', $e->getMessage());
+        } catch (CostCapExceeded $e) {
+            $article->update(['workflow_status' => $previousStatus]);
+
+            return $this->finish($run, 'failed', $e->getMessage().' Phiên dừng; chưa có bản nháp nào được tạo.');
+        } catch (AiProviderError $e) {
+            $this->step($run, 'handoff', 'system', 'failed', 'Nhà cung cấp AI trả lỗi', ErrorMasker::short($e->getMessage(), 200).' Lỗi này thử lại không giúp ích nên phiên dừng; không thay bằng AI giả lập.', ['error' => class_basename($e)]);
+            $article->update(['workflow_status' => $previousStatus]);
+
+            return $this->finish($run, 'failed', 'Nhà cung cấp AI từ chối hoặc trả sai định dạng: '.ErrorMasker::short($e->getMessage(), 160));
         } catch (Throwable $e) {
             $this->step($run, 'handoff', 'system', 'failed', 'Phiên chạy gặp lỗi', 'Lỗi không lường trước; bài được trả về trạng thái cũ, không có gì được đăng.', ['error' => class_basename($e)]);
             $article->update(['workflow_status' => $previousStatus]);
@@ -102,14 +127,22 @@ final class AgentRunOrchestrator
             $assess->reasons === [] ? 'Chủ đề thường, không chạm nhóm nhạy cảm.' : implode(' ', $assess->reasons).($assess->level === 'high' ? ' Bài cần người có chuyên môn duyệt.' : ''),
             ['level' => $assess->level]);
 
+        if ($this->router) {
+            foreach (['outline', 'write'] as $task) {
+                if (($why = $this->router->why($task)) !== null) {
+                    throw new AiRouteUnavailable($task, $why);
+                }
+            }
+        }
+
         $article->update(['workflow_status' => 'drafting']);
 
         // 3. Dàn ý.
         [$briefPb, $briefNote] = $this->usePlaybook('brief', 'content-brief');
         $briefOptions = $briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : [];
-        $outline = $this->withRetry($run, 'lập dàn ý', fn () => $this->ai->generateOutline($article, $briefOptions));
+        $outline = $this->callAi($run, 'outline', 'lập dàn ý', fn (AiProviderInterface $ai) => $ai->generateOutline($article, $briefOptions));
         $this->step($run, 'brief', 'strategist', 'ok', 'Lập dàn ý ('.count($outline['outline'] ?? []).' mục)', 'Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. '.$briefNote,
-            ['outline' => $outline['outline'] ?? [], 'playbook' => $this->pbData($briefPb)], $outline['model'] ?? null, (int) ($outline['tokens_used'] ?? 0), (float) ($outline['cost_vnd'] ?? 0));
+            ['outline' => $outline['outline'] ?? [], 'playbook' => $this->pbData($briefPb)] + $this->providerData($outline), $outline['model'] ?? null, (int) ($outline['tokens_used'] ?? 0), (float) ($outline['cost_vnd'] ?? 0));
         [$editorPb, $editorNote] = $this->usePlaybook('editor', 'qa-review');
 
         // 4. Viết.
@@ -128,6 +161,12 @@ final class AgentRunOrchestrator
                 break;
             }
             $round++;
+            if ($this->router && ($why = $this->router->why('repair')) !== null) {
+                $round--;
+                $reason = 'Chưa có AI cho bước sửa nên giữ nháp: '.$why;
+                $this->decision($run, 'repair_route_missing', 'Dừng sửa vì thiếu cấu hình AI', $reason, ['task' => 'repair']);
+                break;
+            }
             $feedback = array_map(fn ($r) => "{$r->code}: {$r->message}", $report->blocking());
             $attrs = $this->write($run, $article, $outline['outline'] ?? [], $feedback, 'repair', "Sửa lần {$round}", $editorPb);
             $report = $this->grade($run, $article, $attrs, "Chấm lại sau lần sửa {$round}", $round, $editorPb, '');
@@ -189,7 +228,7 @@ final class AgentRunOrchestrator
             $options['playbook'] = $editorPb->body;
             $options['playbook_ref'] = $editorPb->ref();
         }
-        $r = $this->withRetry($run, $title, fn () => $this->ai->generateArticle($article, $outline, $options));
+        $r = $this->callAi($run, $stage, $title, fn (AiProviderInterface $ai) => $ai->generateArticle($article, $outline, $options));
         $html = HtmlSanitizer::clean($r['html_content'] ?? '');
         // Nhà cung cấp thật có thể rơi về bản giả lập một cách im lặng (thiếu khóa, JSON hỏng). Không được gọi đó là AI thật.
         $fellBack = str_starts_with((string) ($r['model'] ?? ''), 'mock');
@@ -200,7 +239,7 @@ final class AgentRunOrchestrator
         $this->step($run, $stage, 'writer', $silentMock ? 'warn' : 'ok', $title, ($silentMock ? 'Nhà cung cấp AI đã rơi về bản giả lập (thiếu khóa hoặc phản hồi hỏng); nội dung không phải AI thật. ' : '').($feedback === []
             ? 'Viết theo dàn ý; HTML được làm sạch trước khi chấm.'
             : 'Gửi lại cho AI '.count($feedback).' lỗi chặn cần sửa: '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
-            ['words' => str_word_count(strip_tags($html)) ?: mb_strlen(strip_tags($html))], $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
+            ['words' => str_word_count(strip_tags($html)) ?: mb_strlen(strip_tags($html))] + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
 
         return [
             'article_id' => $article->id, 'title' => $r['title'] ?? $article->primary_keyword, 'slug' => $r['slug'] ?? 'bai-viet', 'outline' => $outline,
@@ -260,6 +299,55 @@ final class AgentRunOrchestrator
     private function pbData(?Playbook $pb): ?array
     {
         return $pb ? ['ref' => $pb->ref(), 'status' => $pb->status, 'checksum' => substr($pb->checksum, 0, 12), 'source' => $pb->lineage['source'] ?? ''] : null;
+    }
+
+    /**
+     * AG-S11: gọi AI cho một loại việc. Có router: dùng model chính của route; hết lượt thử vì lỗi tạm thời (hoặc phản hồi sai định dạng)
+     * thì chuyển sang model dự phòng THẬT và ghi bước 'failover'; vượt trần chi phí/lần thì ghi quyết định rồi dừng.
+     * Không có router: một nhà cung cấp như cũ.
+     *
+     * @param \Closure(AiProviderInterface): array $call
+     */
+    private function callAi(AgentRun $run, string $task, string $what, \Closure $call): array
+    {
+        if ($this->router === null) {
+            return $this->withRetry($run, $what, fn () => $call($this->ai));
+        }
+        $primary = $this->router->target($task) ?? throw new AiRouteUnavailable($task, (string) $this->router->why($task));
+        $used = $primary;
+        try {
+            $r = $this->withRetry($run, $what, fn () => $call($primary->ai));
+        } catch (AiRetriesExhausted|AiSchemaError $e) {
+            $fb = $this->router->fallback($task);
+            if ($fb === null) {
+                throw $e;
+            }
+            $prev = $e->getPrevious() ?? $e;
+            $why = $e instanceof AiRetriesExhausted
+                ? 'tạm thời ('.($prev instanceof TransientAiError ? ErrorMasker::short($prev->getMessage(), 100) : TransientAiError::describe($prev)).')'
+                : 'định dạng ('.ErrorMasker::short($e->getMessage(), 100).')';
+            $this->step($run, 'failover', 'system', 'warn', "Chuyển model dự phòng: {$what}",
+                "Đã chuyển từ {$primary->label()} sang {$fb->label()} vì lỗi {$why}. Dự phòng là model thật, không phải AI giả lập.",
+                ['task' => $task, 'from' => ['provider' => $primary->providerName, 'model' => $primary->model], 'to' => ['provider' => $fb->providerName, 'model' => $fb->model], 'reason' => $why], $fb->model);
+            $used = $fb;
+            $r = $this->withRetry($run, $what.' (dự phòng)', fn () => $call($fb->ai));
+        }
+        $r['_provider_id'] = $used->providerId;
+        $cost = (float) ($r['cost_vnd'] ?? 0);
+        if ($used->costCapVnd !== null && $used->costCapVnd > 0 && $cost > $used->costCapVnd) {
+            $e = new CostCapExceeded($task, $cost, $used->costCapVnd);
+            $this->step($run, 'decision', 'system', 'warn', "Dừng vì vượt trần chi phí: {$what}", $e->getMessage().' Kết quả của lần gọi này bị bỏ; chi phí đã phát sinh vẫn được tính vào phiên.',
+                ['decision' => 'cost_cap_exceeded', 'task' => $task, 'cost_vnd' => $cost, 'cap_vnd' => $used->costCapVnd] + $this->providerData($r), $used->model, (int) ($r['tokens_used'] ?? 0), $cost);
+            throw $e;
+        }
+
+        return $r;
+    }
+
+    /** @return array{provider_id?: int} nhãn nhà cung cấp để thống kê chi tiêu theo provider */
+    private function providerData(array $r): array
+    {
+        return isset($r['_provider_id']) ? ['provider_id' => $r['_provider_id']] : [];
     }
 
     /**

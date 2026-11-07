@@ -35,7 +35,7 @@ class AgentTeamHubTest extends TestCase
     {
         $this->actingAs($this->user('approver'));
         foreach (['tong-quan', 'chien-dich', 'phien-chay', 'ket-noi-ai'] as $tab) {
-            $this->get("/admin/doi-ai/{$tab}")->assertOk()->assertSee('Tổng quan')->assertSee('Chiến dịch')->assertSee('Phiên chạy')->assertSee('Kết nối AI');
+            $this->get("/admin/doi-ai/{$tab}")->assertOk()->assertSee('Tổng quan')->assertSee('Chiến dịch')->assertSee('Phiên chạy')->assertSee('Tích hợp AI');
         }
     }
 
@@ -127,35 +127,37 @@ class AgentTeamHubTest extends TestCase
     {
         $this->actingAs($this->user('admin'));
         Livewire::test(AgentConnection::class)
-            ->fillForm(['api_key' => 'AIzaSECRETKEY9999', 'model' => 'gemini-1.5-pro', 'run_budget_vnd' => 70000, 'max_repair_rounds' => 2])
-            ->call('save')->assertHasNoFormErrors();
+            ->callAction('addProvider', ['name' => 'Gemini chính', 'kind' => 'gemini', 'api_key' => 'AIzaSECRETKEY9999', 'suggest' => true])
+            ->assertHasNoActionErrors();
 
-        $raw = \DB::table('agent_settings')->value('api_key');
+        $raw = \DB::table('ai_providers')->value('api_key');
         $this->assertStringNotContainsString('SECRETKEY', (string) $raw, 'khóa phải được mã hóa trong CSDL');
-        $this->assertSame('AIzaSECRETKEY9999', AgentSetting::current()->api_key);
-        $this->get('/admin/doi-ai/ket-noi-ai')->assertOk()->assertDontSee('SECRETKEY')->assertSee('9999');
+        $this->assertSame('AIzaSECRETKEY9999', \App\Models\AiProvider::first()->api_key);
+        $this->get('/admin/doi-ai/ket-noi-ai')->assertOk()->assertDontSee('SECRETKEY')->assertDontSee('9999')->assertSee('•••• đã lưu');
+
+        Livewire::test(AgentConnection::class)->callAction('editLimits', ['run_budget_vnd' => 70000, 'max_repair_rounds' => 2])->assertHasNoActionErrors();
         $this->assertSame(70000.0, AgentAi::policy()->budgetVnd);
         $this->assertSame(2, AgentAi::policy()->maxRepairRounds);
     }
 
-    public function test_de_trong_khoa_thi_giu_khoa_cu(): void
+    public function test_cap_nhat_khoa_thay_khoa_cu(): void
     {
-        AgentSetting::create(['provider' => 'gemini', 'api_key' => 'AIza-OLD-1111', 'model' => 'm']);
+        $p = \App\Models\AiProvider::create(['name' => 'G', 'kind' => 'gemini', 'api_key' => 'AIza-OLD-1111']);
         $this->actingAs($this->user('admin'));
 
-        Livewire::test(AgentConnection::class)->fillForm(['api_key' => null, 'model' => 'gemini-1.5-pro', 'run_budget_vnd' => 50000, 'max_repair_rounds' => 3])->call('save');
+        Livewire::test(AgentConnection::class)->callAction('updateKey', ['api_key' => 'AIza-NEW-2222'], ['id' => $p->id])->assertHasNoActionErrors();
 
-        $this->assertSame('AIza-OLD-1111', AgentSetting::current()->api_key);
-        $this->assertSame('gemini-1.5-pro', AgentSetting::current()->model);
+        $this->assertSame('AIza-NEW-2222', $p->fresh()->api_key);
     }
 
-    public function test_nguoi_duyet_xem_duoc_nhung_khong_luu_duoc(): void
+    public function test_nguoi_duyet_xem_duoc_nhung_khong_sua_duoc(): void
     {
+        $p = \App\Models\AiProvider::create(['name' => 'G', 'kind' => 'gemini', 'api_key' => 'AIza-OLD-1111']);
         $this->actingAs($this->user('approver'));
 
-        $this->get('/admin/doi-ai/ket-noi-ai')->assertOk()->assertSee('Chỉ quản trị viên được nhập');
-        Livewire::test(AgentConnection::class)->call('save')->assertForbidden();
-        $this->assertSame(0, AgentSetting::count());
+        $this->get('/admin/doi-ai/ket-noi-ai')->assertOk()->assertSee('Chỉ quản trị viên được thêm')->assertSee('Tác vụ nào chưa có khóa provider sẽ không chạy')->assertDontSee('Cập nhật khóa');
+        Livewire::test(AgentConnection::class)->assertActionHidden('addProvider')->assertActionHidden('updateKey', ['id' => $p->id])->assertActionHidden('editRoute', ['task' => 'write']);
+        $this->assertSame('AIza-OLD-1111', $p->fresh()->api_key);
     }
 
     public function test_ket_noi_khoa_trong_he_thong_uu_tien_hon_bien_moi_truong(): void
