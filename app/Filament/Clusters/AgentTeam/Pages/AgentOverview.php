@@ -9,6 +9,7 @@ use App\Filament\Resources\CampaignResource;
 use App\Filament\Resources\PublicationResource;
 use App\Filament\Resources\WebsiteResource;
 use App\Filament\Support\Agent\AgentFlowBlueprint;
+use App\Filament\Support\Agent\RunActivity;
 use App\Models\AgentRun;
 use App\Models\AgentRunStep;
 use App\Models\ArticleVersion;
@@ -58,7 +59,10 @@ class AgentOverview extends Page
         $stepStats = AgentRunStep::query()->whereHas('run', fn ($q) => $q->where('created_at', '>=', $since))
             ->selectRaw('stage, status, count(*) c')->groupBy('stage', 'status')->get()->groupBy('stage');
 
-        $nodes = array_map(function (array $b) use ($stepStats): array {
+        $liveStages = RunActivity::liveStages();
+        $liveCount = RunActivity::liveCount();
+        $nodes = array_map(function (array $b) use ($stepStats, $liveStages): array {
+            $b['live'] = $liveStages[$b['stage']] ?? 0;
             $b['stats'] = ($stepStats->get($b['stage']) ?? collect())->pluck('c', 'status')->all();
 
             return $b;
@@ -76,6 +80,8 @@ class AgentOverview extends Page
 
         return [
             'ai' => $ai,
+            'liveCount' => $liveCount,
+            'pollSeconds' => $liveCount > 0 ? RunActivity::POLL_LIVE : RunActivity::POLL_IDLE,
             'steps' => $steps,
             'stepsLeft' => collect($steps)->where('state', '!=', 'done')->count(),
             'life' => $life,

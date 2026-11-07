@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\CampaignResource\Pages;
+use App\Filament\Support\Agent\RunActivity;
 use App\Filament\Support\Schedule\VnTime;
 use App\Models\AgentRun;
 use App\Models\Campaign;
@@ -116,11 +117,15 @@ class CampaignResource extends Resource
         return $table
             ->modifyQueryUsing(fn ($query) => $query->with('website'))
             ->defaultSort('id', 'desc')
+            ->poll(fn () => RunActivity::anyRunning() ? '3s' : '20s')
             ->columns([
                 Tables\Columns\TextColumn::make('name')->label('Chiến dịch')->searchable()->description(fn (Campaign $r) => $r->website?->name),
                 Tables\Columns\TextColumn::make('status')->label('Trạng thái')->badge()
                     ->formatStateUsing(fn (string $state) => $state === 'active' ? 'Đang chạy' : 'Tạm dừng')
-                    ->color(fn (string $state) => $state === 'active' ? 'success' : 'gray'),
+                    ->color(fn (string $state) => $state === 'active' ? 'success' : 'gray')
+                    ->icon(fn (Campaign $r) => self::liveRunCount($r) > 0 ? 'heroicon-o-arrow-path' : null)
+                    ->extraAttributes(fn (Campaign $r) => self::liveRunCount($r) > 0 ? ['class' => 'ss-badge-live', 'data-running' => '1'] : [])
+                    ->description(fn (Campaign $r) => self::liveRunCount($r) > 0 ? 'Đang viết '.self::liveRunCount($r).' bài' : null),
                 Tables\Columns\TextColumn::make('today')->label('Hôm nay')->state(fn (Campaign $r) => self::todayCount($r).' / '.$r->daily_limit)->alignCenter(),
                 Tables\Columns\TextColumn::make('left')->label('Từ khóa còn lại')->state(fn (Campaign $r) => self::remaining($r))->alignCenter(),
                 Tables\Columns\TextColumn::make('last_tick_at')->label('Nhịp gần nhất (giờ VN)')->placeholder('Chưa chạy')
@@ -139,6 +144,15 @@ class CampaignResource extends Resource
                     }),
                 Tables\Actions\EditAction::make()->label('Sửa'),
             ]);
+    }
+
+    /** Số phiên đang chạy thật (chưa quá hạn treo) của chiến dịch; cache theo request để không truy vấn lặp. */
+    public static function liveRunCount(Campaign $c): int
+    {
+        static $cache = [];
+
+        return $cache[$c->id.'|'.spl_object_id($c)] ??= AgentRun::query()->where('campaign_id', $c->id)->where('status', 'running')->with('steps')->get()
+            ->filter(fn (AgentRun $r) => RunActivity::isLive($r))->count();
     }
 
     public static function todayCount(Campaign $c): int

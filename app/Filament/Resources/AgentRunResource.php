@@ -4,6 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\AgentRunResource\Pages;
 use App\Filament\Support\Schedule\VnTime;
+use App\Filament\Support\Agent\AgentFlowBlueprint;
+use App\Filament\Support\Agent\RunActivity;
 use App\Models\AgentRun;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -75,15 +77,20 @@ class AgentRunResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with(['article', 'website']))
+            ->modifyQueryUsing(fn ($query) => $query->with(['article', 'website', 'steps']))
+            ->poll(fn () => RunActivity::anyRunning() ? '3s' : '15s')
             ->defaultSort('id', 'desc')
             ->columns([
                 Tables\Columns\TextColumn::make('article.primary_keyword')->label('Bài / từ khóa')->searchable()->wrap()
                     ->description(fn (AgentRun $r) => $r->website?->name),
                 Tables\Columns\TextColumn::make('status')->label('Kết quả')->badge()
-                    ->formatStateUsing(fn (string $state) => self::STATUS[$state][0] ?? $state)
-                    ->color(fn (string $state) => self::STATUS[$state][1] ?? 'gray')
-                    ->description(fn (AgentRun $r) => $r->outcome_reason ? \Illuminate\Support\Str::limit($r->outcome_reason, 70) : null),
+                    ->formatStateUsing(fn (string $state, AgentRun $r) => RunActivity::isStale($r) ? 'Có thể bị treo' : (self::STATUS[$state][0] ?? $state))
+                    ->color(fn (string $state, AgentRun $r) => RunActivity::isStale($r) ? 'warning' : (self::STATUS[$state][1] ?? 'gray'))
+                    ->icon(fn (string $state, AgentRun $r) => RunActivity::isLive($r) ? 'heroicon-o-arrow-path' : null)
+                    ->extraAttributes(fn (AgentRun $r) => RunActivity::isLive($r) ? ['class' => 'ss-badge-live', 'data-running' => '1'] : [])
+                    ->description(fn (AgentRun $r) => RunActivity::isLive($r)
+                        ? 'Đang ở: '.(AgentFlowBlueprint::byStage()[RunActivity::currentStage($r->steps)]['title'] ?? 'hoàn tất')
+                        : ($r->outcome_reason ? \Illuminate\Support\Str::limit($r->outcome_reason, 70) : null)),
                 Tables\Columns\TextColumn::make('ai_mode')->label('AI')->badge()
                     ->formatStateUsing(fn (string $state) => $state === 'real' ? 'AI thật' : 'AI giả lập')
                     ->color(fn (string $state) => $state === 'real' ? 'success' : 'gray'),

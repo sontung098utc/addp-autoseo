@@ -67,6 +67,12 @@ class AdminPanelProvider extends PanelProvider
                     ])->render();
                 },
             )
+            ->renderHook(
+                PanelsRenderHook::USER_MENU_BEFORE,
+                fn (): string => \Illuminate\Support\Facades\Auth::user()?->isApprover()
+                    ? \Illuminate\Support\Facades\Blade::render('@livewire(\'agent-running-pill\')')
+                    : '',
+            )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')

@@ -3,13 +3,24 @@
     $stepLabel = ['ok' => 'Xong', 'warn' => 'Cần chú ý', 'blocked' => 'Bị chặn', 'failed' => 'Lỗi', 'skipped' => 'Bỏ qua'];
     $roles = ['system' => 'Hệ thống', 'strategist' => 'Chiến lược', 'writer' => 'Người viết', 'editor' => 'Biên tập'];
     [$sLabel, $sColor] = $statusMap[$run->status] ?? [$run->status, 'gray'];
+    if ($stale) { [$sLabel, $sColor] = ['Có thể bị treo', 'warning']; }
     $byStage = $run->steps->groupBy('stage');
     $timeline = \App\Services\Agent\Run\RunScorer::timeline($run->steps);
     $decisions = $run->steps->where('stage', 'decision');
     $retries = $run->steps->where('stage', 'retry');
 @endphp
 <x-filament-panels::page>
-    <div class="space-y-4" data-testid="agent-run">
+    <div class="space-y-4" data-testid="agent-run" @if ($live) wire:poll.{{ $pollSeconds }}s @endif>
+        @if ($live)
+            <div class="ss-live-pill" data-testid="run-live" style="display:flex;border-radius:.6rem;padding:.5rem .8rem">
+                <x-studio.running label="Đang chạy" />
+                <span>· Đang ở: <strong>{{ $blueprint[$currentStage]['title'] ?? 'hoàn tất, đang đóng phiên' }}</strong> · đã chạy {{ $elapsed }}</span>
+            </div>
+        @elseif ($stale)
+            <div data-testid="run-stale" style="border:1px dashed #d97706;border-radius:.6rem;padding:.5rem .8rem;color:#b45309;font-size:.85rem">
+                Có thể bị treo: phiên vẫn ghi là đang chạy nhưng quá {{ \App\Filament\Support\Agent\RunActivity::STALE_MINUTES }} phút không có bước mới. Đã ngừng làm mới tự động; tải lại trang để kiểm tra.
+            </div>
+        @endif
         <x-filament::section>
             <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:center">
                 <x-filament::badge :color="$sColor">{{ $sLabel }}</x-filament::badge>
@@ -32,10 +43,11 @@
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(8rem,1fr));gap:.4rem" data-testid="stage-rail">
                 @foreach ($blueprint as $code => $b)
                     @php $ran = $byStage->get($code); $worst = $ran?->contains('status', 'failed') ? 'failed' : ($ran?->contains('status', 'blocked') ? 'blocked' : ($ran?->contains('status', 'warn') ? 'warn' : ($ran ? 'ok' : 'skipped'))); @endphp
-                    <div style="border:1px solid rgba(128,128,128,.3);border-radius:.5rem;padding:.5rem;{{ $ran ? '' : 'opacity:.5' }}">
+                    @php $isNow = $live && $currentStage === $code; $isStale = $stale && \App\Filament\Support\Agent\RunActivity::currentStage($run->steps) === $code; @endphp
+                    <div @if ($isNow) class="ss-stage-live" data-live-stage="{{ $code }}" @elseif ($isStale) class="ss-stage-stale" @endif style="border:1px solid rgba(128,128,128,.3);border-radius:.5rem;padding:.5rem;{{ ($ran || $isNow) ? '' : 'opacity:.5' }}">
                         <div style="font-size:.75rem;font-weight:600">{{ $b['title'] }}</div>
                         <div style="font-size:.68rem;opacity:.7">{{ $b['role'] }}</div>
-                        <div class="mt-1"><x-filament::badge size="sm" :color="$stepColor[$worst]">{{ $ran ? $stepLabel[$worst].($ran->count() > 1 ? ' ×'.$ran->count() : '') : 'Không chạy' }}</x-filament::badge></div>
+                        <div class="mt-1">@if ($isNow)<x-studio.running size="sm" />@else<x-filament::badge size="sm" :color="$stepColor[$worst]">{{ $ran ? $stepLabel[$worst].($ran->count() > 1 ? ' ×'.$ran->count() : '') : 'Không chạy' }}</x-filament::badge>@endif</div>
                     </div>
                 @endforeach
             </div>
@@ -61,7 +73,7 @@
 
         <x-filament::section heading="Nhật ký từng bước" description="Mỗi bước ghi rõ lý do hệ thống làm như vậy.">
             @foreach ($run->steps as $s)
-                <div style="display:grid;grid-template-columns:2rem 1fr auto;gap:.75rem;padding:.6rem 0;border-bottom:1px solid rgba(128,128,128,.18)" data-step="{{ $s->stage }}">
+                <div style="display:grid;grid-template-columns:2rem 1fr auto;gap:.75rem;padding:.6rem 0;border-bottom:1px solid rgba(128,128,128,.18)" data-step="{{ $s->stage }}" @if ($live && $loop->last) class="ss-step-new" @endif>
                     <div style="opacity:.6;font-size:.8rem">{{ $s->seq }}</div>
                     <div>
                         <div style="font-weight:600;font-size:.88rem">{{ $s->title }} <span style="font-weight:400;opacity:.6;font-size:.75rem">· {{ $roles[$s->role] ?? $s->role }}@if($s->model) · {{ $s->model }}@endif</span></div>

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\AgentRunResource\Pages;
 
 use App\Filament\Resources\AgentRunResource;
 use App\Filament\Support\Agent\AgentFlowBlueprint;
+use App\Filament\Support\Agent\RunActivity;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewAgentRun extends ViewRecord
@@ -19,8 +20,20 @@ class ViewAgentRun extends ViewRecord
 
     protected function getViewData(): array
     {
-        $this->record->loadMissing(['steps', 'article', 'website', 'finalVersion']);
+        // Làm mới mỗi lần poll để thấy bước mới và trạng thái mới.
+        $this->record->refresh()->load(['steps', 'article', 'website', 'finalVersion']);
+        $run = $this->record;
+        $live = RunActivity::isLive($run);
 
-        return ['run' => $this->record, 'blueprint' => AgentFlowBlueprint::byStage(), 'statusMap' => AgentRunResource::STATUS];
+        return [
+            'run' => $run,
+            'blueprint' => AgentFlowBlueprint::byStage(),
+            'statusMap' => AgentRunResource::STATUS,
+            'live' => $live,
+            'stale' => RunActivity::isStale($run),
+            'currentStage' => $live ? RunActivity::currentStage($run->steps) : null,
+            'elapsed' => RunActivity::formatElapsed(RunActivity::elapsedSeconds($run)),
+            'pollSeconds' => $live ? RunActivity::POLL_LIVE : null,
+        ];
     }
 }

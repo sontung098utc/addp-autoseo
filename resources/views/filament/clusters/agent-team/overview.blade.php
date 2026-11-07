@@ -3,7 +3,13 @@
     $lab = ['ok' => 'xong', 'warn' => 'cần chú ý', 'blocked' => 'bị chặn', 'failed' => 'lỗi'];
 @endphp
 <x-filament-panels::page>
-    <div data-testid="agent-overview" class="space-y-4">
+    <div data-testid="agent-overview" class="space-y-4" wire:poll.{{ $pollSeconds }}s>
+        @if ($liveCount > 0)
+            <div class="ss-live-pill" data-testid="overview-live" style="display:flex;border-radius:.6rem;padding:.5rem .8rem">
+                <x-studio.running label="Đội AI đang chạy: {{ $liveCount }} phiên" />
+                <a class="underline" href="{{ $runsUrl }}">Xem phiên chạy</a>
+            </div>
+        @endif
         <x-filament::section :heading="'Hoàn tất cài đặt: còn '.$stepsLeft.' bước'" description="Bước chưa có dữ liệu thật được ghi là chưa làm, không tính là xong.">
             @unless ($ai['connected'])
                 <div class="text-sm" style="color:#b45309;margin-bottom:.6rem" data-testid="ai-warning">
@@ -54,14 +60,17 @@
             <div style="display:flex;flex-wrap:wrap;gap:.4rem">
                 @foreach ($nodes as $n)
                     @if (! $loop->first)<div style="align-self:center;opacity:.5">→</div>@endif
-                    <details style="flex:1 1 8.5rem;border:1px solid rgba(128,128,128,.4);border-radius:.6rem;padding:.55rem" data-stage="{{ $n['stage'] }}">
+                    <details wire:ignore.self style="flex:1 1 8.5rem;border:1px solid rgba(128,128,128,.4);border-radius:.6rem;padding:.55rem" data-stage="{{ $n['stage'] }}">
                         <summary style="cursor:pointer;list-style:none">
+                          <div @if ($n['live'] > 0) class="ss-stage-live" data-live-stage="{{ $n['stage'] }}" style="border:1px solid transparent;border-radius:.4rem;padding:.2rem" @endif>
                             <div style="font-size:.68rem;opacity:.6">{{ $n['role'] }}</div>
                             <div style="font-weight:600;font-size:.82rem">{{ $n['title'] }}</div>
+                            @if ($n['live'] > 0)<x-studio.running size="sm" label="Đang chạy ({{ $n['live'] }})" />@endif
                             <div style="margin:.25rem 0"><x-studio.chip domain="readiness" :value="$n['readiness']" /></div>
                             <div style="font-size:.68rem">
                                 @forelse ($n['stats'] as $st => $c)<span style="color:{{ $col[$st] ?? '#6b7280' }}">{{ $c }} {{ $lab[$st] ?? $st }}</span>@if (! $loop->last) · @endif @empty<span style="opacity:.55">chưa có số liệu</span>@endforelse
                             </div>
+                          </div>
                         </summary>
                         <div style="font-size:.72rem;margin-top:.5rem;line-height:1.35">
                             <div>{{ $n['what'] }}</div>
