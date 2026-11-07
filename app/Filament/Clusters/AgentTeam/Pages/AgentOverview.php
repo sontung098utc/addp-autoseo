@@ -3,6 +3,7 @@
 namespace App\Filament\Clusters\AgentTeam\Pages;
 
 use App\Filament\Clusters\AgentTeam;
+use App\Filament\Pages\AgentConnection;
 use App\Filament\Resources\AgentRunResource;
 use App\Filament\Resources\ArticleVersionResource;
 use App\Filament\Resources\CampaignResource;

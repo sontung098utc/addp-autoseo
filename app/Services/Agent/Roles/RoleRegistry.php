@@ -96,17 +96,20 @@ final class RoleRegistry
     /**
      * Kỹ năng của vai trò, kèm trạng thái playbook THẬT trên đĩa.
      *
-     * @return list<array{ref: string, role: string, key: string, exists: bool, version: ?int, status: ?string, title: ?string, lineage: ?array<string, string>, error: ?string}>
+     * AG-S17: kèm `enabled` và `pin` từ bản gán theo vai trò (mặc định bật, không ghim); `version` vẫn là bản mới nhất trên đĩa.
+     *
+     * @return list<array{ref: string, role: string, key: string, exists: bool, version: ?int, status: ?string, title: ?string, lineage: ?array<string, string>, error: ?string, enabled: bool, pin: ?int}>
      */
     public function skills(array $role): array
     {
         $loader = $this->playbooks ?? new PlaybookLoader();
+        $assign = new RoleAssignments($this);
         $out = [];
         foreach ($role['skills'] as $ref) {
             [$pRole, $pKey] = explode('/', $ref, 2);
-            $row = ['ref' => $ref, 'role' => $pRole, 'key' => $pKey, 'exists' => false, 'version' => null, 'status' => null, 'title' => null, 'lineage' => null, 'error' => null];
+            $row = ['ref' => $ref, 'role' => $pRole, 'key' => $pKey, 'exists' => false, 'version' => null, 'status' => null, 'title' => null, 'lineage' => null, 'error' => null] + $assign->skillState($ref);
             try {
-                $pb = $loader->find($pRole, $pKey);
+                $pb = $loader->findLatest($pRole, $pKey);
             } catch (InvalidPlaybook $e) {
                 $out[] = ['error' => 'Playbook lỗi định dạng: '.$e->getMessage()] + $row;
 

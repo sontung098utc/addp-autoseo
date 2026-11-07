@@ -1,8 +1,7 @@
 <?php
 
-namespace App\Filament\Clusters\AgentTeam\Pages;
+namespace App\Filament\Pages;
 
-use App\Filament\Clusters\AgentTeam;
 use App\Models\AgentRunStep;
 use App\Models\AgentSetting;
 use App\Models\AiModelRoute;
@@ -19,16 +18,15 @@ use Filament\Forms\Components\Toggle;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Pages\SubNavigationPosition;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Tab "Tích hợp AI" (slug cũ ket-noi-ai được giữ): nơi DUY NHẤT gắn AI vào đội — danh sách provider và định tuyến model theo loại việc.
+ * Trang "Tích hợp AI" thuộc nhóm Cài đặt (AG-S17, trước là tab của Đội AI; URL cũ doi-ai/ket-noi-ai chuyển hướng): nơi DUY NHẤT gắn AI vào đội — danh sách provider và định tuyến model theo loại việc.
  * Chỉ admin sửa; người duyệt chỉ xem. Khóa API lưu mã hóa, chỉ ghi, không bao giờ hiển thị lại. Tác vụ chưa có khóa thì không chạy (không Mock thay thế).
  */
 class AgentConnection extends Page
 {
-    protected static ?string $cluster = AgentTeam::class;
+    protected static ?string $navigationGroup = 'Cài đặt';
 
     protected static ?string $navigationIcon = 'heroicon-o-key';
 
@@ -36,11 +34,10 @@ class AgentConnection extends Page
 
     protected static ?string $title = 'Tích hợp AI';
 
-    protected static ?string $slug = 'ket-noi-ai';
+    protected static ?string $slug = 'tich-hop-ai';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 30;
 
-    protected static SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
     protected static string $view = 'filament.clusters.agent-team.connection';
 

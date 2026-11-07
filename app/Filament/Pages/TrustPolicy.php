@@ -1,35 +1,32 @@
 <?php
 
-namespace App\Filament\Clusters\AgentTeam\Pages;
+namespace App\Filament\Pages;
 
-use App\Filament\Clusters\AgentTeam;
 use App\Models\User;
 use App\Services\Agent\Trust\RoleMatrix;
 use App\Services\Agent\Trust\TrustGate;
 use App\Services\Agent\Trust\TrustMetrics;
 use Filament\Pages\Page;
-use Filament\Pages\SubNavigationPosition;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * AG-S12: tab "Chính sách" của Đội AI. CHỈ ĐỌC: không có nút nâng bậc nào. Mức 2 bị khóa cứng (TrustGate)
+ * AG-S12: trang "Chính sách tin cậy" thuộc nhóm Cài đặt (AG-S17, trước là tab Đội AI). CHỈ ĐỌC: không có nút nâng bậc nào. Mức 2 bị khóa cứng (TrustGate)
  * tới khi có văn bản chính sách của người dùng và connector hỗ trợ gỡ bài.
  */
 class TrustPolicy extends Page
 {
-    protected static ?string $cluster = AgentTeam::class;
+    protected static ?string $navigationGroup = 'Cài đặt';
 
     protected static ?string $navigationIcon = 'heroicon-o-shield-check';
 
-    protected static ?string $navigationLabel = 'Chính sách';
+    protected static ?string $navigationLabel = 'Chính sách tin cậy';
 
     protected static ?string $title = 'Chính sách tin cậy';
 
-    protected static ?string $slug = 'chinh-sach';
+    protected static ?string $slug = 'chinh-sach-tin-cay';
 
-    protected static ?int $navigationSort = 8;
+    protected static ?int $navigationSort = 31;
 
-    protected static SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
     protected static string $view = 'filament.clusters.agent-team.trust-policy';
 

@@ -3,7 +3,7 @@
 namespace Tests\Feature\Agent;
 
 use App\Filament\Clusters\AgentTeam\Pages\PipelineMap;
-use App\Filament\Clusters\AgentTeam\Pages\TrustPolicy;
+use App\Filament\Pages\TrustPolicy;
 use App\Models\AgentRun;
 use App\Models\AgentRunStep;
 use App\Models\Article;
@@ -44,7 +44,7 @@ class TrustPolicyTest extends TestCase
             $this->assertNull($m[$k]['value'], $k);
         }
         $this->actingAs($this->user('approver'));
-        $this->get('/admin/doi-ai/chinh-sach')->assertOk()->assertSee('Chưa có dữ liệu')->assertDontSee('(0 phiên)');
+        $this->get('/admin/chinh-sach-tin-cay')->assertOk()->assertSee('Chưa có dữ liệu')->assertDontSee('(0 phiên)');
     }
 
     public function test_tinh_dung_tren_du_lieu_mau(): void
@@ -89,7 +89,7 @@ class TrustPolicyTest extends TestCase
         $this->assertGreaterThanOrEqual(2, $gate['unmet']);
 
         $this->actingAs($this->user('admin'));
-        $this->get('/admin/doi-ai/chinh-sach')->assertOk()->assertSee('văn bản chính sách của bạn')->assertDontSee('Nâng lên Mức 2</', false)->assertDontSee('wire:click="upgrade');
+        $this->get('/admin/chinh-sach-tin-cay')->assertOk()->assertSee('văn bản chính sách của bạn')->assertDontSee('Nâng lên Mức 2</', false)->assertDontSee('wire:click="upgrade');
     }
 
     public function test_it_mau_thi_khong_ket_luan_dat(): void
@@ -123,21 +123,21 @@ class TrustPolicyTest extends TestCase
     public function test_quyen_truy_cap_hai_tab(): void
     {
         $this->actingAs($this->user('approver'));
-        $this->get('/admin/doi-ai/chinh-sach')->assertOk();
+        $this->get('/admin/chinh-sach-tin-cay')->assertOk();
         $this->get('/admin/doi-ai/pipeline')->assertOk();
     }
 
     public function test_bien_tap_vien_bi_chan_o_hai_tab(): void
     {
         $this->actingAs($this->user('writer'));
-        $this->get('/admin/doi-ai/chinh-sach')->assertForbidden();
+        $this->get('/admin/chinh-sach-tin-cay')->assertForbidden();
         $this->get('/admin/doi-ai/pipeline')->assertForbidden();
     }
 
     public function test_trang_chinh_sach_hien_nhom_chu_de_va_bac_hien_tai(): void
     {
         $this->actingAs($this->user('approver'));
-        $this->get('/admin/doi-ai/chinh-sach')->assertOk()
+        $this->get('/admin/chinh-sach-tin-cay')->assertOk()
             ->assertSee('Đang áp dụng: Mức 1 (T1)')->assertSee('Chỉ lưu nội bộ')->assertSee('Mở rộng')
             ->assertSee('suc khoe', false)->assertSee('Cao (cần chuyên gia duyệt)');
     }

@@ -4,10 +4,12 @@ namespace App\Services\Agent\Ai;
 
 use App\Models\AiModelRoute;
 use App\Models\AiProvider;
+use App\Services\Agent\Roles\RoleAssignments;
 use Illuminate\Support\Facades\Schema;
 
 /**
  * AG-S11: cho một loại việc, trả provider + model theo bảng ai_model_routes.
+ * AG-S17: bản gán theo vai trò (agent_role_assignments; strategist→outline, writer→write/repair, editor→summary) được ưu tiên trước route theo loại việc.
  * Route chưa cấu hình, provider thiếu khóa hoặc đang tắt thì trả null (tác vụ không chạy) — KHÔNG có Mock thay thế.
  * Dự phòng chỉ là một model THẬT khác đã cấu hình; việc chuyển sang nó do AgentRunOrchestrator thực hiện và ghi vào nhật ký run.
  */
@@ -16,7 +18,7 @@ final class AiModelRouter
     /** Chỉ chế độ định tuyến khi đã có ít nhất một route. Chưa có thì giữ đường cũ (agent_settings/env, một Gemini). */
     public static function isConfigured(): bool
     {
-        return Schema::hasTable('ai_model_routes') && AiModelRoute::query()->exists();
+        return (Schema::hasTable('ai_model_routes') && AiModelRoute::query()->exists()) || RoleAssignments::hasAny();
     }
 
     public function target(string $task): ?RouteTarget
@@ -65,9 +67,20 @@ final class AiModelRouter
         return array_values(array_filter($tasks, fn ($t) => $this->why($t) !== null));
     }
 
+    /** AG-S17: bản gán theo vai trò (nếu có và đủ provider + model) đè lên route theo loại việc; trần chi phí vẫn lấy từ route. */
     private function route(string $task): ?AiModelRoute
     {
-        return AiModelRoute::query()->with(['primaryProvider', 'fallbackProvider'])->where('task', $task)->first();
+        $base = Schema::hasTable('ai_model_routes') ? AiModelRoute::query()->with(['primaryProvider', 'fallbackProvider'])->where('task', $task)->first() : null;
+        $a = (new RoleAssignments())->forTask($task);
+        if (! $a) {
+            return $base;
+        }
+        $r = $base ?? new AiModelRoute(['task' => $task, 'tier' => AiModelRoute::TASKS[$task][1] ?? 'standard']);
+        $r->forceFill(['primary_provider_id' => $a->provider_id, 'primary_model' => $a->model, 'fallback_provider_id' => $a->fallback_provider_id, 'fallback_model' => $a->fallback_model]);
+        $r->setRelation('primaryProvider', $a->provider);
+        $r->setRelation('fallbackProvider', $a->fallbackProvider);
+
+        return $r;
     }
 
     private function build(?AiProvider $p, ?string $model, ?float $cap): ?RouteTarget

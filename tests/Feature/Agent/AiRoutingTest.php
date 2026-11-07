@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Agent;
 
-use App\Filament\Clusters\AgentTeam\Pages\AgentConnection;
+use App\Filament\Pages\AgentConnection;
 use App\Models\AgentRun;
 use App\Models\AgentSetting;
 use App\Models\AiModelRoute;
@@ -469,7 +469,7 @@ class AiRoutingTest extends TestCase
         $this->assertStringNotContainsString('SECRETKEY', (string) \DB::table('ai_providers')->value('api_key'));
         $this->assertSame('claude-opus-5-5', AiModelRoute::where('task', 'write')->value('primary_model'));
         $this->assertSame('claude-haiku-5-5', AiModelRoute::where('task', 'outline')->value('primary_model'));
-        $html = $this->get('/admin/doi-ai/ket-noi-ai')->assertOk()->assertSee('Claude')->assertSee('•••• đã lưu')->assertSee('Định tuyến theo loại việc')->assertSee('Hệ thống không tự dùng Mock thay thế')->getContent();
+        $html = $this->get('/admin/tich-hop-ai')->assertOk()->assertSee('Claude')->assertSee('•••• đã lưu')->assertSee('Định tuyến theo loại việc')->assertSee('Hệ thống không tự dùng Mock thay thế')->getContent();
         $this->assertStringNotContainsString('SECRETKEY', $html);
         $this->assertStringNotContainsString(self::KEY, $html);
     }
@@ -486,7 +486,7 @@ class AiRoutingTest extends TestCase
         $p->refresh();
         $this->assertFalse($p->last_test_ok);
         $this->assertStringNotContainsString('SECRETKEY', (string) $p->last_test_message);
-        $this->get('/admin/doi-ai/ket-noi-ai')->assertOk()->assertDontSee('SECRETKEY');
+        $this->get('/admin/tich-hop-ai')->assertOk()->assertDontSee('SECRETKEY');
     }
 
     public function test_admin_sua_route_va_dat_du_phong_khong_duoc_trung(): void
@@ -520,7 +520,7 @@ class AiRoutingTest extends TestCase
     public function test_bien_tap_vien_bi_chan_khoi_trang_tich_hop_ai(): void
     {
         $this->actingAs($this->user('writer'));
-        $this->get('/admin/doi-ai/ket-noi-ai')->assertForbidden();
+        $this->get('/admin/tich-hop-ai')->assertForbidden();
         Livewire::test(AgentConnection::class)->assertForbidden();
     }
 
@@ -530,7 +530,7 @@ class AiRoutingTest extends TestCase
         $this->route('write', $p);
 
         $this->actingAs($this->user('approver'));
-        $this->get('/admin/doi-ai/ket-noi-ai')->assertOk()->assertSee('P-anthropic')->assertDontSee('Cập nhật khóa');
+        $this->get('/admin/tich-hop-ai')->assertOk()->assertSee('P-anthropic')->assertDontSee('Cập nhật khóa');
         Livewire::test(AgentConnection::class)
             ->assertActionHidden('addProvider')->assertActionHidden('editRoute', ['task' => 'write'])->assertActionHidden('testProvider', ['id' => $p->id])
             ->call('mountAction', 'addProvider')->assertSet('mountedActions', []);

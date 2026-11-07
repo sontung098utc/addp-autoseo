@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Agent;
 
-use App\Filament\Clusters\AgentTeam\Pages\AgentConnection;
+use App\Filament\Pages\AgentConnection;
 use App\Models\AgentSetting;
 use App\Models\Campaign;
 use App\Models\User;
@@ -34,15 +34,15 @@ class AgentTeamHubTest extends TestCase
     public function test_cac_tab_cung_mot_cum_va_biên_tap_vien_bi_chan(): void
     {
         $this->actingAs($this->user('approver'));
-        foreach (['tong-quan', 'chien-dich', 'phien-chay', 'ket-noi-ai'] as $tab) {
-            $this->get("/admin/doi-ai/{$tab}")->assertOk()->assertSee('Tổng quan')->assertSee('Chiến dịch')->assertSee('Phiên chạy')->assertSee('Tích hợp AI');
+        foreach (['tong-quan', 'chien-dich', 'phien-chay', 'vai-tro'] as $tab) {
+            $this->get("/admin/doi-ai/{$tab}")->assertOk()->assertSee('Tổng quan')->assertSee('Chiến dịch')->assertSee('Phiên chạy')->assertSee('Vai trò');
         }
     }
 
     public function test_bien_tap_vien_khong_vao_duoc_cum(): void
     {
         $this->actingAs($this->user('writer'));
-        foreach (['tong-quan', 'chien-dich', 'phien-chay', 'ket-noi-ai'] as $tab) {
+        foreach (['tong-quan', 'chien-dich', 'phien-chay', 'vai-tro'] as $tab) {
             $this->get("/admin/doi-ai/{$tab}")->assertForbidden();
         }
     }
@@ -133,7 +133,7 @@ class AgentTeamHubTest extends TestCase
         $raw = \DB::table('ai_providers')->value('api_key');
         $this->assertStringNotContainsString('SECRETKEY', (string) $raw, 'khóa phải được mã hóa trong CSDL');
         $this->assertSame('AIzaSECRETKEY9999', \App\Models\AiProvider::first()->api_key);
-        $this->get('/admin/doi-ai/ket-noi-ai')->assertOk()->assertDontSee('SECRETKEY')->assertDontSee('9999')->assertSee('•••• đã lưu');
+        $this->get('/admin/tich-hop-ai')->assertOk()->assertDontSee('SECRETKEY')->assertDontSee('9999')->assertSee('•••• đã lưu');
 
         Livewire::test(AgentConnection::class)->callAction('editLimits', ['run_budget_vnd' => 70000, 'max_repair_rounds' => 2])->assertHasNoActionErrors();
         $this->assertSame(70000.0, AgentAi::policy()->budgetVnd);
@@ -155,7 +155,7 @@ class AgentTeamHubTest extends TestCase
         $p = \App\Models\AiProvider::create(['name' => 'G', 'kind' => 'gemini', 'api_key' => 'AIza-OLD-1111']);
         $this->actingAs($this->user('approver'));
 
-        $this->get('/admin/doi-ai/ket-noi-ai')->assertOk()->assertSee('Chỉ quản trị viên được thêm')->assertSee('Tác vụ nào chưa có khóa provider sẽ không chạy')->assertDontSee('Cập nhật khóa');
+        $this->get('/admin/tich-hop-ai')->assertOk()->assertSee('Chỉ quản trị viên được thêm')->assertSee('Tác vụ nào chưa có khóa provider sẽ không chạy')->assertDontSee('Cập nhật khóa');
         Livewire::test(AgentConnection::class)->assertActionHidden('addProvider')->assertActionHidden('updateKey', ['id' => $p->id])->assertActionHidden('editRoute', ['task' => 'write']);
         $this->assertSame('AIza-OLD-1111', $p->fresh()->api_key);
     }

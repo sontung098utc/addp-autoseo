@@ -42,7 +42,27 @@ final class PlaybookLoader
         return $out;
     }
 
+    /**
+     * AG-S17: khi KHÔNG chỉ định version, áp bản gán theo vai trò: kỹ năng bị tắt => null (dùng chỉ dẫn mặc định), có ghim => đúng phiên bản đã ghim
+     * (không còn thì null, không âm thầm dùng bản khác). Chỉ định version rõ ràng thì trả đúng bản đó, không áp gán.
+     */
     public function find(string $role, string $key, ?int $version = null): ?Playbook
+    {
+        if ($version === null) {
+            $st = (new \App\Services\Agent\Roles\RoleAssignments())->skillState("{$role}/{$key}");
+            if (! $st['enabled']) {
+                return null;
+            }
+            if ($st['pin'] !== null) {
+                return $this->findLatest($role, $key, $st['pin']);
+            }
+        }
+
+        return $this->findLatest($role, $key, $version);
+    }
+
+    /** Bản mới nhất (hoặc đúng version), không áp bản gán. Dùng cho giao diện cần thấy playbook thật trên đĩa. */
+    public function findLatest(string $role, string $key, ?int $version = null): ?Playbook
     {
         $hits = array_values(array_filter($this->all(), fn (Playbook $p) => $p->role === $role && $p->key === $key && ($version === null || $p->version === $version)));
 
