@@ -176,4 +176,18 @@ class PlaybookLoaderTest extends TestCase
         $this->assertSame('draft', $p->status, 'Playbook chưa qua bộ mẫu tiếng Việt (AG-K09) thì không được active');
         $this->assertNull((new PlaybookLoader(dirname(__DIR__, 2).'/resources/playbooks'))->latestActive('auditor', 'audit-summary'));
     }
+
+    public function test_playbook_brief_va_editor_la_nhap_va_tham_chieu_luat_co_that(): void
+    {
+        $loader = new PlaybookLoader(dirname(__DIR__, 2).'/resources/playbooks');
+        $known = array_map(fn ($r) => $r->code(), \App\Services\Content\Quality\ContentQualityChecker::defaultRules());
+
+        foreach ([['brief', 'content-brief'], ['editor', 'qa-review']] as [$role, $key]) {
+            $p = $loader->find($role, $key, 1);
+            $this->assertSame('draft', $p->status, "{$role}/{$key} chưa qua AG-K09 thật nên chỉ là nháp");
+            foreach ($p->rubricRefs as $ref) {
+                $this->assertContains($ref, $known, "{$role}/{$key} tham chiếu luật không tồn tại: {$ref}");
+            }
+        }
+    }
 }
