@@ -13,6 +13,7 @@ use App\Services\Ai\MockAiProvider;
 use App\Services\Ai\Playbook\InvalidPlaybook;
 use App\Services\Ai\Playbook\Playbook;
 use App\Services\Ai\Playbook\PlaybookLoader;
+use App\Filament\Support\Schedule\ErrorMasker;
 use App\Services\Content\HtmlSanitizer;
 use App\Services\Content\Quality\ContentQualityChecker;
 use App\Services\Content\Quality\QualityReport;
@@ -38,7 +39,10 @@ final class AgentRunOrchestrator
         private ?EmergencyStopService $stop = null,
         private RunPolicy $policy = new RunPolicy(),
         private ?PlaybookLoader $playbooks = null,
+        /** Bộ ngủ tiêm được để test không chờ thật; nhận số giây. */
+        private ?\Closure $sleep = null,
     ) {
+        $this->sleep ??= fn (int $seconds) => sleep($seconds);
         $this->stop ??= app(EmergencyStopService::class);
         $this->playbooks ??= new PlaybookLoader(resource_path('playbooks'));
     }
@@ -58,6 +62,11 @@ final class AgentRunOrchestrator
 
         try {
             return $this->execute($run, $article, $previousStatus);
+        } catch (AiRetriesExhausted $e) {
+            $this->step($run, 'handoff', 'system', 'failed', 'Nhà cung cấp AI vẫn lỗi sau khi thử lại', 'Đã thử lại '.$this->policy->maxRetries.' lần, nhà cung cấp AI vẫn lỗi tạm thời ('.ErrorMasker::short($e->getMessage(), 160).'). Không thay bằng AI giả lập; bài được trả về trạng thái cũ, không có gì được đăng.', ['error' => class_basename($e), 'attempts' => $e->attempts]);
+            $article->update(['workflow_status' => $previousStatus]);
+
+            return $this->finish($run, 'failed', 'Nhà cung cấp AI lỗi tạm thời, đã hết '.$this->policy->maxRetries.' lần thử lại. Chưa có bản nháp nào được tạo.');
         } catch (Throwable $e) {
             $this->step($run, 'handoff', 'system', 'failed', 'Phiên chạy gặp lỗi', 'Lỗi không lường trước; bài được trả về trạng thái cũ, không có gì được đăng.', ['error' => class_basename($e)]);
             $article->update(['workflow_status' => $previousStatus]);
@@ -94,15 +103,17 @@ final class AgentRunOrchestrator
 
         // 3. Dàn ý.
         [$briefPb, $briefNote] = $this->usePlaybook('brief', 'content-brief');
-        $outline = $this->ai->generateOutline($article, $briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : []);
+        $briefOptions = $briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : [];
+        $outline = $this->withRetry($run, 'lập dàn ý', fn () => $this->ai->generateOutline($article, $briefOptions));
         $this->step($run, 'brief', 'strategist', 'ok', 'Lập dàn ý ('.count($outline['outline'] ?? []).' mục)', 'Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. '.$briefNote,
             ['outline' => $outline['outline'] ?? [], 'playbook' => $this->pbData($briefPb)], $outline['model'] ?? null, (int) ($outline['tokens_used'] ?? 0), (float) ($outline['cost_vnd'] ?? 0));
         [$editorPb, $editorNote] = $this->usePlaybook('editor', 'qa-review');
 
         // 4. Viết.
         $attrs = $this->write($run, $article, $outline['outline'] ?? [], [], 'write', 'Viết bản đầu', null);
-        $report = $this->grade($run, $article, $attrs, 'Chấm bản đầu', $editorPb, $editorNote);
+        $report = $this->grade($run, $article, $attrs, 'Chấm bản đầu', 0, $editorPb, $editorNote);
         $penalty = $this->penalty($report);
+        $score = RunScorer::score($report);
 
         // 5. Vòng sửa có giới hạn.
         $reason = null;
@@ -110,19 +121,27 @@ final class AgentRunOrchestrator
         while ($report->hasBlocking() && $round < $this->policy->maxRepairRounds) {
             if ($this->spent($run) >= $this->policy->budgetVnd) {
                 $reason = 'Hết ngân sách cho phiên chạy ('.number_format($this->policy->budgetVnd, 0, ',', '.').' ₫) nên dừng sửa.';
+                $this->decision($run, 'budget_exhausted', 'Dừng sửa vì hết ngân sách', $reason, ['spent_vnd' => $this->spent($run), 'budget_vnd' => $this->policy->budgetVnd, 'score' => $score]);
                 break;
             }
             $round++;
             $feedback = array_map(fn ($r) => "{$r->code}: {$r->message}", $report->blocking());
             $attrs = $this->write($run, $article, $outline['outline'] ?? [], $feedback, 'repair', "Sửa lần {$round}", $editorPb);
-            $report = $this->grade($run, $article, $attrs, "Chấm lại sau lần sửa {$round}", $editorPb, '');
+            $report = $this->grade($run, $article, $attrs, "Chấm lại sau lần sửa {$round}", $round, $editorPb, '');
             $new = $this->penalty($report);
+            $newScore = RunScorer::score($report);
             if ($report->hasBlocking() && $new >= $penalty) {
                 $reason = 'Sửa không cải thiện điểm (từ '.$penalty.' xuống '.$new.') nên dừng, tránh tốn thêm chi phí.';
+                $this->decision($run, 'no_improvement', 'Dừng sửa vì không cải thiện', $reason." Điểm {$score} → {$newScore}.", ['penalty_before' => $penalty, 'penalty_after' => $new, 'score_before' => $score, 'score_after' => $newScore]);
                 $penalty = $new;
+                $score = $newScore;
                 break;
             }
             $penalty = $new;
+            $score = $newScore;
+        }
+        if ($reason === null && $report->hasBlocking() && $round >= $this->policy->maxRepairRounds) {
+            $this->decision($run, 'max_rounds', 'Dừng sửa vì hết số vòng cho phép', "Đã sửa {$round}/{$this->policy->maxRepairRounds} vòng, còn lỗi chặn nên không sửa thêm.", ['rounds' => $round, 'max_rounds' => $this->policy->maxRepairRounds, 'score' => $score]);
         }
         $run->update(['repair_rounds' => $round]);
 
@@ -131,6 +150,9 @@ final class AgentRunOrchestrator
         $version = $this->persist($article, $attrs, $passed);
         $run->update(['final_version_id' => $version->id]);
 
+        if ($passed && $assess->level === 'high') {
+            $this->decision($run, 'high_risk_expert_review', 'Giữ cho người có chuyên môn duyệt', 'Đạt luật nhưng chủ đề rủi ro cao nên hệ thống không coi là xong; cần người có chuyên môn duyệt trước khi dùng.', ['risk_level' => 'high', 'score' => $score]);
+        }
         if ($passed) {
             $article->update(['workflow_status' => 'needs_review']);
             $this->step($run, 'handoff', 'system', 'ok', 'Chuyển người duyệt', 'Đạt mọi luật bắt buộc. Bản nháp v'.$version->version.' đã vào hàng chờ duyệt; chưa xuất bản vì bậc tin cậy '.$this->policy->trustTier.'.', ['version' => $version->version]);
@@ -154,7 +176,7 @@ final class AgentRunOrchestrator
             $options['playbook'] = $editorPb->body;
             $options['playbook_ref'] = $editorPb->ref();
         }
-        $r = $this->ai->generateArticle($article, $outline, $options);
+        $r = $this->withRetry($run, $title, fn () => $this->ai->generateArticle($article, $outline, $options));
         $html = HtmlSanitizer::clean($r['html_content'] ?? '');
         // Nhà cung cấp thật có thể rơi về bản giả lập một cách im lặng (thiếu khóa, JSON hỏng). Không được gọi đó là AI thật.
         $fellBack = str_starts_with((string) ($r['model'] ?? ''), 'mock');
@@ -176,15 +198,16 @@ final class AgentRunOrchestrator
         ];
     }
 
-    private function grade(AgentRun $run, Article $article, array $attrs, string $title, ?Playbook $editorPb = null, string $note = ''): QualityReport
+    private function grade(AgentRun $run, Article $article, array $attrs, string $title, int $round, ?Playbook $editorPb = null, string $note = ''): QualityReport
     {
         $report = $this->checker->check(new ArticleVersion($attrs), $article);
         $c = $report->counts();
         $failed = array_map(fn ($r) => ['code' => $r->code, 'severity' => $r->severity, 'message' => $r->message], array_slice($report->failed(), 0, 8));
         $block = $report->blockingCodes();
+        $score = RunScorer::score($report);
         $this->step($run, 'grade', 'editor', $block === [] ? 'ok' : 'warn', $title,
-            $block === [] ? "Đạt mọi luật bắt buộc (còn {$c['P1']} mục P1, {$c['P2']} mục P2 chỉ nên xem)." : 'Trượt luật bắt buộc: '.implode(', ', $block).'. Quyết định do luật, không do AI.'.($note !== '' ? ' '.$note : ''),
-            ['blocking' => $block, 'counts' => $c, 'penalty' => $this->penalty($report), 'failed' => $failed, 'playbook' => $this->pbData($editorPb)]);
+            "Điểm {$score}/100 (tham khảo, mốc ".RunScorer::REFERENCE_THRESHOLD.'). '.($block === [] ? "Đạt mọi luật bắt buộc (còn {$c['P1']} mục P1, {$c['P2']} mục P2 chỉ nên xem)." : 'Trượt luật bắt buộc: '.implode(', ', $block).'. Quyết định do luật, không do AI.').($note !== '' ? ' '.$note : ''),
+            ['blocking' => $block, 'counts' => $c, 'score' => $score, 'round' => $round, 'threshold' => RunScorer::REFERENCE_THRESHOLD, 'penalty' => $this->penalty($report), 'failed' => $failed, 'playbook' => $this->pbData($editorPb)]);
 
         return $report;
     }
@@ -224,6 +247,44 @@ final class AgentRunOrchestrator
     private function pbData(?Playbook $pb): ?array
     {
         return $pb ? ['ref' => $pb->ref(), 'status' => $pb->status, 'checksum' => substr($pb->checksum, 0, 12), 'source' => $pb->lineage['source'] ?? ''] : null;
+    }
+
+    /**
+     * Gọi nhà cung cấp AI; lỗi TẠM THỜI được thử lại tối đa policy->maxRetries lần với backoff, mỗi lần ghi một bước 'retry'.
+     * Lỗi không tạm thời ném thẳng ra (phiên 'failed'). Hết lần thì ném AiRetriesExhausted; không bao giờ thay bằng Mock.
+     *
+     * @template T
+     * @param \Closure(): T $call
+     * @return T
+     */
+    private function withRetry(AgentRun $run, string $what, \Closure $call): mixed
+    {
+        $attempt = 0;
+        while (true) {
+            try {
+                return $call();
+            } catch (Throwable $e) {
+                if (! TransientAiError::is($e)) {
+                    throw $e;
+                }
+                $attempt++;
+                if ($attempt > $this->policy->maxRetries) {
+                    throw new AiRetriesExhausted($what, $attempt, $e);
+                }
+                $delays = $this->policy->backoffSeconds;
+                $wait = (int) ($delays[$attempt - 1] ?? ($delays === [] ? 1 : end($delays)));
+                $this->step($run, 'retry', 'system', 'warn', "Thử lại lần {$attempt}/{$this->policy->maxRetries}: {$what}",
+                    'Nhà cung cấp AI lỗi tạm thời ('.TransientAiError::describe($e).'; '.ErrorMasker::short($e->getMessage(), 120)."). Chờ {$wait} giây rồi thử lại, không đổi sang AI giả lập.",
+                    ['attempt' => $attempt, 'max' => $this->policy->maxRetries, 'wait_seconds' => $wait, 'error' => TransientAiError::describe($e)]);
+                ($this->sleep)($wait);
+            }
+        }
+    }
+
+    /** Ghi một quyết định hệ thống tự đưa ra kèm dữ kiện trước/sau. */
+    private function decision(AgentRun $run, string $code, string $title, string $detail, array $facts): void
+    {
+        $this->step($run, 'decision', 'system', 'ok', $title, $detail, ['decision' => $code] + $facts);
     }
 
     private function penalty(QualityReport $r): int
