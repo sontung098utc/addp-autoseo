@@ -99,13 +99,15 @@ class AgentTeamHubTest extends TestCase
         $w = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
         $c = Campaign::create(['website_id' => $w->id, 'name' => 'CD', 'status' => 'active', 'daily_limit' => 5, 'keywords' => ['a']]);
         $this->assertSame('done', $this->steps()['steps'][0]['state']);
-        $this->assertSame(4, $this->steps()['stepsLeft']);
+        // Sau AG-S02 cột campaigns.mode có mặc định 'balanced': có chiến dịch nghĩa là đã có chế độ, bước 4 hoàn tất.
+        $this->assertSame('done', $this->steps()['steps'][3]['state']);
+        $this->assertSame(3, $this->steps()['stepsLeft']);
 
         $art = \App\Models\Article::create(['website_id' => $w->id, 'primary_keyword' => 'a']);
         \App\Models\AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'campaign_id' => $c->id, 'status' => 'held', 'ai_mode' => 'mock']);
         $d = $this->steps();
         $this->assertSame('done', $d['steps'][4]['state']);
-        $this->assertSame(3, $d['stepsLeft']);
+        $this->assertSame(2, $d['stepsLeft']);
         $this->assertSame('todo', $d['steps'][1]['state']);
         $this->assertSame('todo', $d['steps'][2]['state']);
     }
