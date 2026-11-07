@@ -276,7 +276,7 @@ class AgentRunLogTest extends TestCase
         $this->actingAs(User::create(['name' => 'ap', 'email' => 'ap@x.vn', 'password' => 'secret123', 'role' => 'approver', 'is_active' => true]));
 
         $this->get(\App\Filament\Resources\AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()
-            ->assertSee('Điểm chất lượng qua các vòng')->assertSee('v1 ')->assertSee('sửa 1 ')
+            ->assertSee('Vòng Chấm ↔ Sửa')->assertSee('v1 ')->assertSee('sửa 1 ')
             ->assertSee('Quyết định tự động')->assertSee('Dừng sửa vì không cải thiện')
             ->assertSee('Thử lại lần 1/3');
     }
