@@ -4,16 +4,21 @@
 @endphp
 <x-filament-panels::page>
     <div data-testid="agent-overview" class="space-y-4">
-        <x-filament::section heading="Cách dùng: 4 bước" description="Làm lần lượt từ trái sang phải. Sau bước 3 hệ thống tự chạy, bạn chỉ cần duyệt.">
-            <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.6rem">
+        <x-filament::section :heading="'Hoàn tất cài đặt: còn '.$stepsLeft.' bước'" description="Bước chưa có dữ liệu thật được ghi là chưa làm, không tính là xong.">
+            @unless ($ai['connected'])
+                <div class="text-sm" style="color:#b45309;margin-bottom:.6rem" data-testid="ai-warning">
+                    Chưa có khóa AI. Không có khóa thì lượt tự động không chạy. <a class="underline" href="{{ \App\Filament\Clusters\AgentTeam\Pages\AgentConnection::getUrl() }}">Nhập khóa ở Kết nối AI</a>
+                </div>
+            @endunless
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(10.5rem,1fr));gap:.6rem">
                 @foreach ($steps as $s)
-                    <a href="{{ $s['url'] }}" data-step="{{ $s['n'] }}" style="border:1px solid rgba(128,128,128,.35);border-radius:.6rem;padding:.6rem;text-decoration:none;color:inherit;{{ $s['done'] === false ? 'border-color:#d97706;' : '' }}">
+                    <{{ $s['url'] ? 'a' : 'div' }} @if ($s['url']) href="{{ $s['url'] }}" @endif data-step="{{ $s['n'] }}" data-state="{{ $s['state'] }}" style="border:1px solid rgba(128,128,128,.35);border-radius:.6rem;padding:.6rem;text-decoration:none;color:inherit;{{ $s['state'] === 'todo' ? 'border-color:#d97706;' : '' }}">
                         <div style="font-size:.7rem;opacity:.6">Bước {{ $s['n'] }}</div>
                         <div style="font-weight:600;font-size:.88rem">{{ $s['title'] }}
-                            @if ($s['done'] === true)<span style="color:#16a34a">✓</span>@elseif ($s['done'] === false)<span style="color:#d97706">●</span>@endif
+                            @if ($s['state'] === 'done')<span style="color:#16a34a">✓</span>@elseif ($s['state'] === 'todo')<span style="color:#d97706">●</span>@endif
                         </div>
                         <div style="font-size:.72rem;opacity:.8;margin-top:.2rem">{{ $s['note'] }}</div>
-                    </a>
+                    </{{ $s['url'] ? 'a' : 'div' }}>
                 @endforeach
             </div>
         </x-filament::section>

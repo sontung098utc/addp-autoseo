@@ -8,7 +8,7 @@ use Filament\Resources\Pages\ListRecords;
 
 class ListArticles extends ListRecords
 {
-    protected static ?string $title = 'Chiến dịch & Bài viết';
+    protected static ?string $title = 'Bài viết';
 
     protected static string $resource = ArticleResource::class;
 

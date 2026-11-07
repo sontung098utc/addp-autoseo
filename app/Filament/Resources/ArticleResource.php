@@ -20,11 +20,11 @@ class ArticleResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
 
-    protected static ?string $navigationLabel = 'Chiến dịch & Bài viết';
+    protected static ?string $navigationLabel = 'Bài viết';
 
     protected static ?string $modelLabel = 'Bài viết';
 
-    protected static ?string $pluralModelLabel = 'Chiến dịch & Bài viết';
+    protected static ?string $pluralModelLabel = 'Bài viết';
 
     protected static ?string $navigationGroup = 'Chiến dịch';
 

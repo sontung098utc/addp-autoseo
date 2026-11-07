@@ -57,12 +57,12 @@ class AgentTeamHubTest extends TestCase
         $this->assertStringNotContainsString('Phiên chạy của đội AI', $html);
     }
 
-    public function test_tong_quan_chi_dung_4_buoc_khi_chua_co_gi(): void
+    public function test_tong_quan_5_buoc_deu_chua_xong_khi_chua_co_gi(): void
     {
         $this->actingAs($this->user('approver'));
 
         $this->get('/admin/doi-ai/tong-quan')->assertOk()
-            ->assertSee('Chưa có khóa AI')->assertSee('Chưa có chiến dịch nào ở trạng thái')->assertSee('Chưa có bản nháp nào chờ duyệt')
+            ->assertSee('Chưa có khóa AI')->assertSee('Chưa có website nào ở trạng thái hoạt động')
             ->assertSee('Chưa kết nối AI nên lượt tự động không chạy được');
     }
 
@@ -74,7 +74,50 @@ class AgentTeamHubTest extends TestCase
         $this->actingAs($this->user('admin'));
 
         $this->get('/admin/doi-ai/tong-quan')->assertOk()
-            ->assertSee('Đang dùng model gemini-1.5-flash')->assertSee('1 chiến dịch đang chạy')->assertDontSee('Chưa kết nối AI nên');
+            ->assertSee('1 website đang hoạt động')->assertDontSee('Chưa có khóa AI')->assertDontSee('Chưa kết nối AI nên');
+    }
+
+    private function steps(): array
+    {
+        $c = \Livewire\Livewire::test(\App\Filament\Clusters\AgentTeam\Pages\AgentOverview::class)->instance();
+        $m = new \ReflectionMethod($c, 'getViewData');
+        $m->setAccessible(true);
+
+        return $m->invoke($c);
+    }
+
+    public function test_5_buoc_dem_dung_va_buoc_chua_co_du_lieu_luon_chua_lam(): void
+    {
+        $this->actingAs($this->user('admin'));
+        $d = $this->steps();
+        $this->assertSame([1, 2, 3, 4, 5], array_column($d['steps'], 'n'));
+        $this->assertSame(['todo', 'todo', 'todo', 'default', 'todo'], array_column($d['steps'], 'state'));
+        $this->assertSame(5, $d['stepsLeft']);
+        $this->get('/admin/doi-ai/tong-quan')->assertOk()->assertSee('Hoàn tất cài đặt: còn 5 bước')
+            ->assertSee('Hồ sơ doanh nghiệp')->assertSee('Nguồn AI được dùng')->assertSee('Cân bằng (mặc định)')->assertSee('Search Console chưa kết nối');
+
+        $w = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+        $c = Campaign::create(['website_id' => $w->id, 'name' => 'CD', 'status' => 'active', 'daily_limit' => 5, 'keywords' => ['a']]);
+        $this->assertSame('done', $this->steps()['steps'][0]['state']);
+        $this->assertSame(4, $this->steps()['stepsLeft']);
+
+        $art = \App\Models\Article::create(['website_id' => $w->id, 'primary_keyword' => 'a']);
+        \App\Models\AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'campaign_id' => $c->id, 'status' => 'held', 'ai_mode' => 'mock']);
+        $d = $this->steps();
+        $this->assertSame('done', $d['steps'][4]['state']);
+        $this->assertSame(3, $d['stepsLeft']);
+        $this->assertSame('todo', $d['steps'][1]['state']);
+        $this->assertSame('todo', $d['steps'][2]['state']);
+    }
+
+    public function test_nhan_menu_bai_viet_gon_va_khong_con_hai_muc_chien_dich(): void
+    {
+        $this->actingAs($this->user('approver'));
+        $html = $this->get('/admin')->assertOk()->getContent();
+        $this->assertStringNotContainsString('Chiến dịch &amp; Bài viết', $html);
+        $this->assertSame(1, preg_match_all('/>\s*Bài viết\s*</u', $html));
+        $this->assertSame(1, preg_match_all('/>\s*Duyệt bài\s*</u', $html));
+        $this->get('/admin/articles')->assertOk()->assertDontSee('Chiến dịch &amp; Bài viết', false);
     }
 
     public function test_khoa_luu_ma_hoa_va_khong_bao_gio_hien_lai(): void
