@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PublicationResource\Pages;
 
 use App\Filament\Resources\PublicationResource;
+use App\Filament\Support\Explain\WhyAction;
 use App\Filament\Support\Schedule\ReconcileAction;
 use Filament\Resources\Pages\ViewRecord;
 
@@ -14,6 +15,6 @@ class ViewPublication extends ViewRecord
 
     protected function getHeaderActions(): array
     {
-        return [ReconcileAction::page(), \App\Filament\Support\Schedule\RescheduleAction::page()];
+        return [WhyAction::page(), ReconcileAction::page(), \App\Filament\Support\Schedule\RescheduleAction::page()];
     }
 }
