@@ -4,6 +4,7 @@ namespace App\Services\Content\Quality;
 
 use App\Models\Article;
 use App\Models\ArticleVersion;
+use App\Services\Content\Quality\Rules\BannedTermsRule;
 use App\Services\Content\Quality\Rules\DuplicateRule;
 use App\Services\Content\Quality\Rules\FactRule;
 use App\Services\Content\Quality\Rules\FaqRule;
@@ -34,7 +35,7 @@ class ContentQualityChecker
     {
         return [
             new LengthRule(), new HeadingRule(), new KeywordRule(), new MetaRule(), new DuplicateRule(),
-            new ImageRule(), new SafetyRule(), new FactRule(), new FaqRule(),
+            new ImageRule(), new SafetyRule(), new FactRule(), new FaqRule(), new BannedTermsRule(),
         ];
     }
 
