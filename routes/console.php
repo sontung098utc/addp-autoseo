@@ -21,3 +21,10 @@ Schedule::command('autoseo:reconcile-publications')
     ->timezone('Asia/Ho_Chi_Minh')
     ->withoutOverlapping()
     ->runInBackground();
+
+// AG-S01: nhịp chiến dịch của đội AI. Không dùng AI giả lập; thiếu khóa AI thật thì mỗi nhịp chỉ ghi "chưa cấu hình". Dev1 thay bằng hàng đợi (AG-B10).
+Schedule::command('agent:tick')
+    ->everyFifteenMinutes()
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->withoutOverlapping()
+    ->runInBackground();
