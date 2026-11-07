@@ -180,16 +180,31 @@ class CampaignTest extends TestCase
         $this->runner()->tick($this->campaign());
         $this->actingAs($this->user('approver'));
 
-        $this->get('/admin/doi-ai/tong-quan')->assertOk()
-            ->assertSee('Hoàn tất cài đặt: còn')->assertSee('Đường đi của một bài')->assertSee('Dev1 cần (AG-B06)')
-            ->assertSee('1 phiên chạy thật');
+        // Luồng và phần Dev1 cần nằm trong cửa sổ phụ, không chiếm trang chính.
+        $this->get('/admin/doi-ai/tong-quan')->assertOk()->assertSee('Luồng & phần còn thiếu')->assertDontSee('Dev1 cần (AG-B06)');
+        $html = view('filament.clusters.agent-team.flow-modal', (new class extends \App\Filament\Clusters\AgentTeam\Pages\AgentOverview {
+            public function data(): array
+            {
+                return $this->flowData();
+            }
+        })->data())->render();
+        $this->assertStringContainsString('Đường đi của một bài', $html);
+        $this->assertStringContainsString('Dev1 cần (AG-B06)', $html);
+        $this->assertStringContainsString('1 phiên chạy thật', $html);
     }
 
     public function test_ban_do_luong_rong_noi_that_la_chua_co_du_lieu(): void
     {
         $this->actingAs($this->user('admin'));
 
-        $this->get('/admin/doi-ai/tong-quan')->assertOk()->assertSee('0 phiên chạy thật')->assertSee('chưa có số liệu');
+        $html = view('filament.clusters.agent-team.flow-modal', (new class extends \App\Filament\Clusters\AgentTeam\Pages\AgentOverview {
+            public function data(): array
+            {
+                return $this->flowData();
+            }
+        })->data())->render();
+        $this->assertStringContainsString('0 phiên chạy thật', $html);
+        $this->assertStringContainsString('chưa có số liệu', $html);
     }
 
     // ---- AG-S02 ----

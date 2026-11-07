@@ -61,9 +61,10 @@ class AgentTeamHubTest extends TestCase
     {
         $this->actingAs($this->user('approver'));
 
+        // Chưa kết nối AI là việc CẦN làm: nổi bật ở khối "Cần bạn", không nhồi mọi thứ lên trang.
         $this->get('/admin/doi-ai/tong-quan')->assertOk()
-            ->assertSee('Chưa có khóa AI')->assertSee('Chưa có website nào ở trạng thái hoạt động')
-            ->assertSee('Chưa kết nối AI nên lượt tự động không chạy được');
+            ->assertSee('Chưa kết nối AI, lượt tự động không chạy')->assertSee('Nhập khóa')
+            ->assertSee('Chưa có website nào ở trạng thái hoạt động');
     }
 
     public function test_tong_quan_cap_nhat_buoc_khi_da_lam(): void
@@ -198,5 +199,59 @@ class AgentTeamHubTest extends TestCase
             }
         })->ping()['ok']);
         $this->assertFalse((new GeminiAiProvider('', 'm'))->ping()['ok']);
+    }
+
+    // ---- AG-S08: tổng quan gọn, chỉ điều cần chú ý ----
+
+    public function test_khong_co_viec_thi_chi_noi_binh_thuong_va_khong_nhoi_so_lieu(): void
+    {
+        AgentSetting::create(['provider' => 'gemini', 'api_key' => 'AIza-test-1234', 'model' => 'm']);
+        $this->actingAs($this->user('approver'));
+
+        $html = $this->get('/admin/doi-ai/tong-quan')->assertOk()->assertSee('Không có việc nào cần bạn lúc này')->assertSee('Đang nghỉ')->getContent();
+        $this->assertStringNotContainsString('data-live-run', $html);
+        $this->assertStringNotContainsString('Đường đi của một bài', $html, 'đường đi của bài chỉ ở cửa sổ phụ');
+        $this->assertStringNotContainsString('data-stage=', $html, 'không còn lưới chặng gộp mọi phiên');
+    }
+
+    public function test_khoi_can_ban_chi_hien_viec_that_va_xep_theo_muc_nghiem_trong(): void
+    {
+        AgentSetting::create(['provider' => 'gemini', 'api_key' => 'AIza-test-1234', 'model' => 'm']);
+        $w = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+        $art = \App\Models\Article::create(['website_id' => $w->id, 'primary_keyword' => 'a']);
+        \App\Models\AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'status' => 'held', 'ai_mode' => 'mock']);
+        \App\Models\AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'status' => 'failed', 'ai_mode' => 'mock']);
+        $this->actingAs($this->user('approver'));
+
+        $html = $this->get('/admin/doi-ai/tong-quan')->assertOk()->assertDontSee('Không có việc nào cần bạn')->getContent();
+        $this->assertLessThan(strpos($html, '1 phiên giữ nháp'), strpos($html, '1 phiên bị lỗi'), 'lỗi nổi lên trước giữ nháp');
+        $this->assertStringNotContainsString('chờ bạn duyệt', $html, 'không có bản nháp thì không liệt kê');
+    }
+
+    public function test_so_lieu_hom_nay_va_cua_so_luong_co_du_lieu(): void
+    {
+        AgentSetting::create(['provider' => 'gemini', 'api_key' => 'AIza-test-1234', 'model' => 'm']);
+        $w = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+        $art = \App\Models\Article::create(['website_id' => $w->id, 'primary_keyword' => 'a']);
+        \App\Models\AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'status' => 'ready_for_review', 'ai_mode' => 'mock', 'started_at' => now(), 'cost_vnd' => 1234]);
+        $this->actingAs($this->user('approver'));
+
+        $this->get('/admin/doi-ai/tong-quan')->assertOk()->assertSee('bài đã giao hôm nay')->assertSee('1.234 ₫');
+    }
+
+    public function test_bang_phien_chay_va_chien_dich_cot_noi_dung_rong_cot_phu_gon(): void
+    {
+        $this->actingAs($this->user('approver'));
+        $w = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+        $art = \App\Models\Article::create(['website_id' => $w->id, 'primary_keyword' => 'a']);
+        \App\Models\AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'status' => 'held', 'ai_mode' => 'mock', 'started_at' => now(), 'outcome_reason' => 'Dừng vì điểm không tăng']);
+        Campaign::create(['website_id' => $w->id, 'name' => 'CD', 'status' => 'active', 'daily_limit' => 5, 'keywords' => ['a']]);
+
+        $runs = $this->get('/admin/doi-ai/phien-chay')->assertOk()->getContent();
+        $camp = $this->get('/admin/doi-ai/chien-dich')->assertOk()->getContent();
+        $this->assertStringContainsString('min-width:22rem', $runs);
+        $this->assertStringContainsString('width:1%;white-space:nowrap', $runs);
+        $this->assertStringContainsString('min-width:20rem', $camp);
+        $this->assertStringContainsString('width:1%;white-space:nowrap', $camp);
     }
 }

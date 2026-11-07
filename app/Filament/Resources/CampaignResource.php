@@ -119,17 +119,22 @@ class CampaignResource extends Resource
             ->defaultSort('id', 'desc')
             ->poll(fn () => RunActivity::anyRunning() ? '3s' : '20s')
             ->columns([
-                Tables\Columns\TextColumn::make('name')->label('Chiến dịch')->searchable()->description(fn (Campaign $r) => $r->website?->name),
+                Tables\Columns\TextColumn::make('name')->label('Chiến dịch')->searchable()->wrap()->description(fn (Campaign $r) => $r->website?->name)
+                    ->extraHeaderAttributes(['style' => 'min-width:20rem'])->extraCellAttributes(['style' => 'min-width:20rem']),
                 Tables\Columns\TextColumn::make('status')->label('Trạng thái')->badge()
                     ->formatStateUsing(fn (string $state) => $state === 'active' ? 'Đang chạy' : 'Tạm dừng')
                     ->color(fn (string $state) => $state === 'active' ? 'success' : 'gray')
                     ->icon(fn (Campaign $r) => self::liveRunCount($r) > 0 ? 'heroicon-o-arrow-path' : null)
                     ->extraAttributes(fn (Campaign $r) => self::liveRunCount($r) > 0 ? ['class' => 'ss-badge-live', 'data-running' => '1'] : [])
-                    ->description(fn (Campaign $r) => self::liveRunCount($r) > 0 ? 'Đang viết '.self::liveRunCount($r).' bài' : null),
-                Tables\Columns\TextColumn::make('today')->label('Hôm nay')->state(fn (Campaign $r) => self::todayCount($r).' / '.$r->daily_limit)->alignCenter(),
-                Tables\Columns\TextColumn::make('left')->label('Từ khóa còn lại')->state(fn (Campaign $r) => self::remaining($r))->alignCenter(),
+                    ->description(fn (Campaign $r) => self::liveRunCount($r) > 0 ? 'Đang viết '.self::liveRunCount($r).' bài' : null)
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
+                Tables\Columns\TextColumn::make('today')->label('Hôm nay')->state(fn (Campaign $r) => self::todayCount($r).' / '.$r->daily_limit)->alignCenter()
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%;white-space:nowrap']),
+                Tables\Columns\TextColumn::make('left')->label('Từ khóa còn lại')->state(fn (Campaign $r) => self::remaining($r))->alignCenter()
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%;white-space:nowrap']),
                 Tables\Columns\TextColumn::make('last_tick_at')->label('Nhịp gần nhất (giờ VN)')->placeholder('Chưa chạy')
-                    ->formatStateUsing(fn (Campaign $r) => VnTime::format(VnTime::fromRaw($r, 'last_tick_at'))),
+                    ->formatStateUsing(fn (Campaign $r) => VnTime::format(VnTime::fromRaw($r, 'last_tick_at')))
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
             ])
             ->actions([
                 Tables\Actions\Action::make('tick')->label('Chạy một nhịp ngay')->icon('heroicon-o-play')

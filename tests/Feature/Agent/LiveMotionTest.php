@@ -129,13 +129,15 @@ class LiveMotionTest extends TestCase
         $html = $this->get($url)->assertOk()->getContent();
         $this->assertStringContainsString('wire:poll.10s', $html);
         $this->assertStringNotContainsString('overview-live', $html);
-        $this->assertStringNotContainsString('data-live-stage', $html);
+        $this->assertStringNotContainsString('data-live-run', $html);
 
-        $this->makeRun('running', ['guard', 'risk', 'brief']);
+        $run = $this->makeRun('running', ['guard', 'risk', 'brief']);
         $html = $this->get($url)->assertOk()->getContent();
         $this->assertStringContainsString('wire:poll.2s', $html);
-        $this->assertStringContainsString('Đội AI đang chạy: 1 phiên', $html);
-        $this->assertStringContainsString('data-live-stage="write"', $html);
+        $this->assertStringContainsString('Đang chạy 1 phiên', $html);
+        // Mỗi phiên đang chạy một dòng, ghi chặng hiện tại (không còn lưới chặng gộp mọi phiên).
+        $this->assertStringContainsString('data-live-run="'.$run->id.'"', $html);
+        $this->assertStringContainsString('Viết', $html);
     }
 
     public function test_pill_toan_cuc_chi_cho_approver_va_chi_khi_co_phien(): void

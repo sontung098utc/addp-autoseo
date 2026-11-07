@@ -81,23 +81,34 @@ class AgentRunResource extends Resource
             ->poll(fn () => RunActivity::anyRunning() ? '3s' : '15s')
             ->defaultSort('id', 'desc')
             ->columns([
+                // Cột nội dung là cột quan trọng nhất: cho rộng; các cột phụ gọn lại, không xuống dòng.
                 Tables\Columns\TextColumn::make('article.primary_keyword')->label('Bài / từ khóa')->searchable()->wrap()
-                    ->description(fn (AgentRun $r) => $r->website?->name),
+                    ->description(fn (AgentRun $r) => $r->website?->name)
+                    ->extraHeaderAttributes(['style' => 'min-width:22rem'])->extraCellAttributes(['style' => 'min-width:22rem']),
                 Tables\Columns\TextColumn::make('status')->label('Kết quả')->badge()
                     ->formatStateUsing(fn (string $state, AgentRun $r) => RunActivity::isStale($r) ? 'Có thể bị treo' : (self::STATUS[$state][0] ?? $state))
                     ->color(fn (string $state, AgentRun $r) => RunActivity::isStale($r) ? 'warning' : (self::STATUS[$state][1] ?? 'gray'))
                     ->icon(fn (string $state, AgentRun $r) => RunActivity::isLive($r) ? 'heroicon-o-arrow-path' : null)
                     ->extraAttributes(fn (AgentRun $r) => RunActivity::isLive($r) ? ['class' => 'ss-badge-live', 'data-running' => '1'] : [])
-                    ->description(fn (AgentRun $r) => RunActivity::isLive($r)
-                        ? 'Đang ở: '.(AgentFlowBlueprint::byStage()[RunActivity::currentStage($r->steps)]['title'] ?? 'hoàn tất')
-                        : ($r->outcome_reason ? \Illuminate\Support\Str::limit($r->outcome_reason, 70) : null)),
+                    ->description(fn (AgentRun $r) => RunActivity::isLive($r) ? 'Đang ở: '.(AgentFlowBlueprint::byStage()[RunActivity::currentStage($r->steps)]['title'] ?? 'hoàn tất') : null)
+                    ->tooltip(fn (AgentRun $r) => $r->outcome_reason ?: null)
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
+                Tables\Columns\TextColumn::make('score')->label('Điểm')->alignCenter()->placeholder('—')
+                    ->state(fn (AgentRun $r) => $r->steps->where('stage', 'grade')->last()?->data['score'] ?? null)
+                    ->tooltip('Điểm 0–100 của lần chấm gần nhất. Quyết định đạt/không do luật, điểm chỉ để theo dõi.')
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%']),
                 Tables\Columns\TextColumn::make('ai_mode')->label('AI')->badge()
                     ->formatStateUsing(fn (string $state) => $state === 'real' ? 'AI thật' : 'AI giả lập')
-                    ->color(fn (string $state) => $state === 'real' ? 'success' : 'gray'),
-                Tables\Columns\TextColumn::make('repair_rounds')->label('Vòng sửa')->alignCenter(),
-                Tables\Columns\TextColumn::make('cost_vnd')->label('Chi phí')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', '.').' ₫'),
-                Tables\Columns\TextColumn::make('started_at')->label('Bắt đầu (giờ VN)')
-                    ->formatStateUsing(fn (AgentRun $r) => VnTime::format(VnTime::fromRaw($r, 'started_at')))->sortable(),
+                    ->color(fn (string $state) => $state === 'real' ? 'success' : 'gray')
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
+                Tables\Columns\TextColumn::make('repair_rounds')->label('Vòng sửa')->alignCenter()->toggleable(isToggledHiddenByDefault: true)
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%']),
+                Tables\Columns\TextColumn::make('cost_vnd')->label('Chi phí')->toggleable()->alignEnd()
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', '.').' ₫')
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
+                Tables\Columns\TextColumn::make('started_at')->label('Bắt đầu (giờ VN)')->sortable()
+                    ->formatStateUsing(fn (AgentRun $r) => VnTime::format(VnTime::fromRaw($r, 'started_at')))
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
             ])
             ->actions([Tables\Actions\ViewAction::make()->label('Xem diễn biến')]);
     }

@@ -22,7 +22,7 @@ use Filament\Pages\Page;
 use Filament\Pages\SubNavigationPosition;
 use Illuminate\Support\Facades\Schema;
 
-/** Tab "Tổng quan" của Đội AI: bước cần làm, vòng đời một bài (số liệu thật), việc cần bạn, bản đồ chặng. */
+/** Tab "Tổng quan" của Đội AI: trạng thái một dòng, việc CẦN bạn, các phiên đang chạy, số liệu hôm nay. Luồng và phần Dev1 cần xây để trong cửa sổ phụ. */
 class AgentOverview extends Page
 {
     protected static ?string $cluster = AgentTeam::class;
@@ -48,49 +48,85 @@ class AgentOverview extends Page
         return $u instanceof \App\Models\User && $u->is_active && $u->isApprover();
     }
 
-    protected function getViewData(): array
+    protected function getHeaderActions(): array
     {
-        $ai = AgentAi::status();
-        $active = Campaign::query()->where('status', 'active')->get();
-        $drafts = ArticleVersion::query()->where('review_status', 'needs_review')->count();
+        return [
+            \Filament\Actions\Action::make('flow')->label('Luồng & phần còn thiếu')->icon('heroicon-o-map')->color('gray')
+                ->modalHeading('Luồng của đội AI')->modalWidth('5xl')
+                ->modalContent(fn () => view('filament.clusters.agent-team.flow-modal', $this->flowData()))
+                ->modalSubmitAction(false)->modalCancelActionLabel('Đóng'),
+        ];
+    }
+
+    /** Dữ liệu cho cửa sổ "Luồng & phần còn thiếu" (chỉ để tham khảo, không nằm trên trang chính). */
+    protected function flowData(): array
+    {
         $since = now()->subDays(30);
-        $runs = AgentRun::query()->where('created_at', '>=', $since);
-        $byStatus = (clone $runs)->selectRaw('status, count(*) c')->groupBy('status')->pluck('c', 'status')->all();
+        $byStatus = AgentRun::query()->where('created_at', '>=', $since)->selectRaw('status, count(*) c')->groupBy('status')->pluck('c', 'status')->all();
         $stepStats = AgentRunStep::query()->whereHas('run', fn ($q) => $q->where('created_at', '>=', $since))
             ->selectRaw('stage, status, count(*) c')->groupBy('stage', 'status')->get()->groupBy('stage');
-
-        $liveStages = RunActivity::liveStages();
-        $liveCount = RunActivity::liveCount();
-        $nodes = array_map(function (array $b) use ($stepStats, $liveStages): array {
-            $b['live'] = $liveStages[$b['stage']] ?? 0;
+        $nodes = array_map(function (array $b) use ($stepStats): array {
             $b['stats'] = ($stepStats->get($b['stage']) ?? collect())->pluck('c', 'status')->all();
 
             return $b;
         }, AgentFlowBlueprint::stages());
+        $active = Campaign::query()->where('status', 'active')->get();
 
-        $steps = $this->setupSteps($ai);
-
-        $life = [
-            ['label' => 'Từ khóa chưa giao', 'n' => $active->sum(fn ($c) => CampaignResource::remaining($c)), 'url' => CampaignResource::getUrl('index'), 'who' => 'Chiến dịch'],
-            ['label' => 'Đội AI giữ nháp', 'n' => $byStatus['held'] ?? 0, 'url' => AgentRunResource::getUrl('index'), 'who' => 'Cần người xem'],
-            ['label' => 'Chờ duyệt', 'n' => $drafts, 'url' => ArticleVersionResource::getUrl('index'), 'who' => 'Người duyệt'],
-            ['label' => 'Đã xếp lịch', 'n' => Publication::query()->where('status', 'scheduled')->count(), 'url' => PublicationResource::getUrl('index'), 'who' => 'Hệ thống đăng'],
-            ['label' => 'Đã đăng', 'n' => Publication::query()->where('status', 'published')->count(), 'url' => PublicationResource::getUrl('index'), 'who' => 'CMS'],
+        return [
+            'nodes' => $nodes,
+            'total' => array_sum($byStatus),
+            'life' => [
+                ['label' => 'Từ khóa chưa giao', 'n' => $active->sum(fn ($c) => CampaignResource::remaining($c)), 'url' => CampaignResource::getUrl('index'), 'who' => 'Chiến dịch'],
+                ['label' => 'Đội AI giữ nháp', 'n' => $byStatus['held'] ?? 0, 'url' => AgentRunResource::getUrl('index'), 'who' => 'Cần người xem'],
+                ['label' => 'Chờ duyệt', 'n' => ArticleVersion::query()->where('review_status', 'needs_review')->count(), 'url' => ArticleVersionResource::getUrl('index'), 'who' => 'Người duyệt'],
+                ['label' => 'Đã xếp lịch', 'n' => Publication::query()->where('status', 'scheduled')->count(), 'url' => PublicationResource::getUrl('index'), 'who' => 'Hệ thống đăng'],
+                ['label' => 'Đã đăng', 'n' => Publication::query()->where('status', 'published')->count(), 'url' => PublicationResource::getUrl('index'), 'who' => 'CMS'],
+            ],
         ];
+    }
+
+    protected function getViewData(): array
+    {
+        $ai = AgentAi::status();
+        $liveCount = RunActivity::liveCount();
+        $steps = $this->setupSteps($ai);
+        [$from, $to] = \App\Filament\Support\Schedule\VnTime::todayRangeUtc();
+        $today = AgentRun::query()->where('started_at', '>=', $from)->where('started_at', '<', $to);
+        $costCap = Schema::hasColumn('campaigns', 'daily_cost_cap_vnd') ? (float) Campaign::query()->where('status', 'active')->sum('daily_cost_cap_vnd') : 0.0;
+
+        $week = now()->subDays(7);
+        $failed = AgentRun::query()->where('status', 'failed')->where('created_at', '>=', $week)->count();
+        $held = AgentRun::query()->where('status', 'held')->where('created_at', '>=', $week)->count();
+        $stale = AgentRun::query()->where('status', 'running')->get()->filter(fn ($r) => RunActivity::isStale($r))->count();
+        $drafts = ArticleVersion::query()->where('review_status', 'needs_review')->count();
+        $waits = Schema::hasTable('campaign_waits') ? \App\Models\CampaignWait::query()->where('status', 'open')->where('expires_at', '>', now())->count() : 0;
+
+        // Chỉ liệt kê điều CẦN bạn; xếp theo mức nghiêm trọng. Không có gì thì trang chỉ báo bình thường, không nhồi số liệu.
+        $attention = array_values(array_filter([
+            $failed > 0 ? ['tone' => 'danger', 'text' => "{$failed} phiên bị lỗi trong 7 ngày qua", 'action' => 'Xem', 'url' => AgentRunResource::getUrl('index')] : null,
+            $stale > 0 ? ['tone' => 'danger', 'text' => "{$stale} phiên có thể bị treo (lâu không có bước mới)", 'action' => 'Xem', 'url' => AgentRunResource::getUrl('index')] : null,
+            ! $ai['connected'] ? ['tone' => 'warning', 'text' => 'Chưa kết nối AI, lượt tự động không chạy', 'action' => 'Nhập khóa', 'url' => AgentConnection::getUrl()] : null,
+            $held > 0 ? ['tone' => 'warning', 'text' => "{$held} phiên giữ nháp, cần người xem", 'action' => 'Xem', 'url' => AgentRunResource::getUrl('index')] : null,
+            $waits > 0 ? ['tone' => 'info', 'text' => "{$waits} việc đang chờ bạn bổ sung (không chặn việc khác)", 'action' => 'Xem', 'url' => CampaignResource::getUrl('index')] : null,
+            $drafts > 0 ? ['tone' => 'primary', 'text' => "{$drafts} bản nháp chờ bạn duyệt", 'action' => 'Duyệt', 'url' => ArticleVersionResource::getUrl('index')] : null,
+        ]));
 
         return [
             'ai' => $ai,
             'liveCount' => $liveCount,
+            'live' => RunActivity::liveRuns(5),
             'pollSeconds' => $liveCount > 0 ? RunActivity::POLL_LIVE : RunActivity::POLL_IDLE,
+            'attention' => $attention,
+            'today' => [
+                'runs' => (clone $today)->count(),
+                'toReview' => (clone $today)->where('status', 'ready_for_review')->count(),
+                'cost' => (float) (clone $today)->sum('cost_vnd'),
+                'cap' => $costCap,
+            ],
             'steps' => $steps,
             'stepsLeft' => collect($steps)->where('state', '!=', 'done')->count(),
-            'life' => $life,
-            'nodes' => $nodes,
-            'total' => array_sum($byStatus),
-            'byStatus' => $byStatus,
-            'statusMap' => AgentRunResource::STATUS,
-            'attention' => AgentRun::query()->with('article')->whereIn('status', ['held', 'failed'])->latest('id')->limit(5)->get(),
             'runsUrl' => AgentRunResource::getUrl('index'),
+            'stages' => AgentFlowBlueprint::byStage(),
         ];
     }
 
