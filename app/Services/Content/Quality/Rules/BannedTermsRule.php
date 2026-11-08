@@ -3,7 +3,7 @@
 namespace App\Services\Content\Quality\Rules;
 
 use App\Services\Content\Quality\BannedTermsProvider;
-use App\Services\Content\Quality\FileBannedTerms;
+use App\Services\Content\Quality\CompositeBannedTerms;
 use App\Services\Content\Quality\QualityContext;
 use App\Services\Content\Quality\QualityRule;
 use App\Services\Content\Quality\RuleResult;
@@ -25,7 +25,7 @@ class BannedTermsRule implements QualityRule
 
     public function evaluate(QualityContext $ctx): array
     {
-        $terms = ($this->provider ?? new FileBannedTerms())->termsFor($ctx);
+        $terms = ($this->provider ?? new CompositeBannedTerms())->termsFor($ctx);
         $haystack = $this->haystack($ctx);
         $hits = [];
         foreach ($terms as $group => $phrases) {

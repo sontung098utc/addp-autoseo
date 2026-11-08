@@ -131,9 +131,24 @@ class AgentOverview extends Page
         ];
     }
 
+    /** AG-S19: tính THẬT theo hồ sơ của các website đang hoạt động: done khi mọi website hoạt động đều có hồ sơ đủ trường bắt buộc. */
+    private function brandStep(int $activeSites): array
+    {
+        $url = \App\Filament\Pages\BrandProfilePage::getUrl();
+        $profiles = Schema::hasTable('brand_profiles')
+            ? \App\Models\BrandProfile::query()->whereIn('website_id', Website::query()->where('status', 'active')->select('id'))->get()
+            : collect();
+        $complete = $profiles->filter(fn ($p) => \App\Services\Brand\BrandProfileData::isComplete($p))->count();
+        $done = $activeSites > 0 && $complete >= $activeSites;
+        $note = $activeSites === 0 ? 'Cần có website hoạt động trước.'
+            : ($done ? "Cả {$complete} website hoạt động đã có hồ sơ đủ." : "Mới {$complete}/{$activeSites} website có hồ sơ đủ ({$profiles->count()} đã bắt đầu điền). Bấm để điền.");
+
+        return ['n' => 2, 'title' => 'Hồ sơ doanh nghiệp', 'state' => $done ? 'done' : 'todo', 'note' => $note, 'url' => $url];
+    }
+
     /**
      * "Hoàn tất cài đặt" 5 bước. state: done (có dữ liệu thật) | todo (chưa làm) | default (đang dùng mặc định, chưa chọn).
-     * Bước chưa có dữ liệu (hồ sơ doanh nghiệp AG-K11, nguồn AI AG-A03) luôn là todo, không tick giả.
+     * Bước chưa có dữ liệu (nguồn AI AG-A03) luôn là todo, không tick giả.
      *
      * @param  array<string, mixed>  $ai
      * @return list<array<string, mixed>>
@@ -152,9 +167,7 @@ class AgentOverview extends Page
             ['n' => 1, 'title' => 'Nối website', 'state' => $sites > 0 ? 'done' : 'todo',
                 'note' => $sites > 0 ? "{$sites} website đang hoạt động." : 'Chưa có website nào ở trạng thái hoạt động.',
                 'url' => WebsiteResource::getUrl('index')],
-            ['n' => 2, 'title' => 'Hồ sơ doanh nghiệp', 'state' => 'todo',
-                'note' => 'Chưa làm. Chức năng hồ sơ doanh nghiệp (AG-K11) chưa có.',
-                'url' => null],
+            $this->brandStep($sites),
             ['n' => 3, 'title' => 'Nguồn AI được dùng', 'state' => 'todo',
                 'note' => 'Chưa làm. Chọn nguồn (AG-A03) chưa có. Hiện có: '
                     .($crawled > 0 ? "trang website sẵn sàng ({$crawled} trang đã quét)" : 'trang website chưa quét')
