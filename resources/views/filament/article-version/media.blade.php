@@ -7,3 +7,7 @@
 @else
     <p>Chưa có ảnh.</p>
 @endif
+@php($ctxStep = \App\Models\AgentRunStep::query()->whereIn('agent_run_id', \App\Models\AgentRun::where('final_version_id', $getRecord()->id)->select('id'))->whereIn('stage', ['write', 'repair'])->orderByDesc('seq')->first())
+@if ($ctxStep && (isset($ctxStep->data['images']) || isset($ctxStep->data['internal_links'])))
+    @include('filament.agent.context-assets', ['data' => $ctxStep->data])
+@endif

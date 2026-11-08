@@ -28,6 +28,7 @@ use App\Models\BrandProfile;
 use App\Services\Brand\BrandProfileData;
 use App\Services\Content\Quality\ContentQualityChecker;
 use App\Services\Content\Quality\QualityReport;
+use App\Services\Agent\Context\ContextAssets;
 use App\Services\Knowledge\KnowledgeContext;
 use App\Services\Publishing\EmergencyStopService;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +46,8 @@ final class AgentRunOrchestrator
     private int $seq = 0;
 
     private ?KnowledgeContext $kb = null;
+
+    private ?ContextAssets $assets = null; // AG-S25: ảnh thư viện + liên kết nội bộ
 
     public function __construct(
         private AiProviderInterface $ai,
@@ -128,6 +131,7 @@ final class AgentRunOrchestrator
         $site = $article->website;
         $this->brandProfile = BrandProfileData::forWebsite($article->website_id);
         $this->kb = new KnowledgeContext(); // AG-S20: mỗi lượt chạy truy xuất kiến thức riêng
+        $this->assets = new ContextAssets();
 
         // 1. An toàn: dừng khẩn cấp và website phải hoạt động.
         if ($this->stop->isStopped($article->website_id)) {
@@ -225,6 +229,7 @@ final class AgentRunOrchestrator
         $version = $this->persist($article, $attrs, $passed);
         $run->update(['final_version_id' => $version->id]);
         $this->kb?->recordUsage($version);
+        $this->assets?->attachFeatured($version); // AG-S25
 
         if ($passed && $assess->level === 'high') {
             $this->decision($run, 'high_risk_expert_review', 'Giữ cho người có chuyên môn duyệt', 'Đạt luật nhưng chủ đề rủi ro cao nên hệ thống không coi là xong; cần người có chuyên môn duyệt trước khi dùng.', ['risk_level' => 'high', 'score' => $score]);
@@ -268,9 +273,13 @@ final class AgentRunOrchestrator
         $this->kb ??= new KnowledgeContext();
         $this->kb->load($article, $outline); // AG-S20: kiến thức đã duyệt, truy xuất một lần mỗi lượt chạy
         $options += $this->kb->options();
+        $this->assets ??= new ContextAssets();
+        $this->assets->load($article, $outline); // AG-S25: truy xuất một lần mỗi lượt chạy
+        $options += $this->assets->options();
         [$kbData, $kbNote] = $this->kb->stepInfo();
         $r = $this->callAi($run, $stage, $title, fn (AiProviderInterface $ai) => $ai->generateArticle($article, $outline, $options));
         $html = HtmlSanitizer::clean($r['html_content'] ?? '');
+        [$assetData, $assetNote] = $this->assets->stepInfo($html);
         // Nhà cung cấp thật có thể rơi về bản giả lập một cách im lặng (thiếu khóa, JSON hỏng). Không được gọi đó là AI thật.
         $fellBack = str_starts_with((string) ($r['model'] ?? ''), 'mock');
         if ($fellBack && $run->ai_mode !== 'mock') {
@@ -278,9 +287,9 @@ final class AgentRunOrchestrator
         }
         $silentMock = $fellBack && ! $this->ai instanceof MockAiProvider;
         $this->step($run, $stage, 'writer', $silentMock ? 'warn' : 'ok', $title, ($silentMock ? 'Nhà cung cấp AI đã rơi về bản giả lập (thiếu khóa hoặc phản hồi hỏng); nội dung không phải AI thật. ' : '').($feedback === []
-            ? 'Viết theo dàn ý; HTML được làm sạch trước khi chấm.'.$this->brandNote().$kbNote
+            ? 'Viết theo dàn ý; HTML được làm sạch trước khi chấm.'.$this->brandNote().$kbNote.$assetNote
             : 'Gửi lại cho AI '.count($feedback).' lỗi chặn cần sửa: '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
-            ['words' => str_word_count(strip_tags($html)) ?: mb_strlen(strip_tags($html)), 'playbook' => $this->pbData($pb)] + $this->brandData() + $kbData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
+            ['words' => str_word_count(strip_tags($html)) ?: mb_strlen(strip_tags($html)), 'playbook' => $this->pbData($pb)] + $this->brandData() + $kbData + $assetData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
 
         return [
             'article_id' => $article->id, 'title' => $r['title'] ?? $article->primary_keyword, 'slug' => $r['slug'] ?? 'bai-viet', 'outline' => $outline,
