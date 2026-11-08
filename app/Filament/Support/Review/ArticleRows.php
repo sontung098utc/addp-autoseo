@@ -19,6 +19,12 @@ final class ArticleRows
         'grade' => 'Chấm', 'repair' => 'Sửa', 'handoff' => 'Bàn giao',
     ];
 
+    /** Nhãn ngắn của phiên cho badge ở bảng; nhãn đầy đủ nằm ở tooltip. */
+    public const RUN_SHORT = [
+        'running' => 'Đang chạy', 'ready_for_review' => 'Chờ duyệt', 'held' => 'Giữ nháp', 'blocked' => 'Bị chặn',
+        'failed' => 'Lỗi', 'abandoned' => 'Đã bỏ',
+    ];
+
     public static function lastRun(Article $a): ?AgentRun
     {
         if (! $a->relationLoaded('lastRun')) {

@@ -152,6 +152,7 @@ class ArticleResource extends Resource
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->defaultSort('id', 'desc')
+            ->recordClasses('ss-sticky-row')
             ->columns([
                 Tables\Columns\TextColumn::make('primary_keyword')
                     ->label('Bài / từ khóa')
@@ -163,9 +164,9 @@ class ArticleResource extends Resource
                     ->wrap()
                     ->lineClamp(2)
                     ->tooltip(fn (Article $r) => $r->primary_keyword)
-                    ->description(fn (Article $r) => $r->latestVersion?->title ? \Illuminate\Support\Str::limit($r->latestVersion->title, 80) : null)
-                    ->extraHeaderAttributes(['style' => 'min-width:20rem'])
-                    ->extraCellAttributes(['style' => 'min-width:20rem']),
+                    ->description(fn (Article $r) => $r->latestVersion?->title ? \Illuminate\Support\Str::limit($r->latestVersion->title, 60) : null)
+                    ->extraHeaderAttributes(['class' => 'ss-col-main'])
+                    ->extraCellAttributes(['class' => 'ss-col-main']),
                 static::narrow(Tables\Columns\TextColumn::make('workflow_status')->sortable()
                     ->label('Trạng thái')
                     ->badge()
@@ -181,23 +182,33 @@ class ArticleResource extends Resource
                 static::narrow(Tables\Columns\TextColumn::make('campaign_name')
                     ->label('Chiến dịch')
                     ->state(fn (Article $r) => ArticleRows::campaignName($r) ?? '—')
-                    ->limit(24)
-                    ->tooltip(fn (Article $r) => ArticleRows::campaignName($r))),
+                    ->limit(16)
+                    ->tooltip(fn (Article $r) => ArticleRows::campaignName($r))
+                    ->visibleFrom('xl')),
                 static::narrow(Tables\Columns\TextColumn::make('last_run')
                     ->label('Phiên gần nhất')
+                    ->badge()
+                    ->limit(18)
+                    ->tooltip(function (Article $r) {
+                        $run = ArticleRows::lastRun($r);
+                        $score = $run ? ArticleRows::score($run) : null;
+
+                        return $run ? (AgentRunResource::STATUS[$run->status][0] ?? $run->status).' · phiên #'.$run->id.($score !== null ? ' · '.$score.' điểm' : '') : null;
+                    })
                     ->state(function (Article $r) {
                         $run = ArticleRows::lastRun($r);
                         if (! $run) {
                             return '—';
                         }
-                        $score = ArticleRows::score($run);
 
-                        return (AgentRunResource::STATUS[$run->status][0] ?? $run->status).($score !== null ? ' · '.$score.' điểm' : '');
+                        return ArticleRows::RUN_SHORT[$run->status] ?? (AgentRunResource::STATUS[$run->status][0] ?? $run->status);
                     })
                     ->url(fn (Article $r) => ($run = ArticleRows::lastRun($r)) && AgentRunResource::canViewAny() ? AgentRunResource::getUrl('view', ['record' => $run]) : null)
-                    ->color(fn (Article $r) => ArticleRows::lastRun($r) ? 'primary' : null)),
+                    ->color(fn (Article $r) => ($run = ArticleRows::lastRun($r)) ? (AgentRunResource::STATUS[$run->status][1] ?? 'gray') : 'gray')
+                    ->visibleFrom('xl')),
                 static::narrow(Tables\Columns\TextColumn::make('updated_at')->label('Cập nhật')->since()->sortable()
-                    ->tooltip(fn (Article $r) => $r->updated_at?->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y H:i'))),
+                    ->tooltip(fn (Article $r) => $r->updated_at?->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y H:i'))
+                    ->visibleFrom('md')),
                 Tables\Columns\TextColumn::make('website.name')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Website')->badge()->color('info')->sortable(),
                 Tables\Columns\TextColumn::make('topic_cluster')->toggleable(isToggledHiddenByDefault: true)->sortable()
@@ -291,7 +302,7 @@ class ArticleResource extends Resource
 
     private static function viewVersionAction(): Tables\Actions\Action
     {
-        return Tables\Actions\Action::make('view_version')->label('Xem')->icon('heroicon-o-eye')->color('gray')
+        return Tables\Actions\Action::make('view_version')->size('sm')->label('Xem')->icon('heroicon-o-eye')->color('gray')
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'view_version' && $r->versions()->exists())
             ->url(fn (Article $r) => ArticleVersionResource::getUrl('view', ['record' => $r->versions()->orderByDesc('version')->firstOrFail()]));
     }
@@ -316,7 +327,7 @@ class ArticleResource extends Resource
 
     private static function submitAction(): Tables\Actions\Action
     {
-        return Tables\Actions\Action::make('submit_review')->label('Gửi duyệt')->icon('heroicon-o-paper-airplane')
+        return Tables\Actions\Action::make('submit_review')->size('sm')->label('Gửi duyệt')->icon('heroicon-o-paper-airplane')
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'submit_review')
             ->authorize(fn () => ReviewActions::canSubmit())
             ->requiresConfirmation()
@@ -328,7 +339,7 @@ class ArticleResource extends Resource
 
     private static function approveAction(): Tables\Actions\Action
     {
-        return Tables\Actions\Action::make('approve')->label('Duyệt')->icon('heroicon-o-check')->color('success')
+        return Tables\Actions\Action::make('approve')->size('sm')->label('Duyệt')->icon('heroicon-o-check')->color('success')
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'approve')
             ->authorize(fn () => ReviewActions::canApprove())
             ->tooltip(fn (Article $r) => ReviewActions::blockedHint(static::qualityOf($r)))
@@ -354,7 +365,7 @@ class ArticleResource extends Resource
 
     private static function scheduleAction(): Tables\Actions\Action
     {
-        return Tables\Actions\Action::make('schedule')->label('Xếp lịch')->icon('heroicon-o-clock')
+        return Tables\Actions\Action::make('schedule')->size('sm')->label('Xếp lịch')->icon('heroicon-o-clock')
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'schedule')
             ->authorize(fn () => ReviewActions::canApprove())
             ->form(ReviewActions::scheduleForm())

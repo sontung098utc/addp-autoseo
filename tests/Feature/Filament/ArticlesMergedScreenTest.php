@@ -126,7 +126,19 @@ class ArticlesMergedScreenTest extends TestCase
         $table = Livewire::test(ListArticles::class)->instance()->getTable();
 
         $main = $table->getColumn('primary_keyword');
-        $this->assertStringContainsString('min-width:20rem', $main->getExtraHeaderAttributes()['style']);
+        $this->assertSame('ss-col-main', $main->getExtraHeaderAttributes()['class']);
+        $this->assertSame('ss-col-main', $main->getExtraCellAttributes()['class']);
+        $css = file_get_contents(public_path('css/seo-studio.css'));
+        $this->assertMatchesRegularExpression('/\.ss-col-main\s*\{[^}]*min-width:\s*12rem/', $css);
+        $this->assertStringContainsString('position: sticky; right: 0', $css);
+        $this->assertStringContainsString('tr.ss-sticky-row > td:last-child', $css);
+        $this->assertContains('ss-sticky-row', $table->getRecordClasses(new Article));
+        foreach (['campaign_name' => 16, 'last_run' => 18] as $name => $limit) {
+            $this->assertSame($limit, $table->getColumn($name)->getCharacterLimit(), $name);
+        }
+        foreach (['campaign_name', 'last_run', 'updated_at'] as $name) {
+            $this->assertNotNull($table->getColumn($name)->getVisibleFrom() ?? null, $name);
+        }
         foreach (['workflow_status', 'campaign_name', 'last_run', 'updated_at'] as $name) {
             $this->assertStringContainsString('width:1%;white-space:nowrap', $table->getColumn($name)->getExtraHeaderAttributes()['style'], $name);
         }
@@ -186,7 +198,7 @@ class ArticlesMergedScreenTest extends TestCase
         $this->mkRun($out, 'running');
 
         Livewire::test(ListArticles::class)
-            ->assertSee('Chiến dịch Xuân')->assertSee('87 điểm')->assertSee('—')
+            ->assertSee('Chiến dịch Xuân')->assertSee('Chờ duyệt')->assertSee('—')
             ->filterTable('campaign_id', $camp->id)->assertCanSeeTableRecords([$in])->assertCanNotSeeTableRecords([$out])
             ->removeTableFilters()
             ->filterTable('ai_running', true)->assertCanSeeTableRecords([$out])->assertCanNotSeeTableRecords([$in])

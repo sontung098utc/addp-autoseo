@@ -119,9 +119,10 @@ class CampaignResource extends Resource
             ->modifyQueryUsing(fn ($query) => $query->with('website')->withCount(['runs as runs_total', 'runs as runs_review' => fn ($q) => $q->where('status', 'ready_for_review'), 'runs as runs_held' => fn ($q) => $q->where('status', 'held')]))
             ->defaultSort('id', 'desc')
             ->poll(fn () => RunActivity::anyRunning() ? '3s' : '20s')
+            ->recordClasses('ss-sticky-row')
             ->columns([
                 Tables\Columns\TextColumn::make('name')->label('Chiến dịch')->searchable()->wrap()->description(fn (Campaign $r) => $r->website?->name.' · Đã giao '.(int) $r->runs_total.' bài · '.(int) $r->runs_review.' chờ duyệt · '.(int) $r->runs_held.' giữ nháp')
-                    ->extraHeaderAttributes(['style' => 'min-width:20rem'])->extraCellAttributes(['style' => 'min-width:20rem']),
+                    ->extraHeaderAttributes(['class' => 'ss-col-main'])->extraCellAttributes(['class' => 'ss-col-main']),
                 Tables\Columns\TextColumn::make('status')->label('Trạng thái')->badge()
                     ->formatStateUsing(fn (string $state) => $state === 'active' ? 'Đang chạy' : 'Tạm dừng')
                     ->color(fn (string $state) => $state === 'active' ? 'success' : 'gray')
@@ -131,9 +132,9 @@ class CampaignResource extends Resource
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
                 Tables\Columns\TextColumn::make('today')->label('Hôm nay')->state(fn (Campaign $r) => self::todayCount($r).' / '.$r->daily_limit)->alignCenter()
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%;white-space:nowrap']),
-                Tables\Columns\TextColumn::make('left')->label('Từ khóa còn lại')->state(fn (Campaign $r) => self::remaining($r))->alignCenter()
+                Tables\Columns\TextColumn::make('left')->label('Từ khóa còn lại')->visibleFrom('lg')->state(fn (Campaign $r) => self::remaining($r))->alignCenter()
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%;white-space:nowrap']),
-                Tables\Columns\TextColumn::make('last_tick_at')->label('Nhịp gần nhất (giờ VN)')->placeholder('Chưa chạy')
+                Tables\Columns\TextColumn::make('last_tick_at')->label('Nhịp gần nhất (giờ VN)')->visibleFrom('lg')->placeholder('Chưa chạy')
                     ->formatStateUsing(fn (Campaign $r) => VnTime::format(VnTime::fromRaw($r, 'last_tick_at')))
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
             ])

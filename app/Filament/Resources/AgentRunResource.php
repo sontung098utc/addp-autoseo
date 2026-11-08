@@ -80,11 +80,12 @@ class AgentRunResource extends Resource
             ->modifyQueryUsing(fn ($query) => $query->with(['article', 'website', 'steps']))
             ->poll(fn () => RunActivity::anyRunning() ? '3s' : '15s')
             ->defaultSort('id', 'desc')
+            ->recordClasses('ss-sticky-row')
             ->columns([
                 // Cột nội dung là cột quan trọng nhất: cho rộng; các cột phụ gọn lại, không xuống dòng.
                 Tables\Columns\TextColumn::make('article.primary_keyword')->label('Bài / từ khóa')->searchable()->wrap()
                     ->description(fn (AgentRun $r) => $r->website?->name)
-                    ->extraHeaderAttributes(['style' => 'min-width:22rem'])->extraCellAttributes(['style' => 'min-width:22rem']),
+                    ->extraHeaderAttributes(['class' => 'ss-col-main'])->extraCellAttributes(['class' => 'ss-col-main']),
                 Tables\Columns\TextColumn::make('status')->label('Kết quả')->badge()
                     ->formatStateUsing(fn (string $state, AgentRun $r) => RunActivity::isStale($r) ? 'Có thể bị treo' : (self::STATUS[$state][0] ?? $state))
                     ->color(fn (string $state, AgentRun $r) => RunActivity::isStale($r) ? 'warning' : (self::STATUS[$state][1] ?? 'gray'))
@@ -97,13 +98,13 @@ class AgentRunResource extends Resource
                     ->state(fn (AgentRun $r) => $r->steps->where('stage', 'grade')->last()?->data['score'] ?? null)
                     ->tooltip('Điểm 0–100 của lần chấm gần nhất. Quyết định đạt/không do luật, điểm chỉ để theo dõi.')
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%']),
-                Tables\Columns\TextColumn::make('ai_mode')->label('AI')->badge()
+                Tables\Columns\TextColumn::make('ai_mode')->label('AI')->visibleFrom('lg')->badge()
                     ->formatStateUsing(fn (string $state) => $state === 'real' ? 'AI thật' : 'AI giả lập')
                     ->color(fn (string $state) => $state === 'real' ? 'success' : 'gray')
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
                 Tables\Columns\TextColumn::make('repair_rounds')->label('Vòng sửa')->alignCenter()->toggleable(isToggledHiddenByDefault: true)
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%']),
-                Tables\Columns\TextColumn::make('cost_vnd')->label('Chi phí')->toggleable()->alignEnd()
+                Tables\Columns\TextColumn::make('cost_vnd')->label('Chi phí')->visibleFrom('lg')->toggleable()->alignEnd()
                     ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', '.').' ₫')
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
                 Tables\Columns\TextColumn::make('started_at')->label('Bắt đầu (giờ VN)')->sortable()

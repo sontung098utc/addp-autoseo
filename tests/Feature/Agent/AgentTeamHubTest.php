@@ -251,9 +251,9 @@ class AgentTeamHubTest extends TestCase
 
         $runs = $this->get('/admin/doi-ai/phien-chay')->assertOk()->getContent();
         $camp = $this->get('/admin/doi-ai/chien-dich')->assertOk()->getContent();
-        $this->assertStringContainsString('min-width:22rem', $runs);
+        $this->assertStringContainsString('ss-col-main', $runs);
         $this->assertStringContainsString('width:1%;white-space:nowrap', $runs);
-        $this->assertStringContainsString('min-width:20rem', $camp);
+        $this->assertStringContainsString('ss-col-main', $camp);
         $this->assertStringContainsString('width:1%;white-space:nowrap', $camp);
     }
 }

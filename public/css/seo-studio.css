@@ -326,3 +326,18 @@ select:not([multiple]) {
 .rv-bp { padding: .5rem 0; border-bottom: 1px solid rgb(128 128 128 / .18); }
 @media (max-width: 640px) { .rv-tl__item { grid-template-columns: 1fr; } .rv-tl__dot { display: none; } .fi-page:has(.rv) .fi-header-heading { font-size: 1.45rem; } }
 @media (prefers-reduced-motion: reduce) { .rv * { animation: none !important; transition: none !important; } }
+
+/* AG-S23: bảng không tràn ngang; cột thao tác luôn thấy (dính mép phải). */
+.ss-col-main { min-width: 12rem; max-width: 30rem; }
+.ss-col-main .fi-ta-text-item-label { overflow-wrap: anywhere; }
+.ss-col-main .fi-ta-text-item-description { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.fi-ta-table tr.ss-sticky-row > td:last-child,
+.fi-ta-table:has(tr.ss-sticky-row) thead th:last-child { position: sticky; right: 0; z-index: 2; white-space: nowrap; width: 1%; background: rgb(255 255 255); box-shadow: -6px 0 6px -6px rgb(0 0 0 / .18); }
+.dark .fi-ta-table tr.ss-sticky-row > td:last-child,
+.dark .fi-ta-table:has(tr.ss-sticky-row) thead th:last-child { background: rgb(17 24 39); }
+.fi-ta-table tr.ss-sticky-row > td:last-child .fi-ta-actions { flex-wrap: nowrap; gap: .25rem; }
+@media (max-width: 640px) { .ss-col-main { min-width: 9rem; } }
+@media (max-width: 640px) {
+  .ss-col-main { min-width: 7rem; }
+  .fi-ta-table:has(tr.ss-sticky-row) .fi-ta-selection-cell, .fi-ta-table:has(tr.ss-sticky-row) .fi-ta-header-selection-cell { display: none; }
+}
