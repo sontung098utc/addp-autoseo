@@ -156,6 +156,13 @@ final class KnowledgeReview
         }
         $item->update($attrs);
         $this->snapshot($item, $by, $note);
+        if ($status === 'approved') { // AG-S21: mục mới duyệt có thể lấp khoảng trống kiến thức
+            try {
+                (new KnowledgeGaps())->fillFrom($item);
+            } catch (\Throwable) {
+                // vòng học không được làm hỏng việc duyệt
+            }
+        }
 
         return $item;
     }
