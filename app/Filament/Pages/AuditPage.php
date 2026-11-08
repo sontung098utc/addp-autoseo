@@ -9,7 +9,10 @@ use App\Filament\Support\SeoAudit\IssueCatalog;
 use App\Filament\Support\SeoAudit\ScanBlocked;
 use App\Filament\Support\SeoAudit\ScanGuard;
 use App\Filament\Support\SeoAudit\SeoAuditService;
+use App\Models\AuditSuggestion;
 use App\Models\User;
+use App\Services\Audit\AuditSuggestionException;
+use App\Services\Audit\AuditSuggestionService;
 use App\Models\Website;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -141,6 +144,101 @@ class AuditPage extends Page
     public function closeBrief(): void
     {
         $this->briefOpen = false;
+    }
+
+
+    /** AG-S26: chỉ dữ liệu quét THẬT mới sinh đề xuất; dữ liệu minh họa không tạo việc. */
+    private function realRun(?array $run): bool
+    {
+        return $run !== null && ($run['sample'] ?? true) === false;
+    }
+
+    public function suggestRefresh(): void
+    {
+        $user = Auth::user();
+        $site = $this->site();
+        $run = $this->run($site);
+        if (! $user instanceof User || ! $site || ! ScanGuard::canAct($user)) {
+            Notification::make()->title('Không tạo được đề xuất')->body('Chỉ approver trở lên được tạo đề xuất làm mới.')->danger()->send();
+
+            return;
+        }
+        if (! $this->realRun($run)) {
+            Notification::make()->title('Dữ liệu minh họa: không tạo việc')->body('Đề xuất chỉ sinh từ kết quả quét thật của crawler.')->warning()->send();
+
+            return;
+        }
+        $r = (new AuditSuggestionService())->generate($site);
+        if ($r['skipped_reason']) {
+            Notification::make()->title('Chưa tạo đề xuất')->body($r['skipped_reason'])->warning()->send();
+
+            return;
+        }
+        Notification::make()->title("Đã tạo {$r['created']} đề xuất mới")->body("{$r['existing']} URL đã có đề xuất trước đó. Đề xuất chưa thành việc cho đến khi bạn chấp nhận.")->success()->send();
+    }
+
+    public function acceptSuggestion(int $id): void
+    {
+        $this->decide(fn (AuditSuggestionService $svc, User $u, AuditSuggestion $s) => $svc->accept($s, $u), $id, 'Đã chấp nhận: bài làm mới được thêm vào Kế hoạch (chờ chiến dịch giao cho đội AI).');
+    }
+
+    public function dismissSuggestion(int $id): void
+    {
+        $this->decide(fn (AuditSuggestionService $svc, User $u, AuditSuggestion $s) => $svc->dismiss($s, $u), $id, 'Đã bỏ qua đề xuất.');
+    }
+
+    public function acceptAllSuggestions(): void
+    {
+        $user = Auth::user();
+        $site = $this->site();
+        if (! $user instanceof User || ! $site) {
+            return;
+        }
+        try {
+            $ids = AuditSuggestion::query()->where('website_id', $site->id)->where('status', 'de_xuat')->whereNotNull('article_id')->pluck('id')->all();
+            $r = (new AuditSuggestionService())->acceptMany($ids, $user);
+        } catch (AuditSuggestionException $e) {
+            Notification::make()->title('Không chấp nhận được')->body($e->getMessage())->danger()->send();
+
+            return;
+        }
+        Notification::make()->title("Đã chấp nhận {$r['accepted']} đề xuất")->body($r['failed'] ? "{$r['failed']} đề xuất không xử lý được." : null)->success()->send();
+    }
+
+    private function decide(\Closure $do, int $id, string $ok): void
+    {
+        $user = Auth::user();
+        $s = AuditSuggestion::query()->where('website_id', (int) $this->websiteId)->find($id);
+        if (! $user instanceof User || ! $s) {
+            return;
+        }
+        try {
+            $do(new AuditSuggestionService(), $user, $s);
+        } catch (AuditSuggestionException $e) {
+            Notification::make()->title('Không thực hiện được')->body($e->getMessage())->danger()->send();
+
+            return;
+        }
+        Notification::make()->title($ok)->success()->send();
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function suggestionRows(?Website $site): array
+    {
+        if (! $site) {
+            return [];
+        }
+        $label = ['de_xuat' => 'Đề xuất', 'da_chap_nhan' => 'Đã chấp nhận', 'bo_qua' => 'Bỏ qua', 'da_xong' => 'Đã xong'];
+
+        return AuditSuggestion::query()->where('website_id', $site->id)->with(['article', 'task', 'decider'])->orderByDesc('priority')->orderBy('id')->limit(200)->get()
+            ->map(fn (AuditSuggestion $s) => [
+                'id' => $s->id, 'url' => $s->url, 'severity' => $s->severity, 'status' => $s->status, 'status_label' => $label[$s->status] ?? $s->status,
+                'issues' => array_map(fn ($t) => IssueCatalog::exists((string) $t) ? IssueCatalog::label((string) $t) : (string) $t, (array) $s->issue_codes),
+                'types' => (array) $s->issue_codes,
+                'article' => $s->article ? '#'.$s->article->id.' '.$s->article->primary_keyword : null,
+                'task' => $s->task ? '#'.$s->task->id : null,
+                'decided' => $s->decided_at ? ($s->decider?->name ?? '—').' · '.VnTime::format($s->decided_at, 'd/m H:i') : null,
+            ])->all();
     }
 
     /** @return \Illuminate\Support\Collection<int, Website> */
@@ -288,6 +386,9 @@ class AuditPage extends Page
             'evidenceRows' => $this->evidenceRows($group),
             'briefRows' => $this->briefRows($site ? $service->briefs($site) : []),
             'sevStats' => $this->sevStats($run),
+            'realRun' => $this->realRun($run),
+            'suggestions' => $this->realRun($run) ? $this->suggestionRows($site) : [],
+            'suggestBlocker' => $this->realRun($run) && $site ? (new AuditSuggestionService())->blocker($site) : null,
             'fixSteps' => $group ? IssueCatalog::fixSteps($group['type'], $group['items']) : [],
             'nextAtLabel' => $nextAt ? 'Quét lại được từ '.VnTime::format($nextAt, 'H:i d/m/Y').' (giờ VN).' : null,
             'briefs' => $site ? $service->briefs($site) : [],
