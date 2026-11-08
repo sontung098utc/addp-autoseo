@@ -11,6 +11,8 @@ class NextPublicationsWidget extends Widget
 
     protected static bool $isDiscovered = false;
 
+    protected static bool $isLazy = false;
+
     protected int|string|array $columnSpan = 1;
 
     protected function getViewData(): array

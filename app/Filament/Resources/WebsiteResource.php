@@ -36,7 +36,7 @@ class WebsiteResource extends Resource
 
     protected static ?string $modelLabel = 'Website';
 
-    protected static ?string $pluralModelLabel = 'Danh sách Website';
+    protected static ?string $pluralModelLabel = 'Website kết nối';
 
     protected static ?string $navigationGroup = 'Cài đặt';
 
