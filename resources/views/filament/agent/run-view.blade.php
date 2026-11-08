@@ -199,6 +199,7 @@
                                     @foreach ($s->data['failed'] as $f)<li><code>{{ $f['code'] ?? '' }}</code> <span class="rv-sev rv-sev--{{ $f['severity'] ?? '' }}">{{ $f['severity'] ?? '' }}</span> {{ $f['message'] ?? '' }}</li>@endforeach
                                 </ul>
                             @endif
+                            @if (isset($s->data['images']) || isset($s->data['internal_links']))@include('filament.agent.context-assets', ['data' => $s->data])@endif
                             @if ($s->tokens_used || $s->cost_vnd > 0)<div class="rv-small">{{ number_format($s->tokens_used) }} token · {{ number_format($s->cost_vnd, 0, ',', '.') }} ₫</div>@endif
                         </div>
                     </li>
