@@ -16,6 +16,7 @@ class ViewArticleVersion extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            \App\Filament\Support\Explain\WhyAction::page(),
             Actions\Action::make('approve')->label('Duyệt')->icon('heroicon-o-check')->color('primary')
                 ->visible(fn () => $this->record->review_status === 'needs_review')
                 ->authorize(fn () => ReviewActions::canApprove())
