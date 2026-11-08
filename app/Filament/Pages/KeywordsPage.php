@@ -4,8 +4,11 @@ namespace App\Filament\Pages;
 
 use App\Filament\Support\Demo\DemoMode;
 use App\Filament\Support\Keywords\CsvKeywordParser;
+use App\Filament\Support\Keywords\KeywordArticleLinks;
 use App\Filament\Support\Keywords\KeywordIntent;
 use App\Filament\Support\Keywords\KeywordService;
+use App\Models\Keyword;
+use App\Models\Website;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
@@ -247,6 +250,7 @@ class KeywordsPage extends Page
     {
         $demo = DemoMode::state(request()->query('demo'), ['trong'], '');
         $repo = KeywordService::make()->repo();
+        $site = KeywordService::defaultSite();
         $all = $demo === 'trong' ? [] : $repo->all();
         $clusters = $demo === 'trong' ? [] : $repo->clusters();
 
@@ -254,7 +258,8 @@ class KeywordsPage extends Page
             'total' => count($all),
             'clustered' => count(array_filter($all, fn ($r) => $r['cluster'] !== null)),
             'kwColumns' => $this->keywordColumns(),
-            'kwRows' => $this->keywordRows($all),
+            'kwRows' => $this->keywordRows($all, $site),
+            'real' => KeywordService::useReal() && $site !== null,
             'clusterColumns' => $this->clusterColumns(),
             'clusterRows' => $this->clusterRows($clusters),
             'clusters' => $clusters,
@@ -264,7 +269,7 @@ class KeywordsPage extends Page
         ];
     }
 
-    private const SOURCES = ['csv' => 'CSV', 'tay' => 'Tay', 'ai' => 'AI'];
+    private const SOURCES = ['csv' => 'CSV', 'tay' => 'Nhập tay', 'ai' => 'AI đề xuất', 'gsc' => 'Search Console', 'crawl' => 'Trang đã quét', 'competitor' => 'Đối thủ'];
 
     /** @return list<array<string,mixed>> */
     public function keywordColumns(): array
@@ -273,8 +278,9 @@ class KeywordsPage extends Page
             ['key' => 'keyword', 'label' => 'Từ khóa', 'type' => 'text', 'sortable' => true],
             ['key' => 'intent', 'label' => 'Ý định', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'tones' => ['Thông tin' => 'info', 'Thương mại' => 'accent', 'Giao dịch' => 'warn', 'Điều hướng' => 'muted']],
             ['key' => 'cluster', 'label' => 'Cụm chủ đề', 'type' => 'text', 'sortable' => true, 'filter' => true],
-            ['key' => 'volume', 'label' => 'Volume CSV', 'type' => 'number', 'sortable' => true],
-            ['key' => 'source', 'label' => 'Nguồn', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'visible' => false, 'tones' => ['CSV' => 'muted', 'Tay' => 'muted', 'AI' => 'accent']],
+            ['key' => 'volume', 'label' => 'Lượng tìm', 'type' => 'number', 'sortable' => true],
+            ['key' => 'source', 'label' => 'Nguồn', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'tones' => ['CSV' => 'info', 'Nhập tay' => 'muted', 'AI đề xuất' => 'accent', 'Search Console' => 'ok', 'Trang đã quét' => 'muted', 'Đối thủ' => 'warn']],
+            ['key' => 'article', 'label' => 'Bài', 'type' => 'link', 'sortable' => true],
             ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Xóa', 'method' => 'deleteKeyword', 'tone' => 'danger']]],
         ];
     }
@@ -283,9 +289,12 @@ class KeywordsPage extends Page
      * @param  list<array<string,mixed>>  $all
      * @return list<array<string,mixed>>
      */
-    public function keywordRows(array $all): array
+    public function keywordRows(array $all, ?Website $site = null): array
     {
+        $links = KeywordArticleLinks::for($site, array_column($all, 'keyword'));
+
         return array_map(fn ($r) => [
+            'article' => ['text' => ($l = $links[Keyword::keyFor($r['keyword'])] ?? KeywordArticleLinks::none())['label'], 'href' => $l['href']],
             'id' => $r['id'],
             'keyword' => $r['keyword'],
             'intent' => KeywordIntent::LABELS[$r['intent']] ?? $r['intent'],

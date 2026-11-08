@@ -21,6 +21,10 @@
                 @if ($total === 0)
                     <div class="ss-alert ss-alert--info" role="status">Chưa có từ khóa. Nhập CSV hoặc thêm tay ở tab "Nhập từ khóa".</div>
                 @else
+                    <div class="kw-bar">
+                        @if ($real)<x-studio.badge tone="ok">Dữ liệu thật</x-studio.badge>@endif
+                        <x-studio.hint text="Cột lượng tìm hiện — khi chưa có số. Chưa có dữ liệu lượng tìm — nhập CSV có cột volume. Hệ thống không tự điền số." />
+                    </div>
                     <x-studio.data-table id="keywords" :columns="$kwColumns" :rows="$kwRows" :page-size="25" search="Tìm từ khóa hoặc cụm" />
                 @endif
             </x-studio.panel>
@@ -53,7 +57,7 @@
     @endif
                 <div class="ss-split">
                     <div class="ss-card"><div class="ss-card__b">
-                <div class="ss-card__h">Nhập CSV</div>
+                <div class="ss-card__h">Nhập CSV <x-studio.hint text="Từ khóa lấy từ đâu — không bắt buộc mua dịch vụ: nhập tay, CSV (Keyword Planner/Search Console…), Search Console khi nối, AI đề xuất (không có lượng tìm). Lượng tìm chỉ có khi tệp CSV của bạn có cột volume." /></div>
                 <p class="ss-muted ss-text-xs">Cột: <code>keyword</code> (bắt buộc), <code>volume</code>, <code>intent</code> · tối đa 5.000 dòng, 1 MB.</p>
                 <div class="kw-bar">
                     <input type="file" wire:model="csvFile" accept=".csv,text/csv,text/plain" aria-label="Chọn tệp CSV">
@@ -64,7 +68,7 @@
 
                     </div></div>
                     <div class="ss-card"><div class="ss-card__b">
-                <div class="ss-card__h">Thêm tay</div>
+                <div class="ss-card__h">Thêm tay <x-studio.hint text="Từ khóa nhập tay được ghi nguồn 'Nhập tay'. Bỏ trống lượng tìm nếu bạn không có số liệu." /></div>
                 <div class="kw-bar">
                     <input class="kw-in" wire:model="newKeyword" placeholder="Từ khóa" aria-label="Từ khóa mới" maxlength="255">
                     <input class="kw-in" wire:model="newVolume" placeholder="Volume (tùy chọn)" aria-label="Volume" style="width:9rem">
@@ -135,7 +139,7 @@
             <li>Từ khóa trùng (không phân biệt hoa/thường, gộp khoảng trắng) bị bỏ qua và báo lại.</li>
             <li>Xem trước 20 dòng đầu; chỉ lưu khi bấm "Xác nhận".</li>
             <li>Mỗi từ khóa thuộc tối đa một cụm. AI chỉ đề xuất; người duyệt nhận, sửa tên, gộp, tách hoặc bỏ.</li>
-            <li>Xóa từ khóa không xóa bài đã tạo. Volume là số ghi trong tệp CSV, không phải dữ liệu Google.</li>
+            <li>Xóa từ khóa không xóa bài đã tạo. Lượng tìm là số ghi trong tệp CSV bạn nhập, không phải dữ liệu Google; để trống khi nguồn không có.</li>
         </ul>
                 </div></div>
             </x-studio.panel>

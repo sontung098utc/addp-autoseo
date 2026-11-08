@@ -2,6 +2,9 @@
 
 namespace App\Filament\Support\Keywords;
 
+use App\Filament\Support\Demo\DemoMode;
+use App\Models\Website;
+use Illuminate\Database\QueryException;
 use InvalidArgumentException;
 
 /**
@@ -12,9 +15,34 @@ final class KeywordService
 {
     public function __construct(private readonly KeywordRepository $repo) {}
 
-    public static function make(): self
+    /**
+     * Bản Eloquent khi chạy production (DemoMode tắt) hoặc bật STUDIO_KEYWORDS_REAL; ngược lại là bản minh họa có nhãn.
+     * Từ khóa thuộc về website đang hoạt động đầu tiên (cùng cách chọn với màn Kế hoạch nội dung).
+     */
+    public static function make(?Website $site = null): self
     {
+        if (self::useReal()) {
+            $site ??= self::defaultSite();
+            if ($site) {
+                return new self(new EloquentKeywordRepository($site->id));
+            }
+        }
+
         return new self(new DemoKeywordRepository);
+    }
+
+    public static function useReal(): bool
+    {
+        return ! DemoMode::enabled() || (bool) config('studio.keywords_real');
+    }
+
+    public static function defaultSite(): ?Website
+    {
+        try {
+            return Website::where('status', 'active')->orderBy('name')->first();
+        } catch (QueryException) {
+            return null; // chưa có bảng (ví dụ test đơn vị không DB) -> dùng bản minh họa
+        }
     }
 
     public function repo(): KeywordRepository
@@ -36,7 +64,7 @@ final class KeywordService
         foreach ($list as $r) {
             $seen[CsvKeywordParser::key($r['keyword'])] = true;
         }
-        $next = (int) max(0, ...array_column($list, 'id')) + 1;
+        $next = (int) max([0, ...array_column($list, 'id')]) + 1;
         $added = 0;
         foreach ($rows as $r) {
             $k = CsvKeywordParser::key($r['keyword']);
@@ -179,7 +207,7 @@ final class KeywordService
             throw new InvalidArgumentException('Nhập tên cho cụm mới.');
         }
         $props = $this->repo->proposals();
-        $nextId = (int) max(0, ...array_column($props, 'id')) + 1;
+        $nextId = (int) max([0, ...array_column($props, 'id')]) + 1;
         $new = null;
         foreach ($props as &$p) {
             if ($p['id'] !== $id) {
