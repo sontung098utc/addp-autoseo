@@ -130,7 +130,7 @@ class ContentPlanPage extends Page
             return [];
         }
 
-        return KeywordService::make()->repo()->clusters();
+        return KeywordService::make($this->site())->repo()->clusters();
     }
 
     /** @return array<string,string> từ khóa chưa có bài của cụm hiện tại, dạng giá trị => nhãn */
@@ -198,7 +198,7 @@ class ContentPlanPage extends Page
     private function runCreate(Website $site, array $c, array $keywords, ?string $day): void
     {
         $intents = [];
-        foreach (KeywordService::make()->repo()->all() as $r) {
+        foreach (KeywordService::make($this->site())->repo()->all() as $r) {
             $intents[$r['keyword']] = $r['intent'];
         }
         try {
@@ -225,7 +225,7 @@ class ContentPlanPage extends Page
         }
         $free = $this->freeOptions();
         $intents = [];
-        foreach (KeywordService::make()->repo()->all() as $r) {
+        foreach (KeywordService::make($this->site())->repo()->all() as $r) {
             $intents[$r['keyword']] = $r['intent'];
         }
         $this->suggestions = (new MockTitleSuggester)->suggest(array_map(fn ($k) => ['keyword' => $k, 'intent' => $intents[$k] ?? 'informational'], array_keys($free)), 5);
