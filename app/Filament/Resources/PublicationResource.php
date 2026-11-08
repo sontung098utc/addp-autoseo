@@ -226,6 +226,32 @@ class PublicationResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make()->label('Xem'),
+                Tables\Actions\Action::make('publishNow')
+                    ->label('Đăng ngay')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->color('success')
+                    ->visible(fn (Publication $r) => in_array($r->status, ['scheduled', 'failed'], true))
+                    ->authorize(fn () => auth()->user()?->isApprover() || auth()->user()?->isAdmin())
+                    ->requiresConfirmation()
+                    ->modalHeading('Xuất bản ngay lên CMS')
+                    ->modalDescription('Hệ thống sẽ gửi bài viết này trực tiếp lên CMS đích ngay lập tức.')
+                    ->action(function (Publication $r) {
+                        \App\Jobs\PublishArticleJob::dispatchSync($r);
+                        $r->refresh();
+                        if ($r->status === 'published') {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Đã xuất bản thành công lên ' . ($r->website?->name ?? 'CMS'))
+                                ->body($r->published_url ? 'URL: ' . $r->published_url : null)
+                                ->success()
+                                ->send();
+                        } else {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Xuất bản thất bại')
+                                ->body($r->last_error ?? 'Lỗi không xác định')
+                                ->danger()
+                                ->send();
+                        }
+                    }),
                 ReconcileAction::row(),
                 \App\Filament\Support\Schedule\RescheduleAction::row(),
             ]);

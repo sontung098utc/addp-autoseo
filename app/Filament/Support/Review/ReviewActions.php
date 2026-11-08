@@ -49,7 +49,13 @@ class ReviewActions
     /** Kiểm chất lượng tại thời điểm gọi (chưa lưu lịch sử). */
     public static function qualityFor(ArticleVersion $version): QualityReport
     {
-        return (new ContentQualityChecker)->check($version, $version->article);
+        static $cache = [];
+        $key = ($version->id ?? spl_object_hash($version)) . ':' . ($version->updated_at?->timestamp ?? 0);
+        if (! isset($cache[$key])) {
+            $cache[$key] = (new ContentQualityChecker)->check($version, $version->article);
+        }
+
+        return $cache[$key];
     }
 
     /** Lời giải thích cho nút Duyệt khi còn lỗi P0; null nếu không bị chặn. */
