@@ -60,3 +60,39 @@ Bảng này đồng bộ trực tiếp với Master Plan (Google Sheet). Mọi c
 | **6.5** | Dev1 | Dev2 | 16h | 6.3 | `feat/m08/6-5/dev1/usage-ai-images` | Chưa bắt đầu | Báo cáo chi phí/usage AI, bộ nhớ cache prompt, adapter tạo ảnh AI. |
 | **7.1** | Dev1 | Dev2 | 18h | 6.5 | `feat/m08/7-1/dev1/hardening` | Chưa bắt đầu | Giám sát nâng cao, hardening bảo mật, diễn tập phục hồi (restore drill). |
 | **7.2** | Dev1 | Dev2 | 20h | 7.1, 6.4 | `test/m08/7-2/dev1/stability` | Chưa bắt đầu | Chạy ổn định 5 ngày làm việc và hoàn tất toàn bộ bàn giao V2. |
+
+---
+
+## MỐC M09: ĐỘI AI SEO TỰ ĐỘNG — ÁP DỤNG ĐỊNH HƯỚNG (ĐỀ XUẤT — ngoài WBS gốc, CHƯA estimate chính thức)
+
+> Đề xuất từ Dev2, **chờ Dev1 duyệt estimate/phạm vi**. Không cộng vào 432h gốc; không đổi trạng thái task gốc. Chi tiết: `docs/seo-agent/APPLY_PLAN_V1.md` (cổng G0–G3). Quy ước nhánh: `<loại>/m09/<mã>/<dev>/<mô-tả>`.
+> Giờ là ước lượng thô của người đề xuất. Mọi trạng thái giữ "Chưa bắt đầu" cho tới khi có commit + bằng chứng.
+
+| Mã việc | Chủ nhiệm | Reviewer | Giờ (thô) | Phụ thuộc | Nhánh đề xuất | Trạng thái | Nội dung chính |
+| :---: | :---: | :---: | :---: | :---: | :--- | :---: | :--- |
+| **AG-H01** | Dev2 | Dev1 | 3h | - | `docs/m09/ag-h01/dev2/m09-docs` | Chưa bắt đầu | Đưa tài liệu M09 vào repo + link README + mục M09 (PR này) |
+| **AG-H02** | Dev2 | Dev1 | 1h | - | (cục bộ) | Chưa bắt đầu | Dựng lại image Docker (WebP) + chạy toàn bộ test + báo cáo baseline |
+| **AG-H03** | Dev1 | Dev2 | 2h | - | `chore/m09/ag-h03/dev1/ci-verify` | Chưa bắt đầu | Xác nhận/bật GitHub Actions CI; một lượt xanh trên `develop` |
+| **AG-H04** | Dev1 | Dev2 | 10h | - | `docs/m09/ag-h04/dev1/post-merge-review` | Chưa bắt đầu | Hậu kiểm review chéo khối UI Dev2 đã merge trực tiếp (bảo mật + hành vi) |
+| **AG-H05** | Dev2 | Dev1 | 6h | - | `fix/m09/ag-h05/dev2/ux-debt` | Chưa bắt đầu | Tiêu đề trang khớp menu; widget Tổng quan không tải lười/không vẽ khung rỗng |
+| **AG-H06** | Dev2 | Dev1 | 2h | H05 | (không PR) | Chưa bắt đầu | Dọn nhánh/worktree đã merge (sau xác nhận) |
+| **AG-H07** | Dev2 | Dev1 | 0,5h | - | (không PR) | Chưa bắt đầu | Cập nhật issue #6, theo dõi #9 |
+| **AG-H09** | Dev2 | Dev1 | 2h | H01 | `docs/m09/ag-h09/dev2/task-evidence` | Chưa bắt đầu | Ghi mức bằng chứng 4 tầng cho các task đã "Hoàn thành" |
+| **AG-F04** | Dev2 | Dev1 | 6h | - | `docs/m09/ag-f04/dev2/seo-data-source` | Chưa bắt đầu | Chọn nguồn dữ liệu SEO cho Việt Nam (GSC + từ khóa/SERP), chi phí, quyền riêng tư |
+| **AG-K01** | Dev2 | Dev1 | 6h | - | `docs/m09/ag-k01/dev2/knowledge-catalog` | Chưa bắt đầu | Danh mục học từ claude-seo + xác minh quy tắc SEO với tài liệu Google |
+| **AG-F05** | Dev2 | Dev1 | 6h | - | `docs/m09/ag-f05/dev2/usability-results` | Chưa bắt đầu | Thử nghiệm khả dụng 5 người trên mẫu giao diện |
+| **AG-B00** | Dev1 | Dev2 | 4h | - | `feat/m09/ag-b00/dev1/audit-job` | Chưa bắt đầu | Job nền quét audit (bọc `SeoAuditService`) — issue #9 |
+| **AG-B08** | Dev1 | Dev2 | 4h | - | `fix/m09/ag-b08/dev1/stop-persist` | Chưa bắt đầu | Bền hóa trạng thái dừng khẩn cấp (đang lưu trong Cache) — issue #9 |
+| **AG-F03** | Dev1 | Dev2 | 8h | - | `docs/m09/ag-f03/dev1/adr-automation` | Chưa bắt đầu | ADR: orchestrator, vai trò n8n, giấy phép |
+| **AG-U00** | Dev2 | Dev1 | 5h | H05, G0 | `feat/m09/ag-u00/dev2/nav-advanced` | Chưa bắt đầu | Gọn menu: nhóm "Nâng cao" theo vai trò, giữ nguyên URL |
+| **AG-U01** | Dev2 | Dev1 | 6h | G0 | `feat/m09/ag-u01/dev2/status-chips` | Chưa bắt đầu | Nhãn trạng thái + chip AI/Nhập/Mẫu |
+| **AG-U11a** | Dev2 | Dev1 | 3h | G0, U00 | `feat/m09/ag-u11a/dev2/stop-banner` | Chưa bắt đầu | Banner dừng xuất bản toàn cục (chỉ đọc) |
+| **AG-U02** | Dev2 | Dev1 | 8h | U01 | `feat/m09/ag-u02/dev2/how-it-works` | Chưa bắt đầu | Trang "Cách hoạt động" + FeatureRegistry |
+| **AG-U23** | Dev2 | Dev1 | 10h | U01 | `feat/m09/ag-u23/dev2/why-not-published` | Chưa bắt đầu | "Vì sao chưa đăng?" bằng luật thật (mở rộng `ScheduleExplainer`) |
+| **AG-U19** | Dev2 | Dev1 | 12h | U01, U23 | `feat/m09/ag-u19/dev2/daily-digest` | Chưa bắt đầu | Bản tin hằng ngày từ dữ liệu thật |
+| **AG-K04** | Dev2 | Dev1 | 6h | - | `feat/m09/ag-k04/dev2/audit-mapping` | Chưa bắt đầu | Ánh xạ mã lỗi crawler ↔ P0/P1/P2 + `score_method` |
+| **AG-U05** | Dev2 | Dev1 | 12h | K04, B00 | `feat/m09/ag-u05/dev2/audit-db-source` | Chưa bắt đầu | Audit đọc dữ liệu crawler thật (`seo_audits`, `crawled_urls`) |
+| **AG-K03** | Dev2 | Dev1 | 12h | K01 | `feat/m09/ag-k03/dev2/rubric-metadata` | Chưa bắt đầu | Rubric có nguồn/lý do/ngày rà soát; giữ mã luật |
+| **AG-U26** | Dev2 | Dev1 | 6h | U00 | `feat/m09/ag-u26/dev2/role-matrix` | Chưa bắt đầu | Ma trận quyền theo vai trò cho hành động mới |
+| **AG-K02…K13, U09/U10/U15/U22/U24/U25, A01/A03/A05a** | Dev2 | Dev1 | theo kế hoạch | G2 (Dev1) | `feat/m09/ag-<mã>/dev2/<mô-tả>` | Chưa bắt đầu | Giai đoạn 2–3: Playbook, rubric, vòng tự sửa, ba chế độ, đường mỏng WordPress (chỉ đẩy nháp) — xem `APPLY_PLAN_V1.md` §6 |
+| **AG-B01…B12, A02** | Dev1 | Dev2 | theo kế hoạch | G0 | `feat/m09/ag-<mã>/dev1/<mô-tả>` | Chưa bắt đầu | Giai đoạn 2: migration `agent_*`, router đa model (bỏ Mock im lặng), ngân sách, orchestrator, thông báo |

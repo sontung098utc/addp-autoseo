@@ -24,7 +24,7 @@ class ArticleVersionResource extends Resource
 
     protected static ?string $modelLabel = 'Phiên bản bài';
 
-    protected static ?string $pluralModelLabel = 'Phiên bản bài';
+    protected static ?string $pluralModelLabel = 'Duyệt bài';
 
     public static function getNavigationBadge(): ?string
     {

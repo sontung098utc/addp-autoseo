@@ -32,12 +32,41 @@ final class StatusPresenter
         'error' => ['Lỗi kết nối', 'warning', 'heroicon-o-exclamation-triangle'],
     ];
 
+    /**
+     * AG-U01: mức sẵn sàng của một tính năng. Dùng để KHÔNG để người dùng hiểu nhầm tính năng chưa nối là đã hoạt động.
+     * [nhãn, màu, icon, gợi ý]
+     *
+     * @var array<string, array{0: string, 1: string, 2: string, 3: string}>
+     */
+    private const READINESS = [
+        'active' => ['Đang hoạt động', 'success', 'heroicon-o-check-circle', 'Chạy trên dữ liệu thật và có bằng chứng.'],
+        'demo' => ['Dữ liệu minh họa', 'gray', 'heroicon-o-beaker', 'Giao diện chạy trên số mẫu, không phải dữ liệu thật.'],
+        'not_connected' => ['Chưa kết nối', 'warning', 'heroicon-o-link-slash', 'Có giao diện nhưng thiếu nguồn dữ liệu hoặc tích hợp.'],
+        'in_development' => ['Đang phát triển', 'info', 'heroicon-o-wrench-screwdriver', 'Có trong kế hoạch, chưa hoàn thành.'],
+        'idea' => ['Ý tưởng', 'gray', 'heroicon-o-light-bulb', 'Đề xuất, chưa được duyệt hay lên lịch.'],
+    ];
+
+    /**
+     * AG-U01: nguồn của một nội dung/báo cáo. Nội dung AI luôn phải cho biết là AI thật hay giả lập.
+     *
+     * @var array<string, array{0: string, 1: string, 2: string, 3: string}>
+     */
+    private const SOURCE = [
+        'live' => ['AI thật', 'success', 'heroicon-o-sparkles', 'Do một model AI thật tạo ra.'],
+        'mock' => ['AI giả lập', 'warning', 'heroicon-o-exclamation-triangle', 'Nội dung mẫu, KHÔNG phải kết quả AI thật.'],
+        'imported' => ['Nhập thủ công', 'info', 'heroicon-o-arrow-up-tray', 'Do người dùng tải lên.'],
+        'local' => ['Quét cục bộ', 'gray', 'heroicon-o-server', 'Do hệ thống tự tính từ dữ liệu có sẵn, không dùng AI.'],
+        'none' => ['Không dùng AI', 'gray', 'heroicon-o-minus-circle', 'Kết quả xác định, không qua model AI.'],
+    ];
+
     /** @return array{0: string, 1: string, 2: string}|null */
     private static function find(?string $value, string $domain): ?array
     {
         $map = match ($domain) {
             'article', 'publication' => self::ARTICLE,
             'website' => self::WEBSITE,
+            'readiness' => self::READINESS,
+            'source' => self::SOURCE,
             default => [],
         };
 
@@ -56,6 +85,18 @@ final class StatusPresenter
     public static function color(?string $value, string $domain = 'article'): string
     {
         return self::find($value, $domain)[1] ?? 'gray';
+    }
+
+    /** Gợi ý ngắn (tooltip) cho mức sẵn sàng / nguồn; null nếu không có. */
+    public static function hint(?string $value, string $domain): ?string
+    {
+        $map = match ($domain) {
+            'readiness' => self::READINESS,
+            'source' => self::SOURCE,
+            default => [],
+        };
+
+        return $map[(string) $value][3] ?? null;
     }
 
     public static function icon(?string $value, string $domain = 'article'): string

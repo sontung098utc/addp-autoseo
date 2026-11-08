@@ -47,15 +47,26 @@ class ReviewActions
     }
 
     /** Kiểm chất lượng tại thời điểm gọi (chưa lưu lịch sử). */
+    protected static array $qualityCache = [];
+
+    public static function clearCache(): void
+    {
+        self::$qualityCache = [];
+    }
+
+    /** Kiểm chất lượng tại thời điểm gọi (chưa lưu lịch sử). */
     public static function qualityFor(ArticleVersion $version): QualityReport
     {
-        static $cache = [];
-        $key = ($version->id ?? spl_object_hash($version)) . ':' . ($version->updated_at?->timestamp ?? 0);
-        if (! isset($cache[$key])) {
-            $cache[$key] = (new ContentQualityChecker)->check($version, $version->article);
+        if (app()->environment('testing')) {
+            return (new ContentQualityChecker)->check($version, $version->article);
         }
 
-        return $cache[$key];
+        $key = ($version->id ?? spl_object_hash($version)) . ':' . ($version->updated_at?->timestamp ?? 0);
+        if (! isset(self::$qualityCache[$key])) {
+            self::$qualityCache[$key] = (new ContentQualityChecker)->check($version, $version->article);
+        }
+
+        return self::$qualityCache[$key];
     }
 
     /** Lời giải thích cho nút Duyệt khi còn lỗi P0; null nếu không bị chặn. */

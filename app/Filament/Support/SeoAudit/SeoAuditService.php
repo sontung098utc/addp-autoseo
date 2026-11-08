@@ -17,7 +17,7 @@ final class SeoAuditService
 
     public static function make(): self
     {
-        return new self(new DemoSeoAuditSource());
+        return new self(new CompositeSeoAuditSource(new DbSeoAuditSource(), new DemoSeoAuditSource()));
     }
 
     /** @return array{status: string, run: ?array<string, mixed>} */
@@ -30,7 +30,7 @@ final class SeoAuditService
     public function canScan(Website $site, ?User $user = null): array
     {
         if (! DemoMode::enabled()) {
-            return ['ok' => false, 'code' => 'crawler_off', 'reason' => 'Crawler (task 1.1) chưa được triển khai nên chưa quét được website nào.', 'next_at' => null];
+            return ['ok' => false, 'code' => 'crawler_off', 'reason' => 'Quét lại từ giao diện cần job nền (AG-B00). Hiện xem được kết quả của lần quét gần nhất từ lệnh autoseo:audit-website.', 'next_at' => null];
         }
 
         return ScanGuard::check($site, $this->source->lastScanAt($site), $user);
