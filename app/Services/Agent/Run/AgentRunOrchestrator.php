@@ -276,6 +276,7 @@ final class AgentRunOrchestrator
         $this->assets ??= new ContextAssets();
         $this->assets->load($article, $outline); // AG-S25: truy xuất một lần mỗi lượt chạy
         $options += $this->assets->options();
+        $options += \App\Services\Audit\RefreshOptions::for($article); // AG-S26: bài làm mới từ lỗi Audit
         [$kbData, $kbNote] = $this->kb->stepInfo();
         $r = $this->callAi($run, $stage, $title, fn (AiProviderInterface $ai) => $ai->generateArticle($article, $outline, $options));
         $html = HtmlSanitizer::clean($r['html_content'] ?? '');

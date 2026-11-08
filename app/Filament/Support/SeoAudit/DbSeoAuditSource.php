@@ -85,13 +85,13 @@ final class DbSeoAuditSource implements SeoAuditSource
         return $this->lastCompleted($site) !== null;
     }
 
-    private function lastCompleted(Website $site): ?SeoAudit
+    public function lastCompleted(Website $site): ?SeoAudit
     {
         return SeoAudit::query()->where('website_id', $site->id)->where('status', 'completed')->orderByDesc('completed_at')->orderByDesc('id')->first();
     }
 
     /** @return \Illuminate\Support\Collection<int, CrawledUrl> */
-    private function pagesOf(SeoAudit $audit)
+    public function pagesOf(SeoAudit $audit)
     {
         $q = CrawledUrl::query()->where('website_id', $audit->website_id);
         if ($audit->started_at && $audit->completed_at) {

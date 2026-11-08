@@ -102,13 +102,13 @@ final class CampaignRunner
         return ['result' => 'ran', 'message' => "Đã giao \"{$keyword}\": phiên #{$run->id} ({$run->status}).", 'run' => $run];
     }
 
-    /** Bài 'planned' (từ trang Kế hoạch nội dung) của website, chưa có phiên nào, cũ nhất trước. */
+    /** Bài 'planned' (từ trang Kế hoạch nội dung) của website, chưa có phiên nào, ưu tiên (priority) cao trước (bài làm mới P0 trước), cùng mức thì cũ nhất trước. */
     public function nextPlanned(Campaign $c): ?Article
     {
         return Article::query()->where('website_id', $c->website_id)->where('workflow_status', 'planned')
             ->whereNotNull('primary_keyword')->where('primary_keyword', '!=', '')
             ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('agent_runs')->whereColumn('agent_runs.article_id', 'articles.id'))
-            ->orderBy('id')->first();
+            ->orderByRaw('COALESCE(priority, 0) DESC')->orderBy('id')->first();
     }
 
     /** Ghi một mục chờ bổ sung hạn 24 giờ (không trùng mục đang mở, không lặp lại trong 24 giờ sau khi đã bỏ qua/hết hạn). */
