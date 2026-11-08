@@ -1,3 +1,6 @@
+@if ($real)
+    @include('filament.pages.competitors-real')
+@else
 @php
     $nf = fn ($n) => number_format($n, 0, ',', '.');
     $ready = $site && $state !== 'chua-ket-noi';
@@ -130,3 +133,4 @@
     </div>
     <x-filament-actions::modals />
 </x-filament-panels::page>
+@endif
