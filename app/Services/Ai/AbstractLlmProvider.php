@@ -3,6 +3,7 @@
 namespace App\Services\Ai;
 
 use App\Contracts\AiProviderInterface;
+use App\Contracts\StructuredAiInterface;
 use App\Filament\Support\Schedule\ErrorMasker;
 use App\Models\Article;
 use App\Services\Agent\Run\TransientAiError;
@@ -16,7 +17,7 @@ use Illuminate\Support\Str;
  * - Lỗi tạm thời (timeout, mất kết nối, 408/429/5xx) ném TransientAiError để bộ điều phối thử lại; lỗi cứng ném AiProviderError.
  * - Thông điệp lỗi chỉ gồm mã HTTP, không kèm nội dung phản hồi/URL (có thể chứa khóa), và luôn qua ErrorMasker.
  */
-abstract class AbstractLlmProvider implements AiProviderInterface
+abstract class AbstractLlmProvider implements AiProviderInterface, StructuredAiInterface
 {
     protected string $promptVersion = 'v1.0-seo-vietnamese-article';
 
@@ -103,6 +104,20 @@ abstract class AbstractLlmProvider implements AiProviderInterface
             'cost_vnd' => $this->calculateCostVnd($r['prompt_tokens'], $r['completion_tokens'], $this->model),
             'model' => $this->model,
             'prompt_version' => $this->promptVersion,
+        ];
+    }
+
+    /** AG-S21: một lượt gọi trả JSON thô + chi phí. Không kiểm schema ở đây (bên gọi kiểm). */
+    public function generateStructured(string $system, string $user): array
+    {
+        $this->requireKey();
+        $r = $this->complete($system, $user);
+
+        return [
+            'data' => $this->decode($r['text']),
+            'tokens_used' => $r['total_tokens'],
+            'cost_vnd' => $this->calculateCostVnd($r['prompt_tokens'], $r['completion_tokens'], $this->model),
+            'model' => $this->model,
         ];
     }
 

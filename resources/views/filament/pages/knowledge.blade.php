@@ -10,6 +10,7 @@
         .dark .kb-menu__p{background:rgb(var(--gray-800))}
         .kb-menu__p button{text-align:left;padding:.3rem .5rem;border-radius:.3rem}
         .kb-menu__p button:hover{background:rgba(128,128,128,.2)}
+        .kb-ai{border-left:3px solid rgb(var(--info-500,59 130 246))}
         .kb-act{display:flex;gap:.3rem;align-items:center;justify-content:flex-end}
     </style>
     @php
@@ -21,6 +22,7 @@
             ['key' => 'all', 'label' => 'Tất cả'],
             ['key' => 'sources', 'label' => 'Nguồn', 'count' => $sources->count() ?: null],
             ['key' => 'warn', 'label' => 'Cảnh báo', 'count' => $warnCount ?: null, 'tone' => $warnCount ? 'danger' : null],
+            ['key' => 'gaps', 'label' => 'Khoảng trống', 'count' => $gaps->where('status', 'open')->count() ?: null, 'tone' => $gaps->where('status', 'open')->count() ? 'warn' : null],
             ['key' => 'add', 'label' => 'Thêm kiến thức'],
         ] : [['key' => 'all', 'label' => 'Kiến thức đã duyệt']];
         $topicOptions = fn () => $topics;
@@ -102,8 +104,9 @@
                                     <x-studio.hint text="Văn bản gốc đã dán. Đoạn của mục này được tô sáng. Nguồn chỉ là dữ liệu tham khảo." /></div>
                                 @php
                                     $raw = (string) $selected->source->raw_text;
-                                    $pos = $selected->body !== '' ? mb_strpos($raw, mb_substr($selected->body, 0, 80)) : false;
-                                    $len = $pos === false ? 0 : mb_strlen($selected->body);
+                                    $needle = $selected->source_span ?: $selected->body;
+                                    $pos = $needle !== '' ? mb_strpos($raw, mb_substr($needle, 0, 80)) : false;
+                                    $len = $pos === false ? 0 : mb_strlen($needle);
                                 @endphp
                                 <div class="kb-src">@if ($pos === false){{ mb_substr($raw, 0, 6000) }}@else{{ mb_substr($raw, 0, $pos) }}<mark>{{ mb_substr($raw, $pos, $len) }}</mark>{{ mb_substr($raw, $pos + $len, 6000) }}@endif</div>
                             @else
@@ -131,7 +134,12 @@
                         @foreach ($inbox as $i)
                             @php $fl = $inboxFlags[$i->id]; @endphp
                             <tr wire:key="inbox-{{ $i->id }}">
-                                <td style="min-width:20rem"><strong>{{ $i->title }}</strong><div class="kb-prev">{{ $i->body }}</div></td>
+                                <td style="min-width:20rem"@if ($i->created_by === 'ai') class="kb-ai" @endif><strong>{{ $i->title }}</strong>
+                                    @if ($i->created_by === 'ai')<x-studio.badge tone="info">AI đề xuất{{ $i->confidence !== null ? ' · '.$i->confidence.'%' : '' }}</x-studio.badge>@endif
+                                    <div class="kb-prev">{{ $i->body }}</div>
+                                    @if ($i->created_by === 'ai')
+                                        <div class="kb-prev" data-source-span><em>Đoạn nguồn:</em> {{ $i->source_span ?: 'AI không trích được đoạn nguyên văn; mở "Xem" để đối chiếu với nguồn.' }}</div>
+                                    @endif</td>
                                 <td style="width:1%;white-space:nowrap">
                                     @if ($fl['conflict']->isNotEmpty())<x-studio.badge tone="danger">Mâu thuẫn</x-studio.badge>@endif
                                     @if ($fl['exact']->isNotEmpty() || $fl['similar']->isNotEmpty())<x-studio.badge tone="warn">Trùng</x-studio.badge>@endif
@@ -215,7 +223,15 @@
                         <tbody>
                         @foreach ($sources as $s)
                             <tr wire:key="src-{{ $s->id }}">
-                                <td style="min-width:20rem"><strong>{{ $s->title }}</strong> <span class="ss-muted ss-text-xs">{{ $s->created_at?->format('d/m/Y') }} · {{ number_format(mb_strlen((string) $s->raw_text), 0, ',', '.') }} ký tự</span></td>
+                                <td style="min-width:20rem"><strong>{{ $s->title }}</strong> <span class="ss-muted ss-text-xs">{{ $s->created_at?->format('d/m/Y') }} · {{ number_format(mb_strlen((string) $s->raw_text), 0, ',', '.') }} ký tự</span>
+                                    @php $lg = $s->ai_log[0] ?? null; @endphp
+                                    @if ($lg)
+                                        <div class="ss-text-xs ss-muted" data-ai-log>
+                                            <x-studio.badge tone="info">AI</x-studio.badge>
+                                            {{ $lg['proposed'] }} mục đề xuất · {{ number_format($lg['tokens'], 0, ',', '.') }} token · ≈ {{ number_format($lg['cost_vnd'], 0, ',', '.') }} đ · {{ $lg['model'] }}@if ($lg['flag_conflict'] || $lg['flag_similar']) · cờ: {{ $lg['flag_conflict'] }} mâu thuẫn, {{ $lg['flag_similar'] }} gần trùng @endif
+                                            <x-studio.hint :text="'Lượt tách bằng AI gần nhất'.(($lg['stopped'] ?? null) ? ' (dừng sớm: '.$lg['stopped'].')' : '').'. Đã loại '.($lg['invalid'] + $lg['injection_dropped']).' mục không hợp lệ, bỏ '.$lg['duplicates'].' mục trùng y hệt.'.(($lg['demo'] ?? false) ? ' AI giả lập, không phải AI thật.' : '')" />
+                                        </div>
+                                    @endif</td>
                                 <td style="width:1%;white-space:nowrap">{{ $s->website?->name ?? 'Chung' }}</td>
                                 <td style="width:1%;white-space:nowrap">{{ $s->items_count }} @if ($s->proposed_count)<x-studio.badge tone="warn">{{ $s->proposed_count }} chờ duyệt</x-studio.badge>@endif</td>
                                 <td style="width:1%;white-space:nowrap"><div class="kb-act">
@@ -223,6 +239,12 @@
                                         <x-filament::button size="xs" wire:click="approveSource({{ $s->id }})" wire:confirm="Duyệt tất cả mục chờ duyệt của nguồn này? Mục còn mâu thuẫn sẽ được bỏ qua.">Duyệt cả nguồn</x-filament::button>
                                     @else
                                         <x-filament::button size="xs" color="gray" wire:click="splitSource({{ $s->id }})">Tách thành mục</x-filament::button>
+                                    @endif
+                                    @if ($aiAvail['ok'])
+                                        <x-filament::button size="xs" color="info" wire:click="splitSourceAi({{ $s->id }})" wire:loading.attr="disabled" wire:target="splitSourceAi({{ $s->id }})" wire:confirm="Gửi nguồn này cho AI để đề xuất các mục? Mục chỉ vào Hộp duyệt ở trạng thái Đề xuất; có thể tốn chi phí AI.">Tách bằng AI</x-filament::button>
+                                    @else
+                                        <x-filament::button size="xs" color="gray" disabled>Tách bằng AI</x-filament::button>
+                                        <x-studio.hint tone="warning" :text="$aiAvail['reason'] ?: 'Chưa kết nối AI.'" />
                                     @endif
                                     <div class="kb-menu" x-data="{o:false}" x-on:click.outside="o=false">
                                         <button type="button" class="ss-dt__btn" aria-label="Thêm thao tác" aria-haspopup="true" x-on:click="o=!o">⋯</button>
@@ -239,7 +261,7 @@
             </x-studio.panel>
 
             <x-studio.panel key="warn">
-                @if ($warnCount === 0 && $warn['unused']->isEmpty() && $gaps->isEmpty())
+                @if ($warnCount === 0 && $warn['unused']->isEmpty())
                     <div class="ss-alert ss-alert--ok" role="status">Không có cảnh báo.</div>
                 @endif
                 @if ($warn['pairs'])
@@ -272,9 +294,42 @@
                     <div class="ss-card__h">Lâu không dùng <x-studio.hint text="Đã duyệt nhưng chưa được Người viết dùng trong nhiều tháng; xem lại còn cần không." /></div>
                     <ul class="ss-text-sm">@foreach ($warn['unused']->take(30) as $x)<li wire:key="unused-{{ $x->id }}">KB#{{ $x->id }} "{{ $x->title }}"</li>@endforeach</ul>
                 @endif
-                @if ($gaps->isNotEmpty())
-                    <div class="ss-card__h">Khoảng trống kiến thức <x-studio.hint text="Người viết đã tìm trong kho nhưng không thấy mục đã duyệt nào. Hãy bổ sung kiến thức về các chủ đề này." /></div>
-                    <ul class="ss-text-sm">@foreach ($gaps as $g)<li wire:key="gap-{{ $g->id }}">"{{ $g->query }}" · {{ $g->website?->name }} · {{ $g->count }} lần</li>@endforeach</ul>
+            </x-studio.panel>
+
+            <x-studio.panel key="gaps">
+                @if ($gaps->isEmpty())
+                    <div class="ss-alert ss-alert--ok" role="status">Chưa có khoảng trống: Người viết tìm thấy kiến thức đã duyệt cho các bài đã chạy.</div>
+                @else
+                    <div class="kb-bar">
+                        <span class="ss-muted ss-text-sm">{{ $gaps->where('status', 'open')->count() }} chỗ còn thiếu</span>
+                        <x-studio.hint text="Người viết đã tìm trong kho nhưng không thấy mục đã duyệt nào cho từ khóa của bài. Thêm kiến thức rồi duyệt: khoảng trống tự chuyển sang 'Đã bổ sung' khi mục đã duyệt khớp truy vấn." />
+                    </div>
+                    <div class="ss-dt__scroll"><table class="ss-dt__table">
+                        <thead><tr><th>Truy vấn</th><th style="width:1%;white-space:nowrap">Website</th><th>Bài</th><th style="width:1%;white-space:nowrap">Số lần</th><th style="width:1%;white-space:nowrap">Trạng thái</th><th style="width:1%;white-space:nowrap">Thao tác</th></tr></thead>
+                        <tbody>
+                        @foreach ($gaps as $g)
+                            <tr wire:key="gap-{{ $g->id }}">
+                                <td style="min-width:14rem"><strong>{{ $g->query }}</strong></td>
+                                <td style="width:1%;white-space:nowrap">{{ $g->website?->name ?? '—' }}</td>
+                                <td>{{ $g->article ? ($g->article->title ?: $g->article->primary_keyword) : '—' }}</td>
+                                <td style="width:1%;white-space:nowrap">{{ $g->count }}</td>
+                                <td style="width:1%;white-space:nowrap">
+                                    @if ($g->status === 'filled')
+                                        <x-studio.badge tone="ok">Đã bổ sung</x-studio.badge>
+                                        @if ($g->filled_item_id)<span class="ss-muted ss-text-xs">KB#{{ $g->filled_item_id }}</span>@endif
+                                    @else
+                                        <x-studio.badge tone="warn">Còn thiếu</x-studio.badge>
+                                    @endif
+                                </td>
+                                <td style="width:1%;white-space:nowrap"><div class="kb-act">
+                                    @if ($g->status !== 'filled')
+                                        <x-filament::button size="xs" wire:click="prefillFromGap({{ $g->id }})" x-on:click="set('add')">Thêm kiến thức</x-filament::button>
+                                    @endif
+                                </div></td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table></div>
                 @endif
             </x-studio.panel>
 

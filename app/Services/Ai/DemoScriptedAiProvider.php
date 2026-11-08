@@ -3,6 +3,7 @@
 namespace App\Services\Ai;
 
 use App\Contracts\AiProviderInterface;
+use App\Contracts\StructuredAiInterface;
 use App\Models\Article;
 use Illuminate\Support\Str;
 
@@ -11,7 +12,7 @@ use Illuminate\Support\Str;
  * Lần viết đầu cố ý ngắn và thiếu từ khóa; khi nhận danh sách lỗi chặn (options['feedback']) thì trả bản đầy đủ.
  * Phiên chạy dùng nó luôn được ghi nhãn "AI giả lập"; nội dung chỉ là chữ ghép để qua luật, không có giá trị biên tập.
  */
-final class DemoScriptedAiProvider implements AiProviderInterface
+final class DemoScriptedAiProvider implements AiProviderInterface, StructuredAiInterface
 {
     private const LEX = ['khách', 'hàng', 'dịch', 'vụ', 'giải', 'pháp', 'doanh', 'nghiệp', 'quy', 'trình', 'chất', 'lượng', 'kinh', 'nghiệm', 'thực', 'tế', 'hiệu', 'quả',
         'chi', 'phí', 'thời', 'gian', 'tư', 'vấn', 'triển', 'khai', 'kết', 'quả', 'đánh', 'giá', 'kế', 'hoạch', 'mục', 'tiêu', 'người', 'dùng', 'nội', 'dung'];
@@ -34,6 +35,22 @@ final class DemoScriptedAiProvider implements AiProviderInterface
             'focus_keyword' => $kw, 'faq_schema' => [], 'sources_cited' => [],
             'tokens_used' => $fixed ? 1800 : 300, 'cost_vnd' => $fixed ? 90.0 : 15.0, 'model' => 'demo-kich-ban', 'prompt_version' => 'demo',
         ];
+    }
+
+    /** AG-S21: "tách kiến thức" giả lập tất định (chỉ môi trường local): mỗi đoạn trong khung tài liệu thành một mục, độ tin cậy thấp. KHÔNG phải AI thật. */
+    public function generateStructured(string $system, string $user): array
+    {
+        $items = [];
+        if (preg_match('/<<<TAILIEU-(\w+)>>>\n(.*)\n<<<HET-\1>>>/su', $user, $m)) {
+            foreach (preg_split('/\n\s*\n/u', $m[2]) ?: [] as $block) {
+                $block = trim($block);
+                if (mb_strlen($block) >= 15) {
+                    $items[] = ['title' => mb_substr(preg_split('/(?<=[.!?])\s/u', $block, 2)[0], 0, 80), 'body' => mb_substr($block, 0, 600), 'type' => 'fact', 'confidence' => 40, 'source_span' => mb_substr($block, 0, 200)];
+                }
+            }
+        }
+
+        return ['data' => ['items' => $items], 'tokens_used' => 100, 'cost_vnd' => 0.0, 'model' => 'demo-kich-ban'];
     }
 
     public function calculateCostVnd(int $promptTokens, int $completionTokens, string $model): float

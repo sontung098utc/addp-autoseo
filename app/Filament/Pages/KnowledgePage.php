@@ -8,6 +8,7 @@ use App\Models\KnowledgeSource;
 use App\Models\KnowledgeTopic;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Knowledge\KnowledgeAiIngest;
 use App\Services\Knowledge\KnowledgeConflicts;
 use App\Services\Knowledge\KnowledgeDedupe;
 use App\Services\Knowledge\KnowledgeError;
@@ -151,6 +152,31 @@ class KnowledgePage extends Page
         });
     }
 
+    /** AG-S21: AI ĐỀ XUẤT tách nguồn; mọi mục vào Hộp duyệt ở trạng thái 'Đề xuất'. */
+    public function splitSourceAi(int $sourceId): void
+    {
+        $this->guard();
+        try {
+            $r = (new KnowledgeAiIngest())->run(KnowledgeSource::query()->findOrFail($sourceId), Auth::user());
+        } catch (KnowledgeError $e) {
+            Notification::make()->title('Chưa tách được bằng AI')->body($e->getMessage())->danger()->send();
+
+            return;
+        }
+        $stop = ['item_cap' => 'đạt trần số mục', 'budget' => 'đạt trần chi phí', 'cost_cap' => 'một lần gọi vượt trần chi phí', 'chunk_cap' => 'nguồn dài, mới xử lý phần đầu', 'error' => 'AI báo lỗi'][$r['stopped'] ?? ''] ?? null;
+        $n = Notification::make()->title("AI đề xuất {$r['proposed']} mục (chờ bạn duyệt)")
+            ->body(trim("Token: {$r['tokens']} · chi phí ≈ ".number_format($r['cost_vnd'], 0, ',', '.').' đ'.($r['duplicates'] ? " · bỏ {$r['duplicates']} mục trùng y hệt" : '').($r['invalid'] + $r['injection_dropped'] ? ' · loại '.($r['invalid'] + $r['injection_dropped']).' mục không hợp lệ' : '').($stop ? " · dừng: {$stop}" : '')));
+        ($r['stopped'] === 'error' || ($r['proposed'] === 0 && $r['chunks_failed'] > 0) ? $n->warning() : $n->success())->send();
+    }
+
+    /** AG-S21: mở form "Thêm kiến thức" có sẵn tiêu đề từ khoảng trống (chuyển tab do nút phía giao diện). */
+    public function prefillFromGap(int $gapId): void
+    {
+        $this->guard();
+        $gap = KnowledgeGap::query()->findOrFail($gapId);
+        $this->new = array_merge($this->new, ['website_id' => (string) $gap->website_id, 'title' => mb_substr($gap->query, 0, 200), 'body' => '']);
+    }
+
     public function openItem(int $id): void
     {
         $item = $this->item($id);
@@ -281,7 +307,9 @@ class KnowledgePage extends Page
             'all' => $all,
             'sources' => $manage ? KnowledgeSource::query()->withCount(['items', 'items as proposed_count' => fn ($q) => $q->where('status', 'proposed')])->with('website')->orderByDesc('id')->limit(100)->get() : collect(),
             'selected' => $selected, 'selectedFlags' => $selected ? $flags($selected) : null,
-            'warn' => $warn, 'gaps' => $manage ? KnowledgeGap::query()->with('website')->orderByDesc('count')->limit(30)->get() : collect(),
+            'warn' => $warn,
+            'gaps' => $manage ? KnowledgeGap::query()->with(['website', 'article', 'filledItem'])->orderByRaw("status = 'open' desc")->orderByDesc('count')->limit(100)->get() : collect(),
+            'aiAvail' => $manage ? (new KnowledgeAiIngest())->availability() : ['ok' => false, 'reason' => null, 'label' => null, 'demo' => false],
             'topics' => KnowledgeTopic::query()->with('parent')->orderBy('name')->get(),
             'sites' => Website::query()->orderBy('name')->get(['id', 'name']),
             'types' => KnowledgeItem::TYPES, 'statuses' => KnowledgeItem::STATUSES,

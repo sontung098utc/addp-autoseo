@@ -90,6 +90,7 @@ final class KnowledgeContext
             return;
         }
         $gap = KnowledgeGap::firstOrCreate(['website_id' => $article->website_id, 'query' => $query], ['article_id' => $article->id, 'count' => 0]);
-        $gap->update(['count' => $gap->count + 1, 'article_id' => $article->id]);
+        // AG-S21: tìm vẫn không ra dù từng "đã bổ sung" (mục bị cũ/loại, hoặc chưa đủ khớp) → mở lại.
+        $gap->update(['count' => $gap->count + 1, 'article_id' => $article->id, 'status' => 'open', 'filled_at' => null, 'filled_item_id' => null]);
     }
 }

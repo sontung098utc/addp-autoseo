@@ -14,6 +14,8 @@ class AiModelRoute extends Model
         'write' => ['Viết bài', 'reasoning'],
         'repair' => ['Sửa bài theo lỗi chặn', 'standard'],
         'summary' => ['Tóm tắt audit', 'cheap'],
+        // AG-S21: tách kho kiến thức bằng AI. Chưa cấu hình riêng thì KnowledgeAiIngest dùng route 'summary' (cùng bậc rẻ, cùng kiểu việc trích xuất/tóm tắt).
+        'knowledge' => ['Nạp kiến thức (tách mục)', 'cheap'],
     ];
 
     public const TIERS = ['cheap' => 'Rẻ', 'standard' => 'Chuẩn', 'reasoning' => 'Suy luận'];
