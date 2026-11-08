@@ -30,6 +30,11 @@ class Website extends Model
         ];
     }
 
+    public function brandProfile(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(BrandProfile::class);
+    }
+
     public function articles(): HasMany
     {
         return $this->hasMany(Article::class);

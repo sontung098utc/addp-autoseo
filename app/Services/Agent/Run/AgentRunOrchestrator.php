@@ -24,6 +24,8 @@ use App\Services\Ai\Playbook\Playbook;
 use App\Services\Ai\Playbook\PlaybookLoader;
 use App\Filament\Support\Schedule\ErrorMasker;
 use App\Services\Content\HtmlSanitizer;
+use App\Models\BrandProfile;
+use App\Services\Brand\BrandProfileData;
 use App\Services\Content\Quality\ContentQualityChecker;
 use App\Services\Content\Quality\QualityReport;
 use App\Services\Publishing\EmergencyStopService;
@@ -121,6 +123,7 @@ final class AgentRunOrchestrator
     private function execute(AgentRun $run, Article $article, string $previousStatus): AgentRun
     {
         $site = $article->website;
+        $this->brandProfile = BrandProfileData::forWebsite($article->website_id);
 
         // 1. An toàn: dừng khẩn cấp và website phải hoạt động.
         if ($this->stop->isStopped($article->website_id)) {
@@ -161,10 +164,12 @@ final class AgentRunOrchestrator
         } else {
             $this->skills['brief'] = $this->usePlaybook('brief', 'content-brief');
             [$briefPb, $briefNote] = $this->skills['brief'];
-            $briefOptions = ($briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : []) + $this->roleOptions('strategist');
+            $briefOptions = ($briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : []) + $this->roleOptions('strategist') + $this->brandOptions();
             $outline = $this->callAi($run, 'outline', 'lập dàn ý', fn (AiProviderInterface $ai) => $ai->generateOutline($article, $briefOptions));
-            $this->step($run, 'brief', 'strategist', 'ok', 'Lập dàn ý ('.count($outline['outline'] ?? []).' mục)', 'Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. '.$briefNote,
-                ['outline' => $outline['outline'] ?? [], 'playbook' => $this->pbData($briefPb)] + $this->providerData($outline), $outline['model'] ?? null, (int) ($outline['tokens_used'] ?? 0), (float) ($outline['cost_vnd'] ?? 0));
+            $offTopic = BrandProfileData::looksOffTopic($this->brandProfile, (string) $article->primary_keyword);
+            $this->step($run, 'brief', 'strategist', $offTopic ? 'warn' : 'ok', 'Lập dàn ý ('.count($outline['outline'] ?? []).' mục)', 'Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. '.$briefNote.$this->brandNote()
+                .($offTopic ? ' Cảnh báo: chủ đề "'.mb_substr((string) $article->primary_keyword, 0, 80).'" có thể không phù hợp website (lĩnh vực trong hồ sơ: '.mb_substr((string) $this->brandProfile?->business_field, 0, 120).'). Chỉ cảnh báo, không chặn.' : ''),
+                ['outline' => $outline['outline'] ?? [], 'playbook' => $this->pbData($briefPb)] + $this->brandData() + ($offTopic ? ['off_topic' => true] : []) + $this->providerData($outline), $outline['model'] ?? null, (int) ($outline['tokens_used'] ?? 0), (float) ($outline['cost_vnd'] ?? 0));
         }
         $this->skills['grade'] = $this->skills['repair'] = $this->usePlaybook('editor', 'qa-review');
         [$editorPb, $editorNote] = $this->skills['grade'];
@@ -254,7 +259,7 @@ final class AgentRunOrchestrator
             $options['playbook'] = $pb->body;
             $options['playbook_ref'] = $pb->ref();
         }
-        $options += $this->roleOptions('writer');
+        $options += $this->roleOptions('writer') + $this->brandOptions();
         $r = $this->callAi($run, $stage, $title, fn (AiProviderInterface $ai) => $ai->generateArticle($article, $outline, $options));
         $html = HtmlSanitizer::clean($r['html_content'] ?? '');
         // Nhà cung cấp thật có thể rơi về bản giả lập một cách im lặng (thiếu khóa, JSON hỏng). Không được gọi đó là AI thật.
@@ -264,9 +269,9 @@ final class AgentRunOrchestrator
         }
         $silentMock = $fellBack && ! $this->ai instanceof MockAiProvider;
         $this->step($run, $stage, 'writer', $silentMock ? 'warn' : 'ok', $title, ($silentMock ? 'Nhà cung cấp AI đã rơi về bản giả lập (thiếu khóa hoặc phản hồi hỏng); nội dung không phải AI thật. ' : '').($feedback === []
-            ? 'Viết theo dàn ý; HTML được làm sạch trước khi chấm.'
+            ? 'Viết theo dàn ý; HTML được làm sạch trước khi chấm.'.$this->brandNote()
             : 'Gửi lại cho AI '.count($feedback).' lỗi chặn cần sửa: '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
-            ['words' => str_word_count(strip_tags($html)) ?: mb_strlen(strip_tags($html)), 'playbook' => $this->pbData($pb)] + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
+            ['words' => str_word_count(strip_tags($html)) ?: mb_strlen(strip_tags($html)), 'playbook' => $this->pbData($pb)] + $this->brandData() + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
 
         return [
             'article_id' => $article->id, 'title' => $r['title'] ?? $article->primary_keyword, 'slug' => $r['slug'] ?? 'bai-viet', 'outline' => $outline,
@@ -322,6 +327,32 @@ final class AgentRunOrchestrator
         }
 
         return [$pb, "Dùng playbook {$pb->ref()}".($pb->isRunnable() ? '.' : ' (bản nháp, chỉ cho lượt thủ công).')];
+    }
+
+    /** AG-S19: hồ sơ thương hiệu của website của bài đang chạy (null nếu chưa có). */
+    private ?BrandProfile $brandProfile = null;
+
+    /** @return array<string, mixed> */
+    private function brandOptions(): array
+    {
+        $b = BrandProfileData::forPrompt($this->brandProfile);
+
+        return $b ? ['brand' => $b] : [];
+    }
+
+    private function brandNote(): string
+    {
+        $n = BrandProfileData::forPrompt($this->brandProfile)['fields_used'] ?? 0;
+
+        return $n > 0 ? " Đã dùng hồ sơ thương hiệu ({$n} trường)." : '';
+    }
+
+    /** @return array<string, mixed> */
+    private function brandData(): array
+    {
+        $n = BrandProfileData::forPrompt($this->brandProfile)['fields_used'] ?? 0;
+
+        return $n > 0 ? ['brand_profile_fields' => $n] : [];
     }
 
     private function roleOff(string $key): bool
