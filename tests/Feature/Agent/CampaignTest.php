@@ -28,8 +28,16 @@ class CampaignTest extends TestCase
         app(EmergencyStopService::class)->resetForTesting();
     }
 
+    private function freezeClock(CarbonImmutable $at): void
+    {
+        \Carbon\Carbon::setTestNow($at);
+        CarbonImmutable::setTestNow($at);
+    }
+
     protected function tearDown(): void
     {
+        \Carbon\Carbon::setTestNow();
+        CarbonImmutable::setTestNow();
         app(EmergencyStopService::class)->resetForTesting();
         parent::tearDown();
     }
@@ -90,6 +98,7 @@ class CampaignTest extends TestCase
     {
         $c = $this->campaign(['daily_limit' => 1]);
         $now = CarbonImmutable::parse('2026-11-07 03:00:00', 'UTC');
+        $this->freezeClock($now); // các phiên tạo trong test dùng now(): phải trùng ngày đang kiểm, không phụ thuộc đồng hồ thật
         $this->assertSame('ran', $this->runner()->tick($c, $now)['result']);
         $this->assertSame('limit', $this->runner()->tick($c, $now->addHour())['result']);
         AgentRun::query()->update(['started_at' => $now]);
@@ -242,6 +251,7 @@ class CampaignTest extends TestCase
     {
         $c = $this->campaign(['daily_cost_cap_vnd' => 1000]);
         $now = CarbonImmutable::parse('2026-11-07 03:00:00', 'UTC');
+        $this->freezeClock($now); // các phiên tạo trong test dùng now(): phải trùng ngày đang kiểm, không phụ thuộc đồng hồ thật
         $this->assertSame('ran', $this->runner()->tick($c, $now)['result']);
         AgentRun::query()->update(['cost_vnd' => 1000, 'started_at' => $now]);
 
@@ -256,6 +266,7 @@ class CampaignTest extends TestCase
     {
         $c = $this->campaign(['daily_draft_cap' => 1, 'daily_limit' => 5]);
         $now = CarbonImmutable::parse('2026-11-07 03:00:00', 'UTC');
+        $this->freezeClock($now); // các phiên tạo trong test dùng now(): phải trùng ngày đang kiểm, không phụ thuộc đồng hồ thật
         $this->runner()->tick($c, $now);
         AgentRun::query()->update(['status' => 'ready_for_review', 'started_at' => $now]);
 
@@ -281,6 +292,7 @@ class CampaignTest extends TestCase
     {
         $c = $this->campaign(['keywords' => []]);
         $now = CarbonImmutable::parse('2026-11-07 03:00:00', 'UTC');
+        $this->freezeClock($now); // các phiên tạo trong test dùng now(): phải trùng ngày đang kiểm, không phụ thuộc đồng hồ thật
         $this->assertSame('no_keywords', $this->runner()->tick($c, $now)['result']);
         $this->runner()->tick($c, $now->addHour()); // không tạo trùng
         $wait = \App\Models\CampaignWait::firstOrFail();
@@ -288,6 +300,7 @@ class CampaignTest extends TestCase
         $this->assertSame('open', $wait->status);
         $this->assertTrue($wait->expires_at->equalTo($now->addDay()));
 
+        $this->freezeClock($now->addDay()->addMinute()); // đồng hồ chạy tới giờ của nhịp sau 24 giờ
         $this->runner()->tick($c, $now->addDay()->addMinute());
         $wait->refresh();
         $this->assertSame('expired', $wait->status);

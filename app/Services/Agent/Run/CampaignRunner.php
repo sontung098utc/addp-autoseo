@@ -116,7 +116,7 @@ final class CampaignRunner
     {
         $now = $now->setTimezone(config('app.timezone')); // cột thời gian của Eloquent theo múi giờ ứng dụng
         $recent = CampaignWait::query()->where('campaign_id', $c->id)->where('code', $code)
-            ->where(fn ($q) => $q->where('status', 'open')->orWhere('created_at', '>', $now->subDay()))->exists();
+            ->where(fn ($q) => $q->where('status', 'open')->orWhere('updated_at', '>', $now->subDay()))->exists();
         if (! $recent) {
             CampaignWait::create(['campaign_id' => $c->id, 'code' => $code, 'title' => $title, 'detail' => $detail, 'status' => 'open', 'expires_at' => $now->addDay()]);
         }
