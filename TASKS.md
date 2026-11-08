@@ -40,7 +40,7 @@ Bảng này đồng bộ trực tiếp với Master Plan (Google Sheet). Mọi c
 | **1.3** | Dev2 | Dev1 | 8h | 1.1 | `feat/m04/1-3/dev2/audit-report` | **Hoàn thành** | Báo cáo audit SEO tiếng Việt kèm khuyến nghị tối ưu từ AI (AuditPage, AuditReport, BriefBuilder). Commit: `77fb0a9` |
 | **2.1** | Dev2 | Dev1 | 8h | 0.3 | `feat/m04/2-1/dev2/keywords` | **Hoàn thành** | Nhập từ khóa/CSV nội bộ, gom cụm AI (Topic Cluster & Search Intent, KeywordsPage). Commit: `77fb0a9` |
 | **2.2** | Dev2 | Dev1 | 10h | 2.1 | `feat/m04/2-2/dev2/content-plan` | **Hoàn thành** | Lập kế hoạch nội dung, lịch biên tập kéo thả tuần (ContentPlanPage, WeeklySchedule). Commit: `77fb0a9` |
-| **4.1** | Dev1 | Dev2 | 16h | 3.6, 1.3, 2.2 | `test/m06/4-1/dev1/pilot` | Chưa bắt đầu | Chạy thử thực tế 4 ngày (mỗi người 2h/ngày), xuất bản tối thiểu 10 bài/CMS. |
+| **4.1** | Dev1 | Dev2 | 16h | 3.6, 1.3, 2.2 | `test/m06/4-1/dev1/pilot` | **Hoàn thành** | Chạy thử thực tế 4 ngày với 20 bài (10 WP, 10 Magento), đối soát timeout 504 và nút dừng khẩn cấp, tài liệu AC13. Commit: `cc7a461` |
 | **4.2** | Dev1 | Dev2 | 12h | 4.1 | `feat/m06/4-2/dev1/handover` | Chưa bắt đầu | Sửa lỗi pilot, tinh chỉnh prompt, viết hướng dẫn và Marketing nghiệm thu. |
 
 ---
