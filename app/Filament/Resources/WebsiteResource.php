@@ -193,8 +193,8 @@ class WebsiteResource extends Resource
                 Tables\Actions\ViewAction::make()->label('Chi tiết')->slideOver()->modalHeading('Chi tiết kết nối')
                     ->infolist(static::infolistSchema()),
                 Tables\Actions\EditAction::make(),
+                static::testConnectionAction(),
                 Tables\Actions\ActionGroup::make([
-                    static::testConnectionAction(),
                     static::rotateCredentialsAction(),
                     static::revokeAction(),
                 ]),
@@ -295,9 +295,10 @@ class WebsiteResource extends Resource
                 }
 
                 if ($ok) {
-                    $record->forceFill(['last_synced_at' => now()])->save();
-                    Notification::make()->title('Kết nối thành công')->success()->send();
+                    $record->forceFill(['last_synced_at' => now(), 'status' => 'active'])->save();
+                    Notification::make()->title('Kết nối thành công. Trạng thái đã chuyển sang Hoạt động.')->success()->send();
                 } else {
+                    $record->forceFill(['status' => 'error'])->save();
                     Notification::make()->title('Kết nối không thành công. Vui lòng kiểm tra lại địa chỉ và credential.')->danger()->send();
                 }
             });
