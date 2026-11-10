@@ -193,8 +193,9 @@ class ArticleWorkspaceTest extends TestCase
             ->assertSee('lõi lọc nước')->assertSee('Chưa có bài')
             ->assertDontSee('dò theo tên');
 
-        // Bài không gắn keyword_id: dò theo tên và nói rõ.
+        // Bài cũ không gắn keyword_id (tạo trước khi có liên kết tự động): dò theo tên và nói rõ.
         $b = $this->article('needs_review');
+        $b->update(['keyword_id' => null]);
         $this->get(ArticleResource::getUrl('view', ['record' => $b]))->assertOk()->assertSee('12.400')->assertSee('dò theo tên');
     }
 
@@ -202,6 +203,9 @@ class ArticleWorkspaceTest extends TestCase
     {
         $this->actingAs($this->user('writer'));
         $a = $this->article('needs_review');
+        // Từ khóa bị xóa khỏi kho sau khi bài đã tạo: keyword_id về null và không còn bản ghi nào để dò.
+        Keyword::where('website_id', $this->site->id)->delete();
+        $a->refresh();
 
         $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()
             ->assertSee('chưa có trong kho từ khóa')

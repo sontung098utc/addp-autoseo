@@ -85,7 +85,7 @@ final class CampaignRunner
         }
 
         $fromPlan = $article !== null;
-        $article ??= Article::create(['website_id' => $c->website_id, 'created_by' => $c->created_by, 'primary_keyword' => $keyword, 'workflow_status' => 'planned']);
+        $article ??= Article::create(['website_id' => $c->website_id, 'created_by' => $c->created_by, 'primary_keyword' => $keyword, 'workflow_status' => 'planned', 'origin' => 'keyword', 'campaign_id' => $c->id]);
         try {
             $run = (new AgentRunOrchestrator($ai, stop: $this->stop, policy: \App\Services\Agent\Settings\AgentAi::policy(), handoff: app(\App\Services\Agent\Handoff\CmsDraftHandoff::class)))->run($article, null, 'schedule', $c->id);
         } catch (\Throwable $e) {
