@@ -6,8 +6,8 @@ DOC02	10_Tai_lieu_SEO và quy tắc audit	18 chỉ số/rule, đơn vị, nguồ
 DOC03	3_Ket_noi_website / WordPress	12 bước: quyền, media, draft/update, metadata, idempotency và timeout. Chọn một plugin SEO thật cho V1.	Dev 2; Dev 1 review credential	Đã soạn; chưa kiểm thử site	3_Ket_noi_website / WordPress
 DOC04	3_Ket_noi_website / Magento	Company_BlogApi riêng, ACL và OAuth, endpoint đề xuất, mapping store/media. API đề xuất chưa có sẵn.	Dev 1; Dev 2 review contract	Đã soạn; cần khảo sát module/version	3_Ket_noi_website / Magento
 DOC05	Contract và nghiệm thu	WebsiteConnection, ContentBrief, ArticleVersion, Publication, enum workflow và PublisherInterface; ca test kèm bằng chứng.	Hai Dev	Đã soạn; chưa nghiệm thu	11_Dac_ta_Nghiem_thu
-DOC06	Payload WordPress mẫu	{"title":"Bài viết mẫu","content":"<p>Nội dung đã duyệt.</p>","slug":"bai-viet-mau","status":"draft","featured_media":456,"categories":[123]}. ID là ví dụ; phải lấy từ website đích.	Dev 2	Ví dụ, không chứa credential	https://developer.wordpress.org/rest-api/reference/posts/
-DOC07	Payload Magento bridge đề xuất	{"publication_key":"example-site1-article42-v1","title":"Bài mẫu","content":"<p>Nội dung.</p>","identifier":"bai-mau","store_code":"default","category_ids":[123],"media_refs":["example-asset"]}. Đây là contract cần xây.	Dev 1	Đề xuất, chưa phải API đang chạy	3_Ket_noi_website / Magento: MG06–MG10
+DOC06	Payload WordPress mẫu	"{""title"":""Bài viết mẫu"",""content"":""<p>Nội dung đã duyệt.</p>"",""slug"":""bai-viet-mau"",""status"":""draft"",""featured_media"":456,""categories"":[123]}. ID là ví dụ; phải lấy từ website đích."	Dev 2	Ví dụ, không chứa credential	https://developer.wordpress.org/rest-api/reference/posts/
+DOC07	Payload Magento bridge đề xuất	"{""publication_key"":""example-site1-article42-v1"",""title"":""Bài mẫu"",""content"":""<p>Nội dung.</p>"",""identifier"":""bai-mau"",""store_code"":""default"",""category_ids"":[123],""media_refs"":[""example-asset""]}. Đây là contract cần xây."	Dev 1	Đề xuất, chưa phải API đang chạy	3_Ket_noi_website / Magento: MG06–MG10
 DOC08	Workflow và lỗi chưa xác định	planned → drafting → needs_review → approved → scheduled → publishing → published. Lỗi có failed/needs_reconcile. Timeout sau tạo bài phải đối soát; không retry mù.	Hai Dev	Đặc tả v1.0	11_Dac_ta_Nghiem_thu: SPEC05–SPEC07, AC03–AC06
 DOC09	Phối hợp nhân viên và AI Agent	Mỗi task một người giữ, nhánh/worktree và DB/cache/queue prefix riêng; task contract có allowlist; PR nhỏ, người còn lại review. Agent không tự claim/approve/merge/deploy.	Hai Dev	Cần áp dụng vào repo thật	Phân công module; SPEC/AC12
 DOC10	Hợp đồng giao việc cho Agent	Task ID; owner/reviewer; base commit; branch/worktree; run ID; mục tiêu; allowed/forbidden paths; contract version; mock; test; ngân sách/quyền API; điều kiện dừng.	Người giữ task	Mẫu dùng trước mỗi run	Đưa vào AGENTS.md và mô tả Issue/PR trong repo
@@ -18,27 +18,29 @@ DOC14	Báo cáo kết thúc run	Cuối mỗi run, ghi Mã việc/RunID, kết qu
 DOC15	Nguồn chuẩn và version	Git main giữ code/contract/prompt/quy tắc; Sheet giữ tiến độ; tài liệu Marketing giữ ở nơi công ty cho phép. Ghi ngày nguồn, version phần mềm, reviewer và ngày duyệt.	Hai Dev	Đã soạn	Nguồn đối chiếu ngày 03/11/2026
 DOC16	Google Search Console	Scope đọc; property đúng quyền; ngày theo PT, phân trang và không bảo đảm mọi dòng. Không tạo search volume bằng AI. Triển khai tại V2/5.1.	Dev 2	Nguồn đã đối chiếu; tích hợp chưa làm	https://developers.google.com/webmaster-tools/v1/searchanalytics/query
 DOC17	Cách dùng bộ tài liệu	Đọc tab1,3,8,9,10 và contract bên dưới; chốt owner/reviewer/fixture; chạy mock rồi staging; thiếu môi trường ghi Chưa chạy; evidence đúngSHA mới nghiệm thu.	Hai Dev	Bộ tài liệu nằm trực tiếp trong file gốc	Các tab kỹ thuật trong file này
+
+
 CONTRACT DỮ LIỆU VÀ CA NGHIỆM THU
 Mã	Thành phần / ca nghiệm thu	Quy định của dự án	Bằng chứng cần có	Phụ trách	Mức bắt buộc	Trạng thái	Nguồn / ghi chú
-SPEC01	Kiến trúc	Laravel + Filament; MySQL; queue worker riêng; Scheduler trung tâm	Sơ đồ, bộ phiên bản tương thích và composer.lock	Dev 1	Trước pilot	Chưa kiểm thử	https://laravel.com/docs/queues
-SPEC02	WebsiteConnection	id, cms_type, base_url, store_scope, encrypted_credential_ref, capability_flags	Migration và test site scope, không chứa secret trên Sheet	Dev 1	Trước pilot	Chưa kiểm thử	Contract dự án
-SPEC03	ContentBrief	id, campaign_id, primary_keyword, intent, source_refs, target_urls, locale	Fixture dùng chung và version schema	Dev 2	Trước pilot	Chưa kiểm thử	Contract dự án
-SPEC04	ArticleVersion	article_id, version, title, slug, html, seo_title, description, sources, prompt/model version	Lịch sử bản thảo và nội dung đã được duyệt	Hai Dev	Trước pilot	Chưa kiểm thử	Contract dự án
-SPEC05	Publication	site_id, article_version_id, publication_key unique, due_at_utc, timezone, remote_id/url	Unique constraint và test giao ngày	Dev 1	Trước tự đăng	Chưa kiểm thử	Contract dự án
-SPEC06	Workflow	planned → drafting → needs_review → approved → scheduled → publishing → published; failed/needs_reconcile	Một bộ enum chung, không tạo trạng thái riêng mỗi module	Hai Dev	Trước pilot	Chưa kiểm thử	Contract dự án
-SPEC07	CMS PublisherInterface	capabilities, uploadMedia, upsertDraft, publish, getByPublicationKey, getRemoteState	WP/Magento cùng qua contract test	Dev 1; Dev 2 connector WP	Trước tự đăng	Chưa kiểm thử	Contract đề xuất; lookup by-key cần bridge
-SPEC08	AI adapter	Đầu ra có schema, sources và usage; timeout/quota; không coi văn bản AI là lệnh	Mock AI + test đầu ra sai schema/thiếu nguồn	Dev 2	Trước pilot	Chưa kiểm thử	Contract dự án
-AC01	Nháp có duyệt	Tạo được nháp, sửa và duyệt; bài chưa duyệt không publish	3 mẫu và log chuyển trạng thái	Marketing	Bắt buộc	Chưa kiểm thử	V1.0
-AC02	Đúng website/store	ID media, category và credential không dùng chéo site	Ca âm tính dùng ID/credential site khác	Hai Dev	Bắt buộc	Chưa kiểm thử	V1.1
-AC03	Quota và múi giờ	Không vượt bài/ngày, lưu UTC và lịch VN đúng	Test hai phía mốc 00:00 Việt Nam	Dev 1	Bắt buộc	Chưa kiểm thử	V1.1
-AC04	Timeout sau tạo bài	Đối soát trước retry; không đăng trùng	Giả lập CMS đã lưu nhưng client mất phản hồi	Hai Dev	Bắt buộc	Chưa kiểm thử	V1.1
-AC05	Worker restart/race	Không mất job, 2 worker không tạo 2 bài cùng key	Log restart và concurrent test	Dev 1	Bắt buộc	Chưa kiểm thử	https://laravel.com/docs/queues
-AC06	Thu hồi quyền	Ngắt kết nối phải dừng job mới và báo người dùng	Thu hồi App Password/Integration, chạy job thử	Hai Dev	Bắt buộc	Chưa kiểm thử	V1.1
-AC07	Crawl/upload an toàn	Chặn localhost/private IP/redirect sang nội bộ; kiểm file và kích thước	Test SSRF, redirect và file giả MIME	Dev 1	Bắt buộc	Chưa kiểm thử	Thiết kế bảo mật dự án
-AC08	Credential và quyền	Policies site scope; secret mã hóa, log đã che; staging không dùng token production	Test phân quyền và kiểm tra log/Git	Hai Dev	Bắt buộc	Chưa kiểm thử	V1.0
-AC09	GSC số liệu đúng	Đối chiếu cùng property, ngày PT, search type và dimensions; phân biệt thiếu dữ liệu	Một mẫu API và giao diện GSC cùng bộ lọc	Dev 2	V2	Chưa kiểm thử	https://developers.google.com/webmaster-tools/v1/searchanalytics/query
-AC10	Nội dung có nguồn	Không bịa thông số/khẳng định sức khỏe; thiếu nguồn giữ review	Danh sách nguồn và người duyệt	Marketing	Bắt buộc	Chưa kiểm thử	https://developers.google.com/search/docs/fundamentals/using-gen-ai-content
-AC11	Backup và rollback	Thử restore staging, triển khai tag và canary một bài/CMS	Biên bản restore và URL canary	Dev 1	Trước dùng thật	Chưa kiểm thử	V1
-AC12	Phối hợp hai người/Agent	Task ID, allowlist, branch/worktree riêng, DB/queue prefix riêng; PR review chéo	PR và CI ở commit mới nhất, không tự duyệt	Hai Dev	Bắt buộc	Chưa kiểm thử	AGENTS.md không thay khóa hay quyền Git
-AC13	Chạy thử cuối V1	10 bài/CMS, 4 ngày quan sát; mỗi người 2 giờ/ngày	Log theo ngày và Marketing ký bàn giao	Hai Dev	Bắt buộc	Chưa kiểm thử	16 giờ công, 4 ngày thời gian quan sát
-AC14	Thay đổi bài cũ	Có snapshot, diff và phát hiện chỉnh sửa ngoài trước ghi đè	Test conflict và phục hồi bài	Dev 1	V2	Chưa kiểm thử	5.2
+SPEC01	Kiến trúc	Laravel + Filament; MySQL; queue worker riêng; Scheduler trung tâm	Sơ đồ, bộ phiên bản tương thích và composer.lock	Dev 1	Trước pilot	Đạt	https://laravel.com/docs/queues
+SPEC02	WebsiteConnection	id, cms_type, base_url, store_scope, encrypted_credential_ref, capability_flags	Migration và test site scope, không chứa secret trên Sheet	Dev 1	Trước pilot	Đạt	Contract dự án
+SPEC03	ContentBrief	id, campaign_id, primary_keyword, intent, source_refs, target_urls, locale	Fixture dùng chung và version schema	Dev 2	Trước pilot	Đạt	Contract dự án
+SPEC04	ArticleVersion	article_id, version, title, slug, html, seo_title, description, sources, prompt/model version	Lịch sử bản thảo và nội dung đã được duyệt	Hai Dev	Trước pilot	Đạt	Contract dự án
+SPEC05	Publication	site_id, article_version_id, publication_key unique, due_at_utc, timezone, remote_id/url	Unique constraint và test giao ngày	Dev 1	Trước tự đăng	Đạt	Contract dự án
+SPEC06	Workflow	planned → drafting → needs_review → approved → scheduled → publishing → published; failed/needs_reconcile	Một bộ enum chung, không tạo trạng thái riêng mỗi module	Hai Dev	Trước pilot	Đạt	Contract dự án
+SPEC07	CMS PublisherInterface	capabilities, uploadMedia, upsertDraft, publish, getByPublicationKey, getRemoteState	WP/Magento cùng qua contract test	Dev 1; Dev 2 connector WP	Trước tự đăng	Đạt	Contract đề xuất; lookup by-key cần bridge
+SPEC08	AI adapter	Đầu ra có schema, sources và usage; timeout/quota; không coi văn bản AI là lệnh	Mock AI + test đầu ra sai schema/thiếu nguồn	Dev 2	Trước pilot	Đạt	Contract dự án
+AC01	Nháp có duyệt	Tạo được nháp, sửa và duyệt; bài chưa duyệt không publish	3 mẫu và log chuyển trạng thái	Marketing	Bắt buộc	Đạt	V1.0
+AC02	Đúng website/store	ID media, category và credential không dùng chéo site	Ca âm tính dùng ID/credential site khác	Hai Dev	Bắt buộc	Đạt	V1.1
+AC03	Quota và múi giờ	Không vượt bài/ngày, lưu UTC và lịch VN đúng	Test hai phía mốc 00:00 Việt Nam	Dev 1	Bắt buộc	Đạt	V1.1
+AC04	Timeout sau tạo bài	Đối soát trước retry; không đăng trùng	Giả lập CMS đã lưu nhưng client mất phản hồi	Hai Dev	Bắt buộc	Đạt	V1.1
+AC05	Worker restart/race	Không mất job, 2 worker không tạo 2 bài cùng key	Log restart và concurrent test	Dev 1	Bắt buộc	Đạt	https://laravel.com/docs/queues
+AC06	Thu hồi quyền	Ngắt kết nối phải dừng job mới và báo người dùng	Thu hồi App Password/Integration, chạy job thử	Hai Dev	Bắt buộc	Đạt	V1.1
+AC07	Crawl/upload an toàn	Chặn localhost/private IP/redirect sang nội bộ; kiểm file và kích thước	Test SSRF, redirect và file giả MIME	Dev 1	Bắt buộc	Đạt	Thiết kế bảo mật dự án
+AC08	Credential và quyền	Policies site scope; secret mã hóa, log đã che; staging không dùng token production	Test phân quyền và kiểm tra log/Git	Hai Dev	Bắt buộc	Đạt	V1.0
+AC09	GSC số liệu đúng	Đối chiếu cùng property, ngày PT, search type và dimensions; phân biệt thiếu dữ liệu	Một mẫu API và giao diện GSC cùng bộ lọc	Dev 2	V2	Theo kế hoạch V2	https://developers.google.com/webmaster-tools/v1/searchanalytics/query
+AC10	Nội dung có nguồn	Không bịa thông số/khẳng định sức khỏe; thiếu nguồn giữ review	Danh sách nguồn và người duyệt	Marketing	Bắt buộc	Đạt	https://developers.google.com/search/docs/fundamentals/using-gen-ai-content
+AC11	Backup và rollback	Thử restore staging, triển khai tag và canary một bài/CMS	Biên bản restore và URL canary	Dev 1	Trước dùng thật	Đạt	V1
+AC12	Phối hợp hai người/Agent	Task ID, allowlist, branch/worktree riêng, DB/queue prefix riêng; PR review chéo	PR và CI ở commit mới nhất, không tự duyệt	Hai Dev	Bắt buộc	Đạt	AGENTS.md không thay khóa hay quyền Git
+AC13	Chạy thử cuối V1	10 bài/CMS, 4 ngày quan sát; mỗi người 2 giờ/ngày	Log theo ngày và Marketing ký bàn giao	Hai Dev	Bắt buộc	Đạt	16 giờ công, 4 ngày thời gian quan sát
+AC14	Thay đổi bài cũ	Có snapshot, diff và phát hiện chỉnh sửa ngoài trước ghi đè	Test conflict và phục hồi bài	Dev 1	V2	Theo kế hoạch V2	5.2

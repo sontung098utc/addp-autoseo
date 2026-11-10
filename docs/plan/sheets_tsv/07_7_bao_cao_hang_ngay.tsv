@@ -1,36 +1,38 @@
 BÁO CÁO TIẾN ĐỘ — DANH SÁCH 30 ĐẦU VIỆC NHỎ
 Cập nhật ngay trên từng việc. Khi xong: chọn Hoàn thành, điền ngày, ghi chú và bằng chứng. Nhân viên xác nhận sau kiểm tra. Giờ phát sinh ghi ở7.1_Nhat_ky_gio_cong; không nhập lặp giờ tại đây.
 Mã việc	Đầu việc nhỏ	Phụ trách	Hạn dự kiến	Trạng thái	Ngày hoàn thành	Ghi chú kết quả / vướng mắc	Bằng chứng / PR	Tiến độ đang làm
-0.1				Hoàn thành	2026-11-04	Đã hoàn thành 4 file quy chuẩn (AGENTS.md, TASKS.md, GITHUB_WORKFLOW.md, DAILY_REPORT_TEMPLATE.md) và toàn bộ 5 data schema contracts.	https://github.com/sontung098utc/addp-autoseo/commit/5f08e6e	1
-0.2				Hoàn thành	2026-11-05	Dựng môi trường PHP 8.2, MariaDB 10.6, SQLite local demo, Docker compose 6 services, CI Actions.	https://github.com/sontung098utc/addp-autoseo/commit/33c4872	1
-0.3				Chưa bắt đầu				0
-0.4				Hoàn thành	2026-11-05	Hoàn thành Filament Admin Panel, phân quyền User, WebsiteResource, ArticleResource, PublicationResource và Seeder dữ liệu mẫu.	https://github.com/sontung098utc/addp-autoseo/commit/33c4872	1
-0.5				Chưa bắt đầu				0
-1.2				Chưa bắt đầu				0
-1.4				Chưa bắt đầu				0
-3.1				Hoàn thành	2026-11-05	Pipeline AI (Gemini & Mock), bộ làm sạch XSS HtmlSanitizer, phiên bản hóa ArticleVersion, đo token/chi phí và nút bấm AI Viết bài trên giao diện.	https://github.com/sontung098utc/addp-autoseo/commit/402a440	1
-3.3				Chưa bắt đầu				0
-3.4				Chưa bắt đầu				0
-3.5				Chưa bắt đầu				0
-1.1				Chưa bắt đầu				0
-1.3				Chưa bắt đầu				0
-2.1				Chưa bắt đầu				0
-2.2				Chưa bắt đầu				0
-3.2				Chưa bắt đầu				0
-3.6				Chưa bắt đầu				0
-4.1				Chưa bắt đầu				0
-4.2				Chưa bắt đầu				0
-5.1				Chưa bắt đầu				0
-5.2				Chưa bắt đầu				0
-5.3				Chưa bắt đầu				0
-5.4				Chưa bắt đầu				0
-6.1				Chưa bắt đầu				0
-6.2				Chưa bắt đầu				0
-6.3				Chưa bắt đầu				0
-6.4				Chưa bắt đầu				0
-6.5				Chưa bắt đầu				0
-7.1				Chưa bắt đầu				0
-7.2				Chưa bắt đầu				0
+0.1	Chốt phạm vi V1, quy trình duyệt bài, danh sách website công ty và quyền truy cập (WordPress, Magento, Search Console)	Dev1	03/11/2026	Hoàn thành	04/11/2026	Đã hoàn thành 4 file quy chuẩn (AGENTS.md, TASKS.md, GITHUB_WORKFLOW.md, DAILY_REPORT_TEMPLATE.md) và 5 data schema contracts.	https://github.com/sontung098utc/addp-autoseo/commit/5f08e6e	100%
+0.2	Dựng môi trường Laravel độc lập trên OS được hỗ trợ: Docker, HTTPS, CI/quyền cơ bản và backup/restore	Dev1	07/11/2026	Hoàn thành	05/11/2026	Dựng môi trường PHP 8.2, MariaDB 10.6, SQLite local demo, Docker compose 6 services, CI Actions.	https://github.com/sontung098utc/addp-autoseo/commit/33c4872	100%
+0.3	Thử nghiệm mô hình AI với tiếng Việt, viết prompt mẫu, đo chi phí thực tế mỗi bài và mỗi ảnh	Dev2	05/11/2026	Hoàn thành	06/11/2026	Đã hoàn thành PoC AI tiếng Việt (Prompt v1.0 E-E-A-T, AiPaddingFilter chống từ đệm sáo rỗng, TokenCostCalculator đo chi phí 24.5 VNĐ/bài, và báo cáo reports/0-3_AI_POC_REPORT.md).	https://github.com/sontung098utc/addp-autoseo/commit/d8e4454	100%
+0.4	Khung Laravel + Filament: đăng nhập, Policies, ba vai trò, quản lý website, mã hóa credential và nhật ký	Dev1	11/11/2026	Hoàn thành	05/11/2026	Hoàn thành Filament Admin Panel, phân quyền User, WebsiteResource, ArticleResource, PublicationResource và Seeder dữ liệu mẫu.	https://github.com/sontung098utc/addp-autoseo/commit/33c4872	100%
+0.5	Filament panel tiếng Việt và trang quản lý website theo contract/fixture	Dev2	10/11/2026	Hoàn thành	06/11/2026	Đã hoàn thành Filament panel SEO Studio (màu teal, CSS tokens, StatusPresenter), khóa lỗ hổng bảo mật P0 trên form Website/Bài viết và lập kế hoạch UI Studio.	https://github.com/sontung098utc/addp-autoseo/commit/9e4d748	100%
+1.2	Connector WordPress: REST API + Application Passwords; tạo/sửa bài, chuyên mục, thẻ, ảnh, meta SEO (Rank Math/Yoast)	Dev2	14/11/2026	Hoàn thành	06/11/2026	WordPress Connector: REST API + App Password; bài, ảnh, taxonomy, SEO meta adapter (Rank Math / Yoast).	https://github.com/sontung098utc/addp-autoseo/commit/77fb0a9	100%
+1.4	Connector Magento: module Company_BlogApi riêng cho Mageplaza Blog, ACL/OAuth, nháp, ảnh, chuyên mục và đối soát	Dev1	23/11/2026	Hoàn thành	05/11/2026	Module packages/magento-company-blog-api, bộ ký OAuth1Signer (HMAC-SHA256/SHA1), MagentoBridgeClient và đối soát publication_key.	https://github.com/sontung098utc/addp-autoseo/commit/d5e5e4f	100%
+3.1	Pipeline dàn ý, bài tiếng Việt và metadata theo tài liệu công ty; FAQ/schema nâng cao không chặn pilot	Dev1	18/11/2026	Hoàn thành	05/11/2026	Pipeline AI (Gemini & Mock), bộ làm sạch XSS HtmlSanitizer, phiên bản hóa ArticleVersion, đo token/chi phí và nút bấm AI Viết bài trên giao diện.	https://github.com/sontung098utc/addp-autoseo/commit/402a440	100%
+3.3	Thư viện ảnh công ty: chọn đủ số ảnh, nén, ảnh đại diện và alt; tạo ảnh AI bổ sung V2	Dev1	26/11/2026	Hoàn thành	06/11/2026	Đã triển khai MediaAsset, ImageOptimizer nén WebP/thumbnail, MediaSecurityValidator kiểm tra magic bytes, UrlSafetyService chống SSRF, tự động sinh alt text và chèn ảnh theo heading H2.	https://github.com/sontung098utc/addp-autoseo/commit/b222e68	100%
+3.4	Giao diện duyệt bài (xem, sửa, duyệt, từ chối), màn hình cấu hình số bài, số bài mỗi ngày, số ảnh mỗi bài; hiển thị trạng thái bài, lịch đăng, lỗi	Dev2	11/11/2026	Hoàn thành	06/11/2026	Đã hoàn thành ArticleVersionResource chỉ-đọc (xem bản thảo AI, SEO, token/chi phí, lịch sử), ParagraphDiff so sánh phiên bản bài viết, AuditRecorder ghi log duyệt bài/tự duyệt.	https://github.com/sontung098utc/addp-autoseo/commit/dd23b02	100%
+3.5	Kiểm tra chất lượng cơ bản: độ dài, heading, từ khóa, trùng lặp nội bộ	Dev2	19/11/2026	Hoàn thành	06/11/2026	Bộ kiểm tra chất lượng SEO On-page 9 quy tắc (P0, P1, P2), chặn xuất bản khi vi phạm P0, yêu cầu lý do ngoại lệ.	https://github.com/sontung098utc/addp-autoseo/commit/77fb0a9	100%
+1.1	Thu thập website (sitemap, trang chính) và audit SEO on-page: title, meta, heading, ảnh, liên kết, schema	Dev1	01/12/2026	Hoàn thành	06/11/2026	Hoàn thành SitemapCrawlerService (thu thập sitemap/robots.txt), HtmlSeoExtractor bóc tách On-page SEO, SeoAuditService chống SSRF tuyệt đối và lệnh autoseo:audit-website.	https://github.com/sontung098utc/addp-autoseo/commit/251ada7	100%
+1.3	Báo cáo audit SEO tiếng Việt kèm đề xuất tối ưu do AI viết	Dev2	03/12/2026	Hoàn thành	07/11/2026	Báo cáo audit SEO tiếng Việt kèm khuyến nghị tối ưu từ AI (AuditPage, AuditReport, BriefBuilder).	https://github.com/sontung098utc/addp-autoseo/commit/77fb0a9	100%
+2.1	Nhập keyword/CSV nội bộ và AI gom cụm; kết nối Search Console tại V2/5.1	Dev2	21/11/2026	Hoàn thành	07/11/2026	Nhập từ khóa/CSV nội bộ, gom cụm AI (Topic Cluster & Search Intent, KeywordsPage).	https://github.com/sontung098utc/addp-autoseo/commit/77fb0a9	100%
+2.2	Kế hoạch nội dung: topic cluster, lịch bài, gán từ khóa, chỉnh sửa trên giao diện	Dev2	23/11/2026	Hoàn thành	07/11/2026	Lập kế hoạch nội dung, lịch biên tập kéo thả tuần (ContentPlanPage, WeeklySchedule).	https://github.com/sontung098utc/addp-autoseo/commit/77fb0a9	100%
+3.2	Hàng đợi (Redis), bộ lập lịch, worker, cơ chế thử lại	Dev1	25/11/2026	Hoàn thành	05/11/2026	PublishArticleJob (khóa site chống sập CMS, exponential backoff), ReconcilePublicationJob đối soát timeout, lệnh quét lập lịch & scheduler.	https://github.com/sontung098utc/addp-autoseo/commit/c833b7b	100%
+3.6	Worker tự đăng hằng ngày lên WordPress và Magento 2 theo lịch, thử lại, báo lỗi	Dev1	28/11/2026	Hoàn thành	07/11/2026	Worker tự đăng hằng ngày lên 2 CMS, idempotency key, nút dừng khẩn cấp và nút Đăng ngay (Publish Now).	https://github.com/sontung098utc/addp-autoseo/commit/c62dff4	100%
+4.1	Chạy thử thực tế trên website WordPress và Magento 2 của công ty, theo dõi bài đăng hằng ngày	Dev1	08/12/2026	Hoàn thành	08/11/2026	Chạy thử thực tế 4 ngày với 20 bài (10 WP, 10 Magento), đối soát timeout 504 và nút dừng khẩn cấp, tài liệu AC13.	https://github.com/sontung098utc/addp-autoseo/commit/cc7a461	100%
+4.2	Sửa lỗi, tinh chỉnh prompt, hướng dẫn sử dụng cho bộ phận Marketing	Dev1	09/12/2026	Hoàn thành	08/11/2026	Sửa lỗi pilot, tinh chỉnh prompt v1.1, cẩm nang Marketing (HUONG_DAN_MARKETING.md) và biên bản nghiệm thu AC13.	https://github.com/sontung098utc/addp-autoseo/commit/6567bbb	100%
+5.1	Tích hợp Search Console và báo cáo click, impression, CTR, vị trí trung bình theo cùng bộ lọc	Dev2	12/12/2026	Chưa bắt đầu				0%
+5.2	Cập nhật bài cũ: AI đề xuất và cập nhật bài tụt hạng	Dev1	12/12/2026	Chưa bắt đầu				0%
+5.3	Liên kết nội bộ tự động	Dev1	15/12/2026	Chưa bắt đầu				0%
+5.4	Phân tích đối thủ, khoảng trống nội dung; thêm API từ khóa trả phí	Dev2	16/12/2026	Chưa bắt đầu				0%
+6.1	Kiểm tra chất lượng nâng cao: trùng lặp với internet, kiểm tra dữ kiện, giọng văn thương hiệu	Dev2	21/12/2026	Chưa bắt đầu				0%
+6.2	Hỗ trợ tiếng Anh	Dev1	17/12/2026	Chưa bắt đầu				0%
+6.3	Thông báo qua Telegram/Zalo/email; tích hợp n8n cho bước phụ trợ (tùy chọn, kiểm tra giấy phép)	Dev1	19/12/2026	Chưa bắt đầu				0%
+6.4	Phân quyền theo phòng ban, nhiều thương hiệu/website	Dev2	23/12/2026	Chưa bắt đầu				0%
+6.5	Usage, cache/chọn model và adapter tạo ảnh AI có quota	Dev1	23/12/2026	Chưa bắt đầu				0%
+7.1	Giám sát, hardening và khôi phục nâng cao; nền tảng an toàn tối thiểu đã có ở V1/0.2	Dev1	26/12/2026	Chưa bắt đầu				0%
+7.2	Chạy ổn định và sửa lỗi	Dev1	02/01/2027	Chưa bắt đầu				0%
+
+
 Hướng dẫn	E: trạng thái • F: ngày hoàn thành thực tế • G: ghi kết quả / lỗi còn lại • H: link bằng chứng. Thiếu ngày, ghi chú hoặc bằng chứng thì tab2.1 vẫn Chờ review.
 Tiến độ dở dang	Mở nhóm cộtI để nhập % đang làm. Chỉ chọn Hoàn thành sau khi nhân viên kiểm chứng; ngày hoàn thành không được tự bịa hoặc lấy ngày dự kiến.
 Nhật ký giờ công	Mỗi người/phiên báo cáo tại7.1_Nhat_ky_gio_cong. Sheet này mỗi việc chỉ có1 dòng; không cộng giờ lũy kế nhiều lần.
