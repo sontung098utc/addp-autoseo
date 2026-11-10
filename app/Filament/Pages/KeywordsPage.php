@@ -9,6 +9,7 @@ use App\Filament\Support\Keywords\KeywordIntent;
 use App\Filament\Support\Keywords\KeywordService;
 use App\Models\Keyword;
 use App\Models\Website;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
@@ -148,6 +149,24 @@ class KeywordsPage extends Page
         Notification::make()->title('Đã thêm từ khóa')->success()->send();
     }
 
+    /** Nút "Xóa" ở bảng chỉ mở hộp xác nhận; việc xóa thật nằm ở deleteKeyword, chạy sau khi người dùng xác nhận. */
+    public function confirmDeleteKeyword(int $id): void
+    {
+        $this->guard();
+        $this->mountAction('deleteKeywordConfirm', ['id' => $id]);
+    }
+
+    public function deleteKeywordConfirmAction(): Action
+    {
+        return Action::make('deleteKeywordConfirm')
+            ->requiresConfirmation()
+            ->modalHeading('Xóa từ khóa này?')
+            ->modalDescription('Bài viết đã tạo từ từ khóa này không bị ảnh hưởng. Việc xóa không hoàn tác được.')
+            ->modalSubmitActionLabel('Xóa từ khóa')
+            ->color('danger')
+            ->action(fn (array $arguments) => $this->deleteKeyword((int) ($arguments['id'] ?? 0)));
+    }
+
     public function deleteKeyword(int $id): void
     {
         $this->guard();
@@ -281,7 +300,7 @@ class KeywordsPage extends Page
             ['key' => 'volume', 'label' => 'Lượng tìm', 'type' => 'number', 'sortable' => true],
             ['key' => 'source', 'label' => 'Nguồn', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'tones' => ['CSV' => 'info', 'Nhập tay' => 'muted', 'AI đề xuất' => 'accent', 'Search Console' => 'ok', 'Trang đã quét' => 'muted', 'Đối thủ' => 'warn']],
             ['key' => 'article', 'label' => 'Bài', 'type' => 'link', 'sortable' => true],
-            ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Xóa', 'method' => 'deleteKeyword', 'tone' => 'danger']]],
+            ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Xóa', 'method' => 'confirmDeleteKeyword', 'tone' => 'muted']]],
         ];
     }
 

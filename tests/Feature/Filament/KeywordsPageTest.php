@@ -51,7 +51,10 @@ class KeywordsPageTest extends TestCase
         $this->assertContains('học bổng du học Nhật Bản', array_column($d, 'keyword'));
         $this->assertSame(['article', 'id', 'keyword', 'intent', 'cluster', 'volume', 'source'], array_keys($d[0]));
         $cols = Livewire::test(KeywordsPage::class)->viewData('kwColumns');
-        $this->assertSame('deleteKeyword', collect($cols)->firstWhere('type', 'actions')['actions'][0]['method']);
+        // Gói B #13: nút Xóa chỉ mở hộp xác nhận và dùng tông xám, không còn đỏ gạch chân ở mọi dòng.
+        $act = collect($cols)->firstWhere('type', 'actions')['actions'][0];
+        $this->assertSame('confirmDeleteKeyword', $act['method']);
+        $this->assertSame('muted', $act['tone']);
         $this->assertIsArray(Livewire::test(KeywordsPage::class)->viewData('clusterRows'));
     }
 
@@ -106,6 +109,26 @@ class KeywordsPageTest extends TestCase
         $first = KeywordService::make()->repo()->all()[0];
         Livewire::test(KeywordsPage::class)->call('deleteKeyword', $first['id']);
         $this->assertNull(collect(KeywordService::make()->repo()->all())->firstWhere('id', $first['id']));
+    }
+
+    public function test_xoa_phai_qua_hop_xac_nhan(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $first = KeywordService::make()->repo()->all()[0];
+        $t = Livewire::test(KeywordsPage::class)->call('confirmDeleteKeyword', $first['id']);
+        // Mới mở hộp xác nhận: chưa xóa.
+        $this->assertNotNull(collect(KeywordService::make()->repo()->all())->firstWhere('id', $first['id']));
+        $t->assertSee('Xóa từ khóa này?')->assertActionMounted('deleteKeywordConfirm');
+        $t->callMountedAction();
+        $this->assertNull(collect(KeywordService::make()->repo()->all())->firstWhere('id', $first['id']));
+    }
+
+    public function test_huy_hop_xac_nhan_khong_xoa(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $first = KeywordService::make()->repo()->all()[0];
+        Livewire::test(KeywordsPage::class)->call('confirmDeleteKeyword', $first['id'])->call('unmountAction');
+        $this->assertNotNull(collect(KeywordService::make()->repo()->all())->firstWhere('id', $first['id']));
     }
 
     public function test_user_inactive_bi_chan_o_may_chu(): void
