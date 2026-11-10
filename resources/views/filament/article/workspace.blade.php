@@ -495,6 +495,7 @@
                                     @include('filament.article.images-gallery', ['version' => $v])
                                 @endif
                             @endforeach
+                            @if ($imageNote)<p class="aw-muted" style="margin-top:.5rem">Lần chọn ảnh từ thư viện gần nhất: {{ $imageNote }}.</p>@endif
                         </section>
                     @endif
                 </div>
