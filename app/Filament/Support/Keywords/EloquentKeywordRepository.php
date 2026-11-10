@@ -17,6 +17,11 @@ final class EloquentKeywordRepository implements KeywordRepository
 {
     public function __construct(private readonly int $websiteId) {}
 
+    public function websiteId(): int
+    {
+        return $this->websiteId;
+    }
+
     public function all(): array
     {
         return Keyword::where('website_id', $this->websiteId)->with('cluster:id,name')->orderBy('id')->get()

@@ -6,9 +6,11 @@ use App\Contracts\StructuredAiInterface;
 use App\Filament\Support\Demo\DemoMode;
 use App\Models\Keyword;
 use App\Models\Website;
+use App\Services\Agent\Run\JobRunRecorder;
 use App\Services\Keywords\KeywordAiResolver;
 use App\Services\Keywords\KeywordAiUnavailable;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 
 /**
@@ -174,6 +176,48 @@ final class KeywordService
      */
     public function proposeWithAi(?StructuredAiInterface $ai = null): array
     {
+        $siteId = $this->repo instanceof EloquentKeywordRepository ? $this->repo->websiteId() : null;
+        if ($siteId === null) {
+            $o = $this->doProposeWithAi($ai, null);
+            unset($o['before']);
+
+            return $o; // kho minh họa: không có website để ghi phiên
+        }
+        $demo = false;
+        try {
+            if ($ai === null) {
+                try {
+                    $demo = KeywordAiResolver::resolve('keyword_cluster')['demo'];
+                } catch (KeywordAiUnavailable $e) {
+                    $b = JobRunRecorder::start('market_research', $siteId, ['task' => 'keyword_cluster'], Auth::user());
+                    JobRunRecorder::step($b, 'guard', 'Chưa kết nối AI', 'blocked', [], null, 0, 0, 'Chưa gọi AI nên không tốn chi phí.');
+                    JobRunRecorder::finish($b, 'blocked', null, 'Chưa kết nối AI.');
+                    throw $e;
+                }
+            }
+        } catch (KeywordAiUnavailable $e) {
+            throw $e;
+        } catch (\Throwable) {
+            // chỉ để đoán chế độ AI cho nhật ký; lỗi khác sẽ lộ ở doProposeWithAi
+        }
+        $run = JobRunRecorder::start('market_research', $siteId, ['task' => 'keyword_cluster'], Auth::user(), 'manual', $demo ? 'mock' : 'real');
+        try {
+            $out = $this->doProposeWithAi($ai, $run);
+        } catch (\Throwable $e) {
+            JobRunRecorder::finish($run, 'failed', null, 'Lỗi: '.class_basename($e));
+            throw $e;
+        }
+        $failed = $out['stopped_reason'] !== null && $out['cost_vnd'] <= 0.0 && ! ($out['proposals'] > ($out['before'] ?? 0));
+        unset($out['before']);
+        $reason = $out['stopped_reason'];
+        $status = $failed ? 'failed' : ($reason === 'budget' ? 'blocked' : 'ready_for_review');
+        JobRunRecorder::finish($run, $status, ['proposals' => $out['proposals']], $reason);
+
+        return $out;
+    }
+
+    private function doProposeWithAi(?StructuredAiInterface $ai, $run): array
+    {
         $cap = null;
         $label = 'AI';
         $demo = false;
@@ -196,11 +240,15 @@ final class KeywordService
                 $free[] = $r['keyword'];
             }
         }
-        $out = ['proposals' => count($props), 'label' => $label, 'demo' => $demo, 'cost_vnd' => 0.0, 'stopped_reason' => null];
+        $out = ['proposals' => count($props), 'label' => $label, 'demo' => $demo, 'cost_vnd' => 0.0, 'stopped_reason' => null, 'before' => count($props)];
+        JobRunRecorder::step($run, 'guard', 'Chọn từ khóa chưa có cụm', 'completed', ['free_keywords' => count($free), 'pending_proposals' => count($props)]);
         if ($free === []) {
             return $out;
         }
         $res = (new AiClusterer)->cluster($free, array_column($this->repo->clusters(), 'name'), $ai, $cap);
+        foreach ($res['batches'] as $b) {
+            JobRunRecorder::step($run, 'cluster', 'Gom cụm lô '.$b['n'], $b['status'], ['batch' => $b['n'], 'keywords' => $b['size']], $b['model'], $b['tokens'], $b['cost_vnd'], null, 'strategist');
+        }
         $nextId = (int) max([0, ...array_column($props, 'id')]) + 1;
         foreach ($res['groups'] as $g) {
             $hit = null;
@@ -220,6 +268,7 @@ final class KeywordService
             $this->repo->saveProposals($props);
             $this->repo->saveProposalSource('ai');
         }
+        JobRunRecorder::step($run, 'save', 'Lưu đề xuất cụm chờ nhận', $res['groups'] !== [] ? 'completed' : 'skipped', ['groups' => count($res['groups']), 'unprocessed' => count($res['unprocessed'])]);
         $out['proposals'] = count($props);
         $out['cost_vnd'] = $res['cost_vnd'];
         $out['stopped_reason'] = $res['stopped'] ?? $res['error'];

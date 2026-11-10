@@ -45,7 +45,7 @@ final class AiClusterer
      * @param  list<string>  $keywords  từ khóa CHƯA có cụm
      * @param  list<string>  $existingClusters  tên cụm đã có của website
      * @param  array<string,string>  $intents  keyword => intent đang lưu (dùng khi AI không trả intent hợp lệ cho cụm lẻ)
-     * @return array{groups: list<array{name:string,intent:string,keywords:list<string>}>, unprocessed: list<string>, cost_vnd: float, stopped: ?string, error: ?string}
+     * @return array{groups: list<array{name:string,intent:string,keywords:list<string>}>, unprocessed: list<string>, cost_vnd: float, stopped: ?string, error: ?string, batches: list<array{n:int,size:int,status:string,tokens:int,cost_vnd:float,model:?string}>}
      */
     public function cluster(array $keywords, array $existingClusters, StructuredAiInterface $ai, ?float $cap = null): array
     {
@@ -56,7 +56,7 @@ final class AiClusterer
         }
         $budget = self::budgetVnd($cap);
         $nonceSeed = bin2hex(random_bytes(6));
-        $res = ['groups' => [], 'unprocessed' => [], 'cost_vnd' => 0.0, 'stopped' => null, 'error' => null];
+        $res = ['groups' => [], 'unprocessed' => [], 'cost_vnd' => 0.0, 'stopped' => null, 'error' => null, 'batches' => []];
         $byName = []; // lower(name) => index trong $res['groups']
         $leftover = [];
         $seen = []; // keyFor đã được xếp ở cụm trước
@@ -82,6 +82,7 @@ final class AiClusterer
                 $r = $ai->generateStructured(self::systemPrompt($nonce), $user);
             } catch (\Throwable $e) {
                 $res['unprocessed'] = array_merge($res['unprocessed'], $batch);
+                $res['batches'][] = ['n' => $n + 1, 'size' => count($batch), 'status' => 'failed', 'tokens' => 0, 'cost_vnd' => 0.0, 'model' => null];
                 $res['error'] = $e instanceof AiSchemaError ? 'AI trả về sai định dạng.' : 'AI lỗi: '.mb_substr($e->getMessage(), 0, 160);
                 if (! $e instanceof AiSchemaError) {
                     $res['stopped'] = 'error';
@@ -90,6 +91,7 @@ final class AiClusterer
                 continue;
             }
             $res['cost_vnd'] = round($res['cost_vnd'] + (float) ($r['cost_vnd'] ?? 0), 4);
+            $res['batches'][] = ['n' => $n + 1, 'size' => count($batch), 'status' => 'completed', 'tokens' => (int) ($r['tokens_used'] ?? 0), 'cost_vnd' => round((float) ($r['cost_vnd'] ?? 0), 4), 'model' => isset($r['model']) ? (string) $r['model'] : null];
             $clusters = $r['data']['clusters'] ?? null;
             if (! is_array($clusters) || ! array_is_list($clusters)) {
                 $res['unprocessed'] = array_merge($res['unprocessed'], $batch);

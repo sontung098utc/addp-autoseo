@@ -26,7 +26,7 @@ class ArticleKeywordLinkTest extends TestCase
     public function test_bai_tao_tay_tu_tao_tu_khoa_va_noi_keyword_id(): void
     {
         $w = $this->site();
-        $a = Article::create(['website_id' => $w->id, 'primary_keyword' => '  Cách  cải thiện tiểu đường ', 'workflow_status' => 'draft']);
+        $a = Article::create(['website_id' => $w->id, 'primary_keyword' => '  Cách  cải thiện tiểu đường ', 'workflow_status' => 'needs_review']);
 
         $k = Keyword::where('website_id', $w->id)->first();
         $this->assertNotNull($k);
@@ -44,7 +44,7 @@ class ArticleKeywordLinkTest extends TestCase
         $c = KeywordCluster::create(['website_id' => $w->id, 'name' => 'Tiểu đường']);
         $k = Keyword::create(['website_id' => $w->id, 'keyword' => 'Tiểu đường tuýp 2', 'keyword_key' => 'tiểu đường tuýp 2', 'volume' => 900, 'source' => 'csv', 'cluster_id' => $c->id]);
 
-        $a = Article::create(['website_id' => $w->id, 'primary_keyword' => 'tiểu đường  TUÝP 2', 'workflow_status' => 'draft']);
+        $a = Article::create(['website_id' => $w->id, 'primary_keyword' => 'tiểu đường  TUÝP 2', 'workflow_status' => 'needs_review']);
 
         $this->assertSame(1, Keyword::count());
         $this->assertSame($k->id, $a->fresh()->keyword_id);

@@ -9,7 +9,9 @@ use App\Filament\Support\Schedule\ErrorMasker;
 use App\Models\BrandProfile;
 use App\Models\Keyword;
 use App\Models\Website;
+use App\Services\Agent\Run\JobRunRecorder;
 use App\Services\Agent\Settings\AgentAi;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * G3 bước `suggest` của loại việc market_research: AI ĐỀ XUẤT từ khóa mới cho website.
@@ -91,20 +93,71 @@ final class KeywordResearchService
      */
     public function suggest(Website $site, ?array $seeds = null, ?int $limit = null): array
     {
+        $by = Auth::user();
+        $seedList = $this->cleanSeeds($seeds ?? $this->defaultSeeds($site));
+        $limit = self::clampLimit($limit);
+        $refs = ['seeds' => array_slice($seedList, 0, self::MAX_SEEDS + 6), 'seed_count' => count($seedList), 'limit' => $limit];
+        $run = null;
+        try {
+            if ($this->ai !== null) {
+                $mock = $this->demo;
+            } else {
+                try {
+                    $resolved = KeywordAiResolver::resolve('keyword_suggest');
+                } catch (KeywordAiUnavailable $e) {
+                    $run = JobRunRecorder::start('market_research', $site, $refs, $by);
+                    JobRunRecorder::step($run, 'guard', 'Chưa kết nối AI', 'blocked', [], null, 0, 0, 'Chưa gọi AI nên không tốn chi phí.');
+                    JobRunRecorder::finish($run, 'blocked', null, 'Chưa kết nối AI.');
+                    throw $e;
+                }
+                $mock = $resolved['demo'];
+            }
+            $run = JobRunRecorder::start('market_research', $site, $refs, $by, 'manual', $mock ? 'mock' : 'real');
+            $maxId = $run ? (int) Keyword::query()->where('website_id', $site->id)->max('id') : 0;
+        } catch (KeywordAiUnavailable $e) {
+            throw $e;
+        } catch (\Throwable) {
+            $run = null;
+            $maxId = 0;
+        }
+        try {
+            $out = $this->doSuggest($site, $seedList, $limit, $run, $resolved ?? null);
+        } catch (\Throwable $e) {
+            JobRunRecorder::finish($run, 'failed', null, 'Lỗi: '.class_basename($e));
+            throw $e;
+        }
+        $ids = $out['added'] > 0 ? Keyword::query()->where('website_id', $site->id)->where('source', 'ai')->where('id', '>', $maxId)->orderBy('id')->pluck('id')->all() : [];
+        JobRunRecorder::step($run, 'save', 'Ghi từ khóa đề xuất', $out['added'] > 0 ? 'completed' : 'skipped', ['added' => $out['added'], 'skipped_duplicates' => $out['skipped_duplicates'], 'invalid' => $out['invalid']]);
+        $outputRef = ['keyword_ids' => $ids, 'added' => $out['added']];
+        if ($out['stopped'] === 'budget' || $out['stopped'] === 'cost_cap' && $out['added'] === 0) {
+            JobRunRecorder::finish($run, 'blocked', $outputRef, $out['message'] ?? 'Vượt trần chi phí.');
+        } elseif ($out['stopped'] === 'error' || ($out['added'] === 0 && $out['message'] !== null)) {
+            JobRunRecorder::finish($run, 'failed', $outputRef, $out['message'] ?? 'Không có kết quả.');
+        } else {
+            JobRunRecorder::finish($run, 'ready_for_review', $outputRef, $out['stopped'] === 'cost_cap' ? 'Chi phí vượt trần của route nhưng đã dùng kết quả.' : null);
+        }
+
+        return $out;
+    }
+
+    /** @param ?array{ai:StructuredAiInterface,label:string,cap:?float,demo:bool} $resolved */
+    private function doSuggest(Website $site, array $seeds, int $limit, $run, ?array $resolved): array
+    {
         if ($this->ai !== null) {
             ['ai' => $ai, 'cap' => $cap, 'label' => $label, 'demo' => $demo] = ['ai' => $this->ai, 'cap' => $this->cap, 'label' => $this->label, 'demo' => $this->demo];
         } else {
-            ['ai' => $ai, 'cap' => $cap, 'label' => $label, 'demo' => $demo] = KeywordAiResolver::resolve('keyword_suggest');
+            ['ai' => $ai, 'cap' => $cap, 'label' => $label, 'demo' => $demo] = $resolved;
         }
-        $limit = self::clampLimit($limit);
         $out = ['added' => 0, 'skipped_duplicates' => 0, 'invalid' => 0, 'injection_dropped' => 0, 'cost_vnd' => 0.0, 'tokens' => 0, 'model' => $label, 'label' => $label, 'demo' => $demo, 'stopped' => null, 'message' => null];
 
-        $seeds = $this->cleanSeeds($seeds ?? $this->defaultSeeds($site));
         $budget = self::budgetVnd($cap);
         if ($budget <= 0) {
-            return $out + ['message' => 'Ngân sách AI bằng 0, chưa gọi AI.'] + ['stopped' => 'budget'];
+            JobRunRecorder::step($run, 'guard', 'Ngân sách AI bằng 0', 'blocked', ['budget_vnd' => $budget]);
+
+            return ['message' => 'Ngân sách AI bằng 0, chưa gọi AI.', 'stopped' => 'budget'] + $out;
         }
 
+        JobRunRecorder::step($run, 'guard', 'Kiểm tra an toàn', 'completed', ['budget_vnd' => $budget, 'seed_count' => count($seeds), 'limit' => $limit]);
         $nonce = bin2hex(random_bytes(6));
         $user = "<<<DULIEU-{$nonce}>>>\nWebsite: ".$this->clean((string) $site->name, 160)."\n"
             .'Hạt giống: '.($seeds === [] ? '(không có)' : implode('; ', $seeds))."\n<<<HET-{$nonce}>>>";
@@ -113,12 +166,14 @@ final class KeywordResearchService
             $r = $ai->generateStructured(self::systemPrompt($nonce, $limit), $user);
         } catch (\Throwable $e) {
             $out['stopped'] = 'error';
+            JobRunRecorder::step($run, 'suggest', 'Đề xuất từ khóa mới', 'failed', ['error' => class_basename($e)], null, 0, 0, null, 'strategist');
             $out['message'] = $demo ? self::DEMO_MESSAGE : 'AI không trả về được kết quả hợp lệ: '.mb_substr(ErrorMasker::mask($e->getMessage()) ?: class_basename($e), 0, 160);
 
             return $out;
         }
         $out['tokens'] = (int) ($r['tokens_used'] ?? 0);
         $out['cost_vnd'] = round((float) ($r['cost_vnd'] ?? 0), 2);
+        JobRunRecorder::step($run, 'suggest', 'Đề xuất từ khóa mới', 'completed', ['returned' => is_array($r['data']['keywords'] ?? null) ? count($r['data']['keywords']) : 0, 'label' => $label], (string) ($r['model'] ?? $label), $out['tokens'], $out['cost_vnd'], null, 'strategist');
 
         if ($out['cost_vnd'] > $budget) {
             $out['stopped'] = 'budget';
