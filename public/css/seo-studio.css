@@ -181,7 +181,7 @@ select:not([multiple]) {
 .ss-dot--ok { background: var(--ss-ok-fg); } .ss-dot--warn { background: var(--ss-warn-fg); } .ss-dot--danger { background: var(--ss-danger-fg); } .ss-dot--info { background: var(--ss-info-fg); }
 
 /* Tab ngang kiểu Chrome */
-.ss-tabs { display: flex; gap: 0.125rem; align-items: flex-end; overflow-x: auto; border-bottom: 1px solid var(--ss-border); padding: 0 0.25rem; scrollbar-width: thin; }
+.ss-tabs { scroll-padding-inline: 2rem; display: flex; gap: 0.125rem; align-items: flex-end; overflow-x: auto; border-bottom: 1px solid var(--ss-border); padding: 0 0.25rem; scrollbar-width: thin; }
 .ss-tab { position: relative; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-size: var(--ss-fs-base); font-weight: 500; color: var(--ss-text-muted); background: transparent; border: 1px solid transparent; border-bottom: 0; border-radius: 0.5rem 0.5rem 0 0; cursor: pointer; white-space: nowrap; margin-bottom: -1px; }
 .ss-tab:hover { background: var(--ss-surface-sunk); color: var(--ss-text); }
 .ss-tab.is-active { background: var(--ss-surface); color: var(--ss-text); border-color: var(--ss-border-strong); border-bottom: 1px solid var(--ss-surface); font-weight: 600; box-shadow: 0 -2px 0 0 var(--ss-accent-fg) inset; }
@@ -189,6 +189,18 @@ select:not([multiple]) {
 .ss-tab__count { font-size: var(--ss-fs-xs); padding: 0 0.375rem; border-radius: 999px; background: var(--ss-muted-bg); color: var(--ss-muted-fg); font-variant-numeric: tabular-nums; }
 .ss-tab.is-active .ss-tab__count { background: var(--ss-accent-bg); color: var(--ss-accent-fg); }
 .ss-tabpanels { padding-top: 1rem; }
+/* Dấu cuộn của thanh tab: bóng mờ + mũi tên ở mép còn nội dung bị cắt (JS bật has-start / has-end) */
+.ss-tabs-scroller { position: relative; --ss-bg-edge: #FAFAF9; }
+.dark .ss-tabs-scroller { --ss-bg-edge: var(--ss-ink-950); }
+.ss-tabs-scroller::before, .ss-tabs-scroller::after { content: ""; position: absolute; top: 0; bottom: 1px; width: 2.5rem; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 1; }
+.ss-tabs-scroller::before { left: 0; background: linear-gradient(to right, var(--ss-bg-edge, var(--ss-surface)) 35%, transparent); }
+.ss-tabs-scroller::after { right: 0; background: linear-gradient(to left, var(--ss-bg-edge, var(--ss-surface)) 35%, transparent); }
+.ss-tabs-scroller.has-start::before, .ss-tabs-scroller.has-end::after { opacity: 1; }
+.ss-tabs__arrow { display: none; position: absolute; top: 0; bottom: 1px; z-index: 2; width: 1.75rem; align-items: center; justify-content: center; padding: 0 0 0.125rem; font-size: 1.5rem; line-height: 1; color: var(--ss-text); background: transparent; border: 0; cursor: pointer; }
+.ss-tabs__arrow--start { left: 0; } .ss-tabs__arrow--end { right: 0; }
+.ss-tabs__arrow:hover { color: var(--ss-accent-fg); }
+.ss-tabs-scroller.has-start .ss-tabs__arrow--start, .ss-tabs-scroller.has-end .ss-tabs__arrow--end { display: flex; }
+@media (prefers-reduced-motion: reduce) { .ss-tabs-scroller::before, .ss-tabs-scroller::after { transition: none; } }
 
 /* Bảng dữ liệu: tìm, lọc, sắp xếp, chọn cột hiển thị, phân trang */
 .ss-dt { background: var(--ss-surface); border: 1px solid var(--ss-border); border-radius: 0.5rem; }
@@ -340,4 +352,29 @@ select:not([multiple]) {
 @media (max-width: 640px) {
   .ss-col-main { min-width: 7rem; }
   .fi-ta-table:has(tr.ss-sticky-row) .fi-ta-selection-cell, .fi-ta-table:has(tr.ss-sticky-row) .fi-ta-header-selection-cell { display: none; }
+}
+
+/* =====================================================================================================
+   VÙNG BẤM TRÊN MÀN HÌNH HẸP (điện thoại): điều khiển tương tác tối thiểu ~36-40px chiều cao.
+   Chỉ áp dụng ở <= 767px nên bố cục máy tính không đổi; không đổi chiều rộng nên không gây tràn ngang.
+   Liên kết nằm giữa đoạn văn (inline) được miễn theo WCAG 2.5.8, không đụng tới.
+   ===================================================================================================== */
+@media (max-width: 767px) {
+  .ss-dt__act, .ss-dt__sortbtn { display: inline-flex; align-items: center; min-height: 2.5rem; padding-inline: 0.25rem; }
+  .ss-dt__act { margin-right: 0.25rem; }
+  .ss-dt__btn, .ss-dt__bar input[type=search], .ss-dt__bar select { min-height: 2.5rem; }
+  .ss-dt__table input[type=checkbox], .ss-dt__menu input[type=checkbox] { width: 1.25rem; height: 1.25rem; }
+  .ss-tab { min-height: 2.5rem; }
+  /* Nút/liên kết của Filament cỡ xs/sm và liên kết thao tác trong bảng */
+  .fi-btn.fi-size-xs, .fi-btn.fi-size-sm { min-height: 2.25rem; }
+  .fi-ta-table .fi-link, .fi-ta-actions .fi-link, .fi-ta-table a.fi-link { min-height: 2.25rem; }
+  .fi-ta-header-cell [role=button] { min-height: 2.25rem; align-items: center; }
+  .fi-main input[type=checkbox], .fi-ta-table .fi-ta-record-checkbox, .fi-ta-table input[type=checkbox] { width: 1.25rem; height: 1.25rem; }
+  .fi-main label:has(> input[type=checkbox]) { display: inline-flex; align-items: center; gap: 0.375rem; min-height: 2.25rem; }
+  a.ss-muted { display: inline-flex; align-items: center; min-height: 2.25rem; }
+  /* Nút xóa thẻ (X) trong ô nhập thẻ của Filament: mở rộng vùng bấm bằng phần tử ảo, không đổi cỡ nhìn thấy */
+  .fi-badge-delete-button { position: relative; }
+  .fi-badge-delete-button::after { content: ""; position: absolute; inset: -0.5rem; }
+  /* Liên kết đứng một mình trên một dòng trong thẻ (tên thẻ, "xem thêm"…) */
+  .ss-card :is([class$="-row"], .ss-actions) > a { display: inline-flex; align-items: center; min-height: 2.25rem; }
 }

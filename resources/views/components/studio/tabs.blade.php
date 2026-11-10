@@ -6,7 +6,9 @@
     $tones = ['ok', 'warn', 'danger', 'info'];
 @endphp
 <div class="ss-tabs-wrap" x-data="studioTabs(@js($default), @js($persist))" data-tabs="{{ $uid }}">
-    <div class="ss-tabs" role="tablist" aria-label="{{ $label }}" x-on:keydown="onKey($event)">
+    <div class="ss-tabs-scroller" x-bind:class="{ 'has-start': canStart, 'has-end': canEnd }">
+    <button type="button" class="ss-tabs__arrow ss-tabs__arrow--start" tabindex="-1" aria-hidden="true" x-on:click="nudge(-1)" x-cloak>‹</button>
+    <div class="ss-tabs" role="tablist" aria-label="{{ $label }}" x-ref="strip" x-on:keydown="onKey($event)" x-on:scroll.passive="measure()">
         @foreach ($tabs as $t)
             @php $k = (string) $t['key']; @endphp
             <button type="button" role="tab" class="ss-tab" data-key="{{ $k }}" id="{{ $uid }}-tab-{{ $k }}" aria-controls="{{ $uid }}-panel-{{ $k }}"
@@ -21,6 +23,8 @@
                 @endif
             </button>
         @endforeach
+    </div>
+    <button type="button" class="ss-tabs__arrow ss-tabs__arrow--end" tabindex="-1" aria-hidden="true" x-on:click="nudge(1)" x-cloak>›</button>
     </div>
     <div class="ss-tabpanels" data-uid="{{ $uid }}">{{ $slot }}</div>
 </div>
