@@ -3,6 +3,12 @@
 namespace App\Filament\Clusters\AgentTeam\Pages;
 
 use App\Filament\Clusters\AgentTeam;
+use App\Filament\Pages\AuditPage;
+use App\Filament\Pages\ContentPlanPage;
+use App\Filament\Pages\KeywordsPage;
+use App\Filament\Pages\KnowledgePage;
+use App\Filament\Pages\SearchConsolePage;
+use App\Filament\Resources\ArticleResource;
 use App\Models\User;
 use App\Services\Agent\Pipeline\JobTypeRegistry;
 use App\Services\Agent\Pipeline\PipelineBlueprint;
@@ -69,6 +75,7 @@ class PipelineMap extends Page
                 'j' => JobTypeRegistry::find($arguments['job'] ?? ''),
                 'names' => $this->jobNames(),
                 'chain' => JobTypeRegistry::CHAIN,
+                'url' => ($j = JobTypeRegistry::find($arguments['job'] ?? '')) ? self::workUrl($j['id']) : null,
             ]))
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Đóng');
@@ -80,11 +87,91 @@ class PipelineMap extends Page
         return ['human' => 'Người'] + array_column(JobTypeRegistry::all(), 'title', 'id');
     }
 
+    /** Câu mô tả đời thường cho từng loại việc; dùng khi câu đầu của `summary` có mã kỹ thuật hoặc quá dài. */
+    public const PLAIN = [
+        'market_research' => 'Gợi ý từ khóa mới quanh hạt giống và hồ sơ doanh nghiệp, rồi gom thành cụm.',
+        'site_audit' => 'Quét website, tìm lỗi SEO và gợi ý bài nào nên làm mới.',
+        'content_plan' => 'Đề xuất bài nên viết trước, rồi bạn duyệt để đưa vào hàng chờ viết.',
+        'article_write' => 'Viết bản nháp một bài từ từ khóa: dàn ý, tài liệu, viết, chấm và sửa.',
+        'article_refresh' => 'Sửa lại bài cũ ở những chỗ còn yếu, có so sánh trước và sau để bạn duyệt.',
+        'brain_build' => 'Dựng kho kiến thức từ website và tài liệu để các bài viết dùng lại.',
+        'measure' => 'Theo dõi bài lên hay tụt hạng trên Google và gợi ý bài cần làm mới.',
+    ];
+
+    /** Trang làm việc thật của từng loại việc: mã => danh sách class (thử lần lượt, lấy class đầu tiên có thật). */
+    public const PAGES = [
+        'market_research' => [KeywordsPage::class],
+        'site_audit' => [AuditPage::class],
+        'content_plan' => [ContentPlanPage::class],
+        'article_write' => [ArticleResource::class],
+        'article_refresh' => [ArticleResource::class],
+        'brain_build' => ['App\\Filament\\Pages\\BrainBuildPage', KnowledgePage::class],
+        'measure' => [SearchConsolePage::class],
+    ];
+
+    /** Câu mô tả ngắn: câu đầu của summary (đến dấu chấm đầu tiên, <=140 ký tự) nếu không có mã kỹ thuật, nếu không thì câu viết sẵn. */
+    public static function plainLine(array $j): string
+    {
+        $first = trim((string) preg_split('/\.(\s|$)/u', (string) $j['summary'], 2)[0]);
+        $technical = $first === '' || mb_strlen($first) > 140 || preg_match('/[a-z]+_[a-z_]+|::|=|`|\bsource\b|\bjob\b/u', $first);
+
+        return $technical ? (self::PLAIN[$j['id']] ?? $first).(self::PLAIN[$j['id']] ?? false ? '' : '.') : $first.'.';
+    }
+
+    /**
+     * Mức dùng được, quy tắc cố định: status planned => 'none' (Chưa có); active mà summary có "Chưa làm:" hoặc "một phần"
+     * => 'partial' (Dùng được một phần); còn lại active => 'ready' (Dùng được).
+     */
+    public static function usability(array $j): string
+    {
+        if ($j['status'] !== 'active') {
+            return 'none';
+        }
+
+        return preg_match('/Chưa làm:|một phần/iu', (string) $j['summary']) ? 'partial' : 'ready';
+    }
+
+    /** @return array{ready:int, partial:int, none:int, total:int} */
+    public static function tally(): array
+    {
+        $t = ['ready' => 0, 'partial' => 0, 'none' => 0];
+        $all = JobTypeRegistry::all();
+        foreach ($all as $j) {
+            $t[self::usability($j)]++;
+        }
+
+        return $t + ['total' => count($all)];
+    }
+
+    /** Địa chỉ trang làm việc của loại việc; null nếu không có class, không có quyền hoặc lỗi route. */
+    public static function workUrl(string $jobId): ?string
+    {
+        foreach (self::PAGES[$jobId] ?? [] as $class) {
+            if (! class_exists($class)) {
+                continue;
+            }
+            try {
+                $ok = method_exists($class, 'canViewAny') ? $class::canViewAny() : (! method_exists($class, 'canAccess') || $class::canAccess());
+
+                return $ok ? $class::getUrl() : null;
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
     protected function getViewData(): array
     {
         $chain = [];
         foreach (JobTypeRegistry::CHAIN as $key => $label) {
-            $chain[] = ['key' => $key, 'label' => $label, 'jobs' => JobTypeRegistry::forLink($key)];
+            $jobs = array_map(fn (array $j) => $j + [
+                'plain' => self::plainLine($j),
+                'usability' => self::usability($j),
+                'url' => self::workUrl($j['id']),
+            ], JobTypeRegistry::forLink($key));
+            $chain[] = ['key' => $key, 'label' => $label, 'jobs' => $jobs];
         }
 
         return [
@@ -92,6 +179,7 @@ class PipelineMap extends Page
             'controls' => PipelineBlueprint::controlsWired(),
             'chain' => $chain,
             'names' => $this->jobNames(),
+            'tally' => self::tally(),
         ];
     }
 }
