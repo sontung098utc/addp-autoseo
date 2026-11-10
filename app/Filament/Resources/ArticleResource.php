@@ -185,6 +185,12 @@ class ArticleResource extends Resource
                     ->limit(16)
                     ->tooltip(fn (Article $r) => ArticleRows::campaignName($r))
                     ->visibleFrom('xl')),
+                static::narrow(Tables\Columns\TextColumn::make('brains')
+                    ->label('Trí tuệ')
+                    ->state(fn (Article $r) => ($n = \App\Services\Brain\BrainContext::forArticle($r, ArticleRows::lastRun($r)?->campaign_id)->names()) !== '' ? $n : '—')
+                    ->limit(18)
+                    ->tooltip(fn (Article $r) => 'Trí tuệ đang dùng: '.\App\Services\Brain\BrainContext::forArticle($r, ArticleRows::lastRun($r)?->campaign_id)->names())
+                    ->visibleFrom('xl')),
                 static::narrow(Tables\Columns\TextColumn::make('last_run')
                     ->label('Phiên gần nhất')
                     ->badge()

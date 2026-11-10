@@ -24,8 +24,19 @@ final class KnowledgeContext
 
     private bool $gap = false;
 
+    /** AG-B1: phạm vi Trí tuệ của lượt chạy (null = như cũ, không lọc). */
+    private ?array $brainIds = null;
+
     public function __construct(private KnowledgeRetriever $retriever = new KnowledgeRetriever())
     {
+    }
+
+    /** AG-B1: chỉ truy xuất atom thuộc các Trí tuệ này (cộng atom brain_id NULL theo website). Gọi trước load(). @param list<int> $ids */
+    public function scopeToBrains(array $ids): self
+    {
+        $this->brainIds = array_values(array_map('intval', $ids));
+
+        return $this;
     }
 
     /** @param list<string|mixed> $outline */
@@ -41,12 +52,12 @@ final class KnowledgeContext
                 return;
             }
             $query = $article->primary_keyword.' '.implode(' ', array_map(fn ($o) => is_scalar($o) ? (string) $o : '', array_slice($outline, 0, 12)));
-            foreach ($this->retriever->search($site, $query, self::LIMIT) as $r) {
+            foreach ($this->retriever->search($site, $query, self::LIMIT, $this->brainIds) as $r) {
                 $this->items[] = ['id' => $r['id'], 'version' => $r['version'], 'title' => $r['title'], 'body' => mb_substr($r['body'], 0, self::BODY_MAX), 'source' => $r['source']];
             }
             if ($this->items === []) {
                 $this->gap = true;
-                $this->recordGap($article, mb_substr(trim((string) $article->primary_keyword), 0, 190));
+                $this->recordGap($article, mb_substr(trim((string) $article->primary_keyword), 0, 190), $this->brainIds[0] ?? null);
             }
         } catch (\Throwable $e) {
             Log::warning('Kho kiến thức: truy xuất lỗi, bỏ qua.', ['error' => get_class($e)]);
@@ -84,13 +95,13 @@ final class KnowledgeContext
         }
     }
 
-    private function recordGap(Article $article, string $query): void
+    private function recordGap(Article $article, string $query, ?int $brainId = null): void
     {
         if ($query === '') {
             return;
         }
         $gap = KnowledgeGap::firstOrCreate(['website_id' => $article->website_id, 'query' => $query], ['article_id' => $article->id, 'count' => 0]);
         // AG-S21: tìm vẫn không ra dù từng "đã bổ sung" (mục bị cũ/loại, hoặc chưa đủ khớp) → mở lại.
-        $gap->update(['count' => $gap->count + 1, 'article_id' => $article->id, 'status' => 'open', 'filled_at' => null, 'filled_item_id' => null]);
+        $gap->update(['count' => $gap->count + 1, 'article_id' => $article->id, 'brain_id' => $gap->brain_id ?? $brainId, 'status' => 'open', 'filled_at' => null, 'filled_item_id' => null]);
     }
 }

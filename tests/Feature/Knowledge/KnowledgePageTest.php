@@ -34,11 +34,12 @@ class KnowledgePageTest extends TestCase
         $this->actingAs($this->user('admin'));
         $this->assertTrue(KnowledgePage::canAccess());
         Livewire::test(KnowledgePage::class)->assertOk()->assertSee('Hộp duyệt')->assertSee('Cảnh báo')->assertSee('Nguồn');
-        $this->get('/admin/kho-kien-thuc')->assertOk();
+        $this->get('/admin/tri-thuc-tat-ca')->assertOk(); // AG-B1: URL cũ /admin/kho-kien-thuc chuyển hướng sang Kho trí tuệ
+        $this->get('/admin/kho-kien-thuc')->assertRedirect('/admin/kho-tri-tue');
 
         auth()->logout();
         $this->assertFalse(KnowledgePage::canAccess());
-        $this->get('/admin/kho-kien-thuc')->assertRedirect();
+        $this->get('/admin/tri-thuc-tat-ca')->assertRedirect();
     }
 
     public function test_bien_tap_vien_chi_xem_muc_da_duyet_va_khong_thao_tac(): void

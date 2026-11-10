@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\DB;
  * AG-S20: truy xuất atom ĐÃ DUYỆT và CÒN HIỆU LỰC cho Người viết (có id + phiên bản + nguồn để trích).
  * MySQL/MariaDB dùng FULLTEXT (rơi về LIKE nếu không ra gì, vì từ ngắn tiếng Việt hay bị bỏ qua); SQLite dùng LIKE.
  * Atom của website được ưu tiên hơn atom chung. proposed/outdated/rejected/đã xóa không bao giờ được trả về.
+ * AG-B1: có $brainIds thì chỉ lấy atom thuộc các Trí tuệ đó (Trí tuệ đứng trước được cộng điểm nhẹ) cộng atom brain_id NULL theo website/chung như cũ;
+ * $brainIds = null là hành vi cũ (không lọc theo Trí tuệ).
  */
 final class KnowledgeRetriever
 {
@@ -19,7 +21,7 @@ final class KnowledgeRetriever
     private const SITE_BONUS = 0.25;
 
     /** @return list<array{id:int,version:int,title:string,body:string,source:?string,source_id:?int,score:float,scope:string}> */
-    public function search(Website $website, string $query, int $limit = 5): array
+    public function search(Website $website, string $query, int $limit = 5, ?array $brainIds = null): array
     {
         $query = trim(mb_substr($query, 0, 600));
         $terms = $this->terms($query);
@@ -28,10 +30,10 @@ final class KnowledgeRetriever
         }
         $rows = [];
         if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
-            $rows = $this->fulltext($website, $query);
+            $rows = $this->fulltext($website, $query, $brainIds);
         }
         if ($rows === []) {
-            $rows = $this->like($website, $terms, $query);
+            $rows = $this->like($website, $terms, $query, $brainIds);
         }
         usort($rows, fn ($a, $b) => $b['score'] <=> $a['score'] ?: $a['id'] <=> $b['id']);
 
@@ -39,13 +41,16 @@ final class KnowledgeRetriever
     }
 
     /** Điều kiện "dùng được": đã duyệt, còn hiệu lực, thuộc website hoặc chung. */
-    public function eligible(Website $website): Builder
+    public function eligible(Website $website, ?array $brainIds = null): Builder
     {
         $today = now()->toDateString();
+        $scope = fn ($q) => $q->whereNull('website_id')->orWhere('website_id', $website->id);
 
         return KnowledgeItem::query()->with('source')
             ->where('status', 'approved')
-            ->where(fn ($q) => $q->whereNull('website_id')->orWhere('website_id', $website->id))
+            ->when($brainIds === null, fn ($q) => $q->where($scope))
+            ->when($brainIds !== null, fn ($q) => $q->where(fn ($q2) => $q2->whereIn('brain_id', $brainIds ?: [0])
+                ->orWhere(fn ($q3) => $q3->whereNull('brain_id')->where($scope))))
             ->where(fn ($q) => $q->whereNull('valid_from')->orWhereDate('valid_from', '<=', $today))
             ->where(fn ($q) => $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', $today));
     }
@@ -59,10 +64,10 @@ final class KnowledgeRetriever
         return array_slice(array_values(array_unique($words)), 0, 24);
     }
 
-    private function fulltext(Website $website, string $query): array
+    private function fulltext(Website $website, string $query, ?array $brainIds): array
     {
         try {
-            $items = $this->eligible($website)
+            $items = $this->eligible($website, $brainIds)
                 ->selectRaw('knowledge_items.*, MATCH(title, body) AGAINST (? IN NATURAL LANGUAGE MODE) as ft_score', [$query])
                 ->whereRaw('MATCH(title, body) AGAINST (? IN NATURAL LANGUAGE MODE)', [$query])
                 ->orderByDesc('ft_score')->limit(50)->get();
@@ -71,13 +76,13 @@ final class KnowledgeRetriever
         }
         $max = (float) ($items->max('ft_score') ?: 1);
 
-        return $items->map(fn ($i) => $this->row($i, (float) $i->ft_score / $max, $website))->all();
+        return $items->map(fn ($i) => $this->row($i, (float) $i->ft_score / $max, $website, $brainIds))->all();
     }
 
-    private function like(Website $website, array $terms, string $query): array
+    private function like(Website $website, array $terms, string $query, ?array $brainIds): array
     {
         $esc = fn (string $t) => addcslashes($t, '\\%_');
-        $items = $this->eligible($website)->where(function ($q) use ($terms, $esc) {
+        $items = $this->eligible($website, $brainIds)->where(function ($q) use ($terms, $esc) {
             foreach ($terms as $t) {
                 $q->orWhereRaw("lower(title) like ? escape '\\'", ['%'.$esc($t).'%'])->orWhereRaw("lower(body) like ? escape '\\'", ['%'.$esc($t).'%']);
             }
@@ -95,20 +100,22 @@ final class KnowledgeRetriever
             if ($phrase !== '' && (str_contains($title, $phrase) || str_contains($body, $phrase))) {
                 $score = min(1.0, $score + 0.3);
             }
-            $out[] = $this->row($i, $score, $website);
+            $out[] = $this->row($i, $score, $website, $brainIds);
         }
 
         return $out;
     }
 
-    private function row(KnowledgeItem $i, float $score, Website $website): array
+    private function row(KnowledgeItem $i, float $score, Website $website, ?array $brainIds = null): array
     {
         $own = $i->website_id === $website->id;
+        $rank = $brainIds !== null && $i->brain_id !== null ? array_search($i->brain_id, $brainIds, true) : false;
+        $score += $rank !== false ? max(0.0, 0.1 - 0.02 * $rank) : 0.0; // Trí tuệ ưu tiên cao hơn được cộng nhẹ
 
         return [
             'id' => $i->id, 'version' => (int) $i->version, 'title' => $i->title, 'body' => $i->body,
             'source' => $i->source?->title, 'source_id' => $i->source_id,
-            'score' => round($score + ($own ? self::SITE_BONUS : 0.0), 4), 'scope' => $own ? 'website' : 'general',
+            'score' => round($score + ($own ? self::SITE_BONUS : 0.0), 4), 'scope' => $own ? 'website' : 'general', 'brain_id' => $i->brain_id,
         ];
     }
 }

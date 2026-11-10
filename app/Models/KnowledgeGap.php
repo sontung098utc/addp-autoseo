@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** AG-S20: truy vấn của Người viết không tìm thấy atom đã duyệt nào → cần bổ sung kiến thức. */
 class KnowledgeGap extends Model
 {
-    protected $fillable = ['website_id', 'query', 'article_id', 'count', 'status', 'filled_at', 'filled_item_id'];
+    protected $fillable = ['brain_id', 'website_id', 'query', 'article_id', 'count', 'status', 'filled_at', 'filled_item_id'];
 
     protected function casts(): array
     {
@@ -23,6 +23,11 @@ class KnowledgeGap extends Model
     public function filledItem(): BelongsTo
     {
         return $this->belongsTo(KnowledgeItem::class, 'filled_item_id');
+    }
+
+    public function brain(): BelongsTo
+    {
+        return $this->belongsTo(Brain::class);
     }
 
     public function website(): BelongsTo

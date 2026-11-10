@@ -20,6 +20,9 @@ use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 
 /**
+ * AG-B1: màn này giờ là phần "Hiểu biết · Nguồn · Cảnh báo · Khoảng trống" của Kho trí tuệ. Nó vẫn chạy độc lập (xem kiến thức của TẤT CẢ Trí tuệ,
+ * không hiện trên menu) và được BrainPage kế thừa, đặt $brainId để lọc mọi truy vấn/ghi theo một Trí tuệ.
+ *
  * AG-S20: Kho kiến thức (nhóm Khám phá). Tab: Hộp duyệt · Tất cả · Nguồn · Cảnh báo.
  * Quyền TẠM THỜI: admin + approver thao tác; người viết/biên tập chỉ xem atom đã duyệt ("quyền duyệt tính sau theo yêu cầu người dùng").
  * Nội dung kho và nguồn là DỮ LIỆU: luôn hiển thị qua {{ }} (escape), không bao giờ là HTML thô.
@@ -28,15 +31,24 @@ class KnowledgePage extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-book-open';
 
-    protected static ?string $navigationLabel = 'Kho kiến thức';
+    protected static ?string $navigationLabel = 'Tất cả kiến thức';
 
     protected static ?string $navigationGroup = 'Khám phá';
 
     protected static ?int $navigationSort = 3;
 
-    protected static ?string $title = 'Kho kiến thức';
+    protected static ?string $title = 'Tất cả kiến thức';
 
-    protected static ?string $slug = 'kho-kien-thuc';
+    protected static ?string $slug = 'tri-thuc-tat-ca';
+
+    /** Menu chỉ còn "Kho trí tuệ" (BrainLibraryPage). URL cũ /admin/kho-kien-thuc chuyển hướng ở routes/web.php. */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
+    /** AG-B1: khác null = chỉ làm việc trong Trí tuệ này. */
+    public ?int $brainId = null;
 
     protected static string $view = 'filament.pages.knowledge';
 
@@ -86,7 +98,7 @@ class KnowledgePage extends Page
         return new KnowledgeReview();
     }
 
-    private function guard(): void
+    protected function guard(): void
     {
         if (! static::canAccess()) {
             abort(403);
@@ -218,7 +230,7 @@ class KnowledgePage extends Page
     {
         $this->act('Đã thêm vào Hộp duyệt', function () {
             $site = $this->new['website_id'] !== '' ? Website::query()->findOrFail((int) $this->new['website_id']) : null;
-            (new KnowledgeIngest())->manual($this->new, $site, Auth::user());
+            (new KnowledgeIngest())->manual($this->new + ['brain_id' => $this->brainId], $site, Auth::user());
             $this->new = array_merge($this->new, ['title' => '', 'body' => '', 'entity' => '', 'field' => '', 'value' => '', 'value_unit' => '', 'tags' => '', 'valid_until' => '']);
         });
     }
@@ -228,7 +240,7 @@ class KnowledgePage extends Page
         $this->act('Đã lưu nguồn', function () {
             $site = $this->paste['website_id'] !== '' ? Website::query()->findOrFail((int) $this->paste['website_id']) : null;
             $ingest = new KnowledgeIngest();
-            $src = $ingest->paste((string) $this->paste['title'], (string) $this->paste['text'], $site, Auth::user());
+            $src = $ingest->paste((string) $this->paste['title'], (string) $this->paste['text'], $site, Auth::user(), 'paste', null, $this->brainId);
             if ($this->paste['split']) {
                 $r = $ingest->split($src, Auth::user());
                 Notification::make()->title("Tách được {$r['created']} mục đề xuất".($r['duplicates'] ? ", bỏ {$r['duplicates']} mục trùng" : ''))->info()->send();
@@ -248,7 +260,7 @@ class KnowledgePage extends Page
             if ($parent && $parent->parent_id !== null) {
                 throw new KnowledgeError('Chủ đề chỉ có tối đa 2 cấp.');
             }
-            KnowledgeTopic::create(['name' => mb_substr($name, 0, 120), 'parent_id' => $parent?->id, 'website_id' => $parent?->website_id]);
+            KnowledgeTopic::create(['name' => mb_substr($name, 0, 120), 'parent_id' => $parent?->id, 'website_id' => $parent?->website_id, 'brain_id' => $this->brainId ?? $parent?->brain_id]);
             $this->topicName = '';
         });
     }
@@ -266,10 +278,12 @@ class KnowledgePage extends Page
             return ['conflict' => $conflicts->for($i), 'exact' => $f['exact'], 'similar' => $f['similar']];
         };
 
-        $inbox = $manage ? KnowledgeItem::query()->with('source')->where('status', 'proposed')->orderBy('source_id')->orderBy('id')->limit(200)->get() : collect();
+        $b = $this->brainId;
+        $inScope = fn ($q) => $q->when($b !== null, fn ($q2) => $q2->where('brain_id', $b));
+        $inbox = $manage ? KnowledgeItem::query()->tap($inScope)->with('source')->where('status', 'proposed')->orderBy('source_id')->orderBy('id')->limit(200)->get() : collect();
         $inboxFlags = $inbox->mapWithKeys(fn ($i) => [$i->id => $flags($i)]);
 
-        $all = KnowledgeItem::query()->with(['topic', 'website'])
+        $all = KnowledgeItem::query()->tap($inScope)->with(['topic', 'website'])
             ->when(! $manage, fn ($q) => $q->where('status', 'approved'))
             ->when($manage && $this->fStatus !== '', fn ($q) => $q->where('status', $this->fStatus))
             ->when($this->fType !== '', fn ($q) => $q->where('type', $this->fType))
@@ -291,8 +305,9 @@ class KnowledgePage extends Page
         $warn = ['pairs' => [], 'expired' => collect(), 'unused' => collect(), 'dups' => []];
         if ($manage) {
             $fresh = new KnowledgeFreshness();
-            $warn = ['pairs' => $conflicts->all(), 'expired' => $fresh->expired(), 'unused' => $fresh->unused(), 'dups' => []];
-            foreach (KnowledgeItem::query()->whereIn('status', ['proposed', 'approved'])->limit(300)->get() as $i) {
+            $same = fn ($i) => $b === null || (int) $i->brain_id === $b;
+            $warn = ['pairs' => array_values(array_filter($conflicts->all(), fn ($p) => $same($p['a']))), 'expired' => $fresh->expired()->filter($same)->values(), 'unused' => $fresh->unused()->filter($same)->values(), 'dups' => []];
+            foreach (KnowledgeItem::query()->tap($inScope)->whereIn('status', ['proposed', 'approved'])->limit(300)->get() as $i) {
                 foreach ($dedupe->find($i)['similar'] as $s) {
                     if ($i->id < $s['item']->id) {
                         $warn['dups'][] = ['a' => $i, 'b' => $s['item'], 'percent' => $s['percent']];
@@ -302,15 +317,15 @@ class KnowledgePage extends Page
         }
 
         return [
-            'manage' => $manage,
+            'manage' => $manage, 'brain' => null,
             'inbox' => $inbox, 'inboxFlags' => $inboxFlags,
             'all' => $all,
-            'sources' => $manage ? KnowledgeSource::query()->withCount(['items', 'items as proposed_count' => fn ($q) => $q->where('status', 'proposed')])->with('website')->orderByDesc('id')->limit(100)->get() : collect(),
+            'sources' => $manage ? KnowledgeSource::query()->tap($inScope)->withCount(['items', 'items as proposed_count' => fn ($q) => $q->where('status', 'proposed')])->with('website')->orderByDesc('id')->limit(100)->get() : collect(),
             'selected' => $selected, 'selectedFlags' => $selected ? $flags($selected) : null,
             'warn' => $warn,
-            'gaps' => $manage ? KnowledgeGap::query()->with(['website', 'article', 'filledItem'])->orderByRaw("status = 'open' desc")->orderByDesc('count')->limit(100)->get() : collect(),
+            'gaps' => $manage ? KnowledgeGap::query()->tap($inScope)->with(['website', 'article', 'filledItem'])->orderByRaw("status = 'open' desc")->orderByDesc('count')->limit(100)->get() : collect(),
             'aiAvail' => $manage ? (new KnowledgeAiIngest())->availability() : ['ok' => false, 'reason' => null, 'label' => null, 'demo' => false],
-            'topics' => KnowledgeTopic::query()->with('parent')->orderBy('name')->get(),
+            'topics' => KnowledgeTopic::query()->tap($inScope)->with('parent')->orderBy('name')->get(),
             'sites' => Website::query()->orderBy('name')->get(['id', 'name']),
             'types' => KnowledgeItem::TYPES, 'statuses' => KnowledgeItem::STATUSES,
         ];

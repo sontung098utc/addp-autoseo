@@ -21,7 +21,7 @@ final class KnowledgeIngest
     {
     }
 
-    public function paste(string $title, string $text, ?Website $website, ?User $by = null, string $kind = 'paste', ?string $url = null): KnowledgeSource
+    public function paste(string $title, string $text, ?Website $website, ?User $by = null, string $kind = 'paste', ?string $url = null, ?int $brainId = null): KnowledgeSource
     {
         $title = trim(mb_substr($title, 0, 200));
         $text = trim(mb_substr(str_replace(["\r\n", "\r"], "\n", $text), 0, self::MAX_TEXT));
@@ -30,7 +30,7 @@ final class KnowledgeIngest
         }
 
         return KnowledgeSource::create([
-            'website_id' => $website?->id, 'kind' => $kind, 'title' => $title, 'url' => $url, 'raw_text' => $text,
+            'brain_id' => $brainId, 'website_id' => $website?->id, 'kind' => $kind, 'title' => $title, 'url' => $url, 'raw_text' => $text,
             'content_hash' => KnowledgeDedupe::hash('', $text), 'status' => 'new', 'created_by' => $by?->id,
         ]);
     }
@@ -79,7 +79,7 @@ final class KnowledgeIngest
         DB::transaction(function () use ($source, $by, &$created, &$dups) {
             foreach ($this->parse((string) $source->raw_text) as $a) {
                 $item = new KnowledgeItem([
-                    'website_id' => $source->website_id, 'source_id' => $source->id, 'type' => 'fact', 'title' => $a['title'], 'body' => $a['body'],
+                    'brain_id' => $source->brain_id, 'website_id' => $source->website_id, 'source_id' => $source->id, 'type' => 'fact', 'title' => $a['title'], 'body' => $a['body'],
                     'status' => 'proposed', 'created_by' => 'rule', 'version' => 1, 'content_hash' => KnowledgeDedupe::hash($a['title'], $a['body']),
                 ]);
                 if ($this->dedupe->find($item)['exact']->isNotEmpty()) { // trùng y hệt: không tạo lại
@@ -107,7 +107,7 @@ final class KnowledgeIngest
         }
         $type = array_key_exists($data['type'] ?? '', KnowledgeItem::TYPES) ? $data['type'] : 'fact';
         $item = KnowledgeItem::create([
-            'website_id' => $website?->id, 'type' => $type, 'title' => mb_substr($title, 0, 200), 'body' => mb_substr($body, 0, 5000),
+            'brain_id' => ($data['brain_id'] ?? null) ? (int) $data['brain_id'] : null, 'website_id' => $website?->id, 'type' => $type, 'title' => mb_substr($title, 0, 200), 'body' => mb_substr($body, 0, 5000),
             'entity' => $this->nullable($data['entity'] ?? null, 160), 'field' => $this->nullable($data['field'] ?? null, 120),
             'value' => $this->nullable($data['value'] ?? null, 255), 'value_unit' => $this->nullable($data['value_unit'] ?? null, 40),
             'topic_id' => ($data['topic_id'] ?? '') !== '' ? (int) $data['topic_id'] : null, 'tags' => $this->tags($data['tags'] ?? []),

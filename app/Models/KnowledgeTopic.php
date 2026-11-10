@@ -9,7 +9,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** AG-S20: chủ đề, cây tối đa 2 cấp (cấp 2 có parent_id là cấp 1). */
 class KnowledgeTopic extends Model
 {
-    protected $fillable = ['website_id', 'parent_id', 'name'];
+    protected $fillable = ['brain_id', 'website_id', 'parent_id', 'name'];
+
+    public function brain(): BelongsTo
+    {
+        return $this->belongsTo(Brain::class);
+    }
 
     public function parent(): BelongsTo
     {

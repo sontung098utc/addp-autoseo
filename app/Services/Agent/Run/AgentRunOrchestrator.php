@@ -29,6 +29,7 @@ use App\Services\Brand\BrandProfileData;
 use App\Services\Content\Quality\ContentQualityChecker;
 use App\Services\Content\Quality\QualityReport;
 use App\Services\Agent\Context\ContextAssets;
+use App\Services\Brain\BrainContext;
 use App\Services\Knowledge\KnowledgeContext;
 use App\Services\Publishing\EmergencyStopService;
 use Illuminate\Support\Facades\DB;
@@ -48,6 +49,11 @@ final class AgentRunOrchestrator
     private ?KnowledgeContext $kb = null;
 
     private ?ContextAssets $assets = null; // AG-S25: ảnh thư viện + liên kết nội bộ
+
+    /** AG-B1: các Trí tuệ của bài đang chạy (theo chiến dịch hoặc website) và chiến dịch giao việc. */
+    private ?BrainContext $brainCtx = null;
+
+    private ?int $campaignId = null;
 
     public function __construct(
         private AiProviderInterface $ai,
@@ -88,6 +94,7 @@ final class AgentRunOrchestrator
     {
         $this->seq = 0;
         $this->trigger = $trigger;
+        $this->campaignId = $campaignId;
         $this->skills = [];
         $this->disabledRoles = $this->switches->disabled();
         $run = AgentRun::create([
@@ -130,7 +137,8 @@ final class AgentRunOrchestrator
     {
         $site = $article->website;
         $this->brandProfile = BrandProfileData::forWebsite($article->website_id);
-        $this->kb = new KnowledgeContext(); // AG-S20: mỗi lượt chạy truy xuất kiến thức riêng
+        $this->brainCtx = BrainContext::forArticle($article, $this->campaignId); // AG-B1
+        $this->kb = (new KnowledgeContext())->scopeToBrains($this->brainCtx->ids()); // AG-S20: mỗi lượt chạy truy xuất kiến thức riêng; AG-B1: trong phạm vi Trí tuệ
         $this->assets = new ContextAssets();
 
         // 1. An toàn: dừng khẩn cấp và website phải hoạt động.
@@ -148,10 +156,16 @@ final class AgentRunOrchestrator
 
         // 2. Phân hạng rủi ro theo từ khóa (luật, không dùng AI).
         $assess = $this->risk->assess($article->primary_keyword);
+        // AG-B1: Trí tuệ có thể NÂNG hạng (must_cite: tối thiểu vừa; hoặc theo risk_class), không bao giờ hạ hạng đã tính.
+        $raised = $this->brainCtx->raise($assess->level);
+        $brainRaise = $raised !== $assess->level ? ' Hạng được nâng từ '.$this->levelLabel($assess->level).' lên '.$this->levelLabel($raised).' theo cấu hình của Trí tuệ ('.$this->brainCtx->names().').' : '';
+        if ($raised !== $assess->level) {
+            $assess = new \App\Services\Agent\Risk\RiskAssessment($raised, $assess->reasons, $assess->sensitiveClaims);
+        }
         $run->update(['risk_level' => $assess->level]);
         $this->step($run, 'risk', 'editor', $assess->level === 'high' ? 'warn' : 'ok', 'Hạng rủi ro: '.$this->levelLabel($assess->level),
-            $assess->reasons === [] ? 'Chủ đề thường, không chạm nhóm nhạy cảm.' : implode(' ', $assess->reasons).($assess->level === 'high' ? ' Bài cần người có chuyên môn duyệt.' : ''),
-            ['level' => $assess->level]);
+            ($assess->reasons === [] && $brainRaise === '' ? 'Chủ đề thường, không chạm nhóm nhạy cảm.' : implode(' ', $assess->reasons).$brainRaise).($assess->level === 'high' ? ' Bài cần người có chuyên môn duyệt.' : ''),
+            ['level' => $assess->level] + ($brainRaise !== '' ? ['raised_by_brain' => true] : []) + $this->brainCtx->stepData());
 
         if ($this->router) {
             foreach (($this->roleOff('strategist') ? ['write'] : ['outline', 'write']) as $task) {
@@ -172,12 +186,12 @@ final class AgentRunOrchestrator
         } else {
             $this->skills['brief'] = $this->usePlaybook('brief', 'content-brief');
             [$briefPb, $briefNote] = $this->skills['brief'];
-            $briefOptions = ($briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : []) + $this->roleOptions('strategist') + $this->brandOptions();
+            $briefOptions = ($briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : []) + $this->roleOptions('strategist') + $this->brandOptions() + $this->brainCtx->options($article);
             $outline = $this->callAi($run, 'outline', 'lập dàn ý', fn (AiProviderInterface $ai) => $ai->generateOutline($article, $briefOptions));
             $offTopic = BrandProfileData::looksOffTopic($this->brandProfile, (string) $article->primary_keyword);
-            $this->step($run, 'brief', 'strategist', $offTopic ? 'warn' : 'ok', 'Lập dàn ý ('.count($outline['outline'] ?? []).' mục)', 'Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. '.$briefNote.$this->brandNote()
+            $this->step($run, 'brief', 'strategist', $offTopic ? 'warn' : 'ok', 'Lập dàn ý ('.count($outline['outline'] ?? []).' mục)', 'Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. '.$briefNote.$this->brandNote().$this->brainCtx->note()
                 .($offTopic ? ' Cảnh báo: chủ đề "'.mb_substr((string) $article->primary_keyword, 0, 80).'" có thể không phù hợp website (lĩnh vực trong hồ sơ: '.mb_substr((string) $this->brandProfile?->business_field, 0, 120).'). Chỉ cảnh báo, không chặn.' : ''),
-                ['outline' => $outline['outline'] ?? [], 'playbook' => $this->pbData($briefPb)] + $this->brandData() + ($offTopic ? ['off_topic' => true] : []) + $this->providerData($outline), $outline['model'] ?? null, (int) ($outline['tokens_used'] ?? 0), (float) ($outline['cost_vnd'] ?? 0));
+                ['outline' => $outline['outline'] ?? [], 'playbook' => $this->pbData($briefPb)] + $this->brandData() + $this->brainCtx->stepData() + ($offTopic ? ['off_topic' => true] : []) + $this->providerData($outline), $outline['model'] ?? null, (int) ($outline['tokens_used'] ?? 0), (float) ($outline['cost_vnd'] ?? 0));
         }
         $this->skills['grade'] = $this->skills['repair'] = $this->usePlaybook('editor', 'qa-review');
         [$editorPb, $editorNote] = $this->skills['grade'];
@@ -234,6 +248,10 @@ final class AgentRunOrchestrator
         if ($passed && $assess->level === 'high') {
             $this->decision($run, 'high_risk_expert_review', 'Giữ cho người có chuyên môn duyệt', 'Đạt luật nhưng chủ đề rủi ro cao nên hệ thống không coi là xong; cần người có chuyên môn duyệt trước khi dùng.', ['risk_level' => 'high', 'score' => $score]);
         }
+        $brainMustCite = $this->brainCtx->reliance() === 'must_cite';
+        if ($passed && $brainMustCite && $assess->level !== 'high') {
+            $this->decision($run, 'brain_must_cite_review', 'Giữ cho người có chuyên môn duyệt', 'Đạt luật nhưng Trí tuệ ('.$this->brainCtx->names().') đặt mức dựa vào AI là Bắt buộc nguồn nên hệ thống không coi là xong; cần người có chuyên môn duyệt. Việc kiểm từng khẳng định có nguồn chưa được tự động hóa ở bản này.', ['ai_reliance' => 'must_cite', 'score' => $score]);
+        }
         if ($passed) {
             $article->update(['workflow_status' => 'needs_review']);
             $push = $this->handoff?->push($run, $version, $site, true, $assess->level);
@@ -243,7 +261,7 @@ final class AgentRunOrchestrator
             $this->step($run, 'handoff', 'system', $pushFailed ? 'warn' : 'ok', 'Chuyển người duyệt', 'Đạt mọi luật bắt buộc. Bản nháp v'.$version->version.' đã vào hàng chờ duyệt; chưa xuất bản vì bậc tin cậy '.$this->policy->trustTier.'.'.$extra,
                 ['version' => $version->version] + ($push && $push->status !== 'skipped' ? ['cms_draft' => ['status' => $push->status, 'cms' => $push->cms, 'url' => $push->url, 'remote_id' => $push->remoteId]] : []));
 
-            $reasonOut = $assess->level === 'high' ? 'Đạt luật nhưng chủ đề rủi ro cao: cần người có chuyên môn duyệt.' : null;
+            $reasonOut = $assess->level === 'high' ? 'Đạt luật nhưng chủ đề rủi ro cao: cần người có chuyên môn duyệt.' : ($brainMustCite ? 'Đạt luật nhưng lĩnh vực bắt buộc nguồn: cần người có chuyên môn duyệt.' : null);
             if ($pushFailed) {
                 $reasonOut = trim(($reasonOut ?? '').' '.$push->note);
             }
@@ -269,7 +287,7 @@ final class AgentRunOrchestrator
             $options['playbook'] = $pb->body;
             $options['playbook_ref'] = $pb->ref();
         }
-        $options += $this->roleOptions('writer') + $this->brandOptions();
+        $options += $this->roleOptions('writer') + $this->brandOptions() + $this->brainCtx->options($article);
         $this->kb ??= new KnowledgeContext();
         $this->kb->load($article, $outline); // AG-S20: kiến thức đã duyệt, truy xuất một lần mỗi lượt chạy
         $options += $this->kb->options();
@@ -287,10 +305,11 @@ final class AgentRunOrchestrator
             $run->update(['ai_mode' => 'mock']);
         }
         $silentMock = $fellBack && ! $this->ai instanceof MockAiProvider;
-        $this->step($run, $stage, 'writer', $silentMock ? 'warn' : 'ok', $title, ($silentMock ? 'Nhà cung cấp AI đã rơi về bản giả lập (thiếu khóa hoặc phản hồi hỏng); nội dung không phải AI thật. ' : '').($feedback === []
-            ? 'Viết theo dàn ý; HTML được làm sạch trước khi chấm.'.$this->brandNote().$kbNote.$assetNote
+        $mustCite = $this->brainCtx->reliance() === 'must_cite' && $feedback === [];
+        $this->step($run, $stage, 'writer', $silentMock || $mustCite ? 'warn' : 'ok', $title, ($silentMock ? 'Nhà cung cấp AI đã rơi về bản giả lập (thiếu khóa hoặc phản hồi hỏng); nội dung không phải AI thật. ' : '').($feedback === []
+            ? 'Viết theo dàn ý; HTML được làm sạch trước khi chấm.'.$this->brandNote().$this->brainCtx->note().($mustCite ? ' Lĩnh vực bắt buộc nguồn: cần người có chuyên môn duyệt (P1 mới ghi nhận và cảnh báo, chưa tự kiểm từng khẳng định).' : '').$kbNote.$assetNote
             : 'Gửi lại cho AI '.count($feedback).' lỗi chặn cần sửa: '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
-            ['words' => str_word_count(strip_tags($html)) ?: mb_strlen(strip_tags($html)), 'playbook' => $this->pbData($pb)] + $this->brandData() + $kbData + $assetData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
+            ['words' => str_word_count(strip_tags($html)) ?: mb_strlen(strip_tags($html)), 'playbook' => $this->pbData($pb)] + $this->brandData() + $this->brainCtx->stepData() + ($mustCite ? ['needs_expert_review' => true] : []) + $kbData + $assetData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
 
         return [
             'article_id' => $article->id, 'title' => $r['title'] ?? $article->primary_keyword, 'slug' => $r['slug'] ?? 'bai-viet', 'outline' => $outline,

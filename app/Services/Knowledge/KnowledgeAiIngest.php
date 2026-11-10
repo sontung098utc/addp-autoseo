@@ -355,13 +355,13 @@ final class KnowledgeAiIngest
 
                 return;
             }
-            $topic = $a['topic'] ? $this->topicFor($a['topic'], $source->website_id) : null;
+            $topic = $a['topic'] ? $this->topicFor($a['topic'], $source->website_id, $source->brain_id) : null;
             $tags = $a['tags'];
             if ($a['topic'] && ! $topic && ! in_array($a['topic'], $tags, true)) {
                 $tags = array_slice(array_merge($tags, [mb_substr($a['topic'], 0, 40)]), 0, 12); // chủ đề chưa có: gợi ý bằng thẻ, không tự tạo
             }
             $item = new KnowledgeItem([
-                'website_id' => $source->website_id, 'source_id' => $source->id, 'topic_id' => $topic?->id, 'type' => $a['type'],
+                'brain_id' => $source->brain_id, 'website_id' => $source->website_id, 'source_id' => $source->id, 'topic_id' => $topic?->id, 'type' => $a['type'],
                 'title' => $a['title'], 'body' => $a['body'], 'entity' => $a['entity'], 'field' => $a['field'], 'value' => $a['value'], 'value_unit' => $a['value_unit'],
                 'tags' => $tags, 'status' => 'proposed', 'created_by' => 'ai', 'confidence' => $a['confidence'], 'source_span' => $a['source_span'],
                 'version' => 1, 'content_hash' => KnowledgeDedupe::hash($a['title'], $a['body']),
@@ -384,11 +384,14 @@ final class KnowledgeAiIngest
         }
     }
 
-    private function topicFor(string $name, ?int $websiteId): ?KnowledgeTopic
+    private function topicFor(string $name, ?int $websiteId, ?int $brainId = null): ?KnowledgeTopic
     {
         $n = KnowledgeDedupe::normalize($name);
 
-        return KnowledgeTopic::query()->where(fn ($q) => $q->whereNull('website_id')->when($websiteId, fn ($q2) => $q2->orWhere('website_id', $websiteId)))
+        // AG-B1: nguồn thuộc một Trí tuệ thì chỉ khớp chủ đề của Trí tuệ đó.
+        return KnowledgeTopic::query()
+            ->when($brainId !== null, fn ($q) => $q->where('brain_id', $brainId))
+            ->when($brainId === null, fn ($q) => $q->where(fn ($q1) => $q1->whereNull('website_id')->when($websiteId, fn ($q2) => $q2->orWhere('website_id', $websiteId))))
             ->get()->first(fn (KnowledgeTopic $t) => KnowledgeDedupe::normalize($t->name) === $n);
     }
 

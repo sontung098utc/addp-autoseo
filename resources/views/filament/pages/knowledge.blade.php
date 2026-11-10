@@ -25,9 +25,17 @@
             ['key' => 'gaps', 'label' => 'Khoảng trống', 'count' => $gaps->where('status', 'open')->count() ?: null, 'tone' => $gaps->where('status', 'open')->count() ? 'warn' : null],
             ['key' => 'add', 'label' => 'Thêm kiến thức'],
         ] : [['key' => 'all', 'label' => 'Kiến thức đã duyệt']];
+        if ($brain) { // AG-B1: trang một Trí tuệ — thêm tab Hồ sơ lĩnh vực (đầu) và Cài đặt (cuối); 'Tất cả' đổi tên thành 'Hiểu biết'
+            $tabs = array_map(fn ($t) => $t['key'] === 'all' ? ['key' => 'all', 'label' => 'Hiểu biết'] : $t, $tabs);
+            array_unshift($tabs, ['key' => 'profile', 'label' => 'Hồ sơ lĩnh vực', 'count' => $completeness[0].'/'.$completeness[1], 'tone' => $completeness[0] < 3 ? 'warn' : null]);
+            if ($manage) { $tabs[] = ['key' => 'settings', 'label' => 'Cài đặt']; }
+        }
         $topicOptions = fn () => $topics;
     @endphp
     <div class="ss-page">
+        @if ($brain)
+            @include('filament.pages.partials.brain-header')
+        @endif
         @if ($selected)
             <div class="ss-card" style="margin-bottom:1rem" role="region" aria-label="Chi tiết mục kiến thức"><div class="ss-card__b">
                 <div class="kb-bar">
@@ -118,7 +126,10 @@
             </div></div>
         @endif
 
-        <x-studio.tabs persist="kho-kien-thuc" :default="$manage && $inbox->count() ? 'inbox' : 'all'" :tabs="$tabs">
+        <x-studio.tabs :persist="$brain ? 'tri-tue' : 'kho-kien-thuc'" :default="$brain ? 'profile' : ($manage && $inbox->count() ? 'inbox' : 'all')" :tabs="$tabs">
+            @if ($brain)
+                @include('filament.pages.partials.brain-panels')
+            @endif
             @if ($manage)
             <x-studio.panel key="inbox">
                 @if ($inbox->isEmpty())

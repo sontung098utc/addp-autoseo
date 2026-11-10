@@ -17,13 +17,18 @@ class KnowledgeItem extends Model
     public const STATUSES = ['proposed' => 'Đề xuất', 'approved' => 'Đã duyệt', 'outdated' => 'Cũ', 'rejected' => 'Bị loại'];
 
     protected $fillable = [
-        'website_id', 'source_id', 'topic_id', 'type', 'title', 'body', 'entity', 'field', 'value', 'value_unit', 'tags', 'status',
+        'brain_id', 'website_id', 'source_id', 'topic_id', 'type', 'title', 'body', 'entity', 'field', 'value', 'value_unit', 'tags', 'status',
         'valid_from', 'valid_until', 'confidence', 'source_span', 'created_by', 'approved_by', 'approved_at', 'content_hash', 'version', 'last_used_at',
     ];
 
     protected function casts(): array
     {
         return ['tags' => 'array', 'valid_from' => 'date', 'valid_until' => 'date', 'approved_at' => 'datetime', 'last_used_at' => 'datetime'];
+    }
+
+    public function brain(): BelongsTo
+    {
+        return $this->belongsTo(Brain::class);
     }
 
     public function website(): BelongsTo
