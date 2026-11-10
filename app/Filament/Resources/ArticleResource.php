@@ -70,11 +70,50 @@ class ArticleResource extends Resource
         return static::user()?->isAdmin() ?? false;
     }
 
+    public const ASSIGN_DESCRIPTION = 'Đội AI sẽ kiểm an toàn, phân hạng rủi ro, lập dàn ý, viết, tự chấm và sửa (tối đa 3 vòng). Kết quả luôn là BẢN NHÁP chờ người duyệt; không có gì được tự đăng.';
+
+    public static function canView(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return static::canViewAny();
+    }
+
+    public static function canAssignToAgent(Article $record): bool
+    {
+        return (\Illuminate\Support\Facades\Auth::user()?->isApprover() ?? false)
+            && in_array($record->workflow_status, ['planned', 'drafting', 'rejected'], true)
+            && ArticleRows::liveRun($record) === null;
+    }
+
+    /** Giao bài cho đội AI (dùng chung cho bảng Bài viết và trang của bài); kết quả báo qua thông báo. */
+    public static function assignToAgent(Article $record): void
+    {
+        abort_unless(\Illuminate\Support\Facades\Auth::user()?->isApprover(), 403);
+        // Chống giao trùng: đã có phiên đang chạy thật thì không tạo phiên thứ hai.
+        if (ArticleRows::liveRun($record) !== null) {
+            \Filament\Notifications\Notification::make()->title('Bài này đang có phiên chạy')->body('Đợi phiên hiện tại xong rồi hãy giao lại.')->warning()->send();
+
+            return;
+        }
+        $ai = \App\Services\Agent\Settings\AgentAi::forInteractiveUse();
+        if ($ai === null) {
+            \Filament\Notifications\Notification::make()->title('Chưa kết nối AI')->body('Vào Đội AI → Kết nối AI để nhập khóa trước khi giao việc.')->warning()->send();
+
+            return;
+        }
+        $run = (new \App\Services\Agent\Run\AgentRunOrchestrator($ai, policy: \App\Services\Agent\Settings\AgentAi::policy()))->run($record, \Illuminate\Support\Facades\Auth::user());
+        $n = \Filament\Notifications\Notification::make()->title('Phiên chạy #'.$run->id.': '.(AgentRunResource::STATUS[$run->status][0] ?? $run->status))
+            ->body($run->outcome_reason ?: 'Đã có bản nháp chờ duyệt.')
+            ->actions([\Filament\Notifications\Actions\Action::make('xem')->label('Xem diễn biến')->url(AgentRunResource::getUrl('view', ['record' => $run]))]);
+        in_array($run->status, ['ready_for_review'], true) ? $n->success() : $n->warning();
+        $n->send();
+    }
+
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Thông tin chiến dịch SEO')
+                Forms\Components\Section::make('Thông tin bài viết')
+                    ->description('Từ khóa và định hướng của bài. Nội dung, phiên bản, phiên chạy của đội AI và lịch đăng nằm ở trang của bài.')
                     ->schema([
                         Forms\Components\Select::make('website_id')
                             ->label('Website đích')
@@ -245,6 +284,8 @@ class ArticleResource extends Resource
                     'informational' => 'Thông tin', 'commercial' => 'Thương mại', 'transactional' => 'Giao dịch', 'navigational' => 'Điều hướng',
                 ]),
             ])
+            // Bấm vào dòng là vào không gian bài viết (AG-S27), không phải form sửa.
+            ->recordUrl(fn (Article $r) => static::getUrl('view', ['record' => $r]))
             ->actions([
                 static::submitAction(),
                 static::approveAction(),
@@ -271,35 +312,13 @@ class ArticleResource extends Resource
                     Tables\Actions\Action::make('run_agent')
                         ->label('Giao đội AI')
                         ->icon('heroicon-o-cpu-chip')
-                        ->visible(fn (Article $record) => (\Illuminate\Support\Facades\Auth::user()?->isApprover() ?? false)
-                            && in_array($record->workflow_status, ['planned', 'drafting', 'rejected'], true)
-                            && ArticleRows::liveRun($record) === null)
+                        ->visible(fn (Article $record) => static::canAssignToAgent($record))
                         ->requiresConfirmation()
                         ->modalHeading('Giao bài này cho đội AI')
-                        ->modalDescription('Đội AI sẽ kiểm an toàn, phân hạng rủi ro, lập dàn ý, viết, tự chấm và sửa (tối đa 3 vòng). Kết quả luôn là BẢN NHÁP chờ người duyệt; không có gì được tự đăng.')
+                        ->modalDescription(static::ASSIGN_DESCRIPTION)
                         ->modalSubmitActionLabel('Giao việc')
-                        ->action(function (Article $record) {
-                            abort_unless(\Illuminate\Support\Facades\Auth::user()?->isApprover(), 403);
-                            // Chống giao trùng: đã có phiên đang chạy thật thì không tạo phiên thứ hai.
-                            if (ArticleRows::liveRun($record) !== null) {
-                                \Filament\Notifications\Notification::make()->title('Bài này đang có phiên chạy')->body('Đợi phiên hiện tại xong rồi hãy giao lại.')->warning()->send();
-
-                                return;
-                            }
-                            $ai = \App\Services\Agent\Settings\AgentAi::forInteractiveUse();
-                            if ($ai === null) {
-                                \Filament\Notifications\Notification::make()->title('Chưa kết nối AI')->body('Vào Đội AI → Kết nối AI để nhập khóa trước khi giao việc.')->warning()->send();
-
-                                return;
-                            }
-                            $run = (new \App\Services\Agent\Run\AgentRunOrchestrator($ai, policy: \App\Services\Agent\Settings\AgentAi::policy()))->run($record, \Illuminate\Support\Facades\Auth::user());
-                            $n = \Filament\Notifications\Notification::make()->title('Phiên chạy #'.$run->id.': '.(AgentRunResource::STATUS[$run->status][0] ?? $run->status))
-                                ->body($run->outcome_reason ?: 'Đã có bản nháp chờ duyệt.')
-                                ->actions([\Filament\Notifications\Actions\Action::make('xem')->label('Xem diễn biến')->url(AgentRunResource::getUrl('view', ['record' => $run]))]);
-                            in_array($run->status, ['ready_for_review'], true) ? $n->success() : $n->warning();
-                            $n->send();
-                        }),
-                    Tables\Actions\EditAction::make(),
+                        ->action(fn (Article $record) => static::assignToAgent($record)),
+                    Tables\Actions\EditAction::make()->label('Sửa thông tin bài'),
                 ])->label('⋯')->icon('heroicon-m-ellipsis-horizontal')->iconButton()->tooltip('Thao tác khác'),
             ], position: Tables\Enums\ActionsPosition::AfterColumns)
             ->bulkActions([
@@ -392,6 +411,7 @@ class ArticleResource extends Resource
         return [
             'index' => Pages\ListArticles::route('/'),
             'create' => Pages\CreateArticle::route('/create'),
+            'view' => Pages\ViewArticle::route('/{record}'),
             'edit' => Pages\EditArticle::route('/{record}/edit'),
         ];
     }

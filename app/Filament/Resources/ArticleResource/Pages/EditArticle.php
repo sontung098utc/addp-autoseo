@@ -17,6 +17,12 @@ class EditArticle extends EditRecord
         return $data;
     }
 
+    /** Lưu xong quay về trang của bài (AG-S27). */
+    protected function getRedirectUrl(): ?string
+    {
+        return ArticleResource::getUrl('view', ['record' => $this->record]);
+    }
+
     protected function getHeaderActions(): array
     {
         return [
