@@ -4,11 +4,13 @@ namespace App\Filament\Pages;
 
 use App\Models\Brain;
 use App\Models\BrainProfile;
+use App\Models\BrainSource;
 use App\Filament\Support\BrandProfileEditor;
 use App\Models\BrandProfile;
 use App\Models\Website;
 use App\Services\Brand\BrandProfileData;
 use App\Services\Brain\BrainService;
+use App\Services\Brain\BrainSourceRegistry;
 use App\Services\Knowledge\KnowledgeError;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -43,6 +45,15 @@ class BrainPage extends KnowledgePage implements HasForms
 
     /** AG-B2: hồ sơ doanh nghiệp (brand_profiles) của website được chọn, chỉ dùng cho Trí tuệ Thương hiệu. */
     public ?int $brandWebsiteId = null;
+
+    /** AG-B3: form "Thêm nguồn" của Sổ nguồn uy tín. */
+    public string $srcName = '';
+
+    public string $srcDomain = '';
+
+    public string $srcTier = '';
+
+    public string $srcNote = '';
 
     /** @var array<string,mixed> */
     public array $brandData = [];
@@ -221,6 +232,48 @@ class BrainPage extends KnowledgePage implements HasForms
         }
     }
 
+    // ---- AG-B3: Sổ nguồn uy tín ----
+
+    public function addSource(): void
+    {
+        $this->guard();
+        try {
+            (new BrainSourceRegistry())->add($this->brain(), $this->srcName, $this->srcDomain, $this->srcTier ?: null, $this->srcNote, Auth::user());
+            $this->reset(['srcName', 'srcDomain', 'srcTier', 'srcNote']);
+            Notification::make()->title('Đã thêm vào Sổ nguồn')->success()->send();
+        } catch (KnowledgeError $e) {
+            Notification::make()->title('Chưa thêm được')->body($e->getMessage())->danger()->send();
+        }
+    }
+
+    private function ownSource(int $id): BrainSource
+    {
+        return BrainSource::query()->where('brain_id', $this->brain()->id)->findOrFail($id);
+    }
+
+    public function setSourceTier(int $id, string $tier): void
+    {
+        $this->guard();
+        try {
+            $s = $this->ownSource($id);
+            $tier === '' ? (new BrainSourceRegistry())->unconfirm($s, Auth::user()) : (new BrainSourceRegistry())->confirm($s, $tier, Auth::user());
+        } catch (KnowledgeError $e) {
+            Notification::make()->title('Chưa lưu được')->body($e->getMessage())->danger()->send();
+        }
+    }
+
+    public function unconfirmSource(int $id): void
+    {
+        $this->guard();
+        (new BrainSourceRegistry())->unconfirm($this->ownSource($id), Auth::user());
+    }
+
+    public function removeSource(int $id): void
+    {
+        $this->guard();
+        (new BrainSourceRegistry())->remove($this->ownSource($id), Auth::user());
+    }
+
     public function toggleArchive(): void
     {
         $this->guard();
@@ -241,7 +294,8 @@ class BrainPage extends KnowledgePage implements HasForms
             'brain' => $b,
             'isBrand' => $isBrand, 'brandSites' => $b->websites, 'brandExists' => (bool) $bp,
             'brandCompleteness' => $bc, 'canEditBrand' => BrandProfileEditor::canEdit(Auth::user()),
-            'suggestedSources' => (array) ($b->settings['suggested_sources'] ?? []),
+            'authoritySources' => $b->authoritySources()->orderByRaw("case when status='confirmed' then 0 else 1 end")->orderBy('name')->get(),
+            'tiers' => BrainSource::TIERS,
             'sampleLabel' => (string) ($b->settings['sample_label'] ?? ''),
             'completeness' => ($b->profile ?? new BrainProfile())->completeness(),
             'missingFields' => collect(BrainProfile::FIELDS)->filter(fn ($l, $path) => ! ($b->profile ?? new BrainProfile())->hasValue($path))->values()->all(),

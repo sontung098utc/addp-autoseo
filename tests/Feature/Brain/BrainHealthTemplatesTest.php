@@ -282,8 +282,8 @@ class BrainHealthTemplatesTest extends TestCase
         $b = Brain::firstOrFail();
         $this->actingAs($this->user('approver'));
         $t = Livewire::test(BrainPage::class, ['brain' => $b->id])->assertOk()
-            ->assertSee('Gợi ý nguồn để chuyên gia xem xét')->assertSee('dav.gov.vn')->assertSee('chưa xác nhận, cần chuyên gia duyệt')
-            ->assertSee('Chưa phải Sổ nguồn uy tín — sổ nguồn là P2, cần chuyên gia xác nhận')->assertSee('Mẫu: chưa có kiến thức nào được duyệt');
+            ->assertSee('Sổ nguồn uy tín')->assertSee('dav.gov.vn')
+            ->assertSee('Chưa xác nhận, chưa được tính')->assertSee('Mẫu: chưa có kiến thức nào được duyệt'); // P2: gợi ý nằm trong Sổ nguồn, chưa có bậc nên chưa được tính
         $t->assertDontSee('brandData');
         $lib = Livewire::test(BrainLibraryPage::class)->assertSee('Mẫu: chưa có kiến thức nào được duyệt');
         $this->assertTrue($lib->viewData('cards')->first()['sample']);

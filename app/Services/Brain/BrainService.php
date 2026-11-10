@@ -61,6 +61,7 @@ final class BrainService
                     KnowledgeTopic::create(['brain_id' => $brain->id, 'parent_id' => $top->id, 'name' => mb_substr($child, 0, 120)]);
                 }
             }
+            (new BrainSourceRegistry())->importSuggested($brain); // AG-B3: gợi ý nguồn của mẫu vào Sổ nguồn dạng "chưa xác nhận"
             $this->syncWebsites($brain, $websites, $by, false);
             // AG-B2: Trí tuệ Thương hiệu gắn đúng một website thì tự có hồ sơ doanh nghiệp RỖNG của website đó (nếu chưa có). Không đụng hồ sơ đã có.
             if ($key === 'thuong_hieu' && $brain->websites()->count() === 1) {

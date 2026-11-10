@@ -13,22 +13,6 @@
     @if ($sampleLabel)
         <div class="ss-muted ss-text-xs" style="margin-bottom:.6rem" data-testid="sample-label">{{ $sampleLabel }}</div>
     @endif
-    @if ($suggestedSources)
-        <div class="ss-card" style="margin-bottom:.8rem" data-testid="suggested-sources"><div class="ss-card__b">
-            <div class="ss-card__h" style="display:flex;gap:.4rem;align-items:center">Gợi ý nguồn để chuyên gia xem xét
-                <x-studio.hint tone="warning" text="Chưa phải Sổ nguồn uy tín — sổ nguồn là P2, cần chuyên gia xác nhận. Đây chỉ là tên tổ chức và tên miền gợi ý; hệ thống chưa dùng chúng để tìm hay kiểm chứng gì." />
-            </div>
-            <div class="ss-dt__scroll"><table class="ss-dt__table"><tbody>
-                @foreach ($suggestedSources as $src)
-                    <tr>
-                        <td style="min-width:14rem">{{ $src['org'] ?? '' }}</td>
-                        <td style="width:1%;white-space:nowrap">{{ $src['domain'] ?? '' }}</td>
-                        <td style="width:1%;white-space:nowrap"><x-studio.badge tone="warn">{{ $src['status'] ?? 'chưa xác nhận' }}</x-studio.badge></td>
-                    </tr>
-                @endforeach
-            </tbody></table></div>
-        </div></div>
-    @endif
     <form wire:submit="saveProfile">
         {{ $this->form }}
         @if ($canEdit)
@@ -80,6 +64,61 @@
 @endif
 
 @if ($canEdit)
+<x-studio.panel key="registry">
+    {{-- AG-B3 (P2, Tầng 3): Sổ nguồn uy tín. Hệ thống KHÔNG tự cho rằng nguồn nào uy tín: gợi ý của mẫu chưa có bậc và chưa được tính; chỉ nguồn do người xác nhận + xếp bậc mới có hiệu lực. --}}
+    <div data-testid="source-registry">
+        <div class="ss-card" style="margin-bottom:.8rem"><div class="ss-card__b">
+            <div class="ss-card__h" style="display:flex;gap:.4rem;align-items:center">Sổ nguồn uy tín
+                <x-studio.hint text="Chuyên gia xếp bậc từng nguồn: Bậc 1 chính thức · Bậc 2 khoa học · Bậc 3 báo chí uy tín · Bậc 4 khác (chỉ gợi ý hướng tìm, không dùng để khẳng định) · Chặn. Chỉ nguồn đã xác nhận mới được tính khi kiểm bằng chứng. Hệ thống chưa tìm web; việc kiểm hiện ở mức cả bài, chưa nối từng câu với từng nguồn."/>
+            </div>
+            @if ($authoritySources->isEmpty())
+                <div class="ss-alert ss-alert--info" role="status">Sổ nguồn đang trống. @if ($brain->reliance() === 'must_cite') Trí tuệ này đặt mức Bắt buộc nguồn, bài sẽ luôn giữ cho người có chuyên môn duyệt cho tới khi có nguồn đã xác nhận. @endif</div>
+            @else
+                <div class="ss-dt__scroll"><table class="ss-dt__table">
+                    <thead><tr><th>Nguồn</th><th style="width:1%;white-space:nowrap">Bậc</th><th style="width:1%;white-space:nowrap">Trạng thái</th>@if ($canEdit)<th style="width:1%;white-space:nowrap"></th>@endif</tr></thead>
+                    <tbody>
+                    @foreach ($authoritySources as $src)
+                        <tr data-source="{{ $src->id }}">
+                            <td style="min-width:14rem">{{ $src->name }}<div class="ss-muted ss-text-xs">{{ $src->domain }}@if ($src->note) · {{ $src->note }}@endif</div></td>
+                            <td style="width:1%;white-space:nowrap">
+                                @if ($canEdit)
+                                    <select class="kb-in" aria-label="Bậc của {{ $src->name }}" wire:change="setSourceTier({{ $src->id }}, $event.target.value)">
+                                        <option value="">Chọn bậc…</option>
+                                        @foreach ($tiers as $k => $l)<option value="{{ $k }}" @selected((string) $src->tier === (string) $k)>{{ $l }}</option>@endforeach
+                                    </select>
+                                @else
+                                    {{ $src->tier ? ($tiers[$src->tier] ?? '') : '—' }}
+                                @endif
+                            </td>
+                            <td style="width:1%;white-space:nowrap"><x-studio.badge tone="{{ $src->isEffective() ? ($src->tier === 'blocked' ? 'danger' : 'ok') : 'warn' }}">{{ $src->isEffective() ? ($src->tier === 'blocked' ? 'Đã chặn' : 'Đã xác nhận') : 'Chưa xác nhận, chưa được tính' }}</x-studio.badge></td>
+                            @if ($canEdit)
+                                <td style="width:1%;white-space:nowrap">
+                                    @if ($src->status === 'confirmed')<x-filament::button size="xs" color="gray" wire:click="unconfirmSource({{ $src->id }})">Rút xác nhận</x-filament::button>@endif
+                                    <x-filament::button size="xs" color="danger" wire:click="removeSource({{ $src->id }})" wire:confirm="Xóa nguồn này khỏi sổ?">Xóa</x-filament::button>
+                                </td>
+                            @endif
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table></div>
+            @endif
+        </div></div>
+        @if ($canEdit)
+            <div class="ss-card"><div class="ss-card__b">
+                <div class="ss-card__h">Thêm nguồn</div>
+                <div class="kb-grid">
+                    <label>Tên nguồn <input class="kb-in" style="width:100%" maxlength="190" wire:model="srcName" placeholder="Tên tổ chức hoặc ấn phẩm"></label>
+                    <label>Tên miền <input class="kb-in" style="width:100%" maxlength="190" wire:model="srcDomain" placeholder="ví dụ: who.int"></label>
+                    <label>Bậc <x-studio.hint text="Để trống nếu chỉ muốn lưu gợi ý; có bậc thì nguồn được xác nhận ngay."/>
+                        <select class="kb-in" style="width:100%" wire:model="srcTier"><option value="">Chưa xếp bậc</option>@foreach ($tiers as $k => $l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></label>
+                    <label>Ghi chú <input class="kb-in" style="width:100%" maxlength="500" wire:model="srcNote"></label>
+                </div>
+                <div style="margin-top:.6rem"><x-filament::button wire:click="addSource">Thêm vào sổ</x-filament::button></div>
+            </div></div>
+        @endif
+    </div>
+</x-studio.panel>
+
 <x-studio.panel key="settings">
     <div class="ss-card"><div class="ss-card__b">
         <div class="kb-grid">
