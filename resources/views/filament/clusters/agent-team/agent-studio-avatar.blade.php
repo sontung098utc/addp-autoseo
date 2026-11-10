@@ -1,0 +1,2 @@
+@php($a = $avatar + ['type' => 'initials', 'value' => '?', 'color' => '#64748b'])
+<span aria-hidden="true" style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:{{ $size ?? 2.4 }}rem;height:{{ $size ?? 2.4 }}rem;border-radius:999px;background:{{ preg_match('/^#[0-9a-fA-F]{6}$/', $a['color']) ? $a['color'] : '#64748b' }}22;border:2px solid {{ preg_match('/^#[0-9a-fA-F]{6}$/', $a['color']) ? $a['color'] : '#64748b' }};font-size:{{ ($size ?? 2.4) * .5 }}rem;font-weight:600;line-height:1">{{ $a['value'] }}</span>

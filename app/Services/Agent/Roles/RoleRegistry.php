@@ -5,6 +5,7 @@ namespace App\Services\Agent\Roles;
 use App\Services\Ai\Playbook\InvalidPlaybook;
 use App\Services\Ai\Playbook\Playbook;
 use App\Services\Ai\Playbook\PlaybookLoader;
+use App\Services\Content\Quality\ContentQualityChecker;
 use App\Services\Content\Quality\QualityRubric;
 use InvalidArgumentException;
 
@@ -44,9 +45,7 @@ final class RoleRegistry
     /** @var list<array<string, mixed>>|null */
     private ?array $roles = null;
 
-    public function __construct(private readonly ?string $dir = null, private readonly ?PlaybookLoader $playbooks = null)
-    {
-    }
+    public function __construct(private readonly ?string $dir = null, private readonly ?PlaybookLoader $playbooks = null) {}
 
     public function dir(): string
     {
@@ -84,7 +83,16 @@ final class RoleRegistry
     /** Tên tiếng Việt của vai trò; 'system' là Hệ thống. */
     public function roleName(string $key): string
     {
-        return $key === 'system' ? 'Hệ thống' : ($this->find($key)['name'] ?? $key);
+        if ($key === 'system') {
+            return 'Hệ thống';
+        }
+        $custom = null;
+        try {
+            $custom = AgentProfiles::customName($key); // Agent Studio: tên do admin đặt (cache theo request)
+        } catch (\Throwable) {
+        }
+
+        return $custom ?? ($this->find($key)['name'] ?? $key);
     }
 
     /** Vai trò có được tắt không: phải khai báo can_disable và không nằm trong LOCKED. */
@@ -102,7 +110,7 @@ final class RoleRegistry
      */
     public function skills(array $role): array
     {
-        $loader = $this->playbooks ?? new PlaybookLoader();
+        $loader = $this->playbooks ?? new PlaybookLoader;
         $assign = new RoleAssignments($this);
         $out = [];
         foreach ($role['skills'] as $ref) {
@@ -155,7 +163,7 @@ final class RoleRegistry
     public static function severityByCode(): array
     {
         $map = [];
-        foreach ((new \ReflectionClass(\App\Services\Content\Quality\ContentQualityChecker::class))->getMethod('defaultRules')->invoke(null) as $rule) {
+        foreach ((new \ReflectionClass(ContentQualityChecker::class))->getMethod('defaultRules')->invoke(null) as $rule) {
             $src = (string) @file_get_contents((new \ReflectionClass($rule))->getFileName());
             preg_match_all('/RuleResult::(P[0-2])/', $src, $m);
             $levels = array_values(array_unique($m[1]));

@@ -4,25 +4,31 @@ namespace App\Filament\Clusters\AgentTeam\Pages;
 
 use App\Filament\Clusters\AgentTeam;
 use App\Filament\Pages\AgentConnection;
+use App\Filament\Resources\AgentRunResource;
 use App\Models\AiProvider;
+use App\Models\Brain;
 use App\Models\User;
+use App\Services\Agent\Roles\AgentProfiles;
+use App\Services\Agent\Roles\AgentStudioData;
 use App\Services\Agent\Roles\RoleAssignments;
 use App\Services\Agent\Roles\RoleRegistry;
 use App\Services\Agent\Roles\RoleSwitches;
 use App\Services\Ai\Playbook\PlaybookLoader;
+use Filament\Actions\Action;
+use Filament\Facades\Filament;
+use Filament\Forms\Components\Component;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Get;
-use Illuminate\Support\HtmlString;
 use Filament\Notifications\Notification;
-use Filament\Actions\Action;
-use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Pages\SubNavigationPosition;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\HtmlString;
+use Livewire\WithFileUploads;
 
 /**
  * Tab "Vai trò" của Đội AI (AG-S09): xem sổ vai trò, mức sẵn sàng THẬT, rubric, rào chắn, tự động hóa, xuất xứ và kỹ năng.
@@ -31,6 +37,65 @@ use Illuminate\Support\Facades\Auth;
  */
 class AgentRoles extends Page
 {
+    use WithFileUploads;
+
+    /** Agent Studio: vai trò đang mở (null = đóng) và tab hiện tại. */
+    public ?string $studioRole = null;
+
+    public string $studioTab = 'overview';
+
+    public string $fName = '';
+
+    public string $fTitle = '';
+
+    public string $fAvatarType = 'emoji';
+
+    public string $fAvatarValue = '';
+
+    public string $fAvatarColor = '#64748b';
+
+    /** @var list<string> */
+    public array $fTraits = [];
+
+    public string $newTrait = '';
+
+    public string $fPersona = '';
+
+    public string $fInstructions = '';
+
+    public bool $showHistory = false;
+
+    public string $lessonText = '';
+
+    public string $docTitle = '';
+
+    public string $docBody = '';
+
+    public $docFile = null;
+
+    public string $skillTitle = '';
+
+    public string $skillBody = '';
+
+    /** @var array<int, bool> */
+    public array $grants = [];
+
+    /** @var array<string, string> bản nháp bài học theo dòng ở Phòng huấn luyện */
+    public array $teach = [];
+
+    public const STUDIO_TABS = [
+        'overview' => ['Tổng quan', null],
+        'persona' => ['Vai trò & chỉ dẫn', 'BUILD · XÂY DỰNG'],
+        'model' => ['Mô hình & ngữ cảnh', null],
+        'knowledge' => ['Kiến thức & bài học', 'TRAIN · HUẤN LUYỆN'],
+        'brain' => ['Trí tuệ', null],
+        'skills' => ['Kỹ năng', null],
+        'lab' => ['Phòng huấn luyện', null],
+        'connect' => ['Kết nối & dữ liệu', 'CONNECT · KẾT NỐI'],
+        'position' => ['Vị trí & nhiệm vụ trong luồng', 'LUỒNG · PIPELINE'],
+        'activity' => ['Hoạt động', 'OPERATE · VẬN HÀNH'],
+    ];
+
     protected static ?string $cluster = AgentTeam::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-user-group';
@@ -54,10 +119,244 @@ class AgentRoles extends Page
         return $u instanceof User && $u->is_active && $u->isApprover();
     }
 
+    // ---- Agent Studio ----
+
+    private function actor(): User
+    {
+        $u = Auth::user();
+        abort_unless($u instanceof User && $u->is_active && $u->isApprover(), 403);
+
+        return $u;
+    }
+
+    public function openStudio(string $key, string $tab = 'overview'): void
+    {
+        $this->actor();
+        abort_if((new RoleRegistry)->find($key) === null, 404);
+        $this->studioRole = $key;
+        $this->studioTab = array_key_exists($tab, self::STUDIO_TABS) ? $tab : 'overview';
+        $this->showHistory = false;
+        $this->loadStudioForm();
+    }
+
+    public function closeStudio(): void
+    {
+        $this->studioRole = null;
+    }
+
+    public function setStudioTab(string $tab): void
+    {
+        if (array_key_exists($tab, self::STUDIO_TABS)) {
+            $this->studioTab = $tab;
+            $this->showHistory = false;
+        }
+    }
+
+    private function loadStudioForm(): void
+    {
+        $p = AgentProfiles::for((string) $this->studioRole);
+        $this->fName = (string) $p['display_name'];
+        $this->fTitle = (string) $p['title'];
+        $this->fAvatarType = (string) $p['avatar']['type'];
+        $this->fAvatarValue = (string) $p['avatar']['value'];
+        $this->fAvatarColor = (string) $p['avatar']['color'];
+        $this->fTraits = array_values((array) $p['traits']);
+        $this->fPersona = (string) $p['persona'];
+        $this->fInstructions = (string) $p['instructions'];
+        $this->grants = [];
+        foreach (AgentProfiles::brainGrants((string) $this->studioRole) as $id) {
+            $this->grants[$id] = true;
+        }
+    }
+
+    private function guarded(\Closure $fn, ?string $ok = null): void
+    {
+        try {
+            $fn($this->actor());
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()->title($e->getMessage())->danger()->send();
+
+            return;
+        }
+        if ($ok) {
+            Notification::make()->title($ok)->success()->send();
+        }
+    }
+
+    public function addTrait(?string $t = null): void
+    {
+        $t = trim($t ?? $this->newTrait);
+        $this->newTrait = '';
+        if ($t !== '' && ! in_array(mb_strtolower($t), array_map('mb_strtolower', $this->fTraits), true)) {
+            $this->fTraits[] = $t;
+        }
+    }
+
+    public function removeTrait(int $i): void
+    {
+        unset($this->fTraits[$i]);
+        $this->fTraits = array_values($this->fTraits);
+    }
+
+    public function saveProfile(): void
+    {
+        $this->guarded(function (User $u) {
+            AgentProfiles::save((string) $this->studioRole, [
+                'display_name' => $this->fName, 'title' => $this->fTitle, 'avatar' => ['type' => $this->fAvatarType, 'value' => $this->fAvatarValue, 'color' => $this->fAvatarColor],
+                'traits' => $this->fTraits, 'persona' => $this->fPersona, 'instructions' => $this->fInstructions,
+            ], $u);
+            $this->loadStudioForm();
+        }, 'Đã lưu hồ sơ. Có hiệu lực từ lần chạy kế tiếp.');
+    }
+
+    public function undoProfile(): void
+    {
+        $this->guarded(function (User $u) {
+            $prev = AgentProfiles::previousVersion((string) $this->studioRole);
+            if ($prev === null) {
+                throw new \InvalidArgumentException('Chưa có phiên bản trước để hoàn tác.');
+            }
+            AgentProfiles::restore((string) $this->studioRole, $prev, $u);
+            $this->loadStudioForm();
+        }, 'Đã hoàn tác về phiên bản trước (tạo phiên bản mới).');
+    }
+
+    public function toggleHistory(): void
+    {
+        $this->showHistory = ! $this->showHistory;
+    }
+
+    public function restoreVersion(int $v): void
+    {
+        $this->guarded(function (User $u) use ($v) {
+            AgentProfiles::restore((string) $this->studioRole, $v, $u);
+            $this->loadStudioForm();
+            $this->showHistory = false;
+        }, 'Đã khôi phục (tạo phiên bản mới).');
+    }
+
+    public function addLesson(?string $text = null, ?int $runId = null): void
+    {
+        $this->guarded(function (User $u) use ($text, $runId) {
+            AgentProfiles::addLesson((string) $this->studioRole, $text ?? $this->lessonText, $runId, $u);
+            $this->lessonText = '';
+        }, 'Đã thêm bài học. Áp dụng từ lần chạy kế tiếp.');
+    }
+
+    public function teachRow(string $key, ?int $runId): void
+    {
+        $this->addLesson($this->teach[$key] ?? '', $runId);
+        unset($this->teach[$key]);
+    }
+
+    public function toggleLesson(int $id, bool $on): void
+    {
+        $this->guarded(fn (User $u) => AgentProfiles::toggleLesson($id, $on, $u));
+    }
+
+    public function deleteLesson(int $id): void
+    {
+        $this->guarded(fn (User $u) => AgentProfiles::deleteLesson($id, $u), 'Đã xóa bài học.');
+    }
+
+    public function addDocument(): void
+    {
+        $this->guarded(function (User $u) {
+            $title = $this->docTitle;
+            $body = $this->docBody;
+            if ($this->docFile) {
+                $ext = strtolower($this->docFile->getClientOriginalExtension());
+                if (! in_array($ext, ['md', 'txt'], true) || $this->docFile->getSize() > 100 * 1024) {
+                    throw new \InvalidArgumentException('Chỉ nhận tệp .md hoặc .txt dưới 100 KB.');
+                }
+                $body = (string) file_get_contents($this->docFile->getRealPath());
+                if (! mb_check_encoding($body, 'UTF-8')) {
+                    throw new \InvalidArgumentException('Tệp cần mã hóa UTF-8.');
+                }
+                $title = $title !== '' ? $title : pathinfo($this->docFile->getClientOriginalName(), PATHINFO_FILENAME);
+            }
+            AgentProfiles::addDocument((string) $this->studioRole, 'knowledge', $title, $body, $u);
+            $this->docTitle = $this->docBody = '';
+            $this->docFile = null;
+        }, 'Đã thêm tài liệu.');
+    }
+
+    public function addSkillDoc(): void
+    {
+        $this->guarded(function (User $u) {
+            AgentProfiles::addDocument((string) $this->studioRole, 'skill', $this->skillTitle, $this->skillBody, $u);
+            $this->skillTitle = $this->skillBody = '';
+        }, 'Đã thêm kỹ năng tùy chỉnh.');
+    }
+
+    public function cloneSkill(string $ref): void
+    {
+        $pb = in_array($ref, (new RoleRegistry)->find((string) $this->studioRole)['skills'] ?? [], true) ? AgentStudioData::playbookBody($ref) : null;
+        if ($pb === null) {
+            Notification::make()->title('Chưa có playbook gốc để nhân bản.')->warning()->send();
+
+            return;
+        }
+        $this->skillTitle = mb_substr('Bản riêng: '.$pb['title'], 0, 160);
+        $this->skillBody = mb_substr($pb['body'], 0, AgentProfiles::INSTRUCTIONS_MAX);
+        Notification::make()->title('Đã nạp nội dung playbook gốc vào ô soạn. Sửa rồi bấm Thêm kỹ năng.')->success()->send();
+    }
+
+    public function deleteDocument(int $id): void
+    {
+        $this->guarded(fn (User $u) => AgentProfiles::deleteDocument($id, $u), 'Đã xóa.');
+    }
+
+    public function saveGrants(): void
+    {
+        $this->guarded(function (User $u) {
+            AgentProfiles::save((string) $this->studioRole, ['brain_grants' => array_keys(array_filter($this->grants))], $u);
+            $this->loadStudioForm();
+        }, 'Đã lưu quyền Trí tuệ.');
+    }
+
+    /** @return array<string, mixed> */
+    private function studioData(): array
+    {
+        $key = (string) $this->studioRole;
+        $reg = new RoleRegistry;
+        $role = $reg->find($key);
+        $assign = new RoleAssignments($reg);
+        $d = ['key' => $key, 'role' => $role, 'profile' => AgentProfiles::for($key), 'tab' => $this->studioTab,
+            'canEdit' => $this->isAdmin(), 'enabled' => (new RoleSwitches($reg))->isEnabled($key), 'switchable' => $reg->isSwitchable($key),
+            'suggested' => AgentProfiles::SUGGESTED_TRAITS, 'pipelineUrl' => PipelineMap::getUrl(), 'skillsUrl' => self::skillsTabUrl(),
+            'runUrl' => fn (int $id) => AgentRunResource::getUrl('view', ['record' => $id])];
+        $d['canUndo'] = AgentProfiles::previousVersion($key) !== null;
+        match ($this->studioTab) {
+            'persona' => $d['history'] = $this->showHistory ? AgentProfiles::history($key) : [],
+            'model' => $d += ['assigned' => $assign->summary($key), 'modelWired' => isset(RoleAssignments::ROLE_TASKS[$key]), 'tasks' => RoleAssignments::ROLE_TASKS[$key] ?? []],
+            'knowledge' => $d += ['lessons' => AgentProfiles::lessons($key), 'docs' => AgentProfiles::documents($key, 'knowledge'), 'chars' => AgentProfiles::knowledgeChars($key), 'max' => AgentProfiles::PROMPT_MAX],
+            'brain' => $d += ['brains' => $this->brains(), 'applied' => $key === 'writer'],
+            'skills' => $d += ['skills' => $reg->skills($role), 'custom' => AgentProfiles::documents($key, 'skill')],
+            'lab' => $d += ['issues' => AgentStudioData::trainingIssues($key)],
+            'connect' => $d += ['rubric' => $reg->rubric($role)],
+            'position' => $d += ['positions' => AgentStudioData::positions($key)],
+            'activity' => $d += ['activity' => AgentStudioData::activity($key)],
+            default => null,
+        };
+
+        return $d;
+    }
+
+    /** @return list<array{id: int, name: string}> */
+    private function brains(): array
+    {
+        try {
+            return Brain::query()->where('status', 'active')->orderBy('name')->get(['id', 'name'])->map(fn ($b) => ['id' => $b->id, 'name' => $b->name])->all();
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
     public function toggleRole(string $key): void
     {
         $user = Auth::user();
-        $switches = new RoleSwitches();
+        $switches = new RoleSwitches;
         try {
             abort_unless($user instanceof User, 403);
             $switches->set($key, ! $switches->isEnabled($key), $user);
@@ -81,17 +380,17 @@ class AgentRoles extends Page
     {
         return Action::make('assign')
             ->visible(fn () => $this->isAdmin())
-            ->modalHeading(fn (array $arguments) => 'Gán: '.((new RoleRegistry())->find((string) ($arguments['role'] ?? ''))['name'] ?? 'Vai trò'))
+            ->modalHeading(fn (array $arguments) => 'Gán: '.((new RoleRegistry)->find((string) ($arguments['role'] ?? ''))['name'] ?? 'Vai trò'))
             ->slideOver()->modalWidth('2xl')
             ->modalSubmitActionLabel('Lưu')
             ->fillForm(function (array $arguments): array {
                 $role = (string) ($arguments['role'] ?? '');
-                $a = (new RoleAssignments())->find($role);
+                $a = (new RoleAssignments)->find($role);
                 $data = [
                     'provider_id' => $a?->provider_id, 'model' => $a?->model, 'fallback_provider_id' => $a?->fallback_provider_id, 'fallback_model' => $a?->fallback_model,
-                    'model_enabled' => $a?->enabled ?? true, 'role_enabled' => (new RoleSwitches())->isEnabled($role),
+                    'model_enabled' => $a?->enabled ?? true, 'role_enabled' => (new RoleSwitches)->isEnabled($role),
                 ];
-                $reg = new RoleRegistry();
+                $reg = new RoleRegistry;
                 $assign = new RoleAssignments($reg);
                 foreach (array_values($reg->find($role)['skills'] ?? []) as $i => $ref) {
                     $st = $assign->skillState($ref);
@@ -105,7 +404,7 @@ class AgentRoles extends Page
             ->action(function (array $data, array $arguments, Action $action): void {
                 $user = Auth::user();
                 $role = (string) ($arguments['role'] ?? '');
-                $reg = new RoleRegistry();
+                $reg = new RoleRegistry;
                 $def = $reg->find($role);
                 abort_unless($user instanceof User && $def !== null, 404);
                 $assign = new RoleAssignments($reg);
@@ -139,10 +438,10 @@ class AgentRoles extends Page
         return $v === null || $v === '' ? null : (int) $v;
     }
 
-    /** @return list<\Filament\Forms\Components\Component> */
+    /** @return list<Component> */
     private function assignForm(string $role): array
     {
-        $reg = new RoleRegistry();
+        $reg = new RoleRegistry;
         $def = $reg->find($role);
         abort_if($def === null, 404);
         $providers = AiProvider::query()->orderBy('name')->get();
@@ -167,7 +466,7 @@ class AgentRoles extends Page
         }
 
         if ($def['skills'] !== []) {
-            $loader = new PlaybookLoader();
+            $loader = new PlaybookLoader;
             $versions = [];
             foreach ($def['skills'] as $ref) {
                 [$r, $k] = explode('/', $ref, 2);
@@ -198,10 +497,10 @@ class AgentRoles extends Page
     public function detailAction(): Action
     {
         return Action::make('detail')
-            ->modalHeading(fn (array $arguments) => (new RoleRegistry())->find((string) ($arguments['role'] ?? ''))['name'] ?? 'Vai trò')
+            ->modalHeading(fn (array $arguments) => (new RoleRegistry)->find((string) ($arguments['role'] ?? ''))['name'] ?? 'Vai trò')
             ->slideOver()->modalWidth('3xl')
             ->modalContent(function (array $arguments) {
-                $reg = new RoleRegistry();
+                $reg = new RoleRegistry;
                 $role = $reg->find((string) ($arguments['role'] ?? ''));
                 abort_if($role === null, 404);
 
@@ -229,7 +528,7 @@ class AgentRoles extends Page
 
     protected function getViewData(): array
     {
-        $reg = new RoleRegistry();
+        $reg = new RoleRegistry;
         $off = (new RoleSwitches($reg))->disabled();
         $user = Auth::user();
 
@@ -240,7 +539,9 @@ class AgentRoles extends Page
             'cards' => array_map(function (array $r) use ($reg, $off, $assign) {
                 $a = $assign->find($r['key']);
 
-                return $r + [
+                $prof = AgentProfiles::for($r['key']);
+
+                return array_merge($r, ['profile' => $prof, 'name' => $prof['display_name']]) + [
                     'skill_counts' => $reg->skillCounts($r), 'switchable' => $reg->isSwitchable($r['key']), 'is_off' => in_array($r['key'], $off, true),
                     'model_wired' => isset(RoleAssignments::ROLE_TASKS[$r['key']]), 'assigned' => $assign->summary($r['key']),
                     'skill_changes' => count(array_filter($reg->skills($r), fn ($s) => ! $s['enabled'] || $s['pin'] !== null)),
@@ -249,6 +550,7 @@ class AgentRoles extends Page
             }, $reg->all()),
             'skillsUrl' => self::skillsTabUrl(), 'canSwitch' => $user instanceof User && $user->isAdmin(),
             'hasProviders' => $hasProviders, 'connectionUrl' => AgentConnection::getUrl(),
+            'studio' => $this->studioRole !== null ? $this->studioData() : null,
         ];
     }
 }
