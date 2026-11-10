@@ -224,11 +224,11 @@ Không viết lại `AgentRunOrchestrator`. Nó là lớp chạy của `article_
 | Mức | Việc 0 token (`site_audit`, `measure`, `content_plan`) | Việc tốn token | Xuất bản | Tình trạng |
 |---|---|---|---|---|
 | **Duyệt trước** (Thận trọng, Cân bằng) | Thận trọng: người bấm. Cân bằng: tự chạy theo lịch | Người **duyệt kế hoạch trước**, sau đó đội AI viết trong ngân sách; người duyệt bản nháp | Người bấm đăng | Làm được khi có registry; phần "theo lịch" cần job nền (AG-B10) |
-| **Toàn quyền cho đội AI** (Tự chủ) | Tự chạy | Tự nhận kế hoạch, tự viết, tự sửa, tự duyệt theo luật chấm | Tự xuất bản khi bậc xuất bản của website cho phép (T1 chỉ tới bản nháp) | **Đang khóa trong mã** (`CampaignRunner.php:53`): cần văn bản chính sách của bạn và connector hỗ trợ gỡ bài. Thiết kế mở khóa ở dưới |
+| **Toàn quyền cho đội AI** (Tự chủ) | Tự chạy | Tự nhận kế hoạch, tự viết, tự sửa, tự duyệt theo luật chấm | Tự xuất bản khi bậc xuất bản của website cho phép (T1 chỉ tới bản nháp) | **Đang khóa trong mã** (`CampaignRunner.php:53`); thiết kế bỏ khóa ở dưới |
 
 Toàn quyền không có nghĩa là bỏ mọi chặn. Những chặn sau **giữ nguyên ở mọi mức**, vì chúng là điều kiện để AI chạy được một mình an toàn: trần ngân sách (mỗi lời gọi, bước, phiên, ngày); lỗi chặn P0 và từ cấm của hồ sơ doanh nghiệp (bài không qua thì không đăng); hạn mức bài mỗi ngày; nút dừng khẩn cấp; ghi nhật ký mọi việc đã làm. Riêng **cổng chuyên gia cho lĩnh vực rủi ro cao** là một công tắc: mặc định BẬT kể cả ở Toàn quyền; bạn tắt được, nhưng phải xác nhận rõ từng website và hệ thống ghi lại ai tắt, lúc nào. Rủi ro pháp lý của nội dung y tế đăng không qua người có chuyên môn thuộc về bạn.
 
-Điều kiện mở Toàn quyền (mỗi website bật riêng): (1) bạn ký văn bản chính sách tự động hóa; (2) connector của website hỗ trợ gỡ bài; (3) đã chạy Duyệt trước đủ một số bài với tỉ lệ bị từ chối dưới ngưỡng bạn đặt (đề xuất 20 bài, dưới 10%); (4) có nút chuyển về Duyệt trước chỉ một cú bấm. Điều kiện (3) là đề xuất để bạn có số liệu trước khi giao quyền, bạn có thể bỏ.
+**Không có điều kiện mở.** Người dùng chọn "Toàn quyền" được ngay, không cần số bài chạy thử hay ngưỡng. Lần đầu chọn, màn hình hiện tóm tắt `CHINH_SACH_TU_DONG_HOA.md` và một nút xác nhận; hệ thống ghi ai xác nhận, phiên bản chính sách, lúc nào. Đó là ghi nhận đã đọc, không chặn. Hai điều vẫn phải làm ở phía mã: bỏ khóa `CampaignRunner.php:53` (code của Dev1), và nói thẳng trên màn nếu connector của website chưa hỗ trợ gỡ bài, để người dùng biết sự cố phải gỡ tay (chính sách §6).
 
 **Cổng duyệt**, xếp theo chuỗi:
 
@@ -277,7 +277,7 @@ Trong worktree này `vendor/` trống nên không chạy được test tại đ�
 | Q6 | Có làm bước AI tạo ảnh không? | Chưa. Làm sau khi chuỗi chữ chạy thật; trước mắt chọn từ thư viện | Bạn |
 | Q7 | Audit và khảo sát bao lâu thì coi là cũ? | 14 và 30 ngày | Bạn |
 | Q8 | Nguồn AI nêu mà không có trong Sổ nguồn hay Kho: chặn hay chỉ gắn cờ? | Gắn cờ cho bài thường; giữ cho chuyên gia với lĩnh vực bắt buộc nguồn | Bạn |
-| Q9 | Mức tự chủ | **Đã chốt:** bạn chọn giữa "Duyệt trước" và "Toàn quyền" cho từng website/chiến dịch. Mặc định website mới: Duyệt trước. Còn mở: ngưỡng và văn bản chính sách để mở khóa Toàn quyền (§6) | Bạn |
+| Q9 | Mức tự chủ | **Đã chốt:** bạn chọn giữa "Duyệt trước" và "Toàn quyền" cho từng website/chiến dịch. Mặc định website mới: Duyệt trước. Không đặt điều kiện mở Toàn quyền; có văn bản chính sách `CHINH_SACH_TU_DONG_HOA.md` hiện khi chọn lần đầu (§6) | Bạn |
 | Q10 | Ngân sách từng loại việc và trần ngày mỗi website | Chốt sau khi có số đo G0 | Bạn |
 | Q11 | Tách bước nghiên cứu trong lõi; thư mục `resources/agents/job-types/` | Tách, đặt sau dàn ý; xác nhận thư mục | Dev1 |
 
