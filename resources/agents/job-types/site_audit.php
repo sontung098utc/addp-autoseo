@@ -15,13 +15,17 @@ return [
     'shown_at' => ['Trang Audit: nhóm lỗi, đề xuất làm mới', 'Trang Kế hoạch', 'Trang bài: tab Từ khóa và kế hoạch ("bài sinh ra từ Kiểm tra SEO")'],
     'used_by' => ['article_refresh'],
     'steps' => [
-        ['id' => 'guard', 'label' => 'An toàn', 'kind' => 'rule'],
-        ['id' => 'crawl', 'label' => 'Quét', 'kind' => 'rule'],
-        ['id' => 'score', 'label' => 'Nhóm lỗi, chấm điểm', 'kind' => 'rule'],
-        ['id' => 'suggest', 'label' => 'Sinh đề xuất làm mới', 'kind' => 'rule', 'when' => 'Khớp URL với bài'],
+        ['id' => 'guard', 'role' => 'system', 'label' => 'An toàn', 'kind' => 'rule'],
+        ['id' => 'crawl', 'role' => 'auditor', 'label' => 'Quét', 'kind' => 'rule'],
+        ['id' => 'score', 'role' => 'auditor', 'label' => 'Nhóm lỗi, chấm điểm', 'kind' => 'rule'],
+        ['id' => 'suggest', 'human' => true, 'role' => 'auditor', 'label' => 'Sinh đề xuất làm mới', 'kind' => 'rule', 'when' => 'Khớp URL với bài'],
     ],
     'budget' => 'Token tương đối 0',
     'human' => ['Bạn chọn đề xuất nào thành bài làm mới'],
     'features' => [],
     'runner' => AuditWebsiteCommand::class,
+    'records' => [
+        ['label' => 'Audit website', 'class' => 'App\\Filament\\Pages\\AuditPage', 'type' => 'output'],
+        ['label' => 'Kế hoạch nội dung', 'class' => 'App\\Filament\\Pages\\ContentPlanPage', 'type' => 'output'],
+    ],
 ];

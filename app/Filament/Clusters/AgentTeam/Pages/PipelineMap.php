@@ -9,9 +9,11 @@ use App\Filament\Pages\KeywordsPage;
 use App\Filament\Pages\KnowledgePage;
 use App\Filament\Pages\SearchConsolePage;
 use App\Filament\Resources\ArticleResource;
+use App\Filament\Support\Agent\RunActivity;
 use App\Models\User;
 use App\Services\Agent\Pipeline\JobTypeRegistry;
 use App\Services\Agent\Pipeline\PipelineBlueprint;
+use App\Services\Agent\Pipeline\PipelineVisual;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Filament\Pages\SubNavigationPosition;
@@ -79,6 +81,37 @@ class PipelineMap extends Page
             ]))
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Đóng');
+    }
+
+    /** Cửa sổ trượt của một bước trong sơ đồ: mô tả, ai làm, điều kiện, số liệu 30 ngày. */
+    public function stepAction(): Action
+    {
+        return Action::make('step')
+            ->modalHeading(fn (array $arguments): string => 'Bước · '.($this->flowStep($arguments)['label'] ?? ''))
+            ->slideOver()
+            ->modalContent(function (array $arguments) {
+                $s = $this->flowStep($arguments);
+
+                return view('filament.clusters.agent-team.pipeline-step', ['s' => $s, 'stats' => $s ? PipelineVisual::stepStats((string) $arguments['job'], (string) $s['id']) : null]);
+            })
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Đóng');
+    }
+
+    /** @return array<string, mixed>|null */
+    private function flowStep(array $arguments): ?array
+    {
+        foreach (PipelineVisual::flows() as $f) {
+            if ($f['id'] === ($arguments['job'] ?? '')) {
+                foreach ($f['steps'] as $s) {
+                    if ($s['id'] === ($arguments['step'] ?? '')) {
+                        return $s;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     /** @return array<string, string> mã loại việc => tên; 'human' => 'Người' */
@@ -174,7 +207,23 @@ class PipelineMap extends Page
             $chain[] = ['key' => $key, 'label' => $label, 'jobs' => $jobs];
         }
 
+        $runs = PipelineVisual::runs();
+        $live = RunActivity::anyRunning();
+        $liveSteps = [];
+        foreach ($runs as $r) {
+            if ($r['live'] && $r['current']) {
+                $liveSteps[$r['job_type']][] = array_search($r['current'], JobTypeRegistry::stageLabels($r['job_type'], true), true);
+            }
+        }
+
         return [
+            'flows' => PipelineVisual::flows(),
+            'runs' => $runs,
+            'live' => $live,
+            'pollSeconds' => RunActivity::POLL_LIVE,
+            'liveSteps' => $liveSteps,
+            'office' => PipelineVisual::office(),
+            'rolesUrl' => PipelineVisual::urlOf(AgentRoles::class),
             'stages' => PipelineBlueprint::stages(),
             'controls' => PipelineBlueprint::controlsWired(),
             'chain' => $chain,

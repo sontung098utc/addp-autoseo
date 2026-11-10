@@ -3,6 +3,7 @@
 namespace App\Services\Agent\Pipeline;
 
 use App\Models\AiModelRoute;
+use App\Services\Agent\Roles\RoleRegistry;
 
 /**
  * G1: sổ "loại việc" của đội AI, xếp theo chuỗi làm ra một bài (THIET_KE_PIPELINE_THEO_LOAI_VIEC.md §3, §5.1).
@@ -12,6 +13,7 @@ use App\Models\AiModelRoute;
  * Trường của một mục: id, title, link (khóa mắt xích trong CHAIN), order, status (active|planned: planned = chưa có mã chạy),
  * reads[], writes[], shown_at[], used_by[] (mã loại việc khác hoặc 'human'), steps[] {id (<=20 ký tự), label, kind (rule|llm),
  * task? (khóa AiModelRoute::TASKS khi kind=llm), when?, planned? (true = bước chưa chạy trong mã hiện tại)},
+ * (mỗi bước có thêm `role`: khóa vai trò trong RoleRegistry hoặc 'system'), records[] {label, class, type (input|output|report), filter_job_type?},
  * budget?, human[] (điểm người can thiệp), features[] (id trong FeatureRegistry), runner? (FQCN), summary.
  */
 final class JobTypeRegistry
@@ -38,7 +40,7 @@ final class JobTypeRegistry
             $row = require $file;
             $rows[] = (array) $row + [
                 'status' => 'planned', 'also' => [], 'reads' => [], 'writes' => [], 'shown_at' => [], 'used_by' => [],
-                'steps' => [], 'budget' => null, 'human' => [], 'features' => [], 'runner' => null, 'summary' => '', 'order' => 99,
+                'steps' => [], 'budget' => null, 'human' => [], 'features' => [], 'runner' => null, 'summary' => '', 'order' => 99, 'records' => [],
             ];
         }
         usort($rows, fn (array $a, array $b) => [$a['order'], $a['id']] <=> [$b['order'], $b['id']]);
@@ -82,6 +84,12 @@ final class JobTypeRegistry
         return $out;
     }
 
+    /** Khóa vai trò hợp lệ cho `role` của bước: 'system' và mọi vai trò trong RoleRegistry. @return list<string> */
+    public static function roleKeys(): array
+    {
+        return ['system', ...array_column((new RoleRegistry)->all(), 'key')];
+    }
+
     /**
      * Vi phạm luật khai báo. Rỗng là hợp lệ. Test nhất quán gọi hàm này.
      *
@@ -121,6 +129,9 @@ final class JobTypeRegistry
                 $sid = (string) ($s['id'] ?? '');
                 if ($sid === '' || strlen($sid) > 20) {
                     $p[] = "$id: mã bước '$sid' rỗng hoặc dài quá 20 ký tự";
+                }
+                if (! in_array($s['role'] ?? '', self::roleKeys(), true)) {
+                    $p[] = "$id/$sid: thiếu `role` hợp lệ (system hoặc khóa vai trò)";
                 }
                 if (! in_array($s['kind'] ?? '', ['rule', 'llm'], true)) {
                     $p[] = "$id/$sid: kind phải là rule hoặc llm";

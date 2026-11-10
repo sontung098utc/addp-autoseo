@@ -13,14 +13,17 @@ return [
     'shown_at' => ['Trang Search Console', 'Trang bài: mắt xích 7 (lượt hiển thị, nhấp, vị trí)'],
     'used_by' => ['article_refresh', 'market_research'],
     'steps' => [
-        ['id' => 'connect', 'label' => 'Kiểm kết nối', 'kind' => 'rule', 'planned' => true, 'when' => 'Chưa nối thì dừng'],
-        ['id' => 'pull', 'label' => 'Kéo số liệu', 'kind' => 'rule', 'planned' => true],
-        ['id' => 'match', 'label' => 'Ghép với bài đã đăng', 'kind' => 'rule', 'planned' => true],
-        ['id' => 'detect', 'label' => 'Phát hiện bài tụt', 'kind' => 'rule', 'planned' => true, 'when' => 'Theo ngưỡng'],
-        ['id' => 'suggest', 'label' => 'Sinh đề xuất làm mới', 'kind' => 'rule', 'planned' => true],
+        ['id' => 'connect', 'role' => 'system', 'label' => 'Kiểm kết nối', 'kind' => 'rule', 'planned' => true, 'when' => 'Chưa nối thì dừng'],
+        ['id' => 'pull', 'role' => 'monitor', 'label' => 'Kéo số liệu', 'kind' => 'rule', 'planned' => true],
+        ['id' => 'match', 'role' => 'monitor', 'label' => 'Ghép với bài đã đăng', 'kind' => 'rule', 'planned' => true],
+        ['id' => 'detect', 'role' => 'monitor', 'label' => 'Phát hiện bài tụt', 'kind' => 'rule', 'planned' => true, 'when' => 'Theo ngưỡng'],
+        ['id' => 'suggest', 'human' => true, 'role' => 'monitor', 'label' => 'Sinh đề xuất làm mới', 'kind' => 'rule', 'planned' => true],
     ],
     'budget' => 'Token tương đối 0',
     'human' => [],
     'features' => [],
     'runner' => null,
+    'records' => [
+        ['label' => 'Search Console', 'class' => 'App\\Filament\\Pages\\SearchConsolePage', 'type' => 'output'],
+    ],
 ];

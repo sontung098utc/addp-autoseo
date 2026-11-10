@@ -1,7 +1,18 @@
 <x-filament-panels::page>
-    <div data-testid="pipeline" class="space-y-3">
+    <div data-testid="pipeline" class="space-y-3" @if ($live) wire:poll.{{ $pollSeconds }}s @endif>
+        @include('filament.clusters.agent-team.pipeline-style')
         <div class="text-sm" style="opacity:.85">Chuỗi làm ra một bài <x-studio.hint text="Mỗi mắt xích có các loại việc phục vụ nó. Bấm 'Chi tiết' để xem các bước và phần kỹ thuật." /></div>
         <div data-testid="pipeline-tally" class="text-sm" style="font-weight:600">{{ $tally['ready'] }}/{{ $tally['total'] }} việc dùng được, {{ $tally['partial'] }} dùng được một phần, {{ $tally['none'] }} chưa có.</div>
+        <x-studio.tabs persist="pipeline-view" :default="$live ? 'runs' : 'flows'" label="Cách xem pipeline" :tabs="[
+            ['key' => 'flows', 'label' => 'Các luồng', 'count' => count($flows)],
+            ['key' => 'runs', 'label' => 'Đang chạy', 'count' => count($runs) ?: null, 'tone' => $live ? 'info' : null],
+            ['key' => 'office', 'label' => 'Văn phòng AI', 'count' => count($office)],
+        ]">
+            <x-studio.panel key="flows">
+                @include('filament.clusters.agent-team.pipeline-flows')
+                <details style="margin-top:1rem">
+                    <summary class="text-sm" style="cursor:pointer;font-weight:600">Chuỗi 7 mắt xích (dạng thẻ)</summary>
+                    <div style="margin-top:.5rem">
         <div data-testid="pipeline-chain" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:.6rem;align-items:start">
             @foreach ($chain as $i => $link)
                 <div data-link="{{ $link['key'] }}" class="space-y-2">
@@ -24,6 +35,16 @@
                 </div>
             @endforeach
         </div>
+                    </div>
+                </details>
+            </x-studio.panel>
+            <x-studio.panel key="runs">
+                @include('filament.clusters.agent-team.pipeline-runs')
+            </x-studio.panel>
+            <x-studio.panel key="office">
+                @include('filament.clusters.agent-team.pipeline-office')
+            </x-studio.panel>
+        </x-studio.tabs>
         <details data-testid="pipeline-map9" style="margin-top:.5rem">
             <summary class="text-sm" style="cursor:pointer;font-weight:600">Bản đồ 9 giai đoạn (trạng thái bằng chứng)</summary>
         <div class="space-y-3" style="margin-top:.5rem">
