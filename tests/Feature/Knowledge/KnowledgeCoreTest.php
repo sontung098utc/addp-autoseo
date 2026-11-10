@@ -129,6 +129,28 @@ class KnowledgeCoreTest extends TestCase
         $this->assertSame([], (new KnowledgeRetriever())->search($s, '%%% ___'));
     }
 
+    /**
+     * Hồi quy MariaDB: `escape '\'` là lỗi cú pháp trên MySQL/MariaDB (SQLite không phát hiện). Gọi thẳng like() với ký tự đặc biệt
+     * (bộ tách từ bình thường đã loại chúng nên test search() không chạm tới) để câu lệnh thực sự được chạy trên cả hai CSDL.
+     */
+    public function test_like_thoat_ky_tu_dac_biet_va_chay_duoc_tren_moi_csdl(): void
+    {
+        $s = $this->site();
+        $pct = $this->item(['website_id' => $s->id, 'title' => 'Giảm giá', 'body' => 'Giảm 100% học phí kỳ đầu.']);
+        $this->item(['website_id' => $s->id, 'title' => 'Giảm giá khác', 'body' => 'Giảm 1000 đồng mỗi buổi học.']);
+        $und = $this->item(['website_id' => $s->id, 'title' => 'Mã', 'body' => 'Dùng mã ab_cd khi thanh toán.']);
+        $this->item(['website_id' => $s->id, 'title' => 'Mã khác', 'body' => 'Dùng mã abXcd khi thanh toán.']);
+        $bang = $this->item(['website_id' => $s->id, 'title' => 'Lưu ý', 'body' => 'Chú ý!đặc biệt về lịch học.']);
+
+        $like = new \ReflectionMethod(KnowledgeRetriever::class, 'like');
+        $run = fn (string $term) => collect($like->invoke(new KnowledgeRetriever(), $s, [$term], $term, null))->pluck('id')->all();
+
+        $this->assertSame([$pct->id], $run('100%'), '% là ký tự thường, không phải wildcard');
+        $this->assertSame([$und->id], $run('ab_cd'), '_ là ký tự thường, không khớp "abXcd"');
+        $this->assertSame([$bang->id], $run('!đặc'), 'ký tự thoát "!" cũng được thoát');
+        $this->assertSame([], $run('%%%'), 'chỉ toàn wildcard thì không khớp gì');
+    }
+
     public function test_duyet_bi_chan_khi_con_mau_thuan_va_giai_quyet_bang_chon_ban_dung(): void
     {
         $by = $this->user();
