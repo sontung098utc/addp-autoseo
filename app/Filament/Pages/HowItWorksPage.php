@@ -56,6 +56,7 @@ class HowItWorksPage extends Page
 
         return [
             'stages' => $stages,
+            'flow' => \App\Filament\Support\Agent\AgentFlowBlueprint::stages(),
             'automation' => array_values(array_filter(array_map(fn (string $id) => FeatureRegistry::find($id), ['ai.router', 'ai.selfrepair', 'pipeline.auto']))),
             'counts' => FeatureRegistry::counts(),
         ];

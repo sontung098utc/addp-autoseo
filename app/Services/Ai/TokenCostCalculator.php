@@ -46,11 +46,13 @@ class TokenCostCalculator
      * @param int $promptTokens Số token đầu vào
      * @param int $completionTokens Số token đầu ra
      * @param string $model Tên model
+     * @param array|null $rates Giá riêng [input_per_million, output_per_million] (USD); null thì tra bảng MODEL_PRICING
      * @return array [ 'usd' => float, 'vnd' => float, 'details' => array ]
      */
-    public function calculate(int $promptTokens, int $completionTokens, string $model = 'gemini-1.5-flash'): array
+    public function calculate(int $promptTokens, int $completionTokens, string $model = 'gemini-1.5-flash', ?array $rates = null): array
     {
-        $rates = self::MODEL_PRICING[$model] ?? self::MODEL_PRICING['gemini-1.5-flash'];
+        $rates ??= self::MODEL_PRICING[$model] ?? self::MODEL_PRICING['gemini-1.5-flash'];
+        $rates += ['name' => $model];
 
         $inputCostUsd = ($promptTokens / 1_000_000) * $rates['input_per_million'];
         $outputCostUsd = ($completionTokens / 1_000_000) * $rates['output_per_million'];

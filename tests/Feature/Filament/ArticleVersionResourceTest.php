@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\ArticleVersionResource;
-use App\Filament\Resources\ArticleVersionResource\Pages\ListArticleVersions;
 use App\Filament\Resources\ArticleVersionResource\Pages\ViewArticleVersion;
 use App\Models\Article;
 use App\Models\ArticleVersion;
@@ -46,8 +46,9 @@ class ArticleVersionResourceTest extends TestCase
         $v = $this->version(['cost_vnd' => 2450, 'tokens_used' => 1234, 'seo_title' => 'SEO', 'ai_provider' => 'gemini',
             'sources_cited' => ['https://evil.example/a', ['title' => 'Nguồn <b>x</b>']]]);
 
-        Livewire::test(ListArticleVersions::class)->assertSuccessful()
-            ->assertSee('máy lọc nước')->assertSee('Hướng dẫn chọn máy lọc nước')->assertSee('Chờ duyệt')->assertSee('2.450 ₫');
+        $this->article->update(['workflow_status' => 'needs_review']);
+        Livewire::test(\App\Filament\Resources\ArticleResource\Pages\ListArticles::class)->assertSuccessful()
+            ->assertSee('máy lọc nước')->assertSee('Hướng dẫn chọn máy lọc nước')->assertSee('Chờ duyệt');
 
         $html = Livewire::test(ViewArticleVersion::class, ['record' => $v->id])->assertSuccessful()
             ->assertSee('2.450 ₫')->assertSee('AI đề xuất')->assertSee('Chưa có ảnh')->html();
@@ -87,10 +88,11 @@ class ArticleVersionResourceTest extends TestCase
     public function test_filter_by_review_status(): void
     {
         $this->actingAs($this->user());
-        $a = $this->version(['title' => 'Bản chờ']);
-        $b = $this->version(['version' => 2, 'title' => 'Bản duyệt', 'review_status' => 'approved']);
-        Livewire::test(ListArticleVersions::class)->filterTable('review_status', 'approved')
-            ->assertCanSeeTableRecords([$b])->assertCanNotSeeTableRecords([$a]);
+        $this->version(['title' => 'Bản chờ']);
+        $other = Article::create(['website_id' => $this->article->website_id, 'primary_keyword' => 'khác', 'workflow_status' => 'approved']);
+        $this->article->update(['workflow_status' => 'needs_review']);
+        Livewire::test(\App\Filament\Resources\ArticleResource\Pages\ListArticles::class)->set('activeTab', 'approved')
+            ->assertCanSeeTableRecords([$other])->assertCanNotSeeTableRecords([$this->article]);
     }
 
     public function test_xss_is_neutralised_and_iframe_sandboxed(): void
@@ -108,7 +110,8 @@ class ArticleVersionResourceTest extends TestCase
     {
         $this->get('/admin/article-versions')->assertRedirect();
         $this->actingAs($this->user('writer', false))->get('/admin/article-versions')->assertForbidden();
-        $this->actingAs($this->user('writer'))->get('/admin/article-versions')->assertOk();
+        $this->actingAs($this->user('writer'))->get('/admin/article-versions')->assertRedirect(ArticleResource::getUrl('index'));
+        $this->get('/admin/article-versions?tableFilters[review_status][value]=needs_review')->assertRedirect(ArticleResource::getUrl('index', ['activeTab' => 'needs_review']));
         $this->assertFalse(ArticleVersionResource::canCreate());
         $this->assertFalse(ArticleVersionResource::canEdit($this->version()));
         $this->assertFalse(ArticleVersionResource::canDelete($this->version(['version' => 2])));

@@ -20,6 +20,10 @@
         if ($hasData) {
             $tabs[] = ['key' => 'groups', 'label' => 'Nhóm lỗi', 'count' => count($groupRows), 'tone' => $p0 > 0 ? 'danger' : null];
         }
+        if ($site && $run) {
+            $openSug = collect($suggestions)->where('status', 'de_xuat')->count();
+            $tabs[] = ['key' => 'suggest', 'label' => 'Đề xuất làm mới', 'count' => $realRun ? $openSug : null];
+        }
         $tabs[] = ['key' => 'briefs', 'label' => 'Brief đã tạo', 'count' => count($briefRows)];
         $tabs[] = ['key' => 'rules', 'label' => 'Quy tắc'];
         $ctone = ['P0' => 'danger', 'P1' => 'warn', 'P2' => 'muted'];
@@ -41,6 +45,7 @@
             @endif
             <span style="flex:1"></span>
             @if ($hasData)
+                <x-filament::button color="gray" wire:click="suggestRefresh" :disabled="! $canAct || ! $realRun" title="{{ ! $realRun ? 'Dữ liệu mẫu: không tạo việc.' : (! $canAct ? 'Chỉ approver trở lên được tạo đề xuất.' : 'Tạo đề xuất làm mới bài từ lỗi P0/P1') }}">Đề xuất làm mới</x-filament::button>
                 <x-filament::button wire:click="createBrief" :disabled="! $canBrief" title="{{ ! $canAct ? 'Chỉ approver trở lên được tạo brief.' : ($scanning ? 'Đang quét nên chưa tạo được.' : 'Tạo brief từ nhóm lỗi đang chọn') }}">Tạo brief từ lỗi</x-filament::button>
             @endif
         </div>
@@ -94,6 +99,20 @@
                                     ['key' => 'measured', 'label' => 'Đo được', 'type' => 'text'],
                                     ['key' => 'evidence', 'label' => 'Bằng chứng', 'type' => 'mono', 'visible' => false],
                                 ]" />
+                                @php $related = collect($suggestions)->filter(fn ($x) => in_array($group['type'], $x['types'], true)); @endphp
+                                <div class="au-ai" style="border-style:solid">
+                                    <strong>Việc sửa liên quan</strong>
+                                    <x-studio.hint text="Đề xuất làm mới bài từ lỗi này. Đề xuất chỉ thành việc khi approver chấp nhận; hệ thống không tự sửa bài đã đăng." />
+                                    @if (! $realRun)
+                                        <div class="ss-text-sm ss-muted">Dữ liệu mẫu: không tạo việc.</div>
+                                    @else
+                                        @forelse ($related as $x)
+                                            <div class="ss-text-sm"><span class="au-mono">{{ $x['url'] }}</span> · {{ $x['status_label'] }}@if ($x['task']) · bài làm mới {{ $x['task'] }}@endif</div>
+                                        @empty
+                                            <div class="ss-text-sm ss-muted">Chưa có đề xuất cho lỗi này. Dùng nút "Đề xuất làm mới" ở thanh trên (lỗi P2 không sinh đề xuất).</div>
+                                        @endforelse
+                                    @endif
+                                </div>
                                 <div class="au-ai">
                                     <x-studio.badge tone="accent">AI đề xuất</x-studio.badge> <strong>Cách sửa gợi ý</strong>
                                     <ol class="ss-text-sm">@foreach ($fixSteps as $step)<li>{{ $step }}</li>@endforeach</ol>
@@ -102,6 +121,48 @@
                             </div>
                         </div>
                     </div>
+                </x-studio.panel>
+            @endif
+
+            @if ($site && $run)
+                <x-studio.panel key="suggest">
+                    <div class="ss-card"><div class="ss-card__b" style="display:grid;gap:.75rem">
+                        <div class="ss-toolbar">
+                            <strong>Đề xuất làm mới bài</strong>
+                            <x-studio.hint text="Hệ thống sinh đề xuất từ lỗi P0/P1 của lần quét thật gần nhất. Không có gì tự thành việc: approver chấp nhận thì bài làm mới mới vào Kế hoạch để chiến dịch giao cho đội AI. Trang không phải bài viết chỉ sửa thủ công trên CMS." />
+                            <span style="flex:1"></span>
+                            @if ($realRun)
+                                <x-filament::button color="gray" wire:click="acceptAllSuggestions" wire:confirm="Chấp nhận tất cả đề xuất đang chờ có bài khớp? Mỗi đề xuất sẽ tạo một bài làm mới trong Kế hoạch." :disabled="! $canAct" title="{{ $canAct ? 'Chấp nhận hàng loạt (có xác nhận)' : 'Chỉ approver trở lên.' }}">Chấp nhận tất cả đang chờ</x-filament::button>
+                            @endif
+                        </div>
+                        @if (! $realRun)
+                            <div class="ss-alert ss-alert--info" role="status">Dữ liệu mẫu: không tạo việc. Đề xuất chỉ sinh từ kết quả quét thật.</div>
+                        @elseif ($suggestBlocker)
+                            <div class="ss-alert ss-alert--warn" role="status">{{ $suggestBlocker }}</div>
+                        @endif
+                        @if ($realRun)
+                            <div style="overflow-x:auto"><table class="au-rules ss-text-sm">
+                                <thead><tr><th>URL</th><th>Bài liên quan</th><th>Lỗi</th><th>Mức</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+                                <tbody>
+                                @forelse ($suggestions as $x)
+                                    <tr wire:key="sug-{{ $x['id'] }}">
+                                        <td class="au-mono">{{ $x['url'] }}</td>
+                                        <td>@if ($x['article']){{ $x['article'] }}@else<x-studio.badge tone="muted">Trang không phải bài viết</x-studio.badge><div class="ss-text-xs ss-muted">Cần sửa thủ công/trên CMS</div>@endif</td>
+                                        <td>@foreach ($x['issues'] as $i)<x-studio.badge tone="warn">{{ $i }}</x-studio.badge> @endforeach</td>
+                                        <td><x-studio.badge :tone="$ctone[$x['severity']] ?? 'muted'">{{ $x['severity'] }}</x-studio.badge></td>
+                                        <td>{{ $x['status_label'] }}@if ($x['task']) · bài {{ $x['task'] }}@endif @if ($x['decided'])<div class="ss-text-xs ss-muted">{{ $x['decided'] }}</div>@endif</td>
+                                        <td style="white-space:nowrap">
+                                            <x-filament::button size="sm" wire:click="acceptSuggestion({{ $x['id'] }})" wire:confirm="Chấp nhận đề xuất và tạo bài làm mới trong Kế hoạch?" :disabled="! $canAct || $x['status'] !== 'de_xuat' || ! $x['article']" title="{{ ! $canAct ? 'Chỉ approver trở lên.' : (! $x['article'] ? 'Trang không phải bài viết: sửa thủ công trên CMS.' : 'Chấp nhận') }}">Chấp nhận</x-filament::button>
+                                            <x-filament::button size="sm" color="gray" wire:click="dismissSuggestion({{ $x['id'] }})" :disabled="! $canAct || $x['status'] !== 'de_xuat'" title="{{ $canAct ? 'Bỏ qua' : 'Chỉ approver trở lên.' }}">Bỏ qua</x-filament::button>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="6" class="ss-muted">Chưa có đề xuất. Bấm "Đề xuất làm mới" ở thanh trên.</td></tr>
+                                @endforelse
+                                </tbody>
+                            </table></div>
+                        @endif
+                    </div></div>
                 </x-studio.panel>
             @endif
 

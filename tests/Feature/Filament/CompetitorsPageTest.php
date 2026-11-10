@@ -204,15 +204,17 @@ class CompetitorsPageTest extends TestCase
         $this->assertSame(0, CostPolicy::used());
     }
 
-    public function test_production_shows_unconnected_without_sample_data(): void
+    /** AG-S24: production dùng bảng thật, không có số mẫu; không còn trạng thái "chưa kết nối nguồn trả phí". */
+    public function test_production_uses_real_tables_without_sample_data(): void
     {
         $this->app['env'] = 'production';
         $this->assertTrue(app()->isProduction());
         $this->page('approver', 'ket-noi')
-            ->assertSee('Chưa kết nối nguồn từ khóa trả phí')
+            ->assertSee('Chưa có dữ liệu khoảng trống')
             ->assertDontSee('tuyensinhhub.example')->assertDontSee('Dữ liệu minh họa —')
             ->set('newDomain', 'a.vn')->call('addCompetitor');
         $this->assertSame([], CompetitorService::domains($this->site));
+        $this->assertSame(['a.vn'], \App\Models\Competitor::pluck('domain')->all());
     }
 
     public function test_ui_has_tabs_single_primary_and_no_noise(): void

@@ -37,6 +37,20 @@ class ViewArticleVersion extends ViewRecord
                     ReviewActions::run(fn () => (new ReviewWorkflow)->reject(ReviewActions::user(), $this->record, $data['reason'] ?? null), 'Đã từ chối bản thảo');
                     $this->record->refresh();
                 }),
+            Actions\Action::make('cancelCmsDraft')->label('Huỷ nháp trên CMS')->icon('heroicon-o-trash')->color('danger')->outlined()
+                ->visible(fn () => $this->record->cms_draft_status === 'pushed')
+                ->authorize(fn () => ReviewActions::canApprove())
+                ->requiresConfirmation()->modalDescription('Bài nháp trên CMS sẽ được đưa vào thùng rác. Khi đăng chính thức hệ thống sẽ tạo bài như bình thường.')
+                ->action(function () {
+                    abort_unless(ReviewActions::canApprove(), 403);
+                    try {
+                        $msg = app(\App\Services\Agent\Handoff\CmsDraftHandoff::class)->cancel($this->record);
+                        \Filament\Notifications\Notification::make()->title($msg)->success()->send();
+                    } catch (\RuntimeException $e) {
+                        \Filament\Notifications\Notification::make()->title($e->getMessage())->danger()->send();
+                    }
+                    $this->record->refresh();
+                }),
             Actions\Action::make('schedule')->label('Xếp lịch')->icon('heroicon-o-clock')->color('primary')
                 ->visible(fn () => $this->record->review_status === 'approved' && $this->record->article?->workflow_status === 'approved')
                 ->authorize(fn () => ReviewActions::canApprove())

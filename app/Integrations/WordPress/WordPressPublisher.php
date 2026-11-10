@@ -15,6 +15,7 @@ use App\Models\ArticleVersion;
 use App\Models\Publication;
 use App\Models\Website;
 use App\Services\Content\HtmlSanitizer;
+use App\Services\Publishing\DraftCapable;
 use App\Services\Media\MediaSecurityValidator;
 use Illuminate\Support\Facades\Log;
 
@@ -29,7 +30,7 @@ use Illuminate\Support\Facades\Log;
  * (status=any bỏ trash); người dùng thiếu quyền unfiltered_html có thể bị kses lọc comment. Phương án
  * mạnh hơn (mu-plugin bridge expose lookup theo meta) là việc sau, KHÔNG nằm trong task này.
  */
-class WordPressPublisher implements PublisherInterface
+class WordPressPublisher implements PublisherInterface, DraftCapable
 {
     public function __construct(
         protected WordPressClient $client,
@@ -135,22 +136,37 @@ class WordPressPublisher implements PublisherInterface
             $payload['meta'] = $meta;
         }
 
+        // AG-S04 đăng từ nháp: nếu bản này đã có nháp CÒN HIỆU LỰC trên CMS thì cập nhật CHÍNH bài nháp đó
+        // (kèm dấu publication_key) thay vì tạo bài mới. Không có cms_draft_id => đường cũ y nguyên.
+        $draftId = $this->usableDraftId($version);
+        $route = $draftId !== null ? "/wp/v2/posts/{$draftId}" : '/wp/v2/posts';
+
         try {
-            $res = $this->client->request($website, 'POST', '/wp/v2/posts', ['json' => $payload], true);
+            try {
+                $res = $this->client->request($website, 'POST', $route, ['json' => $payload], true);
+            } catch (WordPressException $e) {
+                // 400 do plugin SEO không đăng ký meta: bài CHƯA được tạo/sửa, thử lại một lần không có meta.
+                if ($meta !== [] && str_contains($e->getMessage(), 'HTTP 400')) {
+                    Log::warning("[WordPress] Website #{$website->id} từ chối trường meta SEO; đăng không kèm meta.");
+                    unset($payload['meta']);
+                    $res = $this->client->request($website, 'POST', $route, ['json' => $payload], true);
+                } else {
+                    throw $e;
+                }
+            }
         } catch (WordPressException $e) {
-            // 400 do plugin SEO không đăng ký meta: bài CHƯA được tạo, thử lại một lần không có meta.
-            if ($meta !== [] && str_contains($e->getMessage(), 'HTTP 400')) {
-                Log::warning("[WordPress] Website #{$website->id} từ chối trường meta SEO; đăng không kèm meta.");
-                unset($payload['meta']);
-                $res = $this->client->request($website, 'POST', '/wp/v2/posts', ['json' => $payload], true);
-            } else {
+            // Nháp đã bị xóa trên CMS (404 rõ ràng, bước tra key ở (1) xác nhận chưa có bài mang key): đăng như bình thường.
+            if ($draftId === null || ! str_contains($e->getMessage(), 'HTTP 404')) {
                 throw $e;
             }
+            Log::warning("[WordPress] Nháp #{$draftId} của website #{$website->id} không còn trên CMS; đăng bài mới theo publication_key.");
+            $draftId = null;
+            $res = $this->client->request($website, 'POST', '/wp/v2/posts', ['json' => $payload], true);
         }
 
         $id = $res['json']['id'] ?? null;
-        if (! is_int($id)) {
-            throw new WordPressAmbiguousException(E::ERR06, 'phản hồi tạo bài thiếu id');
+        if (! is_int($id) || ($draftId !== null && (string) $id !== $draftId)) {
+            throw new WordPressAmbiguousException(E::ERR06, 'phản hồi tạo bài thiếu id hoặc không khớp bài nháp');
         }
 
         // (4) Đọc lại để xác minh. Nếu không đọc lại được, bài đã tồn tại => mơ hồ để đối soát.
@@ -163,12 +179,35 @@ class WordPressPublisher implements PublisherInterface
             throw new WordPressAmbiguousException($e->errorCode(), 'bài đã gửi nhưng không xác minh được');
         }
         $result['already_existed'] = false;
+        $result['promoted_draft_id'] = $draftId;
         $result['taxonomy'] = $tax;
         if ($result['seo_meta_persisted'] === false) {
             Log::warning("[WordPress] Meta SEO không được lưu trên website #{$website->id}: plugin có thể chưa expose meta qua REST.");
         }
 
         return $result;
+    }
+
+    public function deleteDraft(Website $website, string $remoteId): void
+    {
+        if (! ctype_digit($remoteId)) {
+            throw new WordPressException(E::ERR06, 'mã bài nháp không hợp lệ');
+        }
+        $res = $this->client->request($website, 'GET', "/wp/v2/posts/{$remoteId}", ['query' => ['context' => 'edit']]);
+        // Chỉ xóa khi CHẮC CHẮN vẫn là nháp: không bao giờ động vào bài đã công khai hoặc đã lên lịch.
+        if (! in_array($res['json']['status'] ?? '', ['draft', 'auto-draft', 'pending'], true)) {
+            throw new WordPressException(E::ERR06, 'bài không còn ở trạng thái nháp nên không hủy');
+        }
+        // Không có force=true => vào thùng rác, khôi phục được.
+        $this->client->request($website, 'DELETE', "/wp/v2/posts/{$remoteId}", [], true);
+    }
+
+    /** Mã nháp CÒN HIỆU LỰC của bản này (chỉ khi đã đẩy thành công và chưa hủy/đăng). */
+    protected function usableDraftId(ArticleVersion $version): ?string
+    {
+        $id = (string) $version->cms_draft_id;
+
+        return $version->cms_draft_status === 'pushed' && ctype_digit($id) && $id !== '' ? $id : null;
     }
 
     public function getByPublicationKey(Website $website, string $publicationKey): ?array

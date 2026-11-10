@@ -5,6 +5,11 @@ namespace App\Filament\Pages;
 use App\Filament\Support\Competitors\ClusterSuggester;
 use App\Filament\Support\Competitors\CompetitorDomain;
 use App\Filament\Support\Competitors\CompetitorService;
+use App\Filament\Support\Competitors\CompetitorStore;
+use App\Filament\Support\Keywords\CsvKeywordParser;
+use App\Models\Competitor;
+use App\Models\KeywordGap;
+use Livewire\WithFileUploads;
 use App\Filament\Support\Competitors\CostPolicy;
 use App\Filament\Support\Competitors\GapCalculator;
 use App\Filament\Support\Competitors\KeywordGapSource;
@@ -27,6 +32,8 @@ use Livewire\Attributes\Url;
 
 class CompetitorsPage extends Page
 {
+    use WithFileUploads;
+
     protected static ?string $navigationIcon = 'heroicon-o-user-group';
 
     protected static ?string $navigationLabel = 'Đối thủ';
@@ -63,6 +70,23 @@ class CompetitorsPage extends Page
 
     public ?string $refreshError = null;
 
+    // --- Bản thật (AG-S24) ---
+    public string $newBrand = '';
+
+    public string $newKind = 'truc_tiep';
+
+    public string $csvText = '';
+
+    public $csvFile = null;
+
+    /** @var ?array{rows:list<array>, errors:list<array>, duplicates:list<array>, fatal:?string} */
+    public ?array $csvPreview = null;
+
+    public function isReal(): bool
+    {
+        return CompetitorStore::useReal();
+    }
+
     public static function canAccess(): bool
     {
         $u = Auth::user();
@@ -75,7 +99,7 @@ class CompetitorsPage extends Page
         $this->websiteId = Website::where('status', 'active')->orderBy('name')->value('id');
         // ?demo=ket-noi: nạp sẵn 3 đối thủ + dữ liệu mẫu (chỉ khi chưa có và không phải production).
         $site = $this->website();
-        if ($site && $this->demo === 'ket-noi' && DemoMode::enabled() && CompetitorService::domains($site) === []) {
+        if (! $this->isReal() && $site && $this->demo === 'ket-noi' && DemoMode::enabled() && CompetitorService::domains($site) === []) {
             $d = CompetitorsDemoData::sampleDomains();
             CompetitorService::saveDomains($site, $d);
             CompetitorService::saveSnapshot($site, $d, CompetitorsDemoData::rankings($d));
@@ -88,6 +112,8 @@ class CompetitorsPage extends Page
         $this->clusterPick = [];
         $this->results = [];
         $this->refreshError = null;
+        $this->csvPreview = null;
+        $this->csvText = '';
     }
 
     public function website(): ?Website
@@ -124,6 +150,18 @@ class CompetitorsPage extends Page
         if (! $site) {
             return;
         }
+        if ($this->isReal()) {
+            try {
+                CompetitorStore::add($site, $this->actor(), $this->newDomain, $this->newBrand, $this->newKind);
+                $this->newDomain = '';
+                $this->newBrand = '';
+                Notification::make()->title('Đã thêm đối thủ')->body('Chỉ lưu tên miền; hệ thống không truy cập website đối thủ.')->success()->send();
+            } catch (InvalidArgumentException $e) {
+                Notification::make()->title('Không thêm được')->body($e->getMessage())->danger()->send();
+            }
+
+            return;
+        }
         try {
             if ($this->source() === null) {
                 throw new InvalidArgumentException('Chưa kết nối nguồn từ khóa nên chưa thêm đối thủ được.');
@@ -145,6 +183,134 @@ class CompetitorsPage extends Page
             return;
         }
         CompetitorService::saveDomains($site, array_values(array_diff(CompetitorService::domains($site), [$domain])));
+    }
+
+    public function removeCompetitorById(int|string $id): void
+    {
+        $this->actor();
+        if ($site = $this->website()) {
+            CompetitorStore::remove($site, (int) $id);
+        }
+    }
+
+    public function updatedCsvFile(): void
+    {
+        $this->csvPreview = null;
+        if ($this->csvFile) {
+            if ($this->csvFile->getSize() > CsvKeywordParser::MAX_BYTES) {
+                $this->csvText = '';
+                $this->csvPreview = ['rows' => [], 'errors' => [], 'duplicates' => [], 'fatal' => 'Tệp vượt quá 1 MB. Hãy tách thành nhiều tệp nhỏ hơn.'];
+
+                return;
+            }
+            $this->csvText = (string) file_get_contents($this->csvFile->getRealPath());
+            $this->previewCsv();
+        }
+    }
+
+    public function previewCsv(): void
+    {
+        $this->actor();
+        if ($site = $this->website()) {
+            $this->csvPreview = CompetitorStore::previewCsv($site, $this->csvText);
+        }
+    }
+
+    public function importCsv(): void
+    {
+        $this->actor();
+        $site = $this->website();
+        if (! $site) {
+            return;
+        }
+        $this->csvPreview = CompetitorStore::previewCsv($site, $this->csvText);
+        if ($this->csvPreview['fatal'] || $this->csvPreview['rows'] === []) {
+            Notification::make()->title('Chưa nhập được')->body($this->csvPreview['fatal'] ?? 'Không có dòng hợp lệ để nhập.')->danger()->send();
+
+            return;
+        }
+        $n = CompetitorStore::importRows($site, $this->csvPreview['rows']);
+        $bad = count($this->csvPreview['errors']) + count($this->csvPreview['duplicates']);
+        $this->csvPreview = null;
+        $this->csvText = '';
+        $this->csvFile = null;
+        Notification::make()->title("Đã nhập $n khoảng trống".($bad ? ", bỏ qua $bad dòng lỗi/trùng" : ''))->success()->send();
+    }
+
+    public function addGapKeyword(int|string $id): void
+    {
+        $user = $this->actor();
+        if (! $site = $this->website()) {
+            return;
+        }
+        try {
+            $kw = CompetitorStore::addKeyword($site, $user, (int) $id);
+            Notification::make()->title('Đã thêm vào Từ khóa')->body('"'.$kw->keyword.'" nguồn Đối thủ. Vào trang Từ khóa để Thêm vào kế hoạch.')->success()->send();
+        } catch (InvalidArgumentException $e) {
+            Notification::make()->title('Không thêm được')->body($e->getMessage())->warning()->send();
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            Notification::make()->title('Không tìm thấy khoảng trống')->danger()->send();
+        }
+    }
+
+    public function ignoreGap(int|string $id): void
+    {
+        $this->actor();
+        if ($site = $this->website()) {
+            CompetitorStore::ignore($site, (int) $id);
+        }
+    }
+
+    public function restoreGap(int|string $id): void
+    {
+        $this->actor();
+        if ($site = $this->website()) {
+            CompetitorStore::restore($site, (int) $id);
+        }
+    }
+
+    /** @return array<string,mixed> */
+    private function realViewData(): array
+    {
+        $site = $this->website();
+        $comps = $site ? CompetitorStore::competitors($site) : collect();
+        $gaps = $site ? KeywordGap::where('website_id', $site->id)->with('competitor:id,domain')->get() : collect();
+        $existing = $site ? GapCalculator::existingFor($site) : [];
+        $byComp = $gaps->groupBy('competitor_id');
+        $sorted = $gaps->sortBy([fn ($a, $b) => ($b->priority_score ?? -1) <=> ($a->priority_score ?? -1), fn ($a, $b) => ($b->volume ?? -1) <=> ($a->volume ?? -1)])->values();
+        $gapRows = [];
+        foreach ($sorted as $g) {
+            $ex = $existing[PlannedArticleCreator::normalize($g->keyword)] ?? null;
+            $gapRows[] = [
+                'id' => $g->id,
+                'keyword' => $g->keyword,
+                'competitor' => $g->competitor?->domain ?? '—',
+                'crank' => $g->competitor_rank,
+                'orank' => $g->our_rank,
+                'volume' => $g->volume,
+                'source' => KeywordGap::SOURCES[$g->source] ?? $g->source,
+                'score' => $g->priority_score === null ? ['text' => '—', 'tone' => 'muted'] : ['text' => (string) $g->priority_score, 'tone' => $g->priority_score >= 70 ? 'ok' : ($g->priority_score >= 40 ? 'accent' : 'muted')],
+                'status' => ['text' => KeywordGap::STATUSES[$g->status].($ex ? ' · đã có bài #'.$ex['id'] : ''), 'tone' => $g->status === 'moi' ? 'accent' : ($g->status === 'da_them_tu_khoa' ? 'ok' : 'muted')],
+            ];
+        }
+        $compRows = $comps->map(fn (Competitor $c) => [
+            'id' => $c->id, 'domain' => $c->domain, 'brand' => $c->brand_name ?? '—', 'kind' => Competitor::KINDS[$c->kind] ?? $c->kind,
+            'gaps' => ($byComp[$c->id] ?? collect())->where('status', 'moi')->count(),
+        ])->all();
+
+        return [
+            'site' => $site,
+            'websites' => Website::where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'compRows' => $compRows,
+            'compCount' => $comps->count(),
+            'gapRows' => $gapRows,
+            'openCount' => $gaps->where('status', 'moi')->count(),
+            'addedCount' => $gaps->where('status', 'da_them_tu_khoa')->count(),
+            'maxCompetitors' => CompetitorDomain::MAX_COMPETITORS,
+            'kinds' => Competitor::KINDS,
+            'formulaReal' => PriorityScorer::FORMULA_REAL,
+            'maxRows' => CsvKeywordParser::MAX_ROWS,
+        ];
     }
 
     /** @return array{rows:int, cost_vnd:int, remaining:int, blocked:?string} */
@@ -381,6 +547,9 @@ class CompetitorsPage extends Page
     /** @return array<string, mixed> */
     public function getViewData(): array
     {
+        if ($this->isReal()) {
+            return ['real' => true, 'canWrite' => Auth::user() instanceof User && Auth::user()->isWriter()] + $this->realViewData();
+        }
         $site = $this->website();
         $user = Auth::user();
         $snap = $site ? CompetitorService::snapshot($site) : null;
@@ -397,6 +566,7 @@ class CompetitorsPage extends Page
         $fetchedAt = $snap ? Carbon::parse($snap['fetched_at']) : null;
 
         return [
+            'real' => false,
             'state' => $this->state(),
             'demoOn' => DemoMode::enabled(),
             'site' => $site,

@@ -30,6 +30,16 @@ class Website extends Model
         ];
     }
 
+    public function brandProfile(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(BrandProfile::class);
+    }
+
+    public function brains(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Brain::class, 'brain_website')->withPivot('priority')->withTimestamps()->orderByPivot('priority');
+    }
+
     public function articles(): HasMany
     {
         return $this->hasMany(Article::class);

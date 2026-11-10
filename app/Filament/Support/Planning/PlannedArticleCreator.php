@@ -3,6 +3,7 @@
 namespace App\Filament\Support\Planning;
 
 use App\Models\Article;
+use App\Models\Keyword;
 use App\Models\User;
 use App\Models\Website;
 use InvalidArgumentException;
@@ -29,8 +30,8 @@ final class PlannedArticleCreator
             ->first(fn (Article $a) => self::normalize((string) $a->primary_keyword) === $n);
     }
 
-    /** @param  list<string>  $secondary */
-    public function create(User $actor, Website $website, string $keyword, ?string $cluster = null, string $intent = 'informational', array $secondary = []): Article
+    /** @param  list<string>  $secondary  $stored: bản ghi trong kho từ khóa (nếu có) để nối hai chiều; $origin: nguồn tạo bài */
+    public function create(User $actor, Website $website, string $keyword, ?string $cluster = null, string $intent = 'informational', array $secondary = [], ?Keyword $stored = null, ?string $origin = null): Article
     {
         if (! $actor->is_active || ! $actor->isWriter()) {
             throw new InvalidArgumentException('Vai trò hiện tại không đủ quyền tạo bài.');
@@ -49,7 +50,7 @@ final class PlannedArticleCreator
             throw new DuplicateKeywordException($dup->id, $keyword);
         }
 
-        return Article::create([
+        $article = Article::create([
             'website_id' => $website->id,
             'created_by' => $actor->id,
             'primary_keyword' => $keyword,
@@ -57,6 +58,15 @@ final class PlannedArticleCreator
             'search_intent' => $intent,
             'topic_cluster' => $cluster,
             'workflow_status' => 'planned',
+            'kind' => 'new',
+            'origin' => $origin,
+            'keyword_id' => $stored?->id,
+            'cluster_id' => $stored?->cluster_id,
         ]);
+        if ($stored && $stored->status === 'new') {
+            $stored->update(['status' => 'planned']);
+        }
+
+        return $article;
     }
 }

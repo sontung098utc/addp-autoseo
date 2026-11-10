@@ -6,7 +6,6 @@ use App\Filament\Pages\CompetitorsPage;
 use App\Filament\Pages\ContentPlanPage;
 use App\Filament\Pages\KeywordsPage;
 use App\Filament\Pages\SearchConsolePage;
-use App\Filament\Resources\ArticleVersionResource;
 use App\Filament\Resources\PublicationResource;
 use App\Filament\Resources\WebsiteResource;
 
@@ -15,11 +14,11 @@ return [
     ['id' => 'website.connect', 'title' => 'Website kết nối', 'what' => 'Thêm/sửa website, lưu credential đã mã hóa, khóa trường nhạy cảm.', 'readiness' => 'active',
         'evidence' => 'Test LockSensitiveFieldsTest, WebsiteUiTest, PoliciesTest (credential bị khóa trên form; quyền theo vai trò).', 'caveat' => 'Chưa kiểm tra kết nối CMS thật trên staging.', 'task' => '0.4/0.5', 'route' => WebsiteResource::class],
     ['id' => 'content.generate', 'title' => 'Viết bài bằng AI', 'what' => 'Sinh dàn ý và bản nháp tiếng Việt, lưu thành phiên bản bài.', 'readiness' => 'active',
-        'evidence' => 'Test ContentPipelineTest, AiPromptPocTest; ContentPipelineService + AiPaddingFilter + HtmlSanitizer.', 'caveat' => 'Dùng AI thật khi có khóa GOOGLE_AI_API_KEY; nếu thiếu khóa sẽ là AI GIẢ LẬP — nội dung chưa có chip nhận biết.', 'task' => '3.1', 'route' => ArticleVersionResource::class],
+        'evidence' => 'Test ContentPipelineTest, AiPromptPocTest; ContentPipelineService + AiPaddingFilter + HtmlSanitizer.', 'caveat' => 'Dùng AI thật khi có khóa GOOGLE_AI_API_KEY; nếu thiếu khóa sẽ là AI GIẢ LẬP — nội dung chưa có chip nhận biết.', 'task' => '3.1', 'route' => \App\Filament\Resources\ArticleResource::class],
     ['id' => 'content.quality', 'title' => 'Kiểm chất lượng bài', 'what' => '9 luật kiểm tra (độ dài, heading, từ khóa, meta, trùng lặp, ảnh, an toàn, số liệu, FAQ); lỗi nặng chặn duyệt.', 'readiness' => 'active',
-        'evidence' => 'Test QualityRulesTest, QualityApproveTest, QualityReviewScreenTest.', 'caveat' => 'Ngưỡng chưa hiệu chỉnh trên dữ liệu thật của công ty.', 'task' => '3.5', 'route' => ArticleVersionResource::class],
+        'evidence' => 'Test QualityRulesTest, QualityApproveTest, QualityReviewScreenTest.', 'caveat' => 'Ngưỡng chưa hiệu chỉnh trên dữ liệu thật của công ty.', 'task' => '3.5', 'route' => \App\Filament\Resources\ArticleResource::class],
     ['id' => 'review.flow', 'title' => 'Duyệt / từ chối / xếp lịch', 'what' => 'Người duyệt xem bản bài, duyệt hoặc từ chối có lý do, rồi xếp lịch đăng.', 'readiness' => 'active',
-        'evidence' => 'Test ReviewWorkflowTest, ReviewActionsTest, ReviewLayoutTest, AuditRecorderTest.', 'caveat' => 'Nhật ký duyệt ghi vào log, chưa có bảng audit_logs (PR-C).', 'task' => '3.4', 'route' => ArticleVersionResource::class],
+        'evidence' => 'Test ReviewWorkflowTest, ReviewActionsTest, ReviewLayoutTest, AuditRecorderTest.', 'caveat' => 'Nhật ký duyệt ghi vào log, chưa có bảng audit_logs (PR-C).', 'task' => '3.4', 'route' => \App\Filament\Resources\ArticleResource::class],
     ['id' => 'publish.schedule', 'title' => 'Lịch xuất bản và tự đăng', 'what' => 'Lượt đăng theo giờ Việt Nam; worker đăng lên WordPress/Magento; chống đăng trùng; đối soát khi CMS không phản hồi.', 'readiness' => 'active',
         'evidence' => 'Test PublishArticleJobTest, AutopublishWorkerTest, ReconcilePublicationJobTest, WordPressConnectorTest, MagentoBridgeClientTest.', 'caveat' => 'Chưa nghiệm thu trên CMS thật (staging/UAT: Chưa chạy).', 'task' => '3.2/3.6/1.2/1.4', 'route' => PublicationResource::class],
     ['id' => 'publish.stop', 'title' => 'Dừng khẩn cấp xuất bản', 'what' => 'Dừng toàn hệ thống hoặc theo website, có lý do và người dừng; khôi phục có kiểm soát.', 'readiness' => 'active',

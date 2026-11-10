@@ -77,8 +77,13 @@ class FeatureRegistryTest extends TestCase
 
     public function test_tu_dong_hoa_ai_chua_co_thi_khong_duoc_danh_dau_hoat_dong(): void
     {
-        foreach (['ai.router', 'ai.selfrepair', 'pipeline.auto'] as $id) {
+        foreach (['ai.router', 'pipeline.auto'] as $id) {
             $this->assertSame('idea', FeatureRegistry::find($id)['readiness']);
+        }
+        // lát dọc AG-S01 chạy được với AI giả lập nhưng chưa có model thật/staging/người nghiệm thu: tối đa "Đang phát triển"
+        foreach (['ai.selfrepair', 'run.slice'] as $id) {
+            $this->assertSame('in_development', FeatureRegistry::find($id)['readiness']);
+            $this->assertStringContainsString('giả lập', FeatureRegistry::find($id)['caveat'].FeatureRegistry::find($id)['what']);
         }
     }
 

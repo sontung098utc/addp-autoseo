@@ -6,6 +6,7 @@ use App\Filament\Support\Planning\DuplicateKeywordException;
 use App\Filament\Support\Planning\PlannedArticleCreator;
 use App\Filament\Support\Schedule\VnTime;
 use App\Models\Article;
+use App\Models\Keyword;
 use App\Models\User;
 use App\Models\Website;
 use Carbon\CarbonImmutable;
@@ -47,9 +48,10 @@ final class PlanActions
         }
         $creator = new PlannedArticleCreator;
         $results = [];
+        $stored = Keyword::where('website_id', $site->id)->get()->keyBy('keyword_key');
         foreach ($keywords as $i => $k) {
             try {
-                $a = $creator->create($actor, $site, $k, $cluster['name'], $intents[$k] ?? $cluster['intent'] ?? 'informational');
+                $a = $creator->create($actor, $site, $k, $cluster['name'], $intents[$k] ?? $cluster['intent'] ?? 'informational', [], $stored->get(Keyword::keyFor($k)), 'keyword');
                 if ($times) {
                     PlanData::setPlannedDate($a->id, $times[$i]);
                 }
