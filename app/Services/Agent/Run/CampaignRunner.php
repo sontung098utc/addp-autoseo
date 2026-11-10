@@ -26,7 +26,7 @@ final class CampaignRunner
 
     /**
      * @return array{result: string, message: string, run: ?AgentRun}
-     *   result: ran | paused | stopped | limit | draft_cap | cost_cap | mode_locked | no_keywords | no_ai | site_inactive
+     *   result: ran | paused | stopped | limit | draft_cap | cost_cap | mode_locked | blocked_gap | no_keywords | no_ai | site_inactive
      */
     public function tick(Campaign $c, ?CarbonImmutable $now = null): array
     {
@@ -98,6 +98,13 @@ final class CampaignRunner
 
         // Chỉ gắn nhãn chế độ; việc đẩy nháp lên CMS là AG-S04.
         $run->forceFill(['trust_mode' => $c->mode])->save();
+
+        if ($run->status === 'blocked' && $run->steps()->where('stage', 'guard')->where('status', 'blocked')->get()->contains(fn ($s) => ($s->data['reason'] ?? null) === 'high_risk_no_knowledge')) {
+            self::raiseWait($c, 'kb_gap', "Cần bổ sung kiến thức cho \"{$keyword}\"",
+                "Bài \"{$keyword}\" thuộc chủ đề rủi ro cao mà kho chưa có kiến thức đã duyệt khớp nên đội AI không viết (phiên #{$run->id}). Cách xử lý: bổ sung kho (Kho trí tuệ / Xây kho từ website) rồi giao lại bài này, hoặc giao lại và chọn \"Vẫn viết dù kho chưa có kiến thức\". Sau 24 giờ sẽ tự bỏ qua và ghi giới hạn.", $now);
+
+            return ['result' => 'blocked_gap', 'message' => "Dừng \"{$keyword}\": chủ đề rủi ro cao, kho chưa có kiến thức (phiên #{$run->id}). Đã ghi mục chờ bổ sung.", 'run' => $run];
+        }
 
         return ['result' => 'ran', 'message' => "Đã giao \"{$keyword}\": phiên #{$run->id} ({$run->status}).", 'run' => $run];
     }

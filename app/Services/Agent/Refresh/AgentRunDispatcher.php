@@ -34,12 +34,13 @@ final class AgentRunDispatcher
         ?RunPolicy $policy = null,
         ?CmsDraftHandoff $handoff = null,
         ?AiModelRouter $router = null,
+        bool $allowWithoutKnowledge = false,
     ): AgentRun {
         $policy ??= new RunPolicy;
         if (self::usesRefresh($article)) {
             return (new ArticleRefreshRunner($ai, stop: $stop, policy: $policy, handoff: $handoff, router: $router))->run($article, $actor, $trigger, $campaignId);
         }
 
-        return (new AgentRunOrchestrator($ai, stop: $stop, policy: $policy, handoff: $handoff, router: $router))->run($article, $actor, $trigger, $campaignId);
+        return (new AgentRunOrchestrator($ai, stop: $stop, policy: $policy, handoff: $handoff, router: $router))->run($article, $actor, $trigger, $campaignId, null, $allowWithoutKnowledge);
     }
 }

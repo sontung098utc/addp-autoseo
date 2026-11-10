@@ -94,8 +94,12 @@ final class AgentRunOrchestrator
     /** @var list<mixed>|null dàn ý có sẵn do người gọi truyền vào (G4); null = tự lập dàn ý như cũ */
     private ?array $presetOutline = null;
 
-    public function run(Article $article, ?User $actor = null, string $trigger = 'manual', ?int $campaignId = null, ?array $presetOutline = null): AgentRun
+    /** người dùng chọn vẫn viết dù chủ đề rủi ro cao và kho chưa có kiến thức */
+    private bool $allowWithoutKnowledge = false;
+
+    public function run(Article $article, ?User $actor = null, string $trigger = 'manual', ?int $campaignId = null, ?array $presetOutline = null, bool $allowWithoutKnowledge = false): AgentRun
     {
+        $this->allowWithoutKnowledge = $allowWithoutKnowledge;
         $this->presetOutline = $presetOutline === [] ? null : $presetOutline;
         $this->seq = 0;
         $this->trigger = $trigger;
@@ -138,6 +142,33 @@ final class AgentRunOrchestrator
         }
     }
 
+    /** @return bool true = phải dừng phiên (đã ghi step và trả bài về trạng thái cũ). Lỗi khi tính thì chạy tiếp như cũ. */
+    private function knowledgeGate(AgentRun $run, Article $article, \App\Services\Agent\Risk\RiskAssessment $assess, string $previousStatus): bool
+    {
+        try {
+            $ready = \App\Services\Agent\Readiness\ArticleReadiness::for($article, $this->campaignId);
+            if (! ($ready['holds_writing'] ?? false)) {
+                return false;
+            }
+        } catch (Throwable $e) {
+            report($e);
+
+            return false;
+        }
+        $data = ['reason' => 'high_risk_no_knowledge', 'risk_level' => $assess->level, 'knowledge_count' => 0];
+        if ($this->allowWithoutKnowledge) {
+            $this->step($run, 'guard', 'system', 'warn', 'Viết dù kho chưa có kiến thức (người dùng chọn)', 'Chủ đề rủi ro cao và kho có 0 mục kiến thức đã duyệt khớp, nhưng người giao việc đã chọn vẫn viết. Bài chỉ là bản nháp và cần người có chuyên môn duyệt.', $data + ['allowed' => true]);
+
+            return false;
+        }
+        $why = implode(' ', $assess->reasons);
+        $this->step($run, 'guard', 'system', 'blocked', 'Dừng trước bước viết: chủ đề rủi ro cao, kho chưa có kiến thức',
+            'Hạng rủi ro: '.$this->levelLabel($assess->level).($why !== '' ? ' ('.$why.')' : '').'. Kho có 0 mục kiến thức đã duyệt khớp chủ đề nên đội AI không viết (chưa tốn token AI nào). Cách xử lý: bổ sung kho (Kho trí tuệ / Xây kho từ website) rồi giao lại, hoặc giao lại và chọn "Vẫn viết dù kho chưa có kiến thức".', $data);
+        $article->update(['workflow_status' => $previousStatus]);
+
+        return true;
+    }
+
     private function execute(AgentRun $run, Article $article, string $previousStatus): AgentRun
     {
         $site = $article->website;
@@ -171,6 +202,11 @@ final class AgentRunOrchestrator
         $this->step($run, 'risk', 'editor', $assess->level === 'high' ? 'warn' : 'ok', 'Hạng rủi ro: '.$this->levelLabel($assess->level),
             ($assess->reasons === [] && $brainRaise === '' ? 'Chủ đề thường, không chạm nhóm nhạy cảm.' : implode(' ', $assess->reasons).$brainRaise).($assess->level === 'high' ? ' Bài cần người có chuyên môn duyệt.' : ''),
             ['level' => $assess->level] + ($brainRaise !== '' ? ['raised_by_brain' => true] : []) + $this->brainCtx->stepData());
+
+        // 2b. Cổng kiến thức: rủi ro cao mà kho chưa có mục đã duyệt khớp thì dừng TRƯỚC khi gọi AI (trừ khi người dùng chọn vẫn viết).
+        if ($this->knowledgeGate($run, $article, $assess, $previousStatus)) {
+            return $this->finish($run, 'blocked', 'Dừng trước bước viết: chủ đề rủi ro cao, kho chưa có kiến thức đã duyệt khớp.');
+        }
 
         if ($this->router) {
             foreach (($this->roleOff('strategist') ? ['write'] : ['outline', 'write']) as $task) {
