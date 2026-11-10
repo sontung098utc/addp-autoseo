@@ -42,15 +42,16 @@
                             <div class="ss-muted ss-text-xs" data-testid="brand-completeness">Hồ sơ doanh nghiệp {{ $c['brand']['filled'] }}/{{ $c['brand']['total'] }} trường @if (! $c['brand']['has_site'])(chưa gắn website)@endif</div>
                         @endif
                         <div class="bl-row ss-text-xs">
-                            <span>{{ $c['sources'] }} nguồn</span><span>·</span><span>{{ $c['items'] }} mục</span>
+                            <span>{{ $c['sources'] }} tài liệu</span><span>·</span><span>{{ $c['items'] }} mục</span>
                             @if ($c['proposed'])<x-studio.badge tone="warn">{{ $c['proposed'] }} chờ duyệt</x-studio.badge>@endif
                         </div>
                         <div class="bl-row ss-text-xs">
                             <span>Độ khỏe</span>
                             <x-studio.hint text="Mâu thuẫn: cùng thực thể và trường nhưng khác giá trị. Cũ: mục đã duyệt nhưng quá hiệu lực. Khoảng trống: truy vấn Người viết không tìm thấy kiến thức đã duyệt." />
-                            @if ($c['conflicts'] + $c['expired'] + $c['gaps'] === 0)
+                            @if ($c['conflicts'] + $c['expired'] + $c['gaps'] === 0 && ! $c['needs_source'])
                                 <x-studio.badge tone="ok">Không cảnh báo</x-studio.badge>
                             @else
+                                @if ($c['needs_source'])<x-studio.badge tone="warn">Chưa có nguồn xác nhận</x-studio.badge>@endif
                                 @if ($c['conflicts'])<x-studio.badge tone="danger">{{ $c['conflicts'] }} mâu thuẫn</x-studio.badge>@endif
                                 @if ($c['expired'])<x-studio.badge tone="warn">{{ $c['expired'] }} cũ</x-studio.badge>@endif
                                 @if ($c['gaps'])<x-studio.badge tone="warn">{{ $c['gaps'] }} khoảng trống</x-studio.badge>@endif
@@ -70,8 +71,11 @@
                         <x-studio.hint tone="warning" text="Mẫu chỉ mang khung cấu trúc, quy tắc an toàn, tên thuật ngữ (chưa có định nghĩa) và gợi ý nguồn chưa xác nhận. Chưa có kiến thức nào được duyệt; cần chuyên gia điền và duyệt trước khi dùng. Mẫu đã cài thì bỏ qua, không ghi đè bản bạn đã sửa. Không tự gắn website." />
                     </div>
                     <form wire:submit="installSelected" style="display:flex;flex-direction:column;gap:.5rem">
+                        <div class="bl-row"><x-filament::button type="button" size="xs" color="gray" wire:click="selectNotInstalled">Chọn các mục chưa cài</x-filament::button>
+                            <x-filament::button type="button" size="xs" color="gray" x-on:click="$wire.set('installKeys', [])">Bỏ chọn hết</x-filament::button></div>
                         @foreach ($healthTemplates as $k => $n)
-                            <label style="display:block"><input type="checkbox" wire:model="installKeys" value="{{ $k }}"> {{ $n }}@if (isset($installed[$k])) <span class="ss-muted ss-text-xs">(đã có)</span>@endif</label>
+                            @php $has = isset($installed[$k]); @endphp
+                            <label style="display:block;{{ $has ? 'opacity:.55' : '' }}"><input type="checkbox" wire:model="installKeys" value="{{ $k }}" @disabled($has)> {{ $n }}@if ($has) <span class="ss-muted ss-text-xs">(đã có)</span>@endif</label>
                         @endforeach
                         <div class="bl-row" style="justify-content:flex-end">
                             <x-filament::button type="button" color="gray" wire:click="closeInstall">Hủy</x-filament::button>
@@ -87,13 +91,13 @@
                 <div class="bl-modal__b">
                     <div class="ss-card__h">Tạo trí tuệ</div>
                     <form wire:submit="createBrain" style="display:flex;flex-direction:column;gap:.7rem">
-                        <label>Mẫu <x-studio.hint text="Mẫu chỉ mang khung cấu trúc và quy tắc, không mang sự kiện hay số liệu. Bạn tự điền thuật ngữ và kiến thức."/>
+                        <label>Mẫu <x-studio.hint text="Chọn Trống nếu muốn tự điền từ đầu. Mẫu chỉ mang khung cấu trúc và quy tắc, không mang sự kiện hay số liệu; bạn tự điền thuật ngữ và kiến thức."/>
                             <select class="bl-in" wire:model.live="create.template">@foreach ($templates as $k => $t)<option value="{{ $k }}">{{ $t['name'] }}</option>@endforeach</select></label>
                         @if (isset($templates[$create['template']]))
                             <div class="ss-muted ss-text-xs">{{ $templates[$create['template']]['description'] }} Mức dựa vào AI mặc định: {{ $reliances[$templates[$create['template']]['ai_reliance']] ?? '' }}.</div>
                         @endif
-                        <label>Tên<input class="bl-in" wire:model="create.name" maxlength="160" placeholder="Ví dụ: Y khoa – sức khỏe" required></label>
-                        <fieldset><legend>Website dùng Trí tuệ này</legend>
+                        <label>Tên (bắt buộc)<input class="bl-in" wire:model="create.name" maxlength="160" placeholder="Ví dụ: Y khoa – sức khỏe" required></label>
+                        <fieldset><legend>Website dùng Trí tuệ này <x-studio.hint text="Tùy chọn. Không chọn thì Trí tuệ chưa áp dụng cho website nào; gắn sau ở tab Cài đặt."/></legend>
                             @foreach ($sites as $s)<label style="display:block"><input type="checkbox" wire:model="create.websites" value="{{ $s->id }}"> {{ $s->name }}</label>@endforeach
                             @if ($sites->isEmpty())<span class="ss-muted ss-text-xs">Chưa có website.</span>@endif
                         </fieldset>

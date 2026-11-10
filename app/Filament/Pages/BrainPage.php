@@ -256,7 +256,14 @@ class BrainPage extends KnowledgePage implements HasForms
         $this->guard();
         try {
             $s = $this->ownSource($id);
-            $tier === '' ? (new BrainSourceRegistry())->unconfirm($s, Auth::user()) : (new BrainSourceRegistry())->confirm($s, $tier, Auth::user());
+            if ($tier === '') {
+                (new BrainSourceRegistry())->unconfirm($s, Auth::user());
+                Notification::make()->title('Đã bỏ bậc của "'.$s->name.'"')->body('Nguồn trở về chưa xác nhận, không còn được tính.')->success()->send();
+
+                return;
+            }
+            $s = (new BrainSourceRegistry())->confirm($s, $tier, Auth::user());
+            Notification::make()->title($tier === 'blocked' ? 'Đã chặn "'.$s->name.'"' : 'Đã xác nhận "'.$s->name.'" ở '.mb_strtolower(BrainSource::TIERS[$tier] ?? $tier))->success()->send();
         } catch (KnowledgeError $e) {
             Notification::make()->title('Chưa lưu được')->body($e->getMessage())->danger()->send();
         }
@@ -265,13 +272,16 @@ class BrainPage extends KnowledgePage implements HasForms
     public function unconfirmSource(int $id): void
     {
         $this->guard();
-        (new BrainSourceRegistry())->unconfirm($this->ownSource($id), Auth::user());
+        $s = (new BrainSourceRegistry())->unconfirm($this->ownSource($id), Auth::user());
+        Notification::make()->title('Đã rút xác nhận "'.$s->name.'"')->body('Nguồn không còn được tính khi kiểm bằng chứng.')->success()->send();
     }
 
     public function removeSource(int $id): void
     {
         $this->guard();
-        (new BrainSourceRegistry())->remove($this->ownSource($id), Auth::user());
+        $s = $this->ownSource($id);
+        (new BrainSourceRegistry())->remove($s, Auth::user());
+        Notification::make()->title('Đã xóa "'.$s->name.'" khỏi Sổ nguồn')->success()->send();
     }
 
     public function toggleArchive(): void
@@ -296,6 +306,7 @@ class BrainPage extends KnowledgePage implements HasForms
             'brandCompleteness' => $bc, 'canEditBrand' => BrandProfileEditor::canEdit(Auth::user()),
             'authoritySources' => $b->authoritySources()->orderByRaw("case when status='confirmed' then 0 else 1 end")->orderBy('name')->get(),
             'tiers' => BrainSource::TIERS,
+            'confirmers' => \App\Models\User::query()->whereIn('id', $b->authoritySources()->whereNotNull('confirmed_by')->pluck('confirmed_by'))->pluck('name', 'id')->all(),
             'sampleLabel' => (string) ($b->settings['sample_label'] ?? ''),
             'completeness' => ($b->profile ?? new BrainProfile())->completeness(),
             'missingFields' => collect(BrainProfile::FIELDS)->filter(fn ($l, $path) => ! ($b->profile ?? new BrainProfile())->hasValue($path))->values()->all(),

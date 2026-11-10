@@ -79,10 +79,13 @@
                     <tbody>
                     @foreach ($authoritySources as $src)
                         <tr data-source="{{ $src->id }}">
-                            <td style="min-width:14rem">{{ $src->name }}<div class="ss-muted ss-text-xs">{{ $src->domain }}@if ($src->note) · {{ $src->note }}@endif</div></td>
+                            <td style="min-width:14rem">{{ $src->name }}<div class="ss-muted ss-text-xs">{{ $src->domain }}@if ($src->note) · {{ $src->note }}@endif</div>
+                                @if ($src->status === 'confirmed' && $src->confirmed_at)<div class="ss-muted ss-text-xs" data-testid="confirmed-by">Xác nhận bởi {{ $confirmers[$src->confirmed_by] ?? 'người dùng đã xóa' }}, {{ $src->confirmed_at->format('d/m/Y') }}</div>@endif</td>
                             <td style="width:1%;white-space:nowrap">
                                 @if ($canEdit)
-                                    <select class="kb-in" aria-label="Bậc của {{ $src->name }}" wire:change="setSourceTier({{ $src->id }}, $event.target.value)">
+                                    {{-- Bậc 1–2 là mức tin cậy cao nhất: hỏi lại trước khi áp dụng, hủy thì trả ô chọn về giá trị cũ --}}
+                                    <select class="kb-in" aria-label="Bậc của {{ $src->name }}" x-data
+                                        x-on:change="if (['1','2'].includes($event.target.value) && ! confirm('Xác nhận nguồn này ở bậc ' + $event.target.value + '? Nguồn bậc cao được tính là bằng chứng chính khi kiểm bài.')) { $event.target.value = @js((string) $src->tier); return }; $wire.setSourceTier({{ $src->id }}, $event.target.value)">
                                         <option value="">Chọn bậc…</option>
                                         @foreach ($tiers as $k => $l)<option value="{{ $k }}" @selected((string) $src->tier === (string) $k)>{{ $l }}</option>@endforeach
                                     </select>
@@ -94,7 +97,7 @@
                             @if ($canEdit)
                                 <td style="width:1%;white-space:nowrap">
                                     @if ($src->status === 'confirmed')<x-filament::button size="xs" color="gray" wire:click="unconfirmSource({{ $src->id }})">Rút xác nhận</x-filament::button>@endif
-                                    <x-filament::button size="xs" color="danger" wire:click="removeSource({{ $src->id }})" wire:confirm="Xóa nguồn này khỏi sổ?">Xóa</x-filament::button>
+                                    <x-filament::button size="xs" color="gray" outlined wire:click="removeSource({{ $src->id }})" wire:confirm="Xóa nguồn này khỏi sổ?">Xóa</x-filament::button>
                                 </td>
                             @endif
                         </tr>

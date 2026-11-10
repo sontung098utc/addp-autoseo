@@ -51,6 +51,21 @@ class BrainSourceRegistryUiTest extends TestCase
         $this->assertSame(0, BrainSource::count());
     }
 
+    public function test_thao_tac_so_nguon_co_thong_bao_va_hien_nguoi_xac_nhan(): void
+    {
+        $b = $this->brain();
+        $u = $this->user('approver');
+        $this->actingAs($u);
+        $s = BrainSource::create(['brain_id' => $b->id, 'name' => 'WHO', 'domain' => 'who.int', 'status' => 'suggested']);
+        $t = Livewire::test(BrainPage::class, ['brain' => $b->id]);
+        $t->call('setSourceTier', $s->id, '1')->assertNotified('Đã xác nhận "WHO" ở bậc 1: chính thức');
+        $t->assertSeeHtml('data-testid="confirmed-by"')->assertSee('Xác nhận bởi approver, '.now()->format('d/m/Y'));
+        $t->call('setSourceTier', $s->id, 'blocked')->assertNotified('Đã chặn "WHO"');
+        $t->call('unconfirmSource', $s->id)->assertNotified('Đã rút xác nhận "WHO"');
+        $t->assertDontSee('Xác nhận bởi');
+        $t->call('removeSource', $s->id)->assertNotified('Đã xóa "WHO" khỏi Sổ nguồn');
+    }
+
     public function test_tien_mien_sai_bi_tu_choi_khong_luu(): void
     {
         $b = $this->brain();
