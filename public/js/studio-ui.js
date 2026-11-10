@@ -8,18 +8,40 @@ document.addEventListener('alpine:init', () => {
   };
 
   Alpine.data('studioTabs', (def, persist) => ({
-    active: def,
+    active: def, canStart: false, canEnd: false,
     init() {
       const keys = this.keys();
       const fromHash = location.hash.startsWith('#tab-') ? location.hash.slice(5) : null;
       const saved = persist ? store('session', 'studio.tab.' + persist, null) : null;
       const pick = [fromHash, saved].find((k) => k && keys.includes(k));
       if (pick) this.active = pick;
+      this.$nextTick(() => { this.measure(); this.reveal(false); });
+      if (window.ResizeObserver) new ResizeObserver(() => this.measure()).observe(this.$refs.strip);
+    },
+    // Dấu cuộn: hiện bóng mờ + mũi tên ở mép còn nội dung bị cắt.
+    measure() {
+      const s = this.$refs.strip; if (!s) return;
+      this.canStart = s.scrollLeft > 2;
+      this.canEnd = s.scrollLeft + s.clientWidth < s.scrollWidth - 2;
+    },
+    nudge(dir) {
+      const s = this.$refs.strip; const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      s.scrollBy({ left: dir * Math.max(120, s.clientWidth * 0.6), behavior: reduce ? 'auto' : 'smooth' });
+    },
+    // Đưa tab đang chọn vào khung nhìn (chỉ cuộn ngang thanh tab, không cuộn trang).
+    reveal(smooth = true) {
+      const s = this.$refs.strip; const t = s && s.querySelector('[role=tab][data-key="' + this.active + '"]'); if (!t) return;
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const pad = 36; const l = t.offsetLeft - pad; const r = t.offsetLeft + t.offsetWidth + pad;
+      let x = s.scrollLeft;
+      if (l < s.scrollLeft) x = Math.max(0, l); else if (r > s.scrollLeft + s.clientWidth) x = r - s.clientWidth;
+      if (x !== s.scrollLeft) s.scrollTo({ left: x, behavior: smooth && !reduce ? 'smooth' : 'auto' });
     },
     keys() { return [...this.$el.querySelectorAll('[role=tab]')].map((e) => e.dataset.key); },
     set(k) {
       this.active = k;
       if (persist) save('session', 'studio.tab.' + persist, k);
+      this.$nextTick(() => this.reveal());
     },
     onKey(e) {
       const keys = this.keys(); let i = keys.indexOf(this.active);
