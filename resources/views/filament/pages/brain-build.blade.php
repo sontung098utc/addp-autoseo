@@ -7,7 +7,52 @@
         .bb-t th,.bb-t td{text-align:left;padding:.35rem .5rem;border-bottom:1px solid rgba(128,128,128,.25);vertical-align:top}
     </style>
     <div class="ss-page">
-        <div class="ss-alert ss-alert--info" role="note" data-testid="bb-note">{{ $this->note() }}</div>
+        <div class="ss-card" data-testid="bb-discover"><div class="ss-card__b">
+            <div class="ss-card__h">Khám phá nguồn trên web</div>
+            @if (! $webAv['ok'])
+                <div class="ss-alert ss-alert--warn" role="status" data-testid="bb-web-off">{{ $webAv['reason'] }}</div>
+            @elseif ($webAv['demo'])
+                <div class="ss-alert ss-alert--warn" role="status">Đang dùng tìm kiếm mô phỏng (môi trường local), kết quả không phải trang thật.</div>
+            @endif
+            <p class="ss-muted ss-text-sm">Mô tả chủ đề, hệ thống tìm trên web và đề xuất nguồn. Nguồn tin cậy (cơ quan nhà nước, giáo dục, tổ chức y khoa trong danh sách) được tự nhận khi có đoạn nguyên văn; nguồn chưa rõ chỉ đề xuất để bạn duyệt một lần; mạng xã hội, diễn đàn, chợ bị loại. Mọi mục có nhãn nguồn và hoàn tác được.</p>
+            <div class="bb-row">
+                <label style="flex:1;min-width:16rem">Chủ đề bạn muốn tìm tài liệu
+                    <input class="bb-in" type="text" wire:model="topic" wire:keydown.enter="discover" maxlength="200" placeholder="Ví dụ: chế độ ăn cho người tiểu đường" data-testid="bb-topic">
+                </label>
+                <x-filament::button wire:click="discover" wire:loading.attr="disabled" :disabled="! $webAv['ok']">Tìm nguồn</x-filament::button>
+                <span wire:loading wire:target="discover" class="ss-muted ss-text-sm">Đang tìm…</span>
+            </div>
+            @if ($candidates !== [])
+                <div data-testid="bb-candidates">
+                @foreach ($candidates as $c)
+                    @php $lv = $c['trust']['level']; @endphp
+                    <label class="ss-card" style="display:block;margin:.5rem 0;padding:.6rem .75rem;border:1px solid rgba(128,128,128,.3);border-radius:.4rem" data-testid="bb-cand">
+                        <input type="checkbox" wire:model="picked" value="{{ $c['url'] }}">
+                        <a href="{{ $c['url'] }}" target="_blank" rel="noopener noreferrer"><strong>{{ $c['title'] }}</strong></a>
+                        <x-studio.badge :tone="$lv === 'trusted' ? 'ok' : 'muted'">{{ $lv === 'trusted' ? 'Tin cậy' : 'Chưa rõ' }}</x-studio.badge>
+                        <span class="ss-muted ss-text-xs">{{ $c['domain'] }}</span>
+                        @if ($c['snippet'] !== '')<br><span class="ss-text-sm">{{ \Illuminate\Support\Str::limit($c['snippet'], 220) }}</span>@endif
+                        <br><span class="ss-muted ss-text-xs">Lý do xếp: {{ $c['trust']['reason'] }}</span>
+                    </label>
+                @endforeach
+                </div>
+                <div class="bb-row">
+                    <x-filament::button wire:click="addPicked" wire:loading.attr="disabled" :disabled="$picked === []">Thêm nguồn đã chọn</x-filament::button>
+                    <x-filament::button color="success" wire:click="addAllTrusted" wire:loading.attr="disabled">Thêm tất cả nguồn tin cậy</x-filament::button>
+                    <span wire:loading wire:target="addPicked,addAllTrusted" class="ss-muted ss-text-sm">Đang đọc các trang, vui lòng chờ…</span>
+                </div>
+                @if ($searchMeta)<p class="ss-muted ss-text-xs">Truy vấn: «{{ $searchMeta['query'] }}» · chi phí tìm ước lượng {{ number_format($searchMeta['cost_vnd'], 0, ',', '.') }} ₫ · tổng cộng tối đa {{ number_format(\App\Services\Knowledge\Build\BrainBuildService::totalBudgetVnd(), 0, ',', '.') }} ₫ cho lần thêm.</p>@endif
+            @endif
+            @if ($webReport)
+                <div class="ss-alert ss-alert--info" role="status" data-testid="bb-web-report">
+                    Đã đọc {{ $webReport['imported'] }} nguồn · {{ $webReport['items_auto'] }} mục tự nhận (xem bên dưới, có Hoàn tác) · <a href="{{ $reviewUrl }}" wire:navigate>{{ $webReport['items_proposed'] }} mục chờ duyệt</a> · chi phí ước lượng {{ number_format($webReport['cost_vnd'], 0, ',', '.') }} ₫.
+                    @if ($webReport['stopped_reason'] === 'budget') Dừng vì chạm trần chi phí.@endif
+                    @foreach ($webReport['pages'] as $pg)@if (! $pg['ok'])<br><span class="ss-text-xs">{{ $pg['domain'] }}: {{ $pg['message'] }}</span>@endif @endforeach
+                </div>
+            @endif
+        </div></div>
+
+        <div class="ss-alert ss-alert--info" role="note" data-testid="bb-note" style="margin-top:1rem">{{ $this->note() }}</div>
         <div class="ss-alert ss-alert--info" role="note" style="margin-top:.5rem">Chạy nền và chạy theo lịch chưa có: lượt xây chạy ngay trong trang và dừng nếu bạn đóng trang giữa chừng.</div>
 
         <div class="ss-card" style="margin-top:1rem"><div class="ss-card__b">
@@ -86,7 +131,7 @@
                 <table class="bb-t"><thead><tr><th>Mục</th><th>Loại</th><th>Căn cứ</th><th></th></tr></thead><tbody>
                 @foreach ($autoItems as $it)
                     <tr>
-                        <td><strong>{{ $it->title }}</strong> <x-studio.badge tone="info">tự nhận</x-studio.badge><br><span class="ss-muted ss-text-xs">{{ \Illuminate\Support\Str::limit($it->body, 160) }}</span></td>
+                        <td><strong>{{ $it->title }}</strong> <x-studio.badge tone="info">tự nhận</x-studio.badge>@if ($it->source?->origin === 'search')<x-studio.badge tone="muted">web: {{ parse_url((string) $it->source->url, PHP_URL_HOST) }} · {{ $it->source->fetched_at?->format('d/m/Y') }}</x-studio.badge>@endif<br><span class="ss-muted ss-text-xs">{{ \Illuminate\Support\Str::limit($it->body, 160) }}</span></td>
                         <td>{{ \App\Models\KnowledgeItem::TYPES[$it->type] ?? $it->type }}</td>
                         <td class="ss-muted ss-text-xs">{{ \Illuminate\Support\Str::limit((string) $it->source_span, 120) }}</td>
                         <td><x-filament::button size="xs" color="gray" wire:click="undo({{ $it->id }})">Hoàn tác</x-filament::button></td>

@@ -9,7 +9,9 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 /**
- * G2: tải MỘT trang của chính website, an toàn. Không bao giờ tải tên miền ngoài.
+ * G2: tải MỘT trang của chính website, an toàn. fetch() không bao giờ tải tên miền ngoài.
+ * Chế độ NGOÀI (fetchExternal, dùng khi người dùng chọn nguồn tìm được trên web): cùng mọi chốt an toàn dưới đây, chỉ bỏ ràng buộc tên miền;
+ * mỗi bước chuyển hướng vẫn qua UrlSafetyService::validateUrl (chặn IP nội bộ) và robots.txt của chính tên miền đó; không gửi cookie hay khóa.
  * - Mọi URL (kể cả mỗi bước chuyển hướng) qua UrlSafetyService::validateUrl; tự chuyển hướng của HTTP client bị TẮT,
  *   tự theo tối đa 3 lần và kiểm lại từng đích; đích ngoài tên miền cho phép thì dừng.
  * - Tối đa 2 MB, chờ 10 giây, chỉ nhận text/html và text/plain, User-Agent rõ ràng, tôn trọng robots.txt của chính site,
@@ -62,8 +64,14 @@ final class SafePageFetcher
         return false;
     }
 
-    /** @param list<string> $allowedHosts @return array<string,mixed> */
-    public function fetch(string $url, array $allowedHosts): array
+    /** Tải một trang ở tên miền BẤT KỲ (đã chọn là nguồn ngoài), vẫn mọi chốt an toàn trừ ràng buộc tên miền. @return array<string,mixed> */
+    public function fetchExternal(string $url): array
+    {
+        return $this->fetch($url, null);
+    }
+
+    /** @param ?list<string> $allowedHosts null = chế độ ngoài (không ràng buộc tên miền) @return array<string,mixed> */
+    public function fetch(string $url, ?array $allowedHosts): array
     {
         $current = trim($url);
         for ($hop = 0; $hop <= self::MAX_REDIRECTS; $hop++) {
@@ -108,7 +116,7 @@ final class SafePageFetcher
     }
 
     /** Kiểm một URL: giao thức/IP nội bộ (blocked) rồi tên miền (off_domain). @return ?array<string,mixed> */
-    private function gate(string $u, array $allowed, string $origin): ?array
+    private function gate(string $u, ?array $allowed, string $origin): ?array
     {
         try {
             $this->safety->validateUrl($u);
@@ -116,7 +124,7 @@ final class SafePageFetcher
             return $this->err($origin, 'blocked', $e->getMessage());
         }
         $host = (string) parse_url($u, PHP_URL_HOST);
-        if (! self::hostAllowed($host, $allowed)) {
+        if ($allowed !== null && ! self::hostAllowed($host, $allowed)) {
             return $this->err($origin, 'off_domain', "Tên miền '{$host}' không thuộc website nên không tải.");
         }
 
@@ -172,7 +180,7 @@ final class SafePageFetcher
     }
 
     /** @return ?array<string,mixed> */
-    private function robotsGate(string $url, array $allowed, string $origin): ?array
+    private function robotsGate(string $url, ?array $allowed, string $origin): ?array
     {
         $p = parse_url($url);
         $host = strtolower((string) ($p['host'] ?? ''));

@@ -10,14 +10,18 @@ use App\Services\Crawler\SitemapCrawlerService;
 use App\Services\Knowledge\Build\BrainBuildService;
 use App\Services\Knowledge\Build\BrandProfileDrafter;
 use App\Services\Knowledge\Build\SafePageFetcher;
+use App\Services\Knowledge\Discover\SourceDiscoveryService;
 use App\Services\Knowledge\KnowledgeError;
 use App\Services\Knowledge\KnowledgeReview;
 use App\Services\Knowledge\Suggest\KnowledgeSuggestions;
+use App\Services\Search\WebSearchResolver;
+use App\Services\Search\WebSearchUnavailable;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Url;
 
 /** G2: xây kho trí tuệ từ chính website. Chạy đồng bộ trong trang (chưa có chạy nền). Chỉ người duyệt trở lên. */
 class BrainBuildPage extends Page
@@ -44,6 +48,22 @@ class BrainBuildPage extends Page
 
     /** @var array<string,mixed>|null kết quả lượt vừa chạy */
     public ?array $result = null;
+
+    /** Khám phá nguồn trên web: chủ đề (có thể đến từ ?topic= của bài), ứng viên tìm được, nguồn đã chọn (URL), báo cáo lần thêm gần nhất. */
+    #[Url]
+    public string $topic = '';
+
+    /** @var list<array<string,mixed>> */
+    public array $candidates = [];
+
+    /** @var array<string,mixed>|null */
+    public ?array $searchMeta = null;
+
+    /** @var list<string> */
+    public array $picked = [];
+
+    /** @var array<string,mixed>|null */
+    public ?array $webReport = null;
 
     public static function canAccess(): bool
     {
@@ -80,13 +100,13 @@ class BrainBuildPage extends Page
 
             return ['id' => $r->id, 'at' => $r->started_at?->format('d/m/Y H:i'), 'status' => $r->status, 'pages' => $pages->count(), 'items' => (int) $pages->sum(fn ($s) => (int) ($s->data['items'] ?? 0)), 'cost' => (float) $r->cost_vnd, 'reason' => $r->outcome_reason];
         })->all();
-        $auto = KnowledgeItem::query()->where('review_mode', 'auto')->where('status', 'approved')->when($this->websiteId, fn ($q) => $q->where('website_id', $this->websiteId))->latest('id')->limit(30)->get();
+        $auto = KnowledgeItem::query()->with('source')->where('review_mode', 'auto')->where('status', 'approved')->when($this->websiteId, fn ($q) => $q->where('website_id', $this->websiteId))->latest('id')->limit(30)->get();
 
         $brand = $site ? BrandProfileDrafter::last($site->id) : null;
         $suggestions = $site ? (new KnowledgeSuggestions)->forWebsite($site, 20) : [];
         $brandProfile = $site ? BrandProfileData::forWebsite($site->id) : null;
 
-        return ['brandAuto' => $brand, 'brandMissing' => BrandProfileData::completeness($brandProfile)['missing'], 'suggestions' => $suggestions, 'sites' => Website::query()->orderBy('name')->get(['id', 'name', 'base_url', 'status']), 'off' => $off, 'avLabel' => $av['label'], 'avDemo' => $av['demo'], 'runs' => $runs, 'autoItems' => $auto, 'statusLabels' => ['running' => 'Đang chạy', 'ready_for_review' => 'Xong', 'blocked' => 'Bị chặn', 'failed' => 'Lỗi', 'held' => 'Tạm giữ'], 'reviewUrl' => KnowledgePage::getUrl()];
+        return ['brandAuto' => $brand, 'brandMissing' => BrandProfileData::completeness($brandProfile)['missing'], 'suggestions' => $suggestions, 'sites' => Website::query()->orderBy('name')->get(['id', 'name', 'base_url', 'status']), 'off' => $off, 'avLabel' => $av['label'], 'avDemo' => $av['demo'], 'runs' => $runs, 'autoItems' => $auto, 'statusLabels' => ['running' => 'Đang chạy', 'ready_for_review' => 'Xong', 'blocked' => 'Bị chặn', 'failed' => 'Lỗi', 'held' => 'Tạm giữ'], 'reviewUrl' => KnowledgePage::getUrl(), 'webAv' => (new WebSearchResolver)->availability()];
     }
 
     /** Nút "Bắt đầu xây kho" chỉ mở hộp xác nhận; việc chạy thật nằm ở build(). */
@@ -125,6 +145,69 @@ class BrainBuildPage extends Page
             return;
         }
         Notification::make()->title('Đã xây xong lượt này')->body($this->result['items_auto'].' mục tự nhận, '.$this->result['items_proposed'].' mục chờ duyệt.')->success()->send();
+    }
+
+    /** "Tìm nguồn": soạn truy vấn bằng luật, tìm trên web, hiện danh sách nguồn có nhãn tin cậy và lý do. Chưa tải trang nào. */
+    public function discover(): void
+    {
+        $this->guard();
+        $this->webReport = null;
+        $site = $this->websiteId ? Website::find($this->websiteId) : null;
+        if ($site === null || trim($this->topic) === '') {
+            Notification::make()->title('Chưa tìm được')->body('Chọn website và nhập chủ đề cần tìm tài liệu.')->warning()->send();
+
+            return;
+        }
+        try {
+            $d = app(SourceDiscoveryService::class)->discover($site, $this->topic);
+        } catch (WebSearchUnavailable $e) {
+            $this->candidates = [];
+            $this->searchMeta = null;
+            Notification::make()->title('Chưa tìm được')->body($e->getMessage())->warning()->send();
+
+            return;
+        }
+        $this->candidates = $d['candidates'];
+        $this->searchMeta = ['query' => $d['query'], 'results' => count($d['candidates']), 'cost_vnd' => $d['cost_vnd'], 'provider' => $d['provider'], 'field' => $d['field'], 'demo' => $d['demo'], 'label' => $d['label']];
+        $this->picked = [];
+        if ($this->candidates === []) {
+            Notification::make()->title('Không có nguồn phù hợp')->body('Thử chủ đề khác hoặc cụ thể hơn.')->warning()->send();
+        }
+    }
+
+    public function addPicked(): void
+    {
+        $this->importWeb(array_values(array_filter($this->candidates, fn ($c) => in_array($c['url'], $this->picked, true))));
+    }
+
+    /** Một cú bấm: thêm mọi nguồn tin cậy, không hỏi thêm. */
+    public function addAllTrusted(): void
+    {
+        $this->importWeb(array_values(array_filter($this->candidates, fn ($c) => ($c['trust']['level'] ?? '') === 'trusted')));
+    }
+
+    /** @param list<array<string,mixed>> $chosen */
+    private function importWeb(array $chosen): void
+    {
+        $this->guard();
+        $site = $this->websiteId ? Website::find($this->websiteId) : null;
+        if ($site === null || $chosen === []) {
+            Notification::make()->title('Chưa có nguồn nào được chọn')->warning()->send();
+
+            return;
+        }
+        @set_time_limit(300);
+        try {
+            $r = app(SourceDiscoveryService::class)->import($site, $chosen, Auth::user(), ['field' => $this->searchMeta['field'] ?? null, 'search' => $this->searchMeta ?? []]);
+        } catch (KnowledgeError $e) {
+            Notification::make()->title('Chưa thêm được')->body($e->getMessage())->danger()->send();
+
+            return;
+        }
+        $this->webReport = $r;
+        $this->searchMeta = null; // chi phí tìm chỉ tính vào lần thêm đầu
+        $this->picked = [];
+        Notification::make()->title('Đã thêm nguồn')->body($r['imported'].' nguồn đã đọc, '.$r['items_auto'].' mục tự nhận, '.$r['items_proposed'].' mục chờ duyệt.')->success()->send();
     }
 
     public function undo(int $id): void

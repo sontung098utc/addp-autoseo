@@ -62,6 +62,18 @@ final class BrainBuildService
     /** @var list<string> */
     private array $keywordTokens = [];
 
+    /** Lượt do hệ thống tự chạy (as_system): KnowledgeAiIngest vẫn kiểm quyền, nên dùng tác nhân hệ thống (không lưu CSDL, không có id). */
+    private bool $asSystem = false;
+
+    /**
+     * Tác nhân hệ thống cho lượt tự chạy: một User chưa lưu (id null) có quyền người duyệt, chỉ để qua kiểm quyền của KnowledgeAiIngest.
+     * Mọi cột "người tạo/người duyệt" vì vậy vẫn null (không gán nhầm cho một người thật).
+     */
+    public static function systemActor(): User
+    {
+        return (new User)->forceFill(['name' => 'Hệ thống', 'role' => 'admin', 'is_active' => true]);
+    }
+
     public function __construct(
         ?SafePageFetcher $fetcher = null,
         private ?SitemapCrawlerService $sitemap = null,
@@ -115,6 +127,7 @@ final class BrainBuildService
         if (! ($options['as_system'] ?? false) && ! KnowledgeReview::canManage($by)) {
             throw new KnowledgeError('Bạn chưa có quyền xây kho. Cần quyền người duyệt trở lên.');
         }
+        $this->asSystem = (bool) ($options['as_system'] ?? false);
         $this->capOverride = isset($options['budget_cap_vnd']) ? max(0.0, (float) $options['budget_cap_vnd']) : null;
         $this->keywordTokens = array_values(array_filter(preg_split('/[^a-z0-9]+/', Str::ascii(mb_strtolower((string) ($options['keyword'] ?? '')))) ?: [], fn ($w) => strlen($w) >= 3));
         $maxPages = self::clampPages(isset($options['max_pages']) ? (int) $options['max_pages'] : null);
@@ -265,7 +278,7 @@ final class BrainBuildService
             $r['source_ids'][] = $source->id;
             $r['pages_read']++;
             try {
-                $log = $this->ingest->run($source, $by, $resolved['ai'], $resolved['cap'], $resolved['label'], $resolved['demo']);
+                $log = $this->ingest->run($source, $by ?? ($this->asSystem ? self::systemActor() : null), $resolved['ai'], $resolved['cap'], $resolved['label'], $resolved['demo']);
             } catch (KnowledgeError $e) {
                 $log = ['cost_vnd' => 0.0, 'stopped' => 'error', 'error' => $e->getMessage()];
             }
@@ -374,13 +387,14 @@ final class BrainBuildService
         return ['ok' => array_values(array_unique($ok)), 'rejected' => $rejected];
     }
 
-    private function autoApprove(KnowledgeItem $item, ?User $by): bool
+    /** Tự nhận một mục (nhãn auto, hoàn tác được). Mục mâu thuẫn với mục khác thì không nhận. Dùng cả cho nguồn tìm trên web (Discover). */
+    public function autoApprove(KnowledgeItem $item, ?User $by, string $note = 'Tự nhận (tầng A)'): bool
     {
         if ($this->conflicts->has($item)) {
             return false; // mâu thuẫn với mục khác: để người chọn
         }
         $item->update(['status' => 'approved', 'review_mode' => 'auto', 'approved_by' => $by?->id, 'approved_at' => now()]);
-        $this->note($item, 'approved', $by, 'Tự nhận (tầng A)');
+        $this->note($item, 'approved', $by, $note);
         try {
             (new KnowledgeGaps)->fillFrom($item);
         } catch (\Throwable) {
