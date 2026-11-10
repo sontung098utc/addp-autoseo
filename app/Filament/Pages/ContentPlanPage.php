@@ -7,12 +7,15 @@ use App\Filament\Support\ContentPlan\PlanActions;
 use App\Filament\Support\ContentPlan\PlanData;
 use App\Filament\Support\ContentPlan\PlanRules;
 use App\Filament\Support\Demo\DemoMode;
+use App\Filament\Support\Keywords\KeywordIntent;
 use App\Filament\Support\Keywords\KeywordService;
 use App\Filament\Support\Planning\PlannedArticleCreator;
 use App\Filament\Support\Schedule\VnTime;
 use App\Filament\Support\StatusPresenter;
 use App\Models\Article;
+use App\Models\User;
 use App\Models\Website;
+use App\Services\Planning\ContentPlanner;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
@@ -52,11 +55,14 @@ class ContentPlanPage extends Page
     /** @var list<array<string,mixed>> kết quả lần tạo gần nhất, từng từ khóa */
     public array $lastResults = [];
 
+    /** @var list<int> keyword_id đã chọn trong hộp "Đề xuất kế hoạch (theo luật)" */
+    public array $planPick = [];
+
     public static function canAccess(): bool
     {
         $u = Auth::user();
 
-        return $u instanceof \App\Models\User && $u->is_active && $u->isWriter();
+        return $u instanceof User && $u->is_active && $u->isWriter();
     }
 
     private function guard(): void
@@ -243,6 +249,28 @@ class ContentPlanPage extends Page
         }
     }
 
+    /** Thêm các từ khóa đã chọn vào kế hoạch (bài planned, chờ người duyệt; không giao đội AI). */
+    public function addProposed(): void
+    {
+        $this->guard();
+        $site = $this->site();
+        if (! $site || $this->planPick === []) {
+            return;
+        }
+        try {
+            $r = (new ContentPlanner)->create(Auth::user(), $site, array_map('intval', $this->planPick));
+        } catch (InvalidArgumentException $e) {
+            Notification::make()->title('Chưa thêm vào kế hoạch')->body($e->getMessage())->danger()->send();
+
+            return;
+        }
+        $n = Notification::make()->title("Đã thêm {$r['created']} bài vào kế hoạch")
+            ->body($r['skipped'] ? 'Bỏ qua: '.implode('; ', $r['skipped']) : 'Bài ở trạng thái Đã lên kế hoạch, chờ bạn duyệt.');
+        $r['skipped'] ? $n->warning() : $n->success();
+        $n->send();
+        $this->planPick = [];
+    }
+
     /** @return array<string,mixed> */
     public function getViewData(): array
     {
@@ -297,7 +325,7 @@ class ContentPlanPage extends Page
         }
         $undated = array_values(array_filter($articles, fn ($a) => $a['at'] === null && in_array($a['status'], ['planned', 'drafting', 'needs_review', 'rejected', 'approved'], true)));
 
-        $intentLabel = \App\Filament\Support\Keywords\KeywordIntent::LABELS;
+        $intentLabel = KeywordIntent::LABELS;
         $clusterRows = array_map(function ($r) use ($intentLabel) {
             $pct = $r['cov']['percent'];
 
@@ -311,6 +339,7 @@ class ContentPlanPage extends Page
         return [
             'clusterColumns' => $this->clusterColumns(), 'clusterRows' => $clusterRows,
             'undatedColumns' => $this->undatedColumns(), 'undatedRows' => $undatedRows,
+            'proposals' => $site ? (new ContentPlanner)->propose($site, 10) : [],
             'demo' => $demo, 'demoOn' => DemoMode::enabled(), 'sites' => $sites, 'site' => $site, 'rows' => $rows, 'detail' => $detail,
             'allConflicts' => $allConflicts, 'byId' => $byId, 'days' => $days, 'weekCount' => $weekCount, 'undated' => $undated,
             'rangeLabel' => $start->format('d/m').' – '.$start->addDays(6)->format('d/m/Y'),

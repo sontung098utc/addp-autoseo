@@ -13,6 +13,9 @@ use App\Models\Article;
 use App\Models\ArticleVersion;
 use App\Models\Keyword;
 use App\Models\KeywordCluster;
+use App\Models\KnowledgeItem;
+use App\Models\KnowledgeItemUsage;
+use App\Models\KnowledgeSource;
 use App\Models\Publication;
 use App\Models\User;
 use App\Models\Website;
@@ -251,5 +254,39 @@ class ArticleWorkspaceTest extends TestCase
         $this->get(ArticleVersionResource::getUrl('view', ['record' => $v]))->assertOk()
             ->assertSee('Về bài viết')
             ->assertSee(ArticleResource::getUrl('view', ['record' => $a]).'#tab-content', false);
+    }
+
+    public function test_the_san_pham_noi_that_khi_chua_co(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $a = $this->article('needs_review');
+        $this->get(ArticleResource::getUrl('view', ['record' => $a]))
+            ->assertOk()->assertSee('data-testid="aw-products"', false)->assertSee('Chưa có sản phẩm nào trong kho');
+    }
+
+    public function test_the_san_pham_liet_ke_muc_product_da_dung(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $a = $this->article('needs_review');
+        $src = KnowledgeSource::create(['website_id' => $this->site->id, 'kind' => 'url', 'title' => 'Trang SP', 'url' => 'https://a.vn/sp/rox', 'status' => 'done']);
+        $it = KnowledgeItem::create(['website_id' => $this->site->id, 'source_id' => $src->id, 'type' => 'product', 'title' => 'Máy ROX', 'entity' => 'ROX 9', 'body' => 'b', 'status' => 'approved', 'version' => 1, 'content_hash' => 'h1']);
+        KnowledgeItemUsage::create(['article_version_id' => $a->versions()->first()->id, 'item_id' => $it->id, 'item_version' => 1]);
+        $this->get(ArticleResource::getUrl('view', ['record' => $a]))
+            ->assertOk()->assertSee('ROX 9')->assertSee('https://a.vn/sp/rox', false)->assertDontSee('Chưa có sản phẩm nào trong kho');
+    }
+
+    public function test_nghien_cuu_doc_tu_buoc_research_roi_ve_buoc_write(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $a = $this->article('needs_review');
+        $run = AgentRun::create(['website_id' => $this->site->id, 'article_id' => $a->id, 'triggered_by' => null, 'trigger' => 'manual', 'status' => 'needs_review', 'started_at' => now(), 'finished_at' => now()]);
+        $step = fn (int $seq, string $stage, array $data) => AgentRunStep::create(['agent_run_id' => $run->id, 'seq' => $seq, 'stage' => $stage, 'role' => 'system', 'status' => 'ok', 'title' => $stage, 'data' => $data]);
+        $step(1, 'write', ['knowledge' => ['gap' => true], 'images' => ['warning' => 'ẢNH-CŨ']]);
+        $url = ArticleResource::getUrl('view', ['record' => $a]);
+        $this->get($url)->assertSee('ẢNH-CŨ')->assertDontSee('Nguồn được phép trích');
+
+        $step(2, 'research', ['knowledge' => ['gap' => false], 'images' => ['warning' => 'ẢNH-MỚI'], 'citable_sources' => [['title' => 'Bộ Y tế'], ['title' => 'WHO']]]);
+        $this->get($url)->assertSee('ẢNH-MỚI')->assertDontSee('ẢNH-CŨ')->assertDontSee('data-testid="aw-gap"', false)
+            ->assertSee('Nguồn được phép trích: 2')->assertSee('Bộ Y tế');
     }
 }

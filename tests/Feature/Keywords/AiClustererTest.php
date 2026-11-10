@@ -131,7 +131,9 @@ class AiClustererTest extends TestCase
         $ai = $this->fake(fn () => ['clusters' => [['name' => 'cụm cũ', 'intent' => 'informational', 'keywords' => ['a2']]]]);
         $this->svc->proposeWithAi($ai);
         $this->assertStringContainsString('Cụm cũ', $ai->calls[0][1]);
-        $this->assertStringNotContainsString('a1', explode('<<<TUKHOA', $ai->calls[0][1])[1]);
+        // Chỉ xét các dòng từ khóa giữa hai dòng khung (nonce ngẫu nhiên dạng hex có thể chứa chữ 'a1').
+        preg_match('/<<<TUKHOA-[^>]+>>>\n(.*)\n<<<HET-/s', $ai->calls[0][1], $m);
+        $this->assertNotContains('a1', explode("\n", $m[1]));
         $this->assertSame('Cụm cũ', $this->svc->repo()->proposals()[0]['name']);
         $this->svc->accept($this->svc->repo()->proposals()[0]['id']);
         $this->assertSame(['a1', 'a2'], $this->svc->repo()->clusters()[0]['keywords']);

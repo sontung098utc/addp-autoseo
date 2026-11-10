@@ -37,6 +37,27 @@
             @endif
         </div>
 
+        <div class="ss-card" style="margin-bottom:.75rem" data-plan-proposals><div class="ss-card__b">
+            <div class="ss-card__h">Đề xuất kế hoạch (theo luật)</div>
+            <p class="ss-muted ss-text-sm">Xếp theo luật, không dùng AI: lượt tìm (nếu có), độ phủ cụm, khoảng trống đối thủ. Bạn duyệt kế hoạch trước khi đội AI viết.</p>
+            @forelse ($proposals as $p)
+                <label class="ss-text-sm" style="display:block;padding:.3rem 0;border-bottom:1px solid rgba(128,128,128,.2)" wire:key="pp-{{ $p['keyword_id'] }}">
+                    <input type="checkbox" value="{{ $p['keyword_id'] }}" wire:model="planPick">
+                    <strong>{{ $p['keyword'] }}</strong>
+                    · cụm: {{ $p['cluster'] ?? 'chưa gom' }}
+                    · {{ $p['volume'] !== null ? number_format($p['volume'], 0, ',', '.').' lượt tìm' : 'chưa có số liệu' }}
+                    · điểm {{ $p['priority'] }}
+                    <span class="ss-muted">({{ implode('; ', $p['reasons']) }})</span>
+                    @if ($p['off_topic'])<x-studio.badge tone="warn">Có vẻ lệch chủ đề, sẽ không được thêm</x-studio.badge>@endif
+                </label>
+            @empty
+                <p class="ss-muted ss-text-sm">Không còn từ khóa mới nào chưa có bài.</p>
+            @endforelse
+            @if ($proposals)
+                <div style="margin-top:.5rem"><x-filament::button size="sm" wire:click="addProposed">Thêm vào kế hoạch</x-filament::button></div>
+            @endif
+        </div></div>
+
         @if ($lastResults)
             <div class="ss-card" style="margin-bottom:.75rem" role="status"><div class="ss-card__b">
                 <div class="ss-card__h">Kết quả tạo bài</div>

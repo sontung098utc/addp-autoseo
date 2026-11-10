@@ -1,4 +1,5 @@
 @php
+    use App\Filament\Pages\BrainLibraryPage;
     use App\Filament\Pages\BrainPage;
     use App\Filament\Pages\BrandProfilePage;
     use App\Filament\Pages\ContentPlanPage;
@@ -298,6 +299,25 @@
                                 </ul>
                             @endif
                         </section>
+                        <section class="ss-review-card" data-testid="aw-products">
+                            <h2 class="ss-review-card__title">Sản phẩm liên quan của công ty</h2>
+                            @if ($products->isEmpty())
+                                <p>Chưa có sản phẩm nào trong kho. Thêm mục loại Sản phẩm (hoặc dán trang sản phẩm) ở Kho trí tuệ để bài nhắc đúng sản phẩm.</p>
+                                @if (BrainLibraryPage::canAccess())<p><a class="aw-link" href="{{ BrainLibraryPage::getUrl() }}">Mở Kho trí tuệ</a></p>@endif
+                            @else
+                                <ul class="aw-list">
+                                    @foreach ($products as $u)
+                                        <li>
+                                            {{ $u->item?->entity ?: $u->item?->title }}
+                                            <span class="aw-muted">· {{ KnowledgeItem::STATUSES[$u->item?->status] ?? $u->item?->status }}</span>
+                                            @if (! empty($u->item?->source?->url))
+                                                · <a class="aw-link" href="{{ $u->item->source->url }}" target="_blank" rel="noopener">trang nguồn</a>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </section>
                         <section class="ss-review-card" data-testid="aw-brand">
                             <div class="aw-head">
                                 <h2 class="ss-review-card__title">Từ hồ sơ doanh nghiệp</h2>
@@ -327,6 +347,12 @@
                                     @endforeach
                                 </ul>
                                 <p class="aw-note">Các nguồn này do AI tự nêu, hệ thống chưa kiểm chứng. Người duyệt cần kiểm trước khi đăng.</p>
+                            @endif
+                            @php
+                                $citable = array_values(array_filter((array) ($research['citable_sources'] ?? [])));
+                            @endphp
+                            @if ($citable !== [])
+                                <p style="margin-top:.5rem">Nguồn được phép trích: {{ count($citable) }} ({{ implode(', ', array_map(fn ($c) => is_array($c) ? (string) ($c['title'] ?? $c['name'] ?? $c['url'] ?? '') : (string) $c, array_slice($citable, 0, 6))) }})</p>
                             @endif
                         </section>
                         <section class="ss-review-card" data-testid="aw-outline">

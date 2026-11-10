@@ -12,7 +12,7 @@ class KnowledgeItem extends Model
 {
     use SoftDeletes;
 
-    public const TYPES = ['fact' => 'Sự kiện', 'price' => 'Giá/số liệu', 'policy' => 'Chính sách', 'process' => 'Quy trình', 'faq' => 'FAQ', 'messaging' => 'Giọng/thông điệp', 'myth' => 'Quan niệm sai', 'forbidden' => 'Không được nói'];
+    public const TYPES = ['fact' => 'Sự kiện', 'price' => 'Giá/số liệu', 'policy' => 'Chính sách', 'process' => 'Quy trình', 'faq' => 'FAQ', 'messaging' => 'Giọng/thông điệp', 'myth' => 'Quan niệm sai', 'forbidden' => 'Không được nói', 'product' => 'Sản phẩm'];
 
     /**
      * AG-B3 (P2, Tầng 2): loại mục là QUY TẮC của chuyên gia, không phải sự thật để trích. 'myth' = điều hay bị hiểu sai (title) kèm bản đúng (body);

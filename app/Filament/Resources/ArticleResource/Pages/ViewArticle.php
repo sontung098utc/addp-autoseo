@@ -164,6 +164,7 @@ class ViewArticle extends EditArticle
         // Nghiên cứu: lấy từ phiên chạy gần nhất có dàn ý (bước brief) và bước viết/sửa cuối (kiến thức, ảnh, liên kết nội bộ).
         $briefStep = $runs->flatMap->steps->where('stage', 'brief')->sortByDesc('id')->first();
         $writeStep = $runs->flatMap->steps->whereIn('stage', ['write', 'repair'])->sortByDesc('id')->first();
+        $researchStep = $runs->flatMap->steps->where('stage', 'research')->sortByDesc('id')->first();
 
         return [
             'article' => $article,
@@ -183,9 +184,10 @@ class ViewArticle extends EditArticle
             'clusterArticles' => $clusterArticles,
             'brains' => BrainContext::forArticle($article, $campaignId)->brains,
             'usages' => $latest ? KnowledgeItemUsage::query()->where('article_version_id', $latest->id)->with('item.source')->get() : collect(),
+            'products' => $latest ? KnowledgeItemUsage::query()->where('article_version_id', $latest->id)->whereHas('item', fn ($q) => $q->where('type', 'product'))->with('item.source')->get() : collect(),
             'brand' => BrandProfile::query()->where('website_id', $article->website_id)->first(),
             'outline' => array_values(array_filter((array) ($briefStep?->data['outline'] ?? []), 'is_string')),
-            'research' => (array) ($writeStep?->data ?? []),
+            'research' => (array) ($researchStep?->data ?? []) + (array) ($writeStep?->data ?? []),
             'publications' => $publications,
             'quality' => $latest ? ReviewActions::qualityFor($latest) : null,
             'totalCost' => (float) $runs->sum('cost_vnd'),

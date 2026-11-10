@@ -17,10 +17,16 @@ final class KnowledgeContext
 {
     public const LIMIT = 5;
 
+    /** Chỗ riêng cho mục loại 'product', không chiếm 5 chỗ của mục thường. */
+    public const PRODUCT_LIMIT = 2;
+
     public const BODY_MAX = 600;
 
     /** @var list<array{id:int,version:int,title:string,body:string,source:?string}>|null */
     private ?array $items = null;
+
+    /** @var list<array<string,mixed>> */
+    private array $products = [];
 
     private bool $gap = false;
 
@@ -30,9 +36,7 @@ final class KnowledgeContext
     /** AG-B1: phạm vi Trí tuệ của lượt chạy (null = như cũ, không lọc). */
     private ?array $brainIds = null;
 
-    public function __construct(private KnowledgeRetriever $retriever = new KnowledgeRetriever())
-    {
-    }
+    public function __construct(private KnowledgeRetriever $retriever = new KnowledgeRetriever) {}
 
     /** AG-B1: chỉ truy xuất atom thuộc các Trí tuệ này (cộng atom brain_id NULL theo website). Gọi trước load(). @param list<int> $ids */
     public function scopeToBrains(array $ids): self
@@ -59,7 +63,10 @@ final class KnowledgeContext
             foreach ($this->retriever->search($site, $query, self::LIMIT, $this->brainIds) as $r) {
                 $this->items[] = ['id' => $r['id'], 'version' => $r['version'], 'title' => $r['title'], 'body' => mb_substr($r['body'], 0, self::BODY_MAX), 'source' => $r['source']];
             }
-            if ($this->items === []) {
+            foreach ($this->retriever->products($site, $query, self::PRODUCT_LIMIT, $this->brainIds) as $r) {
+                $this->products[] = ['id' => $r['id'], 'version' => $r['version'], 'type' => 'product', 'title' => $r['title'], 'body' => mb_substr($r['body'], 0, self::BODY_MAX), 'source' => $r['source']];
+            }
+            if ($this->items === [] && $this->products === []) {
                 $this->gap = true;
                 $this->recordGap($article, mb_substr(trim((string) $article->primary_keyword), 0, 190), $this->brainIds[0] ?? null);
             }
@@ -72,7 +79,10 @@ final class KnowledgeContext
     /** @return array<string,mixed> options cho adapter AI (rỗng nếu không có atom) */
     public function options(): array
     {
-        return ($this->items ? ['knowledge' => $this->items] : []) + ($this->rules ? ['knowledge_rules' => $this->rules] : []);
+        // Adapter AI chỉ đọc 'knowledge': sản phẩm nằm chung mảng này, phân biệt bằng trường 'type' => 'product'.
+        $all = array_merge($this->items ?? [], $this->products);
+
+        return ($all ? ['knowledge' => $all] : []) + ($this->rules ? ['knowledge_rules' => $this->rules] : []);
     }
 
     /** Dữ liệu ghi vào bước 'write' và đoạn ghi chú ngắn. @return array{0:array<string,mixed>,1:string} */
@@ -80,8 +90,12 @@ final class KnowledgeContext
     {
         $ids = array_column($this->items ?? [], 'id');
         $data = ['knowledge' => ['count' => count($ids), 'ids' => $ids, 'gap' => $this->gap] + ($this->rules ? ['rule_ids' => array_column($this->rules, 'id')] : [])];
+        $data['products'] = ['count' => count($this->products), 'ids' => array_column($this->products, 'id')];
         $note = $ids !== [] ? ' Dùng '.count($ids).' mục kiến thức đã duyệt (KB#'.implode(', KB#', $ids).').'
             : ($this->gap ? ' Kho kiến thức chưa có mục đã duyệt phù hợp; đã ghi khoảng trống kiến thức để bổ sung.' : '');
+        if ($this->products) {
+            $note .= ' Có '.count($this->products).' sản phẩm của công ty khớp chủ đề: KB#'.implode(', KB#', array_column($this->products, 'id')).'.';
+        }
         if ($this->rules) {
             $note .= ' Áp '.count($this->rules).' quy tắc của chuyên gia (quan niệm sai / không được nói): KB#'.implode(', KB#', array_column($this->rules, 'id')).'.';
         }
@@ -93,7 +107,7 @@ final class KnowledgeContext
     public function recordUsage(ArticleVersion $version): void
     {
         try {
-            foreach (array_merge($this->items ?? [], $this->rules) as $i) {
+            foreach (array_merge($this->items ?? [], $this->products, $this->rules) as $i) {
                 KnowledgeItemUsage::updateOrCreate(['article_version_id' => $version->id, 'item_id' => $i['id']], ['item_version' => $i['version']]);
                 KnowledgeItem::whereKey($i['id'])->update(['last_used_at' => now()]);
             }

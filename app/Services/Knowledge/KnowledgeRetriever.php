@@ -21,7 +21,7 @@ final class KnowledgeRetriever
     private const SITE_BONUS = 0.25;
 
     /** @return list<array{id:int,version:int,title:string,body:string,source:?string,source_id:?int,score:float,scope:string}> */
-    public function search(Website $website, string $query, int $limit = 5, ?array $brainIds = null): array
+    public function search(Website $website, string $query, int $limit = 5, ?array $brainIds = null, ?string $onlyType = null): array
     {
         $query = trim(mb_substr($query, 0, 600));
         $terms = $this->terms($query);
@@ -30,10 +30,10 @@ final class KnowledgeRetriever
         }
         $rows = [];
         if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
-            $rows = $this->fulltext($website, $query, $brainIds);
+            $rows = $this->fulltext($website, $query, $brainIds, $onlyType);
         }
         if ($rows === []) {
-            $rows = $this->like($website, $terms, $query, $brainIds);
+            $rows = $this->like($website, $terms, $query, $brainIds, $onlyType);
         }
         usort($rows, fn ($a, $b) => $b['score'] <=> $a['score'] ?: $a['id'] <=> $b['id']);
 
@@ -58,7 +58,13 @@ final class KnowledgeRetriever
     /** Như eligible() nhưng bỏ các mục QUY TẮC (quan niệm sai / không được nói): chúng không phải sự thật để trích. */
     public function searchable(Website $website, ?array $brainIds = null): Builder
     {
-        return $this->eligible($website, $brainIds)->whereNotIn('type', KnowledgeItem::RULE_TYPES);
+        return $this->eligible($website, $brainIds)->whereNotIn('type', KnowledgeItem::RULE_TYPES)->where('type', '!=', 'product');
+    }
+
+    /** Sản phẩm của công ty (mục loại 'product', đã duyệt, còn hiệu lực) khớp chủ đề; có chỗ riêng, không tranh chỗ với mục thường. @return list<array<string,mixed>> */
+    public function products(Website $website, string $query, int $limit = 2, ?array $brainIds = null): array
+    {
+        return $this->search($website, $query, $limit, $brainIds, 'product');
     }
 
     /**
@@ -101,10 +107,15 @@ final class KnowledgeRetriever
         return array_slice(array_values(array_unique($words)), 0, 24);
     }
 
-    private function fulltext(Website $website, string $query, ?array $brainIds): array
+    private function base(Website $website, ?array $brainIds, ?string $onlyType): Builder
+    {
+        return $onlyType === 'product' ? $this->eligible($website, $brainIds)->where('type', 'product') : $this->searchable($website, $brainIds);
+    }
+
+    private function fulltext(Website $website, string $query, ?array $brainIds, ?string $onlyType = null): array
     {
         try {
-            $items = $this->searchable($website, $brainIds)
+            $items = $this->base($website, $brainIds, $onlyType)
                 ->selectRaw('knowledge_items.*, MATCH(title, body) AGAINST (? IN NATURAL LANGUAGE MODE) as ft_score', [$query])
                 ->whereRaw('MATCH(title, body) AGAINST (? IN NATURAL LANGUAGE MODE)', [$query])
                 ->orderByDesc('ft_score')->limit(50)->get();
@@ -116,11 +127,11 @@ final class KnowledgeRetriever
         return $items->map(fn ($i) => $this->row($i, (float) $i->ft_score / $max, $website, $brainIds))->all();
     }
 
-    private function like(Website $website, array $terms, string $query, ?array $brainIds): array
+    private function like(Website $website, array $terms, string $query, ?array $brainIds, ?string $onlyType = null): array
     {
         // Ký tự thoát là '!' (không phải '\'): trong MariaDB/MySQL '\' là ký tự thoát của chuỗi SQL nên `escape '\'` là lỗi cú pháp.
         $esc = fn (string $t) => preg_replace('/([!%_])/', '!$1', $t);
-        $items = $this->searchable($website, $brainIds)->where(function ($q) use ($terms, $esc) {
+        $items = $this->base($website, $brainIds, $onlyType)->where(function ($q) use ($terms, $esc) {
             foreach ($terms as $t) {
                 $q->orWhereRaw("lower(title) like ? escape '!'", ['%'.$esc($t).'%'])->orWhereRaw("lower(body) like ? escape '!'", ['%'.$esc($t).'%']);
             }
