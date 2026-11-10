@@ -14,12 +14,14 @@ class Article extends Model
 
     protected $fillable = [
         'website_id',
+        'campaign_id',
         'created_by',
         'primary_keyword',
         'secondary_keywords',
         'search_intent',
         'topic_cluster',
         'workflow_status',
+        'approved_version_id',
     ];
 
     protected function casts(): array
@@ -34,9 +36,19 @@ class Article extends Model
         return $this->belongsTo(Website::class);
     }
 
+    public function campaign(): BelongsTo
+    {
+        return $this->belongsTo(Campaign::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function approvedVersion(): BelongsTo
+    {
+        return $this->belongsTo(ArticleVersion::class, 'approved_version_id');
     }
 
     public function versions(): HasMany
