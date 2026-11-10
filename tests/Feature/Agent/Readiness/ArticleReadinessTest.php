@@ -62,6 +62,17 @@ class ArticleReadinessTest extends TestCase
         $this->assertFalse($r['holds_writing']);
     }
 
+    public function test_cum_hiem_xep_truoc_cum_pho_bien(): void
+    {
+        $w = $this->site();
+        $this->brain('Thực phẩm bảo vệ sức khỏe', 'tpbvsk');
+        $this->brain('Dinh dưỡng thực phẩm cho trẻ', 'dinh_duong');
+        $this->brain('Đái tháo đường (tiểu đường)', 'dai_thao_duong');
+        $s = BrainSuggester::forArticle($this->article($w, 'thực phẩm tốt cho người tiểu đường'));
+
+        $this->assertSame('Đái tháo đường (tiểu đường)', $s[0]['name']);
+    }
+
     public function test_goi_y_tri_tue_khop_chu_de_nhung_chua_gan(): void
     {
         $w = $this->site();
@@ -72,6 +83,7 @@ class ArticleReadinessTest extends TestCase
         $s = BrainSuggester::forArticle($a);
         $this->assertCount(1, $s);
         $this->assertSame('Đái tháo đường (tiểu đường)', $s[0]['name']);
+        $this->assertStringContainsString('tiểu đường', $s[0]['reason'], 'lý do hiện chữ có dấu');
         $this->assertContains('no_brain', array_column(ArticleReadiness::for($a)['issues'], 'code'));
         // Đã gắn thì không gợi ý nữa.
         $this->assertSame([], BrainSuggester::forArticle($a, [$s[0]['id']]));

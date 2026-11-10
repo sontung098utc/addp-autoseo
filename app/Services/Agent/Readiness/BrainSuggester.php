@@ -16,34 +16,49 @@ final class BrainSuggester
     /** @param  list<int>  $excludeIds Trí tuệ đã gắn. @return list<array{id:int,name:string,reason:string,score:int}> */
     public static function forArticle(Article $article, array $excludeIds = [], int $limit = 3): array
     {
-        $kw = self::words((string) $article->primary_keyword);
-        if (count($kw) === 0) {
+        $raw = self::tokens((string) $article->primary_keyword);
+        $kw = array_column($raw, 'k');
+        if ($kw === []) {
             return [];
         }
-        $kwBigrams = self::bigrams($kw);
+        $shown = [];   // bigram không dấu => chữ gốc để hiển thị
+        for ($i = 0; $i < count($raw) - 1; $i++) {
+            $shown[$raw[$i]['k'].' '.$raw[$i + 1]['k']] = $raw[$i]['o'].' '.$raw[$i + 1]['o'];
+        }
+        $kwBigrams = array_keys($shown);
+
+        $brains = Brain::query()->where('status', 'active')->whereNotIn('id', $excludeIds)->get();
+        $perBrain = [];
+        $df = [];   // bigram => số Trí tuệ chứa nó: cụm càng hiếm càng đáng tin (tránh "thực phẩm" kéo mọi Trí tuệ lên)
+        foreach ($brains as $b) {
+            $words = array_column(self::tokens($b->name.' '.$b->description.' '.str_replace('_', ' ', (string) $b->domain_key)), 'k');
+            $perBrain[$b->id] = ['words' => $words, 'bi' => array_values(array_intersect($kwBigrams, self::bigrams($words)))];
+            foreach ($perBrain[$b->id]['bi'] as $bg) {
+                $df[$bg] = ($df[$bg] ?? 0) + 1;
+            }
+        }
         $out = [];
-        foreach (Brain::query()->where('status', 'active')->whereNotIn('id', $excludeIds)->get() as $b) {
-            $words = self::words($b->name.' '.$b->description.' '.str_replace('_', ' ', (string) $b->domain_key));
-            $hitBi = array_values(array_intersect($kwBigrams, self::bigrams($words)));
-            $hitWords = array_values(array_filter(array_unique(array_intersect($kw, $words)), fn ($w) => mb_strlen($w) >= 4));
-            $score = count($hitBi) * 10 + count($hitWords);
+        foreach ($brains as $b) {
+            $hitBi = $perBrain[$b->id]['bi'];
+            $hitWords = array_values(array_filter(array_unique(array_intersect($kw, $perBrain[$b->id]['words'])), fn ($w) => mb_strlen($w) >= 4));
             if ($hitBi === [] && count($hitWords) < 2) {
                 continue; // một từ đơn lẻ trùng chưa đủ tin
             }
+            $score = (int) round(array_sum(array_map(fn ($bg) => 100 / max(1, $df[$bg]), $hitBi))) + count($hitWords);
             $out[] = ['id' => $b->id, 'name' => $b->name, 'score' => $score,
-                'reason' => 'Trùng "'.($hitBi[0] ?? implode(' ', array_slice($hitWords, 0, 2))).'" với chủ đề của bài'];
+                'reason' => 'Trùng "'.($hitBi !== [] ? $shown[$hitBi[0]] : implode(' ', array_slice($hitWords, 0, 2))).'" với chủ đề của bài'];
         }
         usort($out, fn ($a, $b) => $b['score'] <=> $a['score'] ?: $a['id'] <=> $b['id']);
 
         return array_slice($out, 0, $limit);
     }
 
-    /** @return list<string> */
-    private static function words(string $s): array
+    /** @return list<array{o:string,k:string}> o = chữ gốc (giữ dấu, chữ thường), k = khóa không dấu */
+    private static function tokens(string $s): array
     {
-        $s = Str::of(Str::ascii(mb_strtolower($s)))->replaceMatches('/[^a-z0-9]+/', ' ')->trim()->toString();
+        $o = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($s), -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
-        return $s === '' ? [] : array_values(array_filter(explode(' ', $s), fn ($w) => $w !== ''));
+        return array_map(fn ($w) => ['o' => $w, 'k' => Str::ascii($w)], $o);
     }
 
     /** @param list<string> $w @return list<string> */
