@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Website extends Model
 {
@@ -35,6 +36,11 @@ class Website extends Model
         return $this->hasMany(Article::class);
     }
 
+    public function campaigns(): HasMany
+    {
+        return $this->hasMany(Campaign::class);
+    }
+
     public function publications(): HasMany
     {
         return $this->hasMany(Publication::class);
@@ -50,8 +56,18 @@ class Website extends Model
         return $this->hasMany(SeoAudit::class);
     }
 
-    public function latestSeoAudit(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function latestSeoAudit(): HasOne
     {
         return $this->hasOne(SeoAudit::class)->latestOfMany();
+    }
+
+    public function connectionChecks(): HasMany
+    {
+        return $this->hasMany(WebsiteConnectionCheck::class);
+    }
+
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(AuditLog::class);
     }
 }
