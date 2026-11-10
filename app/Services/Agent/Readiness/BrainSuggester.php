@@ -41,8 +41,8 @@ final class BrainSuggester
         foreach ($brains as $b) {
             $hitBi = $perBrain[$b->id]['bi'];
             $hitWords = array_values(array_filter(array_unique(array_intersect($kw, $perBrain[$b->id]['words'])), fn ($w) => mb_strlen($w) >= 4));
-            if ($hitBi === [] && count($hitWords) < 2) {
-                continue; // một từ đơn lẻ trùng chưa đủ tin
+            if ($hitBi === []) {
+                continue; // chỉ tin cụm 2 từ liền nhau: hai từ rời chung chung ("đường", "thường") kéo nhầm Trí tuệ không liên quan
             }
             $score = (int) round(array_sum(array_map(fn ($bg) => 100 / max(1, $df[$bg]), $hitBi))) + count($hitWords);
             $out[] = ['id' => $b->id, 'name' => $b->name, 'score' => $score, 'bigram' => $hitBi !== [],

@@ -312,7 +312,7 @@ final class AgentRunOrchestrator
             $briefOptions = ($briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : []) + $this->guidanceOptions($article) + $this->roleOptions('strategist') + $this->brandOptions() + $this->brainCtx->options($article);
             $outline = $this->callAi($run, 'outline', 'lập dàn ý', fn (AiProviderInterface $ai) => $ai->generateOutline($article, $briefOptions));
             $offTopic = BrandProfileData::looksOffTopic($this->brandProfile, (string) $article->primary_keyword);
-            $this->step($run, 'brief', 'strategist', $offTopic ? 'warn' : 'ok', 'Lập dàn ý ('.count($outline['outline'] ?? []).' mục)', 'Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. '.$briefNote.$this->brandNote().$this->brainCtx->note()
+            $this->step($run, 'brief', 'strategist', $offTopic ? 'warn' : 'ok', 'Lập dàn ý ('.count($outline['outline'] ?? []).' mục)', 'Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. '.($this->guidanceOptions($article) !== [] ? 'Đã áp dụng chỉ dẫn thêm của người phụ trách bài. ' : '').$briefNote.$this->brandNote().$this->brainCtx->note()
                 .($offTopic ? ' Cảnh báo: chủ đề "'.mb_substr((string) $article->primary_keyword, 0, 80).'" có thể không phù hợp website (lĩnh vực trong hồ sơ: '.mb_substr((string) $this->brandProfile?->business_field, 0, 120).'). Chỉ cảnh báo, không chặn.' : ''),
                 ['outline' => $outline['outline'] ?? [], 'playbook' => $this->pbData($briefPb)] + $this->brandData() + $this->brainCtx->stepData() + ($offTopic ? ['off_topic' => true] : []) + $this->providerData($outline), $outline['model'] ?? null, (int) ($outline['tokens_used'] ?? 0), (float) ($outline['cost_vnd'] ?? 0));
         }
@@ -480,7 +480,7 @@ final class AgentRunOrchestrator
         $silentMock = $fellBack && ! $this->ai instanceof MockAiProvider;
         $mustCite = $this->brainCtx->reliance() === 'must_cite' && $feedback === [];
         $this->step($run, $stage, 'writer', $silentMock || $mustCite ? 'warn' : 'ok', $title, ($silentMock ? 'Nhà cung cấp AI đã rơi về bản giả lập (thiếu khóa hoặc phản hồi hỏng); nội dung không phải AI thật. ' : '').($feedback === []
-            ? 'Viết theo dàn ý; HTML được làm sạch trước khi chấm.'.$this->brandNote().$this->brainCtx->note().($mustCite ? ' Lĩnh vực bắt buộc nguồn: cần người có chuyên môn duyệt (luật EVID01 kiểm bằng chứng theo Sổ nguồn ở mức cả bài, chưa nối từng khẳng định với từng nguồn; hiện có '.$citable->count().' nguồn đã xác nhận).' : '').$kbNote.$assetNote
+            ? 'Viết theo dàn ý'.(($options['guidance'] ?? '') !== '' ? ' và chỉ dẫn thêm của người phụ trách bài' : '').'; HTML được làm sạch trước khi chấm.'.$this->brandNote().$this->brainCtx->note().($mustCite ? ' Lĩnh vực bắt buộc nguồn: cần người có chuyên môn duyệt (luật EVID01 kiểm bằng chứng theo Sổ nguồn ở mức cả bài, chưa nối từng khẳng định với từng nguồn; hiện có '.$citable->count().' nguồn đã xác nhận).' : '').$kbNote.$assetNote
             : 'Gửi lại cho AI '.count($feedback).' lỗi chặn cần sửa: '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
             ['words' => str_word_count(strip_tags($html)) ?: mb_strlen(strip_tags($html)), 'playbook' => $this->pbData($pb)] + $this->brandData() + $this->brainCtx->stepData() + ($mustCite ? ['needs_expert_review' => true] : []) + $kbData + $assetData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
 

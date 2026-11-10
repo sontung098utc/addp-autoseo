@@ -45,7 +45,10 @@ class AgentTodayWidget extends Widget
             }
         }
 
+        $isApprover = (bool) auth()->user()?->isApprover();
+
         return [
+            'isApprover' => $isApprover,
             'running' => $running,
             'waiting' => Article::query()->where('workflow_status', 'needs_review')->count(),
             'expert' => $expert,

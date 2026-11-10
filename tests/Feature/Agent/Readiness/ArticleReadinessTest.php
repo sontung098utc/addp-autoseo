@@ -87,6 +87,16 @@ class ArticleReadinessTest extends TestCase
         $this->assertSame('Đái tháo đường (tiểu đường)', $s[0]['name']);
     }
 
+    public function test_hai_tu_roi_chung_chung_khong_keo_nham_tri_tue(): void
+    {
+        $w = $this->site();
+        // "đường" và "thường" đều xuất hiện trong mô tả nhưng KHÔNG thành cụm liền nhau của chủ đề bài.
+        Brain::create(['name' => 'Sức khỏe trẻ em', 'slug' => 'tre_em', 'domain_key' => 'tre_em', 'language' => 'vi', 'status' => 'active', 'description' => 'Các bệnh thường gặp, đường hô hấp và đường tiêu hóa ở trẻ']);
+        $s = BrainSuggester::forArticle($this->article($w, 'chỉ số đường huyết bình thường'));
+
+        $this->assertSame([], $s);
+    }
+
     public function test_goi_y_tri_tue_khop_chu_de_nhung_chua_gan(): void
     {
         $w = $this->site();

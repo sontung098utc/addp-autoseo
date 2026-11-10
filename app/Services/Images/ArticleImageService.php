@@ -10,6 +10,7 @@ use App\Models\BrandProfile;
 use App\Models\MediaAsset;
 use App\Services\Agent\Refresh\HtmlSections;
 use App\Services\Agent\Risk\RiskClassifier;
+use App\Services\Brain\BrainContext;
 use App\Services\Media\MediaService;
 use Illuminate\Support\Str;
 
@@ -198,6 +199,14 @@ final class ArticleImageService
         $assess = (new RiskClassifier)->assess((string) $article->primary_keyword);
         if (str_contains(implode(' ', $assess->reasons), 'sức khỏe')) {
             return true;
+        }
+        // Trí tuệ đã gắn (kể cả tự gắn) xếp bài vào hạng rủi ro cao (lĩnh vực sức khỏe...) thì cũng coi là sức khỏe: bộ từ khóa của RiskClassifier không phủ hết thuật ngữ.
+        try {
+            if (BrainContext::forArticle($article)->riskFloor() === 'high') {
+                return true;
+            }
+        } catch (\Throwable) {
+            // không có bảng Trí tuệ thì bỏ qua nhánh này
         }
         $f = Str::lower(Str::ascii((string) $brand?->business_field));
 

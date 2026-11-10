@@ -11,7 +11,7 @@ return [
     'reviewed_at' => '2026-11-07',
     'topics' => [
         'high' => [
-            'suc_khoe' => ['chữa bệnh', 'điều trị', 'triệu chứng', 'thuốc', 'liều dùng', 'ung thư', 'tiểu đường', 'huyết áp', 'mang thai', 'phẫu thuật'],
+            'suc_khoe' => ['chữa bệnh', 'điều trị', 'triệu chứng', 'thuốc', 'liều dùng', 'ung thư', 'tiểu đường', 'đái tháo đường', 'đường huyết', 'hba1c', 'insulin', 'cholesterol', 'mỡ máu', 'huyết áp', 'mang thai', 'phẫu thuật'],
             'tai_chinh' => ['đầu tư', 'cổ phiếu', 'chứng khoán', 'tiền ảo', 'vay vốn', 'lãi suất', 'bảo hiểm', 'thuế', 'lợi nhuận đảm bảo'],
             'phap_ly' => ['luật', 'nghị định', 'khởi kiện', 'tranh chấp', 'hợp đồng lao động', 'bản quyền', 'xử phạt'],
             'an_toan' => ['an toàn điện', 'chất cháy nổ', 'hóa chất độc', 'trẻ sơ sinh'],

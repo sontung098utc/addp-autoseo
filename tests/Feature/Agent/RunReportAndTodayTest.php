@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Agent;
 
+use App\Filament\Pages\UiKitPage;
 use App\Filament\Resources\AgentRunResource;
 use App\Filament\Support\Agent\RunReport;
 use App\Models\AgentRun;
@@ -47,6 +48,15 @@ class RunReportAndTodayTest extends TestCase
         $r = RunReport::for($run);
         $this->assertStringContainsString('Chưa có bản nháp', $r['lines'][0]);
         $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()->assertSee('run-report', false)->assertSee('Lý do kết thúc: AI lỗi');
+    }
+
+    public function test_writer_khong_thay_so_lieu_chi_phi_cua_quan_ly(): void
+    {
+        $this->site();
+        $this->actingAs(User::create(['name' => 'w', 'email' => 'w@x.vn', 'password' => 'secret123', 'role' => 'writer', 'is_active' => true]));
+
+        $this->get('/admin')->assertOk()->assertSee('Đội AI hôm nay')->assertSee('bài chờ duyệt')->assertDontSee('chi phí AI hôm nay')->assertDontSee('gợi ý bổ sung kho');
+        $this->assertFalse(UiKitPage::shouldRegisterNavigation());
     }
 
     public function test_tong_quan_hien_khoi_doi_ai_hom_nay(): void

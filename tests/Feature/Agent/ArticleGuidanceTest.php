@@ -109,5 +109,8 @@ class ArticleGuidanceTest extends TestCase
         $this->assertSame('Dùng giọng gần gũi.', $seen['outline']);
         $this->assertSame('Dùng giọng gần gũi.', $seen['write']);
         $this->assertGreaterThan(0, AgentRun::count());
+        $run = AgentRun::first();
+        $this->assertStringContainsString('chỉ dẫn thêm', mb_strtolower($run->steps->firstWhere('stage', 'brief')->detail), 'người dùng thấy chỉ dẫn đã được áp dụng');
+        $this->assertStringContainsString('chỉ dẫn thêm', mb_strtolower($run->steps->firstWhere('stage', 'write')->detail));
     }
 }

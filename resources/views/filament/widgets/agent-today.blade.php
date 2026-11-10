@@ -5,9 +5,11 @@
             <a class="at-card" href="{{ $urls['pipeline'] ?? '#' }}"><b>{{ $running }}</b><span>đang chạy (xem trên Pipeline)</span></a>
             <a class="at-card @if ($waiting) at-warn @endif" href="{{ $urls['review'] }}"><b>{{ $waiting }}</b><span>bài chờ duyệt</span></a>
             <a class="at-card @if ($expert) at-warn @endif" href="{{ $urls['review'] }}"><b>{{ $expert }}</b><span>chờ người có chuyên môn xem</span></a>
+            @if ($isApprover)
             <a class="at-card @if ($blocked) at-warn @endif" href="{{ $urls['runs'] }}"><b>{{ $blocked }}</b><span>phiên bị chặn hoặc lỗi hôm nay</span></a>
             <a class="at-card" href="{{ $urls['kb'] ?? '#' }}"><b>{{ $suggestions }}</b><span>gợi ý bổ sung kho</span></a>
             <a class="at-card" href="{{ $urls['cost'] ?? '#' }}"><b>{{ number_format($cost, 0, ',', '.') }} ₫</b><span>chi phí AI hôm nay ({{ $runs }} phiên)</span></a>
+            @endif
         </div>
     </x-filament::section>
 </x-filament-widgets::widget>

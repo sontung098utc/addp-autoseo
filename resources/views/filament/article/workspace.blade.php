@@ -136,7 +136,14 @@
     <div class="aw-stack" data-testid="article-workspace" @if ($live) wire:poll.{{ $pollSeconds }}s @endif>
         <div class="aw-meta" data-testid="aw-meta">
             <x-filament::badge :color="$statusColor">{{ $statusLabel }}</x-filament::badge>
-            @if ($needsExpert)<x-filament::badge color="warning" data-testid="aw-expert">{{ ArticleResource::EXPERT_LABEL }}</x-filament::badge>@endif
+            @if ($needsExpert)
+                @if (in_array($article->workflow_status, ['approved', 'scheduled', 'published'], true))
+                    {{-- Đã duyệt rồi: không còn "chờ", nhưng nhắc đây là chủ đề cần chuyên môn để người sau đọc ghi chú duyệt. --}}
+                    <x-filament::badge color="gray" data-testid="aw-expert">Chủ đề cần chuyên môn · xem ghi chú duyệt</x-filament::badge>
+                @else
+                    <x-filament::badge color="warning" data-testid="aw-expert">{{ ArticleResource::EXPERT_LABEL }}</x-filament::badge>
+                @endif
+            @endif
             @if ($live)
                 <span class="ss-live-pill" data-testid="aw-live-pill"><span class="ss-spin" aria-hidden="true"></span>Đội AI đang chạy · {{ W::runStages()[$liveStage] ?? 'sắp xong' }}</span>
             @endif

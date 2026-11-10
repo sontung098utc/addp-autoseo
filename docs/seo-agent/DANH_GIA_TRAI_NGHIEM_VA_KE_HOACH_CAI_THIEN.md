@@ -102,3 +102,32 @@ Trạng thái: ✅ đã làm (kể cả đợt làm đêm 10–11/11) · ⏭ c�
 ## 5. Cần Dev1 rà trước khi vào nhánh chính
 
 Migration: `2026_11_20_000001` (job_type), `2026_11_21_000001` (nguồn gốc/tầng kho), `2026_11_22_000001` (hồ sơ agent), `2026_11_23_000001` (nguồn số liệu từ khóa), `2026_11_24_000001` (chỉ dẫn cho đội AI ở từng bài). Lõi: `AgentRunOrchestrator` (bước nghiên cứu, tự chuẩn bị kiến thức, tìm web, tạo ảnh, hồ sơ agent), `AbstractLlmProvider` (sửa một phần, hồ sơ vai trò), luật `SRC01`, tự duyệt qua `ReviewWorkflow` bằng tài khoản hệ thống, `SafePageFetcher` ở chế độ tải tên miền ngoài.
+
+## 6. Nhập vai thật trên giao diện (11/11/2026, bản xem thử cục bộ, AI giả lập)
+
+Đã làm thật, từng bước, với ba vai đăng nhập bằng tài khoản mẫu: **writer** (nhân viên content), **approver** (trưởng nhóm duyệt) và **admin** (quản lý). Tình huống: website dược ADDP, bài "chỉ số đường huyết bình thường" (chủ đề sức khỏe), sếp dặn viết cho người trên 50 tuổi mới chẩn đoán.
+
+| Bước | Vai | Kết quả |
+|---|---|---|
+| Vào trang chủ | writer | Thấy "Đội AI hôm nay" và việc của mình. Menu gọn, đủ việc. |
+| Mở bài đã lên kế hoạch | writer | Thấy khối "AI sẽ tự chuẩn bị" (rủi ro cao, kho 0 mục, hồ sơ 0%, Trí tuệ đã tự gắn kèm Hoàn tác). |
+| Nhập "Chỉ dẫn cho đội AI" | writer | Lưu được, hiện ngay ở tab Tổng quan. |
+| Giao đội AI | writer | **Được** (đúng yêu cầu). Phiên chạy xong: tự gắn Trí tuệ, thử đọc website, thử tìm web, dàn ý, viết, sửa 1 vòng, tạo ảnh, gắn nhãn chuyên gia. |
+| Đọc bản nháp | approver | Một trang đủ: chất lượng, bản sắc/quy tắc lĩnh vực, thẻ SEO, nguồn, ảnh, lịch sử. |
+| Duyệt kèm ghi chú | approver | Được. |
+| Xếp lịch đăng | approver | Được, nhưng bộ chọn ngày giờ khó dùng (xem dưới). |
+| Lịch xuất bản, Lịch tuần | approver | Bấm bài mở đúng **trang bài mới ở tab Xuất bản** (lỗi cũ đã hết). |
+
+**Lỗi và điểm sai phát hiện khi nhập vai, đã sửa ngay (có test)**
+1. Gợi ý Trí tuệ sai ("Sức khỏe trẻ em" cho bài đường huyết người lớn) vì trùng hai từ rời "đường", "thường": nay chỉ gợi ý khi trùng cụm hai từ liền nhau.
+2. Bài sức khỏe vẫn được tạo 3 ảnh AI vì từ "đường huyết" chưa nằm trong danh sách rủi ro cao: đã thêm thuật ngữ (đái tháo đường, đường huyết, HbA1c, insulin, cholesterol...), và Trí tuệ rủi ro cao cũng được coi là sức khỏe.
+3. Câu cảnh báo nói sai: "AI đã tự bổ sung kiến thức từ website" trong khi lượt đọc website thất bại và mục kiến thức đưa cho AI là 0: đã đổi thành nội dung đúng sự thật.
+4. Nhãn "Chờ chuyên gia xem lại" vẫn còn sau khi bài đã duyệt: nay đổi thành "Chủ đề cần chuyên môn · xem ghi chú duyệt".
+5. Chỉ dẫn của người dùng không thấy được đã áp dụng: nay bước dàn ý và bước viết ghi "Đã áp dụng chỉ dẫn thêm của người phụ trách".
+
+**Điểm khó dùng còn mở**
+- Bộ chọn ngày giờ xếp lịch: hiển thị "Th11 12, 2026 00:00" (không phải định dạng Việt), giờ mặc định 00:00 và nhập giờ khó; người dùng dễ xếp nhầm nửa đêm.
+- ~~Menu của writer còn "Thành phần UI"~~ và ~~khối "Đội AI hôm nay" hiện số chi phí cho writer~~: đã sửa (ẩn khỏi menu nhân viên; writer chỉ thấy đang chạy, chờ duyệt, chờ chuyên gia).
+- Bộ chọn ngày giờ nằm trong `ReviewActions` (mã của Dev1), chưa sửa: cần Dev1 đổi định dạng sang dd/mm/yyyy HH:mm và giờ mặc định hợp lý.
+- Duyệt bài sức khỏe không có chỗ ghi "tôi là người có chuyên môn xác nhận": chỉ có ô ghi chú tự do.
+- Đã thử đọc website nhưng mạng của bản xem thử không ra ngoài nên không đánh giá được việc tự bổ sung kiến thức thật; nội dung bài do AI giả lập (mẫu 925 từ), **không đánh giá được văn chất lượng**.

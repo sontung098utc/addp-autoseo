@@ -102,7 +102,7 @@ class ArticleResource extends Resource
 
     public const SCORE_NOTE = 'Chỉ đo luật hình thức (độ dài, tiêu đề, SEO, từ cấm...). Không đo độ đúng của nội dung.';
 
-    public const GAP_NOTE = 'AI đã tự bổ sung kiến thức từ website công ty; bài này chưa có nguồn từ kho: người có chuyên môn nên xem lại các nhận định.';
+    public const GAP_NOTE = 'Bài này không có mục kiến thức nào từ kho làm căn cứ (AI viết khi chưa có tài liệu, hoặc chưa đọc được nguồn nào). Người có chuyên môn nên xem lại các nhận định; xem lượt "Tự đọc website" ở tab Hoạt động để biết vì sao chưa có tài liệu.';
 
     public const EXPERT_LABEL = 'Chờ chuyên gia xem lại';
 

@@ -9,6 +9,7 @@ use App\Models\AiModelRoute;
 use App\Models\AiProvider;
 use App\Models\Article;
 use App\Models\ArticleVersion;
+use App\Models\Brain;
 use App\Models\BrandProfile;
 use App\Models\MediaAsset;
 use App\Models\Website;
@@ -155,6 +156,19 @@ class ArticleImageTest extends TestCase
         $this->assertSame('no_provider', $r['skip_code']);
         $this->assertStringContainsString('Chưa cấu hình', $r['skipped']);
         $this->assertSame(0, MediaAsset::count());
+    }
+
+    public function test_thuat_ngu_y_te_moi_va_tri_tue_rui_ro_cao_deu_bi_coi_la_suc_khoe(): void
+    {
+        // "đường huyết" không còn lọt: nằm trong danh sách rủi ro cao của RiskClassifier.
+        [$a, $v] = $this->make('chỉ số đường huyết bình thường');
+        $this->assertSame('medical', $this->svc()->generateFor($a, $v)['skip_code']);
+
+        // Chủ đề lạ nhưng website đã gắn Trí tuệ xếp hạng rủi ro cao thì vẫn coi là sức khỏe.
+        [$b, $w] = $this->make('thực đơn tuần cho người lớn tuổi');
+        $brain = Brain::create(['name' => 'Y khoa', 'slug' => 'y_khoa', 'domain_key' => 'y_khoa', 'language' => 'vi', 'status' => 'active', 'description' => '', 'settings' => ['risk_class' => 'high']]);
+        $b->website->brains()->attach($brain->id, ['priority' => 10]);
+        $this->assertSame('medical', $this->svc()->generateFor($b, $w)['skip_code']);
     }
 
     public function test_health_topic_skipped_by_default_and_prompt_is_safe(): void
