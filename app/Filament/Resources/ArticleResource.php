@@ -10,13 +10,28 @@ use App\Filament\Support\Review\ReviewWorkflow;
 use App\Filament\Support\StatusPresenter;
 use App\Models\AgentRun;
 use App\Models\Article;
+use App\Models\ArticleVersion;
 use App\Models\Campaign;
+use App\Models\User;
 use App\Models\Website;
+use App\Services\Agent\Readiness\ArticleReadiness;
+use App\Services\Agent\Refresh\AgentRunDispatcher;
+use App\Services\Agent\Settings\AgentAi;
+use App\Services\Brain\BrainContext;
+use App\Services\Content\ContentPipelineService;
+use App\Services\Content\Quality\QualityReport;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 
 class ArticleResource extends Resource
 {
@@ -37,12 +52,11 @@ class ArticleResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
-
-    protected static function user(): ?\App\Models\User
+    protected static function user(): ?User
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
+        $user = Auth::user();
 
-        return $user instanceof \App\Models\User && $user->is_active ? $user : null;
+        return $user instanceof User && $user->is_active ? $user : null;
     }
 
     public static function canViewAny(): bool
@@ -55,12 +69,12 @@ class ArticleResource extends Resource
         return static::user()?->isWriter() ?? false;
     }
 
-    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    public static function canEdit(Model $record): bool
     {
         return static::user()?->isWriter() ?? false;
     }
 
-    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    public static function canDelete(Model $record): bool
     {
         return static::user()?->isAdmin() ?? false;
     }
@@ -72,40 +86,149 @@ class ArticleResource extends Resource
 
     public const ASSIGN_DESCRIPTION = 'Đội AI sẽ kiểm an toàn, phân hạng rủi ro, lập dàn ý, viết, tự chấm và sửa (tối đa 3 vòng). Kết quả luôn là BẢN NHÁP chờ người duyệt; không có gì được tự đăng.';
 
-    public static function canView(\Illuminate\Database\Eloquent\Model $record): bool
+    public static function canView(Model $record): bool
     {
         return static::canViewAny();
     }
 
     public static function canAssignToAgent(Article $record): bool
     {
-        return (\Illuminate\Support\Facades\Auth::user()?->isApprover() ?? false)
+        return (Auth::user()?->isApprover() ?? false)
             && in_array($record->workflow_status, ['planned', 'drafting', 'rejected'], true)
             && ArticleRows::liveRun($record) === null;
     }
 
-    /** Giao bài cho đội AI (dùng chung cho bảng Bài viết và trang của bài); kết quả báo qua thông báo. */
-    public static function assignToAgent(Article $record): void
+    public const RISK_LABELS = ['low' => 'Thấp', 'medium' => 'Vừa', 'high' => 'Cao'];
+
+    public const SCORE_NOTE = 'Chỉ đo luật hình thức (độ dài, tiêu đề, SEO, từ cấm...). Không đo độ đúng của nội dung.';
+
+    public const GAP_NOTE = 'Bài này chưa có căn cứ nào từ kho: người có chuyên môn cần kiểm từng nhận định.';
+
+    public const HOLD_WARNING = 'Kho chưa có kiến thức đã duyệt cho chủ đề rủi ro cao. Đội AI sẽ DỪNG trước bước viết.';
+
+    public const ALLOW_LABEL = 'Vẫn viết dù kho chưa có kiến thức (bài sẽ cần người có chuyên môn kiểm từng nhận định)';
+
+    /** Tiền VND theo dạng "12.000 ₫". */
+    public static function vnd(float|int $v): string
     {
-        abort_unless(\Illuminate\Support\Facades\Auth::user()?->isApprover(), 403);
+        return number_format((float) $v, 0, ',', '.').' ₫';
+    }
+
+    /** Tóm tắt ngắn cho hộp thoại Giao việc, từ ArticleReadiness (một lần mỗi lần gọi). @return list<string> */
+    public static function assignLines(array $r): array
+    {
+        $cost = $r['cost'];
+        $lines = [
+            'Rủi ro chủ đề: '.(self::RISK_LABELS[$r['risk']['level']] ?? $r['risk']['level']).'.',
+            'Kho có '.$r['knowledge']['count'].' mục kiến thức đã duyệt khớp chủ đề.',
+            'Chi phí: '.($cost['estimate_vnd'] === null ? 'chưa có số liệu để ước lượng' : 'khoảng '.self::vnd($cost['estimate_vnd'])).' · ngân sách phiên tối đa '.self::vnd($cost['budget_vnd']).'.',
+        ];
+
+        return $lines;
+    }
+
+    /** @return array<string, mixed> */
+    public static function readiness(Article $record): array
+    {
+        return ArticleReadiness::for($record, $record->campaign_id);
+    }
+
+    public static function assignContent(Article $record): HtmlString
+    {
+        $r = static::readiness($record);
+        $html = '<p>'.e(static::ASSIGN_DESCRIPTION).'</p><ul class="list-disc pl-5 mt-2 text-sm" data-testid="assign-summary">';
+        foreach (static::assignLines($r) as $l) {
+            $html .= '<li>'.e($l).'</li>';
+        }
+        $html .= '</ul>';
+        if ($r['holds_writing']) {
+            $html .= '<p class="mt-2 text-sm font-semibold" style="color:#b91c1c" data-testid="assign-hold">'.e(static::HOLD_WARNING).'</p>';
+        }
+
+        return new HtmlString($html);
+    }
+
+    /** Ô tick "Vẫn viết dù kho trống": chỉ hiện khi cổng dừng sẽ chặn bài này. */
+    public static function allowField(bool $holds): Forms\Components\Checkbox
+    {
+        return Forms\Components\Checkbox::make('allow_without_knowledge')->label(static::ALLOW_LABEL)->default(false)->visible($holds);
+    }
+
+    /** Giao bài cho đội AI (dùng chung cho bảng Bài viết và trang của bài); kết quả báo qua thông báo. */
+    public static function assignToAgent(Article $record, bool $allowWithoutKnowledge = false): void
+    {
+        abort_unless(Auth::user()?->isApprover(), 403);
         // Chống giao trùng: đã có phiên đang chạy thật thì không tạo phiên thứ hai.
         if (ArticleRows::liveRun($record) !== null) {
-            \Filament\Notifications\Notification::make()->title('Bài này đang có phiên chạy')->body('Đợi phiên hiện tại xong rồi hãy giao lại.')->warning()->send();
+            Notification::make()->title('Bài này đang có phiên chạy')->body('Đợi phiên hiện tại xong rồi hãy giao lại.')->warning()->send();
 
             return;
         }
-        $ai = \App\Services\Agent\Settings\AgentAi::forInteractiveUse();
+        $ai = AgentAi::forInteractiveUse();
         if ($ai === null) {
-            \Filament\Notifications\Notification::make()->title('Chưa kết nối AI')->body('Vào Đội AI → Kết nối AI để nhập khóa trước khi giao việc.')->warning()->send();
+            Notification::make()->title('Chưa kết nối AI')->body('Vào Đội AI → Kết nối AI để nhập khóa trước khi giao việc.')->warning()->send();
 
             return;
         }
-        $run = \App\Services\Agent\Refresh\AgentRunDispatcher::run($record, $ai, \Illuminate\Support\Facades\Auth::user(), policy: \App\Services\Agent\Settings\AgentAi::policy());
-        $n = \Filament\Notifications\Notification::make()->title('Phiên chạy #'.$run->id.': '.(AgentRunResource::STATUS[$run->status][0] ?? $run->status))
+        // Chỉ truyền cờ khi bật: tham số do cổng dừng ở lõi đội AI cung cấp, mặc định tắt.
+        $extra = ['policy' => AgentAi::policy()] + ($allowWithoutKnowledge ? ['allowWithoutKnowledge' => true] : []);
+        $run = AgentRunDispatcher::run($record, $ai, Auth::user(), ...$extra);
+        $n = Notification::make()->title('Bài #'.$record->id.' · phiên #'.$run->id.': '.(AgentRunResource::STATUS[$run->status][0] ?? $run->status))
             ->body($run->outcome_reason ?: 'Đã có bản nháp chờ duyệt.')
-            ->actions([\Filament\Notifications\Actions\Action::make('xem')->label('Xem diễn biến')->url(AgentRunResource::getUrl('view', ['record' => $run]))]);
+            ->actions([Action::make('xem')->label('Xem diễn biến')->url(AgentRunResource::getUrl('view', ['record' => $run]))]);
         in_array($run->status, ['ready_for_review'], true) ? $n->success() : $n->warning();
         $n->send();
+    }
+
+    public const BULK_MAX = 5;
+
+    /** Giao hàng loạt: tuần tự, tối đa BULK_MAX bài mỗi lần (chạy đồng bộ). */
+    private static function bulkAssignAction(): Tables\Actions\BulkAction
+    {
+        $eligible = fn (Collection $records) => $records->filter(fn (Article $a) => static::canAssignToAgent($a))->sortBy('id')->values();
+
+        return Tables\Actions\BulkAction::make('assign_agent_bulk')
+            ->label('Giao đội AI')->icon('heroicon-o-cpu-chip')
+            ->visible(fn () => Auth::user()?->isApprover() ?? false)
+            ->deselectRecordsAfterCompletion()
+            ->modalHeading('Giao các bài đã chọn cho đội AI')
+            ->modalSubmitActionLabel('Giao việc')
+            ->modalDescription(function (Collection $records) use ($eligible) {
+                $ok = $eligible($records);
+                $run = $ok->take(static::BULK_MAX);
+                $held = $run->filter(fn (Article $a) => ArticleReadiness::for($a, $a->campaign_id)['holds_writing'])->count();
+                $budget = (float) AgentAi::policy()->budgetVnd;
+                $t = 'Đã chọn '.$records->count().' bài, giao được '.$run->count().' bài (chỉ bài Kế hoạch, Đang viết, Cần sửa và chưa có phiên chạy). Ngân sách tối đa '.static::vnd($run->count() * $budget).' ('.$run->count().' × '.static::vnd($budget).').';
+                if ($ok->count() > static::BULK_MAX) {
+                    $t .= ' Mỗi lần chỉ chạy '.static::BULK_MAX.' bài vì chạy tuần tự; '.($ok->count() - static::BULK_MAX).' bài còn lại sẽ KHÔNG được giao, hãy giao lượt sau.';
+                }
+                if ($held > 0) {
+                    $t .= ' '.$held.' bài thuộc chủ đề rủi ro cao mà kho trống: sẽ bị DỪNG (bỏ qua) trừ khi tick ô bên dưới.';
+                }
+
+                return $t;
+            })
+            ->form([static::allowField(true)->label(static::ALLOW_LABEL.' (áp cho các bài kho trống)')])
+            ->action(function (Collection $records, array $data) use ($eligible) {
+                abort_unless(Auth::user()?->isApprover(), 403);
+                $allow = (bool) ($data['allow_without_knowledge'] ?? false);
+                $ok = $eligible($records);
+                foreach ($ok->take(static::BULK_MAX) as $a) {
+                    if (! $allow && ArticleReadiness::for($a, $a->campaign_id)['holds_writing']) {
+                        Notification::make()->title('Bài #'.$a->id.' bị bỏ qua')->body(static::HOLD_WARNING)->warning()->send();
+
+                        continue;
+                    }
+                    static::assignToAgent($a, $allow);
+                }
+                if ($ok->count() > static::BULK_MAX) {
+                    Notification::make()->title($ok->count() - static::BULK_MAX.' bài chưa được giao')->body('Mỗi lần chỉ giao tối đa '.static::BULK_MAX.' bài. Chọn lại các bài còn lại để giao lượt sau.')->warning()->send();
+                }
+                $skipped = $records->count() - $ok->count();
+                if ($skipped > 0) {
+                    Notification::make()->title($skipped.' bài không giao được')->body('Bài không ở trạng thái Kế hoạch, Đang viết, Cần sửa, hoặc đang có phiên chạy.')->warning()->send();
+                }
+            });
     }
 
     public static function form(Form $form): Form
@@ -206,7 +329,7 @@ class ArticleResource extends Resource
                     ->wrap()
                     ->lineClamp(2)
                     ->tooltip(fn (Article $r) => $r->primary_keyword)
-                    ->description(fn (Article $r) => $r->latestVersion?->title ? \Illuminate\Support\Str::limit($r->latestVersion->title, 60) : null)
+                    ->description(fn (Article $r) => $r->latestVersion?->title ? Str::limit($r->latestVersion->title, 60) : null)
                     ->extraHeaderAttributes(['class' => 'ss-col-main'])
                     ->extraCellAttributes(['class' => 'ss-col-main']),
                 static::narrow(Tables\Columns\TextColumn::make('workflow_status')->sortable()
@@ -229,9 +352,9 @@ class ArticleResource extends Resource
                     ->visibleFrom('xl')),
                 static::narrow(Tables\Columns\TextColumn::make('brains')
                     ->label('Trí tuệ')
-                    ->state(fn (Article $r) => ($n = \App\Services\Brain\BrainContext::forArticle($r, ArticleRows::lastRun($r)?->campaign_id)->names()) !== '' ? $n : '—')
+                    ->state(fn (Article $r) => ($n = BrainContext::forArticle($r, ArticleRows::lastRun($r)?->campaign_id)->names()) !== '' ? $n : '—')
                     ->limit(18)
-                    ->tooltip(fn (Article $r) => 'Trí tuệ đang dùng: '.\App\Services\Brain\BrainContext::forArticle($r, ArticleRows::lastRun($r)?->campaign_id)->names())
+                    ->tooltip(fn (Article $r) => 'Trí tuệ đang dùng: '.BrainContext::forArticle($r, ArticleRows::lastRun($r)?->campaign_id)->names())
                     ->visibleFrom('xl')),
                 static::narrow(Tables\Columns\TextColumn::make('last_run')
                     ->label('Phiên gần nhất')
@@ -301,9 +424,9 @@ class ArticleResource extends Resource
                         ->modalDescription('Hệ thống sẽ dựa trên từ khóa chính và cụm chủ đề để sinh dàn ý, bài viết chuẩn SEO và metadata.')
                         ->modalSubmitActionLabel('Bắt đầu sinh')
                         ->action(function (Article $record) {
-                            $service = new \App\Services\Content\ContentPipelineService();
+                            $service = new ContentPipelineService;
                             $version = $service->generateArticleVersion($record);
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->title('Đã sinh xong bản thảo mới!')
                                 ->body("Bản thảo phiên bản #{$version->version} ({$version->title}) đã được tạo và chuyển sang chờ duyệt.")
                                 ->success()
@@ -313,15 +436,16 @@ class ArticleResource extends Resource
                         ->label('Giao đội AI')
                         ->icon('heroicon-o-cpu-chip')
                         ->visible(fn (Article $record) => static::canAssignToAgent($record))
-                        ->requiresConfirmation()
                         ->modalHeading('Giao bài này cho đội AI')
-                        ->modalDescription(static::ASSIGN_DESCRIPTION)
+                        ->modalDescription(fn (Article $record) => static::assignContent($record))
+                        ->form(fn (Article $record) => [static::allowField(static::readiness($record)['holds_writing'])])
                         ->modalSubmitActionLabel('Giao việc')
-                        ->action(fn (Article $record) => static::assignToAgent($record)),
+                        ->action(fn (Article $record, array $data) => static::assignToAgent($record, (bool) ($data['allow_without_knowledge'] ?? false))),
                 ])->label('⋯')->icon('heroicon-m-ellipsis-horizontal')->iconButton()->tooltip('Thao tác khác'),
             ], position: Tables\Enums\ActionsPosition::AfterColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    static::bulkAssignAction(),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
@@ -336,14 +460,14 @@ class ArticleResource extends Resource
     }
 
     /** Kiểm chất lượng bản mới nhất; null nếu bài chưa có bản nào. */
-    private static function qualityOf(Article $record): ?\App\Services\Content\Quality\QualityReport
+    private static function qualityOf(Article $record): ?QualityReport
     {
         $v = $record->versions()->orderByDesc('version')->first();
 
         return $v ? ReviewActions::qualityFor($v) : null;
     }
 
-    private static function latest(Article $record): \App\Models\ArticleVersion
+    private static function latest(Article $record): ArticleVersion
     {
         $v = $record->versions()->orderByDesc('version')->first();
         if (! $v) {

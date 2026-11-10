@@ -69,6 +69,12 @@
                 .ss-qual-ok{margin-top:.6rem;font-size:.85rem}
             </style>
             <h2 class="ss-review-card__title" id="ss-review-quality">Kiểm chất lượng</h2>
+            @php
+                $rd = $article ? \App\Filament\Resources\ArticleResource::readiness($article) : null;
+                $noGround = $rd && (($rd['risk']['level'] === 'high' && $rd['knowledge']['count'] === 0));
+            @endphp
+            <p class="ss-qual-measure" data-testid="vr-score-note"><strong>Điểm hình thức.</strong> {{ \App\Filament\Resources\ArticleResource::SCORE_NOTE }}</p>
+            @if ($noGround)<p class="ss-qual-blocked" data-testid="vr-gap" style="color:#b45309">{{ \App\Filament\Resources\ArticleResource::GAP_NOTE }}</p>@endif
             @if ($quality->hasBlocking())
                 <p class="ss-qual-blocked"><strong>Còn {{ $qCounts['P0'] }} lỗi P0 — chặn duyệt.</strong> Sửa bài hoặc duyệt ngoại lệ với lý do (được ghi log).</p>
             @endif

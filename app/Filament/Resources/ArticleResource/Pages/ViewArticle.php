@@ -11,6 +11,7 @@ use App\Filament\Support\Review\ReviewWorkflow;
 use App\Models\AgentRun;
 use App\Models\Article;
 use App\Models\ArticleVersion;
+use App\Models\Brain;
 use App\Models\BrandProfile;
 use App\Models\Campaign;
 use App\Models\Keyword;
@@ -20,7 +21,10 @@ use App\Models\Publication;
 use App\Models\Website;
 use App\Services\Agent\Pipeline\JobTypeRegistry;
 use App\Services\Brain\BrainContext;
+use App\Services\Brain\BrainService;
 use Filament\Actions;
+use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
 
 /**
  * AG-S27: không gian bài viết. Bấm vào một bài ở màn Bài viết sẽ vào đây. Các tab đi theo đúng chuỗi làm ra một bài:
@@ -95,17 +99,41 @@ class ViewArticle extends EditArticle
         );
     }
 
+    /** Gắn một Trí tuệ gợi ý cho website của bài; người xác nhận mới gắn (quyền approver trở lên, như BrainService). */
+    public function attachBrainAction(): Actions\Action
+    {
+        return Actions\Action::make('attachBrain')
+            ->label('Gắn cho website')
+            ->requiresConfirmation()
+            ->modalHeading('Gắn Trí tuệ cho website')
+            ->modalDescription('Mọi bài của website này sẽ dùng Trí tuệ này khi viết. Có thể gỡ ở trang Trí tuệ.')
+            ->modalSubmitActionLabel('Gắn')
+            ->authorize(fn () => BrainService::canManage(ReviewActions::user()))
+            ->action(function (array $arguments) {
+                $user = ReviewActions::user();
+                abort_unless(BrainService::canManage($user), 403);
+                $brain = Brain::query()->where('status', 'active')->findOrFail((int) ($arguments['brain'] ?? 0));
+                $site = $this->record->website;
+                abort_if($site === null, 422);
+                $map = $brain->websites->mapWithKeys(fn ($w) => [$w->id => (int) $w->pivot->priority])->all();
+                $map[$site->id] = ($map ? max($map) : 0) + 10;
+                (new BrainService)->linkWebsites($brain, $map, $user);
+                Log::info('Gắn Trí tuệ cho website từ trang bài', ['brain_id' => $brain->id, 'website_id' => $site->id, 'article_id' => $this->record->id, 'user_id' => $user?->id]);
+                Notification::make()->title('Đã gắn "'.$brain->name.'" cho '.$site->name)->body('Người gắn: '.$user?->name.'.')->success()->send();
+            });
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             Actions\Action::make('run_agent')->label('Giao đội AI')->icon('heroicon-o-cpu-chip')
                 ->visible(fn () => ArticleResource::canAssignToAgent($this->record))
-                ->requiresConfirmation()
                 ->modalHeading('Giao bài này cho đội AI')
-                ->modalDescription(ArticleResource::ASSIGN_DESCRIPTION)
+                ->modalDescription(fn () => ArticleResource::assignContent($this->record))
+                ->form(fn () => [ArticleResource::allowField(ArticleResource::readiness($this->record)['holds_writing'])])
                 ->modalSubmitActionLabel('Giao việc')
-                ->action(function () {
-                    ArticleResource::assignToAgent($this->record);
+                ->action(function (array $data) {
+                    ArticleResource::assignToAgent($this->record, (bool) ($data['allow_without_knowledge'] ?? false));
                     $this->refreshRecord();
                 }),
             Actions\Action::make('submit_review')->label('Gửi duyệt')->icon('heroicon-o-paper-airplane')
@@ -186,7 +214,22 @@ class ViewArticle extends EditArticle
         $writeStep = $runs->flatMap->steps->whereIn('stage', ['write', 'repair'])->sortByDesc('id')->first();
         $researchStep = $runs->flatMap->steps->where('stage', 'research')->sortByDesc('id')->first();
 
+        $unwritten = $latest === null || in_array($article->workflow_status, ['planned', 'drafting', 'rejected'], true);
+        // Tính một lần mỗi lượt render; dùng cho khối "Sẵn sàng trước khi giao" và cảnh báo điểm hình thức.
+        $readiness = ArticleResource::readiness($article);
+        // Tab mở đầu theo trạng thái; bài chưa viết luôn mở Tổng quan và không nhớ tab của bài khác.
+        $tabDefault = match (true) {
+            $latest === null || $article->workflow_status === 'planned' => 'overview',
+            $article->workflow_status === 'needs_review' => 'content',
+            in_array($article->workflow_status, ['approved', 'scheduled'], true) => 'publish',
+            default => 'overview',
+        };
+
         return [
+            'readiness' => $readiness,
+            'showPreflight' => $unwritten,
+            'tabDefault' => $tabDefault,
+            'canAttachBrain' => BrainService::canManage(ReviewActions::user()),
             'article' => $article,
             'latest' => $latest,
             'versions' => $versions,

@@ -28,6 +28,12 @@
     $canApprove = \App\Filament\Support\Review\ReviewActions::canApprove();
     $sources = array_values((array) ($latest?->sources_cited ?? []));
     $knowledgeGap = (bool) ($research['knowledge']['gap'] ?? false);
+    $riskLevel = $readiness['risk']['level'] ?? 'low';
+    // Bài rủi ro cao hoặc bước research ghi kho thiếu: điểm hình thức không nói gì về độ đúng.
+    $noGrounding = $knowledgeGap || ($riskLevel === 'high' && ($readiness['knowledge']['count'] ?? 0) === 0);
+    $buildPage = class_exists(\App\Filament\Pages\BrainBuildPage::class) && \App\Filament\Pages\BrainBuildPage::canAccess() ? \App\Filament\Pages\BrainBuildPage::getUrl() : null;
+    $riskLabel = ArticleResource::RISK_LABELS[$riskLevel] ?? $riskLevel;
+    $money = fn ($v) => ArticleResource::vnd($v);
     $imageNote = $research['images']['warning'] ?? null;
     $links = array_values(array_filter((array) ($research['internal_links']['inserted'] ?? [])));
     $images = $versions->flatMap->mediaAssets->unique('id');
@@ -140,11 +146,71 @@
             @endif
         </div>
 
-        <x-studio.tabs persist="bai-viet-v3" default="overview" :tabs="$tabs">
+        <x-studio.tabs :persist="$showPreflight ? null : 'bai-viet-v4-'.$article->id" :default="$tabDefault" :tabs="$tabs">
             {{-- Tổng quan: bài đang ở đâu trong chuỗi, việc tiếp theo, và sửa thông tin bài ngay tại đây. --}}
             <x-studio.panel key="overview">
                 <div class="aw-stack">
                     <p class="aw-next" data-testid="aw-next"><strong>Việc tiếp theo:</strong> {{ $next }}</p>
+                    @if ($showPreflight)
+                        <section class="ss-review-card" data-testid="aw-preflight">
+                            <h2 class="ss-review-card__title">Sẵn sàng trước khi giao</h2>
+                            <dl class="ss-review-dl">
+                                <dt>Rủi ro chủ đề</dt>
+                                <dd data-testid="pf-risk"><strong>{{ $riskLabel }}</strong>@if (! empty($readiness['risk']['reasons'])) <span class="aw-muted">· {{ implode(' ', array_slice($readiness['risk']['reasons'], 0, 2)) }}</span>@endif</dd>
+                                <dt>Kho kiến thức</dt>
+                                <dd data-testid="pf-kb">
+                                    @if ($readiness['knowledge']['count'] > 0)
+                                        Kho có {{ $readiness['knowledge']['count'] }} mục kiến thức đã duyệt khớp chủ đề:
+                                        {{ implode('; ', array_map(fn ($i) => $i['title'], array_slice($readiness['knowledge']['items'], 0, 3))) }}
+                                    @else
+                                        Kho có 0 mục kiến thức đã duyệt khớp chủ đề.
+                                    @endif
+                                </dd>
+                                <dt>Sản phẩm liên quan</dt><dd data-testid="pf-products">{{ $readiness['products']['count'] }}</dd>
+                                <dt>Hồ sơ doanh nghiệp</dt>
+                                <dd data-testid="pf-brand">{{ $readiness['brand']['percent'] }}%@if ($readiness['brand']['missing'] !== []) <span class="aw-muted">· thiếu: {{ implode(', ', $readiness['brand']['missing']) }}</span>@endif</dd>
+                                <dt>Trí tuệ đang gắn</dt>
+                                <dd data-testid="pf-brains">{{ $readiness['brains']['attached'] === [] ? 'Chưa gắn Trí tuệ nào' : implode(', ', array_column($readiness['brains']['attached'], 'name')) }}</dd>
+                                <dt>Chi phí ước lượng</dt>
+                                <dd data-testid="pf-cost">
+                                    {{ $readiness['cost']['estimate_vnd'] === null ? 'Chưa có số liệu để ước lượng' : 'Khoảng '.$money($readiness['cost']['estimate_vnd']) }}
+                                    <span class="aw-muted">· ngân sách phiên tối đa {{ $money($readiness['cost']['budget_vnd']) }}</span>
+                                </dd>
+                            </dl>
+                            @if ($readiness['brains']['suggested'] !== [])
+                                <div data-testid="pf-suggested" style="margin-top:.6rem">
+                                    <strong>Trí tuệ khớp chủ đề, chưa gắn:</strong>
+                                    <ul class="aw-list">
+                                        @foreach ($readiness['brains']['suggested'] as $sg)
+                                            <li>{{ $sg['name'] }} <span class="aw-muted">· {{ $sg['reason'] }}</span>
+                                                @if ($canAttachBrain && $article->website)
+                                                    <button type="button" class="aw-btn" data-testid="pf-attach" wire:click="mountAction('attachBrain', @js(['brain' => $sg['id']]))">Gắn cho website</button>
+                                                @endif
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+                            @foreach ($readiness['issues'] as $is)
+                                @if ($is['severity'] !== 'info' || in_array($is['code'], ['brand_incomplete'], true))
+                                    <p class="aw-note" data-testid="pf-issue" data-code="{{ $is['code'] }}" data-severity="{{ $is['severity'] }}" @if ($is['severity'] === 'block') style="color:#b91c1c" @endif>
+                                        {{ $is['message'] }}
+                                        @if ($is['code'] === 'kb_empty')
+                                            @if (BrainLibraryPage::canAccess()) <a class="aw-link" href="{{ BrainLibraryPage::getUrl() }}">Mở Kho trí tuệ</a>@endif
+                                            @if ($buildPage) · <a class="aw-link" href="{{ $buildPage }}">Xây kho từ website</a>@endif
+                                        @elseif ($is['code'] === 'brand_incomplete' && BrandProfilePage::canAccess())
+                                            <a class="aw-link" href="{{ BrandProfilePage::getUrl() }}">Mở hồ sơ doanh nghiệp</a>
+                                        @elseif ($is['code'] === 'no_brain' && BrainLibraryPage::canAccess())
+                                            <a class="aw-link" href="{{ BrainLibraryPage::getUrl() }}">Mở Kho trí tuệ</a>
+                                        @endif
+                                    </p>
+                                @endif
+                            @endforeach
+                            @if ($readiness['holds_writing'])
+                                <p class="aw-note" data-testid="pf-hold" style="color:#b91c1c"><strong>{{ ArticleResource::HOLD_WARNING }}</strong></p>
+                            @endif
+                        </section>
+                    @endif
                     <section class="ss-review-card" data-testid="aw-chain">
                         <h2 class="ss-review-card__title">Bài này được làm ra thế nào</h2>
                         <p class="aw-muted" style="margin-bottom:.6rem">Mỗi bước dùng kết quả của bước trước. Bấm vào một bước để xem chi tiết.</p>
@@ -376,6 +442,10 @@
                 <div class="aw-stack">
                     <section class="ss-review-card">
                         <h2 class="ss-review-card__title">Các phiên bản</h2>
+                        @if ($latest)
+                            <p class="aw-muted" data-testid="aw-content-score-note">Điểm hình thức ({{ $qCounts['P0'] }} lỗi P0 · {{ $qCounts['P1'] }} P1 · {{ $qCounts['P2'] }} P2): {{ ArticleResource::SCORE_NOTE }}</p>
+                            @if ($noGrounding)<p class="aw-note" data-testid="aw-content-gap" style="color:#b45309">{{ ArticleResource::GAP_NOTE }}</p>@endif
+                        @endif
                         @if ($versions->isEmpty())
                             <p>Bài chưa có nội dung. Bấm <strong>Giao đội AI</strong> ở đầu trang để tạo bản nháp đầu tiên.</p>
                         @else
@@ -465,9 +535,11 @@
                         @if ($runs->isEmpty())
                             <p>Bài này chưa được giao cho đội AI.</p>
                         @else
+                            <p class="aw-muted" data-testid="aw-score-note" style="margin-bottom:.4rem">Điểm hình thức: {{ ArticleResource::SCORE_NOTE }}</p>
+                            @if ($noGrounding)<p class="aw-note" data-testid="aw-score-gap" style="color:#b45309">{{ ArticleResource::GAP_NOTE }}</p>@endif
                             <div class="aw-scroll">
                                 <table class="aw-table" data-testid="aw-runs">
-                                    <thead><tr><th>Phiên</th><th>Kết quả</th><th>Điểm</th><th>Tạo ra bản</th><th>AI</th><th>Vòng sửa</th><th>Chi phí</th><th>Bắt đầu</th><th></th></tr></thead>
+                                    <thead><tr><th>Phiên</th><th>Kết quả</th><th title="{{ ArticleResource::SCORE_NOTE }}">Điểm hình thức</th><th>Tạo ra bản</th><th>AI</th><th>Vòng sửa</th><th>Chi phí</th><th>Bắt đầu</th><th></th></tr></thead>
                                     <tbody>
                                         @foreach ($runs as $r)
                                             @php $isLive = $live && $r->id === $live->id; $fv = $r->final_version_id ? $versions->firstWhere('id', $r->final_version_id) : null; @endphp
