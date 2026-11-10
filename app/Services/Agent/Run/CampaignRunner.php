@@ -3,13 +3,21 @@
 namespace App\Services\Agent\Run;
 
 use App\Contracts\AiProviderInterface;
+use App\Filament\Support\Review\ReviewWorkflow;
 use App\Filament\Support\Schedule\VnTime;
 use App\Models\AgentRun;
+use App\Models\AgentRunStep;
 use App\Models\Article;
 use App\Models\Campaign;
 use App\Models\CampaignWait;
+use App\Models\User;
+use App\Services\Agent\Handoff\CmsDraftHandoff;
+use App\Services\Agent\Refresh\AgentRunDispatcher;
+use App\Services\Agent\Settings\AgentAi;
 use App\Services\Publishing\EmergencyStopService;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * AG-S01: một "nhịp" của chiến dịch — tự chọn từ khóa kế tiếp rồi giao cho đội AI, trong giới hạn bài/ngày.
@@ -18,6 +26,10 @@ use Carbon\CarbonImmutable;
  */
 final class CampaignRunner
 {
+    public const AUTO_APPROVE_LABEL = 'Tự duyệt bởi đội AI (chế độ Toàn quyền)';
+
+    public const SYSTEM_EMAIL = 'ai-auto@system.local';
+
     /** @param callable(): ?AiProviderInterface $providerFactory trả null nếu chưa cấu hình AI thật */
     public function __construct(private $providerFactory, private ?EmergencyStopService $stop = null)
     {
@@ -26,7 +38,7 @@ final class CampaignRunner
 
     /**
      * @return array{result: string, message: string, run: ?AgentRun}
-     *   result: ran | paused | stopped | limit | draft_cap | cost_cap | mode_locked | blocked_gap | no_keywords | no_ai | site_inactive
+     *                                                                result: ran | auto_approved | paused | stopped | limit | draft_cap | cost_cap | blocked_gap | no_keywords | no_ai | site_inactive
      */
     public function tick(Campaign $c, ?CarbonImmutable $now = null): array
     {
@@ -48,10 +60,6 @@ final class CampaignRunner
         $today = AgentRun::query()->where('campaign_id', $c->id)->where('started_at', '>=', $from)->where('started_at', '<', $to)->count();
         if ($today >= $c->daily_limit) {
             return $this->out('limit', "Đã đủ {$today}/{$c->daily_limit} bài hôm nay, chờ ngày mai.");
-        }
-
-        if ($c->mode === 'autonomous') {
-            return $this->out('mode_locked', 'Chế độ Tự chủ đang khóa (cần văn bản chính sách của bạn và connector hỗ trợ gỡ bài). Chiến dịch không giao việc; hãy chuyển sang Thận trọng hoặc Cân bằng.');
         }
 
         $drafts = AgentRun::query()->where('campaign_id', $c->id)->where('status', 'ready_for_review')->where('started_at', '>=', $from)->where('started_at', '<', $to)->count();
@@ -87,7 +95,7 @@ final class CampaignRunner
         $fromPlan = $article !== null;
         $article ??= Article::create(['website_id' => $c->website_id, 'created_by' => $c->created_by, 'primary_keyword' => $keyword, 'workflow_status' => 'planned', 'origin' => 'keyword', 'campaign_id' => $c->id]);
         try {
-            $run = \App\Services\Agent\Refresh\AgentRunDispatcher::run($article, $ai, null, 'schedule', $c->id, stop: $this->stop, policy: \App\Services\Agent\Settings\AgentAi::policy(), handoff: app(\App\Services\Agent\Handoff\CmsDraftHandoff::class));
+            $run = AgentRunDispatcher::run($article, $ai, null, 'schedule', $c->id, stop: $this->stop, policy: AgentAi::policy(), handoff: app(CmsDraftHandoff::class));
         } catch (\Throwable $e) {
             // Không để lại bài mồ côi làm mất lượt của từ khóa này ở nhịp sau.
             if (! $fromPlan && ! AgentRun::query()->where('article_id', $article->id)->exists()) {
@@ -106,7 +114,74 @@ final class CampaignRunner
             return ['result' => 'blocked_gap', 'message' => "Dừng \"{$keyword}\": chủ đề rủi ro cao, kho chưa có kiến thức (phiên #{$run->id}). Đã ghi mục chờ bổ sung.", 'run' => $run];
         }
 
+        if ($c->mode === 'autonomous' && $run->status === 'ready_for_review') {
+            return $this->autoReview($c, $run, $keyword);
+        }
+
         return ['result' => 'ran', 'message' => "Đã giao \"{$keyword}\": phiên #{$run->id} ({$run->status}).", 'run' => $run];
+    }
+
+    /**
+     * Chế độ Toàn quyền: tự duyệt có điều kiện. Chỉ tự duyệt khi KHÔNG có quyết định giữ cho chuyên gia, rủi ro không cao và không còn lỗi chặn P0
+     * (ReviewWorkflow::approve tự từ chối nếu còn P0 mà không có lý do ngoại lệ; ta không đưa lý do ngoại lệ). Bài còn lại ở "Chờ duyệt" cho người.
+     * Không xuất bản: việc đẩy nháp lên CMS vẫn do bậc tin cậy hiện có quyết định.
+     *
+     * @return array{result: string, message: string, run: ?AgentRun}
+     */
+    private function autoReview(Campaign $c, AgentRun $run, string $keyword): array
+    {
+        $run->load('steps', 'finalVersion');
+        $needsExpert = $run->risk_level === 'high'
+            || $run->steps->contains(fn ($s) => in_array($s->data['decision'] ?? null, ['high_risk_expert_review', 'brain_must_cite_review'], true) || ! empty($s->data['needs_expert_review']));
+        $version = $run->finalVersion;
+        $held = fn (string $why) => $this->holdForPeople($c, $run, $keyword, $why);
+        if ($needsExpert) {
+            return $held('rủi ro cao hoặc cần người có chuyên môn');
+        }
+        if ($version === null || $version->review_status !== 'needs_review') {
+            return $held('chưa có bản chờ duyệt hợp lệ');
+        }
+
+        $note = self::AUTO_APPROVE_LABEL.': đạt luật chấm, không còn lỗi chặn, chủ đề không thuộc nhóm rủi ro cao (phiên #'.$run->id.').';
+        try {
+            app(ReviewWorkflow::class)->approve(self::systemUser(), $version, $note);
+        } catch (\InvalidArgumentException $e) {
+            return $held('còn lỗi chặn hoặc không duyệt được: '.$e->getMessage());
+        }
+
+        $run->forceFill(['outcome_reason' => trim(($run->outcome_reason ? $run->outcome_reason.' ' : '').self::AUTO_APPROVE_LABEL.'.')])->save();
+        $this->stepNote($run, 'ok', self::AUTO_APPROVE_LABEL, $note, ['decision' => 'auto_approved', 'version' => $version->version]);
+        Log::info('campaign.auto_approved', ['campaign_id' => $c->id, 'run_id' => $run->id, 'article_id' => $run->article_id, 'version' => $version->version]);
+
+        return ['result' => 'auto_approved', 'message' => "Đã tự duyệt bài \"{$keyword}\" (phiên #{$run->id}, chế độ Toàn quyền).", 'run' => $run];
+    }
+
+    private function holdForPeople(Campaign $c, AgentRun $run, string $keyword, string $why): array
+    {
+        $this->stepNote($run, 'warn', 'Chờ người xem (chế độ Toàn quyền)', "Không tự duyệt: {$why}.", ['decision' => 'auto_approve_skipped']);
+        Log::info('campaign.auto_approve_skipped', ['campaign_id' => $c->id, 'run_id' => $run->id, 'why' => $why]);
+
+        return ['result' => 'ran', 'message' => "Bài \"{$keyword}\" chờ người xem vì rủi ro cao hoặc cần chuyên môn (phiên #{$run->id}).", 'run' => $run];
+    }
+
+    private function stepNote(AgentRun $run, string $status, string $title, string $detail, array $data): void
+    {
+        $now = now();
+        AgentRunStep::create(['agent_run_id' => $run->id, 'seq' => (int) $run->steps()->max('seq') + 1, 'stage' => 'decision', 'role' => 'system', 'status' => $status, 'title' => $title, 'detail' => $detail,
+            'data' => ['role_key' => 'system', 'role_name' => 'Hệ thống'] + $data, 'tokens_used' => 0, 'cost_vnd' => 0, 'started_at' => $now, 'finished_at' => $now]);
+    }
+
+    /** Người thực hiện hệ thống cho việc tự duyệt: tạo một lần, tái dùng. Không đăng nhập được (mật khẩu ngẫu nhiên). */
+    public static function systemUser(): User
+    {
+        $u = User::query()->where('email', self::SYSTEM_EMAIL)->first();
+        if ($u === null) {
+            $u = User::create(['name' => 'Đội AI (tự động)', 'email' => self::SYSTEM_EMAIL, 'password' => Str::random(64), 'role' => 'approver', 'is_active' => true]);
+        } elseif (! $u->is_active || $u->role !== 'approver') {
+            $u->forceFill(['is_active' => true, 'role' => 'approver'])->save();
+        }
+
+        return $u;
     }
 
     /** Bài 'planned' (từ trang Kế hoạch nội dung) của website, chưa có phiên nào, ưu tiên (priority) cao trước (bài làm mới P0 trước), cùng mức thì cũ nhất trước. */

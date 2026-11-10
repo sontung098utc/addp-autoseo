@@ -2,16 +2,20 @@
 
 namespace Tests\Feature\Agent;
 
+use App\Filament\Clusters\AgentTeam\Pages\AgentOverview;
 use App\Filament\Resources\CampaignResource;
 use App\Filament\Resources\CampaignResource\Pages\ListCampaigns;
 use App\Models\AgentRun;
 use App\Models\Article;
 use App\Models\Campaign;
+use App\Models\CampaignWait;
+use App\Models\Publication;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Agent\Run\CampaignRunner;
 use App\Services\Ai\DemoScriptedAiProvider;
 use App\Services\Publishing\EmergencyStopService;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -30,13 +34,13 @@ class CampaignTest extends TestCase
 
     private function freezeClock(CarbonImmutable $at): void
     {
-        \Carbon\Carbon::setTestNow($at);
+        Carbon::setTestNow($at);
         CarbonImmutable::setTestNow($at);
     }
 
     protected function tearDown(): void
     {
-        \Carbon\Carbon::setTestNow();
+        Carbon::setTestNow();
         CarbonImmutable::setTestNow();
         app(EmergencyStopService::class)->resetForTesting();
         parent::tearDown();
@@ -57,7 +61,7 @@ class CampaignTest extends TestCase
 
     private function runner(): CampaignRunner
     {
-        return new CampaignRunner(fn () => new DemoScriptedAiProvider());
+        return new CampaignRunner(fn () => new DemoScriptedAiProvider);
     }
 
     public function test_nhip_giao_tu_khoa_ke_tiep_ghi_chien_dich_va_trigger_lich(): void
@@ -69,7 +73,7 @@ class CampaignTest extends TestCase
         $this->assertSame($c->id, $r['run']->campaign_id);
         $this->assertSame('schedule', $r['run']->trigger);
         $this->assertSame('dịch vụ thiết kế website', $r['run']->article->primary_keyword);
-        $this->assertSame(0, \App\Models\Publication::count());
+        $this->assertSame(0, Publication::count());
     }
 
     public function test_bo_qua_tu_khoa_da_co_bai_va_het_tu_khoa_thi_dung(): void
@@ -137,7 +141,6 @@ class CampaignTest extends TestCase
         $this->assertSame(1, AgentRun::count());
     }
 
-
     public function test_luot_tu_dong_khong_dung_playbook_chua_active(): void
     {
         $c = $this->campaign();
@@ -147,8 +150,6 @@ class CampaignTest extends TestCase
         $this->assertNull($brief->data['playbook']);
         $this->assertStringContainsString('không dùng', $brief->detail);
     }
-
-
 
     public function test_quyen_va_nut_tren_giao_dien(): void
     {
@@ -191,7 +192,8 @@ class CampaignTest extends TestCase
 
         // Luồng và phần Dev1 cần nằm trong cửa sổ phụ, không chiếm trang chính.
         $this->get('/admin/doi-ai/tong-quan')->assertOk()->assertSee('Luồng & phần còn thiếu')->assertDontSee('Dev1 cần (AG-B06)');
-        $html = view('filament.clusters.agent-team.flow-modal', (new class extends \App\Filament\Clusters\AgentTeam\Pages\AgentOverview {
+        $html = view('filament.clusters.agent-team.flow-modal', (new class extends AgentOverview
+        {
             public function data(): array
             {
                 return $this->flowData();
@@ -206,7 +208,8 @@ class CampaignTest extends TestCase
     {
         $this->actingAs($this->user('admin'));
 
-        $html = view('filament.clusters.agent-team.flow-modal', (new class extends \App\Filament\Clusters\AgentTeam\Pages\AgentOverview {
+        $html = view('filament.clusters.agent-team.flow-modal', (new class extends AgentOverview
+        {
             public function data(): array
             {
                 return $this->flowData();
@@ -273,19 +276,13 @@ class CampaignTest extends TestCase
         $this->assertSame('draft_cap', $this->runner()->tick($c, $now->addHour())['result']);
     }
 
-    public function test_che_do_tu_chu_bi_khoa_o_runner_va_form(): void
+    public function test_che_do_tu_chu_khong_con_bi_khoa_o_runner(): void
     {
         $c = $this->campaign(['mode' => 'autonomous']);
         $r = $this->runner()->tick($c);
 
-        $this->assertSame('mode_locked', $r['result']);
-        $this->assertStringContainsString('Tự chủ', $r['message']);
-        $this->assertSame(0, AgentRun::count());
-
-        $this->actingAs($this->user('approver'));
-        Livewire::test(CampaignResource\Pages\CreateCampaign::class)
-            ->fillForm(['name' => 'X', 'website_id' => $c->website_id, 'keywords' => ['a'], 'daily_limit' => 1, 'status' => 'paused', 'mode' => 'autonomous', 'source' => 'plan', 'daily_cost_cap_vnd' => 1000, 'daily_draft_cap' => 1])
-            ->call('create')->assertHasFormErrors(['mode']);
+        $this->assertNotSame('mode_locked', $r['result']);
+        $this->assertSame(1, AgentRun::count());
     }
 
     public function test_cho_bo_sung_ghi_24h_het_han_tu_bo_qua_va_ghi_gioi_han(): void
@@ -295,8 +292,8 @@ class CampaignTest extends TestCase
         $this->freezeClock($now); // các phiên tạo trong test dùng now(): phải trùng ngày đang kiểm, không phụ thuộc đồng hồ thật
         $this->assertSame('no_keywords', $this->runner()->tick($c, $now)['result']);
         $this->runner()->tick($c, $now->addHour()); // không tạo trùng
-        $wait = \App\Models\CampaignWait::firstOrFail();
-        $this->assertSame(1, \App\Models\CampaignWait::count());
+        $wait = CampaignWait::firstOrFail();
+        $this->assertSame(1, CampaignWait::count());
         $this->assertSame('open', $wait->status);
         $this->assertTrue($wait->expires_at->equalTo($now->addDay()));
 
@@ -305,7 +302,7 @@ class CampaignTest extends TestCase
         $wait->refresh();
         $this->assertSame('expired', $wait->status);
         $this->assertStringContainsString('24 giờ', $wait->limit_note);
-        $this->assertSame(1, \App\Models\CampaignWait::count()); // không tái tạo trong 24h
+        $this->assertSame(1, CampaignWait::count()); // không tái tạo trong 24h
     }
 
     public function test_bo_sung_du_lieu_thi_muc_cho_duoc_giai_quyet(): void
@@ -315,14 +312,14 @@ class CampaignTest extends TestCase
         $c->update(['keywords' => ['mới']]);
         $this->runner()->tick($c);
 
-        $this->assertSame('resolved', \App\Models\CampaignWait::first()->status);
+        $this->assertSame('resolved', CampaignWait::first()->status);
     }
 
     public function test_giao_dien_hien_cho_bo_sung_han_muc_va_nut_bo_qua_chi_nguoi_duyet(): void
     {
         $c = $this->campaign(['keywords' => []]);
         $this->runner()->tick($c);
-        $wait = \App\Models\CampaignWait::first();
+        $wait = CampaignWait::first();
 
         $this->actingAs($this->user('approver'));
         $this->get(CampaignResource::getUrl('index'))->assertOk()
@@ -339,10 +336,10 @@ class CampaignTest extends TestCase
         Livewire::test(ListCampaigns::class)->assertForbidden();
     }
 
-    public function test_form_hien_ba_the_che_do(): void
+    public function test_form_hien_cac_the_che_do(): void
     {
         $this->actingAs($this->user('admin'));
         $this->get(CampaignResource::getUrl('create'))->assertOk()
-            ->assertSee('Thận trọng')->assertSee('Cân bằng')->assertSee('Tự chủ')->assertSee('connector hỗ trợ gỡ bài');
+            ->assertSee('Duyệt trước')->assertSee('thận trọng')->assertSee('cân bằng')->assertSee('Toàn quyền cho đội AI')->assertDontSee('connector hỗ trợ gỡ bài');
     }
 }

@@ -17,4 +17,12 @@ class CreateCampaign extends CreateRecord
 
         return $data;
     }
+
+    /** Ghi nhật ký xác nhận chính sách khi lưu ở chế độ Toàn quyền. */
+    protected function afterCreate(): void
+    {
+        if ($this->record->mode === 'autonomous') {
+            CampaignResource::logPolicyAck($this->record);
+        }
+    }
 }
