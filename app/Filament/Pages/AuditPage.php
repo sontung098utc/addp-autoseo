@@ -13,6 +13,7 @@ use App\Models\AuditSuggestion;
 use App\Models\User;
 use App\Services\Audit\AuditSuggestionException;
 use App\Services\Audit\AuditSuggestionService;
+use App\Services\Audit\RealScanService;
 use App\Models\Website;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -49,6 +50,10 @@ class AuditPage extends Page
     public ?string $demo = null;
 
     public bool $briefOpen = false;
+
+    public bool $realScanOpen = false;
+
+    public int $realScanLimit = RealScanService::DEFAULT_LIMIT;
 
     /** @var array{title: string, body: string}|null */
     public ?array $brief = null;
@@ -112,6 +117,45 @@ class AuditPage extends Page
         $this->demo = null;
         $this->groupType = null;
         Notification::make()->title('Đã quét lại (dữ liệu mẫu)')->body('Phân tích chạy lại trên bộ trang mẫu; mốc quét đã cập nhật.')->success()->send();
+    }
+
+    public function openRealScan(): void
+    {
+        $user = Auth::user();
+        if ($user instanceof User && ScanGuard::canAct($user)) {
+            $this->realScanOpen = true;
+        }
+    }
+
+    public function closeRealScan(): void
+    {
+        $this->realScanOpen = false;
+    }
+
+    public function realScan(): void
+    {
+        $user = Auth::user();
+        $site = $this->site();
+        if (! $user instanceof User || ! $site || ! ScanGuard::canAct($user)) {
+            Notification::make()->title('Không quét được')->body('Chỉ approver trở lên được quét thật.')->danger()->send();
+
+            return;
+        }
+        $limit = RealScanService::clamp($this->realScanLimit);
+        $this->realScanLimit = $limit;
+        try {
+            $audit = (new RealScanService())->run($site, $user, $limit);
+        } catch (ScanBlocked $e) {
+            Notification::make()->title('Không quét được')->body($e->getMessage())->danger()->send();
+
+            return;
+        }
+        $this->realScanOpen = false;
+        $this->demo = null;
+        $this->groupType = null;
+        $n = (int) $audit->total_urls_scanned;
+        $note = $n <= 1 ? ' Chỉ quét được 1 trang (không tìm thấy sitemap hoặc sitemap trống, đã quét trang chủ).' : '';
+        Notification::make()->title("Đã quét thật {$n} trang (giới hạn {$limit})")->body('Kết quả là dữ liệu quét thật.'.$note)->success()->send();
     }
 
     public function createBrief(): void
@@ -370,6 +414,8 @@ class AuditPage extends Page
         $nextAt = $guard['next_at'] ?? null;
 
         return [
+            'canRealScan' => $canAct && $site !== null && $state !== 'chua-ket-noi',
+            'realScanMax' => RealScanService::MAX_LIMIT,
             'websites' => $websites,
             'site' => $site,
             'state' => $state,

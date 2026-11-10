@@ -83,7 +83,7 @@
 
             <x-studio.panel key="propose">
                 <div class="ss-card"><div class="ss-card__b">
-                <div class="ss-card__h">Gom cụm <x-studio.badge tone="accent">AI đề xuất</x-studio.badge></div>
+                <div class="ss-card__h">Gom cụm @if ($proposals !== []) @if ($proposalSource === 'ai')<x-studio.badge tone="accent">AI đề xuất</x-studio.badge>@else<x-studio.badge>Bản minh họa (theo luật, không phải AI)</x-studio.badge>@endif @endif</div>
                 <x-filament::button wire:click="propose" :disabled="$total - $clustered === 0">Gom cụm {{ $total - $clustered }} từ khóa chưa gom</x-filament::button>
                 @if ($total - $clustered === 0 && $total > 0)<p class="ss-muted ss-text-xs">Mọi từ khóa đã có cụm.</p>@endif
 

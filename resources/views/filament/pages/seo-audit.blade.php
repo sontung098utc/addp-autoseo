@@ -36,7 +36,10 @@
                 @foreach ($websites as $w)<option value="{{ $w->id }}">{{ $w->name }}</option>@endforeach
             </select>
             @if ($site && $state !== 'chua-ket-noi')
-                <x-filament::button color="gray" wire:click="rescan" :disabled="! $canRescan">{{ $run ? 'Quét lại' : 'Quét lần đầu' }}</x-filament::button>
+                <x-filament::button color="gray" wire:click="rescan" :disabled="! $canRescan">{{ $run ? 'Quét lại (dữ liệu mẫu)' : 'Quét lần đầu (dữ liệu mẫu)' }}</x-filament::button>
+                @if ($canRealScan)
+                    <x-filament::button color="gray" wire:click="openRealScan">Quét thật (giới hạn {{ $realScanMax }} trang)</x-filament::button>
+                @endif
                 @if ($scanning)
                     <span class="ss-text-sm ss-muted">Đang quét, chờ xong mới quét lại được.</span>
                 @elseif (! $guard['ok'])
@@ -44,10 +47,22 @@
                 @endif
             @endif
             <span style="flex:1"></span>
+            @if ($run)
+                <span class="ss-text-sm ss-muted">{{ $realRun ? 'Quét thật lúc '.$vn($run['at']) : 'Dữ liệu mẫu, không phải kết quả quét website thật' }}</span>
+            @endif
             @if ($hasData)
                 <x-filament::button wire:click="createBrief" :disabled="! $canBrief" title="{{ ! $canAct ? 'Chỉ approver trở lên được tạo brief.' : ($scanning ? 'Đang quét nên chưa tạo được.' : 'Tạo brief từ nhóm lỗi đang chọn') }}">Tạo brief từ lỗi</x-filament::button>
             @endif
         </div>
+        @if ($realScanOpen && $canRealScan)
+            <div class="ss-alert ss-alert--info" role="dialog" aria-label="Xác nhận quét thật">
+                <label for="au-limit">Số trang tối đa (1 đến {{ $realScanMax }})</label>
+                <input id="au-limit" type="number" min="1" max="{{ $realScanMax }}" wire:model="realScanLimit">
+                <p class="ss-text-sm">Quét chạy ngay trên trang này và có thể mất vài chục giây; giới hạn số trang để không treo. Quét lớn hơn dùng lệnh dòng lệnh.</p>
+                <x-filament::button wire:click="realScan" wire:loading.attr="disabled">Quét thật</x-filament::button>
+                <x-filament::button color="gray" wire:click="closeRealScan">Hủy</x-filament::button>
+            </div>
+        @endif
 
         @if ($state === 'chua-ket-noi' || ! $site)
             <div class="ss-alert ss-alert--warn" role="status">Website chưa được kết nối. Thêm website vào mục Website kết nối trước khi quét.</div>

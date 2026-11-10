@@ -2,8 +2,12 @@
 
 namespace App\Filament\Support\Keywords;
 
+use App\Contracts\StructuredAiInterface;
 use App\Filament\Support\Demo\DemoMode;
+use App\Models\Keyword;
 use App\Models\Website;
+use App\Services\Keywords\KeywordAiResolver;
+use App\Services\Keywords\KeywordAiUnavailable;
 use Illuminate\Database\QueryException;
 use InvalidArgumentException;
 
@@ -149,8 +153,78 @@ final class KeywordService
             $props[] = ['id' => $i + 1, 'name' => $g['name'], 'intent' => self::mainIntent($g['keywords'], $byKw), 'keywords' => $g['keywords']];
         }
         $this->repo->saveProposals($props);
+        $this->repo->saveProposalSource('mock');
 
         return count($props);
+    }
+
+    /** Lần đề xuất gần nhất do AI hay do bản minh họa (để giao diện gắn nhãn đúng). @return 'ai'|'mock' */
+    public function proposalSource(): string
+    {
+        return $this->repo->proposalSource();
+    }
+
+    /**
+     * Đề xuất gom cụm bằng AI cho các từ khóa CHƯA có cụm và chưa nằm trong đề xuất đang chờ.
+     * Đề xuất mới cùng tên với đề xuất đang chờ thì hợp nhất (không nhân đôi). Không có AI thật: ném KeywordAiUnavailable.
+     *
+     * @return array{proposals:int, label:string, demo:bool, cost_vnd:float, stopped_reason:?string}
+     *
+     * @throws KeywordAiUnavailable
+     */
+    public function proposeWithAi(?StructuredAiInterface $ai = null): array
+    {
+        $cap = null;
+        $label = 'AI';
+        $demo = false;
+        if ($ai === null) {
+            ['ai' => $ai, 'cap' => $cap, 'label' => $label, 'demo' => $demo] = KeywordAiResolver::resolve('keyword_cluster');
+        }
+        $all = $this->repo->all();
+        $pending = [];
+        $props = $this->repo->proposals();
+        foreach ($props as $p) {
+            foreach ($p['keywords'] as $k) {
+                $pending[Keyword::keyFor($k)] = true;
+            }
+        }
+        $free = [];
+        $intents = [];
+        foreach ($all as $r) {
+            $intents[$r['keyword']] = $r['intent'];
+            if ($r['cluster'] === null && ! isset($pending[Keyword::keyFor($r['keyword'])])) {
+                $free[] = $r['keyword'];
+            }
+        }
+        $out = ['proposals' => count($props), 'label' => $label, 'demo' => $demo, 'cost_vnd' => 0.0, 'stopped_reason' => null];
+        if ($free === []) {
+            return $out;
+        }
+        $res = (new AiClusterer)->cluster($free, array_column($this->repo->clusters(), 'name'), $ai, $cap);
+        $nextId = (int) max([0, ...array_column($props, 'id')]) + 1;
+        foreach ($res['groups'] as $g) {
+            $hit = null;
+            foreach ($props as $i => $p) {
+                if (mb_strtolower($p['name']) === mb_strtolower($g['name'])) {
+                    $hit = $i;
+                    break;
+                }
+            }
+            if ($hit !== null) {
+                $props[$hit]['keywords'] = array_values(array_unique(array_merge($props[$hit]['keywords'], $g['keywords'])));
+            } else {
+                $props[] = ['id' => $nextId++, 'name' => $g['name'], 'intent' => $g['name'] === MockClusterer::LEFTOVER ? self::mainIntent($g['keywords'], $intents) : $g['intent'], 'keywords' => $g['keywords']];
+            }
+        }
+        if ($res['groups'] !== []) {
+            $this->repo->saveProposals($props);
+            $this->repo->saveProposalSource('ai');
+        }
+        $out['proposals'] = count($props);
+        $out['cost_vnd'] = $res['cost_vnd'];
+        $out['stopped_reason'] = $res['stopped'] ?? $res['error'];
+
+        return $out;
     }
 
     /** Nhận đề xuất thành cụm thật (trùng tên cụm đã có thì nhập vào cụm đó). */

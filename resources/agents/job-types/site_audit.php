@@ -9,7 +9,7 @@ return [
     'link' => 'plan',
     'order' => 20,
     'status' => 'active',
-    'summary' => 'Quét website, nhóm lỗi, chấm điểm, sinh đề xuất làm mới và khớp URL với bài. Không có bước AI. Chạy hôm nay bằng lệnh autoseo:audit-website và AuditSuggestionService. Chưa kiểm được trong mã: bước người chấp nhận đề xuất tạo bài kind=refresh, origin=audit đã đủ chưa.',
+    'summary' => 'Quét website, nhóm lỗi, chấm điểm, sinh đề xuất làm mới và khớp URL với bài. Không có bước AI. Chạy bằng lệnh autoseo:audit-website, và từ trang Audit bằng nút "Quét thật" (G3: giới hạn số trang, cùng luật chống SSRF; chưa quét website thật, mới kiểm bằng mạng giả); nút "Quét lại" cũ vẫn chạy trên bộ trang mẫu. Đề xuất làm mới do AuditSuggestionService. Chưa kiểm được trong mã: bước người chấp nhận đề xuất tạo bài kind=refresh, origin=audit đã đủ chưa.',
     'reads' => ['crawled_urls', 'seo_audits'],
     'writes' => ['audit_suggestions', 'articles (kind=refresh, origin=audit) khi người chấp nhận'],
     'shown_at' => ['Trang Audit: nhóm lỗi, đề xuất làm mới', 'Trang Kế hoạch', 'Trang bài: tab Từ khóa và kế hoạch ("bài sinh ra từ Kiểm tra SEO")'],

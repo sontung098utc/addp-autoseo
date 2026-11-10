@@ -8,8 +8,15 @@ use App\Filament\Support\Keywords\KeywordArticleLinks;
 use App\Filament\Support\Keywords\KeywordIntent;
 use App\Filament\Support\Keywords\KeywordService;
 use App\Models\Keyword;
+use App\Models\User;
 use App\Models\Website;
+use App\Services\Keywords\KeywordAiResolver;
+use App\Services\Keywords\KeywordAiUnavailable;
+use App\Services\Keywords\KeywordResearchService;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
@@ -67,7 +74,7 @@ class KeywordsPage extends Page
     {
         $u = Auth::user();
 
-        return $u instanceof \App\Models\User && $u->is_active && $u->isWriter();
+        return $u instanceof User && $u->is_active && $u->isWriter();
     }
 
     private function guard(): bool
@@ -134,6 +141,60 @@ class KeywordsPage extends Page
         Notification::make()->title('Đã nhập '.$n.' từ khóa')->body(count($r['errors']).' dòng lỗi và '.count($r['duplicates']).' dòng trùng đã được bỏ qua.')->success()->send();
     }
 
+    /** G3: nút "Khảo sát thị trường (AI)". Chỉ writer trở lên; tắt kèm lý do khi chưa có AI. */
+    protected function getHeaderActions(): array
+    {
+        $av = KeywordAiResolver::availability('keyword_suggest');
+        $site = KeywordService::defaultSite();
+        $off = ! $av['ok'] ? $av['reason'] : ($site === null || ! KeywordService::useReal() ? 'Cần một website đang hoạt động và dữ liệu thật (không phải bản minh họa).' : null);
+
+        return [
+            Action::make('marketResearch')
+                ->label('Khảo sát thị trường (AI)')
+                ->icon('heroicon-o-sparkles')
+                ->visible(fn () => static::canAccess())
+                ->disabled($off !== null)
+                ->tooltip($off)
+                ->modalHeading('Khảo sát thị trường (AI)')
+                ->modalSubmitActionLabel('Chạy khảo sát')
+                ->form([
+                    Placeholder::make('note')->label('')->content('AI không biết lượt tìm kiếm. Từ khóa mới sẽ có nhãn \'AI đề xuất\' và cột lượt tìm để trống; muốn có lượt tìm hãy nhập CSV hoặc nối Search Console.'),
+                    Textarea::make('seeds')->label('Hạt giống (tùy chọn, mỗi dòng một từ)')->rows(4)->helperText('Để trống: dùng từ khóa đã có và thông tin thương hiệu của website.'),
+                    TextInput::make('limit')->label('Số từ khóa tối đa')->numeric()->default(KeywordResearchService::DEFAULT_LIMIT)->minValue(1)->maxValue(KeywordResearchService::HARD_LIMIT)->required(),
+                ])
+                ->action(function (array $data) use ($site) {
+                    $this->guard();
+                    $this->runMarketResearch($site, (string) ($data['seeds'] ?? ''), (int) ($data['limit'] ?? 0));
+                }),
+        ];
+    }
+
+    public function runMarketResearch(?Website $site, string $seedText, int $limit): void
+    {
+        $this->guard();
+        if ($site === null) {
+            $this->fail('Chưa chạy được', 'Chưa có website đang hoạt động.');
+
+            return;
+        }
+        $seeds = array_values(array_filter(array_map('trim', preg_split('/\R/u', $seedText) ?: []), fn ($x) => $x !== ''));
+        try {
+            $r = (new KeywordResearchService)->suggest($site, $seeds === [] ? null : $seeds, $limit > 0 ? $limit : null);
+        } catch (KeywordAiUnavailable $e) {
+            $this->fail('Chưa có AI', $e->getMessage());
+
+            return;
+        }
+        if ($r['message'] !== null && $r['added'] === 0) {
+            $this->fail('Khảo sát chưa thêm từ khóa', $r['message']);
+
+            return;
+        }
+        $n = Notification::make()->title('Đã thêm '.$r['added'].' từ khóa (AI đề xuất)')
+            ->body($r['skipped_duplicates'].' từ trùng đã bỏ. Chi phí '.$r['cost_vnd'].' đ ('.$r['label'].'). Lượt tìm để trống.'.($r['demo'] ? ' Đây là AI giả lập, không phải kết quả thật.' : ''));
+        $r['message'] !== null ? $n->warning()->send() : $n->success()->send();
+    }
+
     public function addKeyword(): void
     {
         $this->guard();
@@ -196,10 +257,31 @@ class KeywordsPage extends Page
     public function propose(): void
     {
         $this->guard();
-        $n = KeywordService::make()->propose();
+        $service = KeywordService::make();
         $this->proposalNames = [];
+        if (KeywordService::useReal() && KeywordAiResolver::availability('keyword_cluster')['ok']) {
+            try {
+                $r = $service->proposeWithAi();
+            } catch (KeywordAiUnavailable $e) {
+                $this->fail('Chưa gom cụm được bằng AI', $e->getMessage());
+
+                return;
+            }
+            if ($r['proposals'] === 0) {
+                Notification::make()->title('Không còn từ khóa chưa gom cụm')->warning()->send();
+            } else {
+                Notification::make()->title("AI đề xuất {$r['proposals']} cụm")
+                    ->body('Chi phí '.number_format($r['cost_vnd'], 0, ',', '.').' đ'.($r['demo'] ? ' (AI giả lập)' : '').($r['stopped_reason'] ? '. '.$r['stopped_reason'] : '').' Bạn xem và nhận từng cụm.')->success()->send();
+            }
+
+            return;
+        }
+        // Chưa có AI thật: dùng bản gom cụm minh họa, nói rõ trên màn (nhãn đề xuất đổi thành "minh họa").
+        $n = $service->propose();
         if ($n === 0) {
             Notification::make()->title('Không còn từ khóa chưa gom cụm')->warning()->send();
+        } else {
+            Notification::make()->title("Đề xuất {$n} cụm bằng bản minh họa")->body('Chưa kết nối AI nên dùng gom cụm theo luật, không phải AI.')->warning()->send();
         }
     }
 
@@ -283,6 +365,7 @@ class KeywordsPage extends Page
             'clusterRows' => $this->clusterRows($clusters),
             'clusters' => $clusters,
             'proposals' => $repo->proposals(),
+            'proposalSource' => $repo->proposalSource(),
             'intents' => KeywordIntent::LABELS,
             'demoOn' => DemoMode::enabled(),
         ];
