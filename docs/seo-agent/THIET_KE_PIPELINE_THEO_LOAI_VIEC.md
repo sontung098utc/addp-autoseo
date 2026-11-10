@@ -219,13 +219,16 @@ Không viết lại `AgentRunOrchestrator`. Nó là lớp chạy của `article_
 
 ## 6. Tự động hóa và điểm người can thiệp
 
-**Mức tự chủ.** Dùng lại ba chế độ của chiến dịch (`campaigns.mode`). Mức tự chủ không đổi bậc xuất bản: ở T1 không gì tự xuất bản.
+**Mức tự chủ do bạn chọn**, cho từng website hoặc từng chiến dịch (cột `campaigns.mode` đã có ba giá trị). Hai lựa chọn chính, và bạn đổi được bất cứ lúc nào:
 
-| Mức | Việc 0 token (`site_audit`, `measure`, `content_plan`) | Việc tốn token | Tình trạng |
-|---|---|---|---|
-| Thận trọng | Người bấm | Hỏi trước, kèm ước lượng | Làm được khi có registry |
-| Cân bằng *(đề xuất mặc định)* | Tự chạy theo lịch | Tự chạy trong ngân sách **sau khi kế hoạch được duyệt** | Phần "theo lịch" cần job nền (AG-B10) |
-| Tự chủ | Tự | Tự, kể cả tự nhận kế hoạch | **Khóa** như hiện nay (`CampaignRunner.php:53`) |
+| Mức | Việc 0 token (`site_audit`, `measure`, `content_plan`) | Việc tốn token | Xuất bản | Tình trạng |
+|---|---|---|---|---|
+| **Duyệt trước** (Thận trọng, Cân bằng) | Thận trọng: người bấm. Cân bằng: tự chạy theo lịch | Người **duyệt kế hoạch trước**, sau đó đội AI viết trong ngân sách; người duyệt bản nháp | Người bấm đăng | Làm được khi có registry; phần "theo lịch" cần job nền (AG-B10) |
+| **Toàn quyền cho đội AI** (Tự chủ) | Tự chạy | Tự nhận kế hoạch, tự viết, tự sửa, tự duyệt theo luật chấm | Tự xuất bản khi bậc xuất bản của website cho phép (T1 chỉ tới bản nháp) | **Đang khóa trong mã** (`CampaignRunner.php:53`): cần văn bản chính sách của bạn và connector hỗ trợ gỡ bài. Thiết kế mở khóa ở dưới |
+
+Toàn quyền không có nghĩa là bỏ mọi chặn. Những chặn sau **giữ nguyên ở mọi mức**, vì chúng là điều kiện để AI chạy được một mình an toàn: trần ngân sách (mỗi lời gọi, bước, phiên, ngày); lỗi chặn P0 và từ cấm của hồ sơ doanh nghiệp (bài không qua thì không đăng); hạn mức bài mỗi ngày; nút dừng khẩn cấp; ghi nhật ký mọi việc đã làm. Riêng **cổng chuyên gia cho lĩnh vực rủi ro cao** là một công tắc: mặc định BẬT kể cả ở Toàn quyền; bạn tắt được, nhưng phải xác nhận rõ từng website và hệ thống ghi lại ai tắt, lúc nào. Rủi ro pháp lý của nội dung y tế đăng không qua người có chuyên môn thuộc về bạn.
+
+Điều kiện mở Toàn quyền (mỗi website bật riêng): (1) bạn ký văn bản chính sách tự động hóa; (2) connector của website hỗ trợ gỡ bài; (3) đã chạy Duyệt trước đủ một số bài với tỉ lệ bị từ chối dưới ngưỡng bạn đặt (đề xuất 20 bài, dưới 10%); (4) có nút chuyển về Duyệt trước chỉ một cú bấm. Điều kiện (3) là đề xuất để bạn có số liệu trước khi giao quyền, bạn có thể bỏ.
 
 **Cổng duyệt**, xếp theo chuỗi:
 
@@ -268,13 +271,13 @@ Trong worktree này `vendor/` trống nên không chạy được test tại đ�
 |---|---|---|---|
 | Q1 | Bảy loại việc ở §3.2 và việc gộp chiến dịch vào viết bài có đúng ý bạn không? | Đồng ý | Bạn |
 | Q2 | Lưu phiên chạy: mở rộng `agent_runs` hay bảng mới? | Mở rộng (P1) | Bạn + Dev1 |
-| Q3 | Bắt buộc duyệt kế hoạch trước khi viết theo chiến dịch? | Có, ở Thận trọng và Cân bằng | Bạn |
+| Q3 | Duyệt kế hoạch trước khi viết | **Đã chốt:** bắt buộc ở "Duyệt trước"; ở "Toàn quyền" thì không | Bạn |
 | Q4 | Lượt tìm kiếm lấy từ đâu? AI không biết con số này. | Trước mắt CSV; sau đó Search Console; nguồn trả phí để sau | Bạn |
 | Q5 | Sản phẩm của công ty lưu ở đâu để bài nhắc đúng? | Là mục kiến thức trong Kho trí tuệ (không thêm bảng) | Bạn + phiên Kho trí tuệ |
 | Q6 | Có làm bước AI tạo ảnh không? | Chưa. Làm sau khi chuỗi chữ chạy thật; trước mắt chọn từ thư viện | Bạn |
 | Q7 | Audit và khảo sát bao lâu thì coi là cũ? | 14 và 30 ngày | Bạn |
 | Q8 | Nguồn AI nêu mà không có trong Sổ nguồn hay Kho: chặn hay chỉ gắn cờ? | Gắn cờ cho bài thường; giữ cho chuyên gia với lĩnh vực bắt buộc nguồn | Bạn |
-| Q9 | Mức tự chủ mặc định | Cân bằng | Bạn |
+| Q9 | Mức tự chủ | **Đã chốt:** bạn chọn giữa "Duyệt trước" và "Toàn quyền" cho từng website/chiến dịch. Mặc định website mới: Duyệt trước. Còn mở: ngưỡng và văn bản chính sách để mở khóa Toàn quyền (§6) | Bạn |
 | Q10 | Ngân sách từng loại việc và trần ngày mỗi website | Chốt sau khi có số đo G0 | Bạn |
 | Q11 | Tách bước nghiên cứu trong lõi; thư mục `resources/agents/job-types/` | Tách, đặt sau dàn ý; xác nhận thư mục | Dev1 |
 

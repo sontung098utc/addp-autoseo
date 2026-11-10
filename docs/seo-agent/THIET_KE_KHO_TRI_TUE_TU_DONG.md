@@ -307,7 +307,7 @@ Giai đoạn đầu chỉ tải tên miền của chính website, nên rủi ro 
 | Phân tầng rủi ro, Hộp duyệt xếp rủi ro cao lên trên | 5: người duyệt không ngập | **Giữ**, dùng Hộp duyệt đang có, không làm trang mới |
 | Khởi tạo một bước | 3: kho có dữ liệu trước bài đầu tiên | **Giữ**, thu gọn |
 | AI điền nháp Hồ sơ doanh nghiệp | 4: bài có giọng và thông điệp | **Giữ**, sau lượt xây đầu |
-| Mức tự chủ ba mức | 5 | **Thu còn hai mức**: Thủ công, Cân bằng. Mức Tự động **để sau**: chưa có số liệu sai sót để dám mở |
+| Mức tự chủ của kho | 5 | **Giữ hai lựa chọn do bạn chọn**: "Duyệt trước" (mọi mục chờ duyệt, trừ tầng A) và "Toàn quyền cho đội AI" (AI tự nhận cả tầng B; tầng C chỉ tự nhận khi bạn tắt cổng chuyên gia, xem Q1). Dùng cùng công tắc với bản pipeline §6 |
 | Làm mới định kỳ | Đo lường → làm mới bài | **Để sau** (cần AG-B10). Giữ phần rẻ: so băm, chỉ gọi AI khi trang đổi |
 | Hộp gợi ý riêng, bảng `knowledge_suggestions`, 5 loại gợi ý | 3 | **Cắt.** Khoảng trống, mục chờ duyệt, tên miền gợi ý đã có chỗ chứa |
 | Học từ bản sửa của người (`new_fact`, `outdated`) | 3 cho bài sau | **Để sau.** Chưa biết câu nào sinh từ mục nào nên dễ báo sai |
@@ -433,10 +433,10 @@ G1 nhỏ, không phụ thuộc ai, và sửa ngay chỗ người duyệt đang t
 
 | # | Câu hỏi | Khuyến nghị |
 |---|---|---|
-| Q1 | Mức tự chủ mặc định của kho | **Cân bằng**; chưa mở mức Tự động |
+| Q1 | Mức tự chủ của kho | **Đã chốt:** bạn chọn "Duyệt trước" hoặc "Toàn quyền". Mặc định Duyệt trước. Ở Toàn quyền, tầng C (giá, chính sách, số liệu y tế, pháp lý, tài chính) vẫn chờ người duyệt trừ khi bạn tắt công tắc cổng chuyên gia từng website (có xác nhận và nhật ký); khi tắt, hệ thống vẫn ghi nhãn "tự nhận" và cho hoàn tác |
 | Q2 | Cho **tự nhận không cần duyệt** thông tin thông thường của công ty lấy từ website công ty? (đổi quy tắc "AI không tự duyệt") | **Có**, kèm nhãn và hoàn tác; không áp dụng cho giá, chính sách, lĩnh vực rủi ro cao |
-| Q3 | Bài thuộc lĩnh vực rủi ro cao có **dừng trước bước viết** khi kiến thức chưa được duyệt? | **Có** |
-| Q4 | Có làm tìm web tự động không, khi nào? (đổi quy tắc "không tự tìm web ngoài") | **Có nhưng sau cùng (G4)**, bắt đầu chỉ trong tên miền đã xác nhận |
+| Q3 | Bài rủi ro cao dừng trước bước viết khi kiến thức chưa duyệt | **Đã chốt:** có ở "Duyệt trước"; ở "Toàn quyền" chỉ dừng khi cổng chuyên gia còn bật |
+| Q4 | Tìm web tự động | **Đã chốt: làm**, sau cùng (G4), bắt đầu chỉ trong tên miền đã xác nhận |
 | Q5 | Nhóm nhà cung cấp tìm kiếm | **API tìm kiếm riêng**; chọn nhà cụ thể sau khi thử và kiểm giá |
 | Q6 | Ngân sách: trần lượt xây đầu, trần mỗi bài cho nghiên cứu, trần tìm kiếm mỗi tháng mỗi website | 30 trang và 150.000 đ cho lượt đầu; 5 trang mỗi bài; trần tìm kiếm do bạn định sau khi có giá |
 | Q7 | **Danh sách nguồn tin cậy theo lĩnh vực**: ai chốt, ai xếp bậc? Lĩnh vực sức khỏe cần người có chuyên môn | Admin và người duyệt chốt như hiện nay; mẫu chỉ gợi ý; sức khỏe phải có chuyên gia xác nhận trước khi dùng |
