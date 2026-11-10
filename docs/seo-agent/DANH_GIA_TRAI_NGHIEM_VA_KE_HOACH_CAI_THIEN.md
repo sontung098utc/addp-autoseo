@@ -128,6 +128,6 @@ Migration: `2026_11_20_000001` (job_type), `2026_11_21_000001` (nguồn gốc/t�
 **Điểm khó dùng còn mở**
 - Bộ chọn ngày giờ xếp lịch: hiển thị "Th11 12, 2026 00:00" (không phải định dạng Việt), giờ mặc định 00:00 và nhập giờ khó; người dùng dễ xếp nhầm nửa đêm.
 - ~~Menu của writer còn "Thành phần UI"~~ và ~~khối "Đội AI hôm nay" hiện số chi phí cho writer~~: đã sửa (ẩn khỏi menu nhân viên; writer chỉ thấy đang chạy, chờ duyệt, chờ chuyên gia).
-- Bộ chọn ngày giờ nằm trong `ReviewActions` (mã của Dev1), chưa sửa: cần Dev1 đổi định dạng sang dd/mm/yyyy HH:mm và giờ mặc định hợp lý.
+- ~~Bộ chọn ngày giờ xếp lịch~~: đã sửa (cả nút Xếp lịch và Đổi giờ đăng): hiển thị dd/mm/yyyy HH:mm, tuần bắt đầu thứ Hai, bước 5 phút, mặc định 9 giờ sáng ngày mai (giờ VN), không chọn được ngày đã qua. Sửa nằm trong `ReviewActions` và `RescheduleAction`, Dev1 cần biết khi rà.
 - Duyệt bài sức khỏe không có chỗ ghi "tôi là người có chuyên môn xác nhận": chỉ có ô ghi chú tự do.
 - Đã thử đọc website nhưng mạng của bản xem thử không ra ngoài nên không đánh giá được việc tự bổ sung kiến thức thật; nội dung bài do AI giả lập (mẫu 925 từ), **không đánh giá được văn chất lượng**.
