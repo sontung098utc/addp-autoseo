@@ -30,6 +30,40 @@ class StudioUiKitTest extends TestCase
         $this->assertStringContainsString('studioTabs(', $html);
     }
 
+    public function test_tabs_co_dau_cuoc_ma_nut_mui_ten_an_khoi_trinh_doc_man_hinh(): void
+    {
+        $html = Blade::render('<x-studio.tabs persist="t" :tabs="[[\'key\'=>\'a\',\'label\'=>\'A\'],[\'key\'=>\'b\',\'label\'=>\'B\']]"><x-studio.panel key="a">A</x-studio.panel></x-studio.tabs>');
+
+        $this->assertStringContainsString('ss-tabs-scroller', $html);
+        $this->assertStringContainsString('x-ref="strip"', $html);
+        // Mũi tên chỉ là phụ trợ chuột/chạm: ẩn khỏi trình đọc màn hình, không vào thứ tự Tab (bàn phím dùng ←/→/Home/End).
+        $this->assertSame(2, substr_count($html, 'ss-tabs__arrow '));
+        $this->assertSame(2, substr_count($html, 'aria-hidden="true" x-on:click="nudge('));
+        $this->assertSame(2, substr_count($html, 'tabindex="-1" aria-hidden'));
+
+        $js = (string) file_get_contents(public_path('js/studio-ui.js'));
+        foreach (['reveal(', 'measure()', 'prefers-reduced-motion'] as $needle) {
+            $this->assertStringContainsString($needle, $js);
+        }
+    }
+
+    public function test_trang_quan_tri_khai_bao_favicon_cuc_bo_va_file_ton_tai(): void
+    {
+        $this->assertFileExists(public_path('favicon.svg'));
+        $svg = (string) file_get_contents(public_path('favicon.svg'));
+        $this->assertStringContainsString('<svg', $svg);
+        $this->assertStringNotContainsString('http', str_replace('http://www.w3.org/2000/svg', '', $svg), 'favicon không tham chiếu tài nguyên ngoài');
+
+        $html = $this->get('/admin/login')->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('#<link[^>]+rel="icon"[^>]+href="[^"]*/favicon\.svg"#', $html);
+    }
+
+    public function test_css_man_hinh_hep_co_vung_bam_toi_thieu(): void
+    {
+        $css = (string) file_get_contents(public_path('css/seo-studio.css'));
+        $this->assertMatchesRegularExpression('/@media \(max-width: 767px\)[^{]*\{[^@]*\.ss-dt__act[^{]*\{[^}]*min-height: 2\.5rem/s', $css);
+    }
+
     public function test_bang_du_lieu_khong_in_html_tho_tu_du_lieu(): void
     {
         $payload = '<script>alert(1)</script><img src=x onerror=alert(2)>';
