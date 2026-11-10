@@ -5,6 +5,7 @@ namespace Tests\Feature\Knowledge\Build;
 use App\Contracts\StructuredAiInterface;
 use App\Models\AgentRun;
 use App\Models\Brain;
+use App\Models\BrandProfile;
 use App\Models\KnowledgeItem;
 use App\Models\KnowledgeSource;
 use App\Models\User;
@@ -119,7 +120,10 @@ class BrainBuildServiceTest extends TestCase
         $this->assertSame(2, $r['items_auto']);
         $this->assertSame(2, $r['items_proposed']);
         $this->assertNull($r['stopped_reason']);
-        $this->assertEqualsWithDelta(20.0, $r['cost_vnd'], 0.01);
+        $this->assertEqualsWithDelta(30.0, $r['cost_vnd'], 0.01, '2 trang x 10 + 1 lần AI tự điền hồ sơ (10)');
+        $this->assertArrayHasKey('brand_profile', $r);
+        $this->assertFalse($r['brand_profile']['applied'], 'AI giả không trả hồ sơ: không điền gì, có lý do');
+        $this->assertNotEmpty($r['brand_profile']['reason']);
 
         $fact = KnowledgeItem::where('title', 'Năm thành lập')->first();
         $this->assertSame('approved', $fact->status);
@@ -349,5 +353,20 @@ class BrainBuildServiceTest extends TestCase
         $r = $this->service($ai, ['https://a.vn/gioi-thieu'])->run($this->site, $this->user());
         $this->assertSame(0, $r['items_auto']);
         $this->assertSame(0, KnowledgeItem::count(), 'mục giống chỉ dẫn tiêm bị loại, không vào kho');
+    }
+
+    public function test_cuoi_luot_tu_dien_ho_so_khi_ai_tra_du_lieu_co_can_cu(): void
+    {
+        $this->fakeSite();
+        $brand = ['business_field' => 'Tư vấn du học', 'audience' => 'Học sinh và phụ huynh', 'voice' => 'than_thien', 'key_messages' => ['Làm việc tận tâm với từng khách hàng'],
+            'evidence' => ['business_field' => 'Công ty Ánh Dương thành lập năm 2010 tại Hà Nội, chuyên tư vấn du học', 'audience' => 'Bàn học gỗ sồi có ngăn kéo, phù hợp phòng nhỏ', 'voice' => 'Chúng tôi làm việc tận tâm với từng khách hàng', 'key_messages' => ['Chúng tôi làm việc tận tâm với từng khách hàng']]];
+        $ai = $this->fakeAi([['items' => []], ['items' => []], $brand]);
+        $r = $this->service($ai, ['https://a.vn/gioi-thieu', 'https://a.vn/san-pham/ban-go'])->run($this->site, $this->user());
+
+        $this->assertTrue($r['brand_profile']['applied']);
+        $this->assertEqualsCanonicalizing(['business_field', 'audience', 'voice', 'key_messages'], $r['brand_profile']['fields']);
+        $this->assertSame('Tư vấn du học', BrandProfile::first()->business_field);
+        $step = AgentRun::where('job_type', 'brain_build')->first()->steps()->where('stage', 'brand')->first();
+        $this->assertSame('completed', $step->status);
     }
 }

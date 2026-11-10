@@ -56,6 +56,12 @@ final class BrainBuildService
 
     private KnowledgeConflicts $conflicts;
 
+    /** Trần chi phí cả lượt do người gọi đặt (nhỏ hơn thì thắng) và từ khóa ưu tiên trang; chỉ đặt trong run(). */
+    private ?float $capOverride = null;
+
+    /** @var list<string> */
+    private array $keywordTokens = [];
+
     public function __construct(
         ?SafePageFetcher $fetcher = null,
         private ?SitemapCrawlerService $sitemap = null,
@@ -95,21 +101,26 @@ final class BrainBuildService
     }
 
     /**
-     * @param  array{max_pages?: int, urls?: list<string>|string}  $options
+     * @param  array{max_pages?: int, urls?: list<string>|string, as_system?: bool, budget_cap_vnd?: float, keyword?: string, purpose?: string}  $options
+     *                                                                                                                                                     as_system: do hệ thống tự chạy (đội AI tự chuẩn bị kiến thức), bỏ kiểm quyền người dùng; mọi luật còn lại (tầng, tự nhận, tên miền) giữ nguyên.
+     *                                                                                                                                                     budget_cap_vnd: trần riêng cho lượt này. keyword: ưu tiên trang có đường dẫn chứa từ khóa.
      * @return array{run_id: ?int, pages_planned: int, pages_read: int, pages_skipped: int, pages_failed: int, items_auto: int, items_proposed: int, cost_vnd: float,
-     *               stopped_reason: ?string, message: ?string, source_ids: list<int>, auto_item_ids: list<int>, proposed_item_ids: list<int>, rejected_urls: list<string>, label: ?string, demo: bool}
+     *               stopped_reason: ?string, message: ?string, source_ids: list<int>, auto_item_ids: list<int>, proposed_item_ids: list<int>, rejected_urls: list<string>, label: ?string, demo: bool,
+     *               brand_profile: array{applied: bool, fields: list<string>, reason: ?string}}
      *
      * @throws KnowledgeError không có quyền, website không hoạt động, dừng khẩn cấp, chưa kết nối AI
      */
     public function run(Website $site, ?User $by, array $options = []): array
     {
-        if (! KnowledgeReview::canManage($by)) {
+        if (! ($options['as_system'] ?? false) && ! KnowledgeReview::canManage($by)) {
             throw new KnowledgeError('Bạn chưa có quyền xây kho. Cần quyền người duyệt trở lên.');
         }
+        $this->capOverride = isset($options['budget_cap_vnd']) ? max(0.0, (float) $options['budget_cap_vnd']) : null;
+        $this->keywordTokens = array_values(array_filter(preg_split('/[^a-z0-9]+/', Str::ascii(mb_strtolower((string) ($options['keyword'] ?? '')))) ?: [], fn ($w) => strlen($w) >= 3));
         $maxPages = self::clampPages(isset($options['max_pages']) ? (int) $options['max_pages'] : null);
         $allowed = SafePageFetcher::allowedHostsFor($site);
         $pasted = $this->pastedUrls($options['urls'] ?? [], $allowed);
-        $refs = ['max_pages' => $maxPages, 'pasted_urls' => count($pasted['ok']), 'rejected_urls' => count($pasted['rejected']), 'budget_vnd' => self::totalBudgetVnd()];
+        $refs = ['max_pages' => $maxPages, 'pasted_urls' => count($pasted['ok']), 'rejected_urls' => count($pasted['rejected']), 'budget_vnd' => $this->budget()] + (isset($options['purpose']) ? ['purpose' => (string) $options['purpose']] : []);
 
         // Cổng: website hoạt động, không dừng khẩn cấp, có AI. Chưa qua cổng thì chưa tốn gì và không tải gì.
         $this->stop ??= app(EmergencyStopService::class);
@@ -147,12 +158,36 @@ final class BrainBuildService
             JobRunRecorder::finish($run, 'failed', null, 'Lỗi: '.class_basename($e));
             throw $e;
         }
+        $out['brand_profile'] = $this->draftBrand($site, $by, $run, $resolved, $out);
         $outputRef = ['source_ids' => $out['source_ids'], 'item_ids' => array_merge($out['auto_item_ids'], $out['proposed_item_ids']), 'auto_approved' => $out['items_auto'], 'proposed' => $out['items_proposed']];
         $status = $out['stopped_reason'] === 'emergency_stop' ? 'blocked' : (($out['stopped_reason'] === 'ai_error' && $out['pages_read'] === 0) ? 'failed' : 'ready_for_review');
         JobRunRecorder::finish($run, $status, $outputRef, $out['message']);
         $out['run_id'] = $run?->id;
 
         return $out;
+    }
+
+    /**
+     * Cuối lượt: tự điền nháp Hồ sơ doanh nghiệp (chỉ trường trống, có căn cứ trang, hoàn tác được). Lỗi ở đây không làm hỏng lượt xây.
+     *
+     * @return array{applied: bool, fields: list<string>, reason: ?string}
+     */
+    private function draftBrand(Website $site, ?User $by, $run, array $resolved, array &$out): array
+    {
+        if ($out['pages_read'] === 0 || $out['stopped_reason'] !== null) {
+            return ['applied' => false, 'fields' => [], 'reason' => 'Lượt này không đọc trang mới hoặc đã dừng giữa chừng (trần chi phí, lỗi AI, dừng khẩn cấp) nên chưa tự điền hồ sơ doanh nghiệp.'];
+        }
+        try {
+            $drafter = new BrandProfileDrafter($resolved['ai'], $resolved['label'], $resolved['demo'], $this->fetcher);
+            $res = $drafter->draftFor($site, $by);
+            $out['cost_vnd'] = round($out['cost_vnd'] + $drafter->lastCost, 2);
+        } catch (\Throwable $e) {
+            $res = ['applied' => false, 'fields' => [], 'reason' => 'Lỗi khi tự điền hồ sơ doanh nghiệp: '.class_basename($e)];
+        }
+        JobRunRecorder::step($run, 'brand', 'Tự điền hồ sơ doanh nghiệp', $res['applied'] ? 'completed' : 'skipped', ['applied' => $res['applied'], 'fields' => $res['fields']], $resolved['label'], 0, 0,
+            $res['applied'] ? 'Đã tự điền: '.implode(', ', $res['fields']).'. Hoàn tác được trên trang Xây kho.' : $res['reason']);
+
+        return $res;
     }
 
     /** Hoàn tác một mục đã tự nhận: về 'proposed', bỏ nhãn tự nhận. Chỉ người duyệt trở lên. */
@@ -170,12 +205,17 @@ final class BrainBuildService
         return $item;
     }
 
+    private function budget(): float
+    {
+        return $this->capOverride !== null ? min($this->capOverride, self::totalBudgetVnd()) : self::totalBudgetVnd();
+    }
+
     /** @param ?array{ai: StructuredAiInterface, cap: ?float, label: string, demo: bool} $resolved */
     private function work(Website $site, ?User $by, $run, array $resolved, ?Brain $brain, array $allowed, int $maxPages, array $pasted): array
     {
         $urls = $this->selectPages($site, $pasted['ok'], $maxPages);
         $total = count($urls);
-        $budget = self::totalBudgetVnd();
+        $budget = $this->budget();
         $r = ['run_id' => null, 'pages_planned' => $total, 'pages_read' => 0, 'pages_skipped' => 0, 'pages_failed' => 0, 'items_auto' => 0, 'items_proposed' => 0, 'cost_vnd' => 0.0,
             'stopped_reason' => null, 'message' => null, 'source_ids' => [], 'auto_item_ids' => [], 'proposed_item_ids' => [], 'rejected_urls' => $pasted['rejected'], 'label' => $resolved['label'], 'demo' => $resolved['demo']];
         JobRunRecorder::step($run, 'select', 'Chọn trang', 'completed', ['pages' => $total, 'from_sitemap' => count($urls) - count($pasted['ok']), 'pasted' => count($pasted['ok']), 'rejected_urls' => $pasted['rejected']], null, 0, 0, 'Đã chọn '.$total.' trang trên '.implode(', ', $allowed).'.');
@@ -297,6 +337,11 @@ final class BrainBuildService
             return 5;
         }
         $p = Str::ascii(mb_strtolower($path));
+        foreach ($this->keywordTokens as $w) {
+            if (str_contains($p, $w)) {
+                return -1; // trang trùng từ khóa của bài đi trước
+            }
+        }
         foreach (self::PRIORITY as $score => $needles) {
             foreach ($needles as $n) {
                 if (str_contains($p, $n)) {

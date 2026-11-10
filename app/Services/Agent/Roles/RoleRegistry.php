@@ -29,7 +29,7 @@ final class RoleRegistry
 
     /** AG-S14: bước của phiên chạy thuộc vai trò nào (khóa vai trò, hoặc 'system' = hệ thống). Có test đối chiếu với AgentRunOrchestrator. */
     public const STEP_ROLE = [
-        'guard' => 'system', 'handoff' => 'system', 'retry' => 'system', 'failover' => 'system', 'decision' => 'system',
+        'guard' => 'system', 'handoff' => 'system', 'images' => 'system', 'retry' => 'system', 'failover' => 'system', 'decision' => 'system',
         'risk' => 'editor', 'brief' => 'strategist', 'write' => 'writer', 'repair' => 'writer', 'grade' => 'editor',
     ];
 

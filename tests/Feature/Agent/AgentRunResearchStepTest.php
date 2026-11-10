@@ -86,7 +86,7 @@ class AgentRunResearchStepTest extends TestCase
         $kb = $this->kb($a);
         $run = (new AgentRunOrchestrator($this->fake(), policy: new RunPolicy))->run($a, null);
 
-        $this->assertSame(['guard', 'risk', 'brief', 'research', 'write', 'grade', 'handoff'], $run->steps->pluck('stage')->all());
+        $this->assertSame(['guard', 'risk', 'brief', 'research', 'write', 'grade', 'images', 'handoff'], $run->steps->pluck('stage')->all());
         $r = $run->steps->firstWhere('stage', 'research');
         $this->assertSame('ok', $r->status);
         $this->assertSame('system', $r->role);

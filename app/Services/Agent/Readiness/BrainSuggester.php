@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
  */
 final class BrainSuggester
 {
-    /** @param  list<int>  $excludeIds Trí tuệ đã gắn. @return list<array{id:int,name:string,reason:string,score:int}> */
+    /** @param  list<int>  $excludeIds Trí tuệ đã gắn. @return list<array{id:int,name:string,reason:string,score:int,bigram:bool}> */
     public static function forArticle(Article $article, array $excludeIds = [], int $limit = 3): array
     {
         $raw = self::tokens((string) $article->primary_keyword);
@@ -45,7 +45,7 @@ final class BrainSuggester
                 continue; // một từ đơn lẻ trùng chưa đủ tin
             }
             $score = (int) round(array_sum(array_map(fn ($bg) => 100 / max(1, $df[$bg]), $hitBi))) + count($hitWords);
-            $out[] = ['id' => $b->id, 'name' => $b->name, 'score' => $score,
+            $out[] = ['id' => $b->id, 'name' => $b->name, 'score' => $score, 'bigram' => $hitBi !== [],
                 'reason' => 'Trùng "'.($hitBi !== [] ? $shown[$hitBi[0]] : implode(' ', array_slice($hitWords, 0, 2))).'" với chủ đề của bài'];
         }
         usort($out, fn ($a, $b) => $b['score'] <=> $a['score'] ?: $a['id'] <=> $b['id']);

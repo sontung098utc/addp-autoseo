@@ -30,15 +30,17 @@ class ArticleReadinessTest extends TestCase
         return Brain::create(['name' => $name, 'slug' => $slug, 'domain_key' => $slug, 'language' => 'vi', 'status' => 'active', 'description' => '']);
     }
 
-    public function test_chu_de_y_te_kho_trong_thi_chan_truoc_khi_viet(): void
+    public function test_chu_de_y_te_kho_trong_khong_chan_ma_can_chuyen_gia(): void
     {
         $a = $this->article($this->site(), 'người tiểu đường nên ăn gì');
         $r = ArticleReadiness::for($a);
 
         $this->assertSame('high', $r['risk']['level']);
         $this->assertSame(0, $r['knowledge']['count']);
-        $this->assertTrue($r['holds_writing']);
-        $this->assertContains('block', array_column($r['issues'], 'severity'));
+        $this->assertFalse($r['holds_writing']);
+        $this->assertTrue($r['needs_expert']);
+        $this->assertNotContains('block', array_column($r['issues'], 'severity'));
+        $this->assertContains('Viết xong sẽ gắn nhãn cần chuyên gia xem lại (chủ đề rủi ro cao)', $r['auto_actions']);
         $this->assertNull($r['cost']['estimate_vnd']);
         $this->assertSame(0, $r['brand']['percent']);
     }
@@ -49,6 +51,8 @@ class ArticleReadinessTest extends TestCase
 
         $this->assertNotSame('high', $r['risk']['level']);
         $this->assertFalse($r['holds_writing']);
+        $this->assertFalse($r['needs_expert']);
+        $this->assertSame([], $r['auto_actions']);
         $this->assertContains('kb_empty', array_column($r['issues'], 'code'));
     }
 
@@ -60,6 +64,16 @@ class ArticleReadinessTest extends TestCase
 
         $this->assertSame(1, $r['knowledge']['count']);
         $this->assertFalse($r['holds_writing']);
+        $this->assertFalse($r['needs_expert']);
+    }
+
+    public function test_auto_actions_noi_se_tu_gan_tri_tue(): void
+    {
+        $w = $this->site();
+        $this->brain('Đái tháo đường (tiểu đường)', 'dai_thao_duong');
+        $r = ArticleReadiness::for($this->article($w, 'người tiểu đường nên ăn gì'));
+
+        $this->assertStringContainsString('Tự gắn Trí tuệ «Đái tháo đường (tiểu đường)»', $r['auto_actions'][0]);
     }
 
     public function test_cum_hiem_xep_truoc_cum_pho_bien(): void

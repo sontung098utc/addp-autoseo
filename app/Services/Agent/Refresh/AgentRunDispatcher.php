@@ -34,7 +34,7 @@ final class AgentRunDispatcher
         ?RunPolicy $policy = null,
         ?CmsDraftHandoff $handoff = null,
         ?AiModelRouter $router = null,
-        bool $allowWithoutKnowledge = false,
+        bool $allowWithoutKnowledge = false, // deprecated: không còn cổng dừng, giữ để nơi gọi cũ không vỡ
     ): AgentRun {
         $policy ??= new RunPolicy;
         if (self::usesRefresh($article)) {

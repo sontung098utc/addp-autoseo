@@ -43,6 +43,41 @@
             </div></div>
         @endif
 
+        <div class="ss-card" style="margin-top:1rem" data-testid="bb-brand"><div class="ss-card__b">
+            <div class="ss-card__h">Hồ sơ doanh nghiệp tự điền</div>
+            @if ($brandAuto)
+                <p data-testid="bb-brand-done">Đã tự điền hồ sơ doanh nghiệp từ website lúc {{ \Illuminate\Support\Carbon::parse($brandAuto['at'])->format('d/m/Y H:i') }}: {{ implode(', ', array_map(fn ($f) => \App\Services\Brand\BrandProfileData::REQUIRED[$f] ?? $f, array_keys($brandAuto['fields']))) }}. @if ($brandAuto['demo'])<x-studio.badge tone="warn">AI giả lập</x-studio.badge>@endif</p>
+                <p class="ss-muted ss-text-sm">Chỉ điền trường đang trống, mỗi trường có đoạn nguyên văn từ trang. Từ cấm và đối thủ cần tránh không bao giờ tự điền. Hãy xem lại ở trang hồ sơ.</p>
+                <x-filament::button size="xs" color="gray" wire:click="undoBrand">Hoàn tác</x-filament::button>
+            @elseif ($brandMissing === [])
+                <p class="ss-muted ss-text-sm">Hồ sơ doanh nghiệp đã đủ các trường chính.</p>
+            @else
+                <p class="ss-muted ss-text-sm">Chưa tự điền. Hồ sơ còn trống: {{ implode(', ', $brandMissing) }}. Sau mỗi lượt xây kho đọc được trang, AI sẽ thử điền các trường trống (chỉ khi trống từ 3 trường).</p>
+            @endif
+            @if ($result && isset($result['brand_profile']) && ! $result['brand_profile']['applied'] && $result['brand_profile']['reason'])<p class="ss-muted ss-text-xs" data-testid="bb-brand-reason">Lượt vừa chạy: {{ $result['brand_profile']['reason'] }}</p>@endif
+        </div></div>
+
+        <div class="ss-card" style="margin-top:1rem" data-testid="bb-suggest"><div class="ss-card__b">
+            <div class="ss-card__h">Gợi ý cho kho từ các bài gần đây</div>
+            @if ($suggestions === [])
+                <p class="ss-muted ss-text-sm">Chưa có gợi ý.</p>
+            @else
+                <table class="bb-t"><tbody>
+                @foreach ($suggestions as $sg)
+                    <tr data-testid="bb-sg">
+                        <td><strong>{{ $sg['title'] }}</strong><br><span class="ss-muted ss-text-xs">{{ $sg['detail'] }}</span></td>
+                        <td style="white-space:nowrap">
+                            @if ($sg['action'] === 'build')<x-filament::button size="xs" wire:click="fillGap('{{ $sg['key'] }}')" wire:loading.attr="disabled">Bổ sung từ website</x-filament::button>
+                            @else<a href="{{ $reviewUrl }}" wire:navigate class="ss-text-sm">Mở Kho trí tuệ</a>@endif
+                            <x-filament::button size="xs" color="gray" wire:click="dismissSuggestion('{{ $sg['key'] }}')">Bỏ qua</x-filament::button>
+                        </td>
+                    </tr>
+                @endforeach
+                </tbody></table>
+                <p class="ss-muted ss-text-xs">Chỉ là gợi ý, không có gì tự vào kho. "Bổ sung từ website" chỉ đọc tối đa 5 trang có đường dẫn chứa từ khóa.</p>
+            @endif
+        </div></div>
+
         <div class="ss-card" style="margin-top:1rem"><div class="ss-card__b">
             <div class="ss-card__h">Mục đã tự nhận ({{ $autoItems->count() }})</div>
             @if ($autoItems->isEmpty())

@@ -6,9 +6,11 @@ use App\Models\AgentRun;
 use App\Models\Article;
 use App\Models\Brain;
 use App\Services\Agent\Risk\RiskClassifier;
+use App\Services\Agent\Run\AgentRunOrchestrator;
 use App\Services\Agent\Settings\AgentAi;
 use App\Services\Brain\BrainContext;
 use App\Services\Brand\BrandProfileData;
+use App\Services\Knowledge\Build\BrainBuildService;
 use App\Services\Knowledge\KnowledgeRetriever;
 
 /**
@@ -23,8 +25,10 @@ use App\Services\Knowledge\KnowledgeRetriever;
  *  - products: ['count' => int, 'items' => list<array{id,title}>]
  *  - brand: ['percent' => int, 'missing' => list<string>]
  *  - cost: ['estimate_vnd' => ?float (trung bình các phiên viết gần nhất của website, null nếu chưa có), 'basis' => string, 'budget_vnd' => float]
- *  - issues: list<array{code,severity,message}> severity: 'block' (nên dừng) | 'warn' | 'info'
- *  - holds_writing: bool (true khi rủi ro cao mà kho chưa có mục đã duyệt nào: cổng dừng trước bước viết)
+ *  - issues: list<array{code,severity,message}> severity: 'warn' | 'info' (không còn mức chặn)
+ *  - holds_writing: bool, DEPRECATED: luôn false (không còn cổng dừng; AI tự chuẩn bị kiến thức, giữ khóa để nơi cũ không vỡ)
+ *  - needs_expert: bool (rủi ro cao VÀ kho chưa có mục đã duyệt khớp: viết xong sẽ gắn nhãn cần chuyên gia xem lại)
+ *  - auto_actions: list<string> điều AI SẼ tự làm khi giao (cùng điều kiện với AgentRunOrchestrator)
  */
 final class ArticleReadiness
 {
@@ -64,9 +68,9 @@ final class ArticleReadiness
         $issues = [];
         $high = $level === 'high';
         if ($knowledge['count'] === 0) {
-            $issues[] = ['code' => 'kb_empty', 'severity' => $high ? 'block' : 'warn',
+            $issues[] = ['code' => 'kb_empty', 'severity' => 'warn',
                 'message' => $high
-                    ? 'Chủ đề rủi ro cao mà kho chưa có mục kiến thức đã duyệt nào khớp. AI sẽ viết không có tài liệu để dựa vào.'
+                    ? 'Chủ đề rủi ro cao mà kho chưa có mục kiến thức đã duyệt nào khớp. AI sẽ tự bổ sung kiến thức nếu làm được; bài viết xong sẽ được gắn nhãn cần chuyên gia xem lại.'
                     : 'Kho chưa có mục kiến thức đã duyệt khớp chủ đề này; AI viết từ kiến thức chung của model.'];
         }
         if ($ctx->isEmpty()) {
@@ -83,6 +87,8 @@ final class ArticleReadiness
             $issues[] = ['code' => 'no_product', 'severity' => 'info', 'message' => 'Chưa có sản phẩm nào của công ty khớp chủ đề này trong kho.'];
         }
 
+        $needsExpert = $high && $knowledge['count'] === 0;
+
         return [
             'risk' => ['level' => $level, 'reasons' => $reasons],
             'brains' => ['attached' => array_map(fn (Brain $b) => ['id' => $b->id, 'name' => $b->name], $ctx->brains), 'suggested' => $suggested],
@@ -91,8 +97,33 @@ final class ArticleReadiness
             'brand' => ['percent' => $profile['percent'], 'missing' => $profile['missing']],
             'cost' => $cost,
             'issues' => $issues,
-            'holds_writing' => $high && $knowledge['count'] === 0,
+            'holds_writing' => false,
+            'needs_expert' => $needsExpert,
+            'auto_actions' => self::autoActions($article, $ctx, $needsExpert),
         ];
+    }
+
+    /** @return list<string> */
+    private static function autoActions(Article $article, BrainContext $ctx, bool $needsExpert): array
+    {
+        $out = [];
+        try {
+            $site = $article->website;
+            $new = $site ? BrainAutoAttach::candidates($article, $ctx->ids()) : [];
+            foreach ($new as $b) {
+                $out[] = 'Tự gắn Trí tuệ «'.$b['name'].'» ('.lcfirst($b['reason']).')';
+            }
+            if ($needsExpert) {
+                if ($site && trim((string) $site->base_url) !== '' && (new BrainBuildService)->availability()['ok']) {
+                    $out[] = 'Tự đọc tối đa '.AgentRunOrchestrator::GAP_PAGES.' trang trên website công ty để bổ sung kiến thức';
+                }
+                $out[] = 'Viết xong sẽ gắn nhãn cần chuyên gia xem lại (chủ đề rủi ro cao)';
+            }
+        } catch (\Throwable) {
+            // chỉ là lời giải thích: lỗi thì bỏ qua
+        }
+
+        return $out;
     }
 
     /** @return array{estimate_vnd: ?float, basis: string, budget_vnd: float} */

@@ -72,6 +72,8 @@ final class AgentRunOrchestrator
         /** AG-S14: sổ vai trò (tên, kỹ năng) và công tắc vai trò. Null = đọc từ resources/agents/roles và agent_settings. */
         private ?RoleRegistry $roles = null,
         private ?RoleSwitches $switches = null,
+        /** Điểm nối tự chuẩn bị kiến thức: fn(Website, array $options): array (kết quả BrainBuildService::run). Null = dùng BrainBuildService thật. */
+        private ?\Closure $knowledgeBuilder = null,
     ) {
         if ($this->router === null && $this->ai instanceof RoutedAiProvider) {
             $this->router = $this->ai->router();
@@ -94,12 +96,14 @@ final class AgentRunOrchestrator
     /** @var list<mixed>|null dàn ý có sẵn do người gọi truyền vào (G4); null = tự lập dàn ý như cũ */
     private ?array $presetOutline = null;
 
-    /** người dùng chọn vẫn viết dù chủ đề rủi ro cao và kho chưa có kiến thức */
-    private bool $allowWithoutKnowledge = false;
+    public const GAP_PAGES = 5;
 
-    public function run(Article $article, ?User $actor = null, string $trigger = 'manual', ?int $campaignId = null, ?array $presetOutline = null, bool $allowWithoutKnowledge = false): AgentRun
+    /** kho vẫn chưa có mục đã duyệt khớp sau khi tự chuẩn bị, chủ đề rủi ro cao: bài cần chuyên gia xem lại sau khi viết */
+    private bool $needsExpert = false;
+
+    public function run(Article $article, ?User $actor = null, string $trigger = 'manual', ?int $campaignId = null, ?array $presetOutline = null, bool $allowWithoutKnowledge = false /* deprecated: không còn tác dụng, không có cổng dừng */): AgentRun
     {
-        $this->allowWithoutKnowledge = $allowWithoutKnowledge;
+        $this->needsExpert = false;
         $this->presetOutline = $presetOutline === [] ? null : $presetOutline;
         $this->seq = 0;
         $this->trigger = $trigger;
@@ -142,36 +146,62 @@ final class AgentRunOrchestrator
         }
     }
 
-    /** @return bool true = phải dừng phiên (đã ghi step và trả bài về trạng thái cũ). Lỗi khi tính thì chạy tiếp như cũ. */
-    private function knowledgeGate(AgentRun $run, Article $article, \App\Services\Agent\Risk\RiskAssessment $assess, string $previousStatus): bool
+    /**
+     * "AI tự chuẩn bị kiến thức" (thay cổng chặn cũ): rủi ro cao mà kho chưa có mục đã duyệt khớp thì đọc tối đa GAP_PAGES trang của website
+     * (trần chi phí ≤ 10% ngân sách phiên), rồi viết tiếp. Không dừng bao giờ; còn trống thì gắn cờ cần chuyên gia xem lại SAU khi viết.
+     */
+    private function prepareKnowledge(AgentRun $run, Article $article, \App\Services\Agent\Risk\RiskAssessment $assess): void
     {
+        if ($assess->level !== 'high') {
+            return;
+        }
         try {
-            $ready = \App\Services\Agent\Readiness\ArticleReadiness::for($article, $this->campaignId);
-            if (! ($ready['holds_writing'] ?? false)) {
-                return false;
+            if (\App\Services\Agent\Readiness\ArticleReadiness::for($article, $this->campaignId)['knowledge']['count'] > 0) {
+                return;
             }
         } catch (Throwable $e) {
             report($e);
 
-            return false;
+            return;
         }
-        $data = ['reason' => 'high_risk_no_knowledge', 'risk_level' => $assess->level, 'knowledge_count' => 0];
-        if ($this->allowWithoutKnowledge) {
-            $this->step($run, 'guard', 'system', 'warn', 'Viết dù kho chưa có kiến thức (người dùng chọn)', 'Chủ đề rủi ro cao và kho có 0 mục kiến thức đã duyệt khớp, nhưng người giao việc đã chọn vẫn viết. Bài chỉ là bản nháp và cần người có chuyên môn duyệt.', $data + ['allowed' => true]);
-
-            return false;
+        $site = $article->website;
+        $data = ['reason' => 'high_risk_no_knowledge', 'risk_level' => $assess->level, 'purpose' => 'gap'];
+        if (trim((string) $site->base_url) === '') {
+            $this->step($run, 'research', 'system', 'warn', 'Chưa tự đọc được website để bổ sung kiến thức', 'Chủ đề rủi ro cao, kho chưa có kiến thức khớp, nhưng website chưa có địa chỉ để đọc. Vẫn viết; bài sẽ được gắn nhãn cần chuyên gia xem lại.', $data);
+        } else {
+            $opts = ['max_pages' => self::GAP_PAGES, 'purpose' => 'gap', 'as_system' => true, 'keyword' => (string) $article->primary_keyword, 'budget_cap_vnd' => $this->policy->budgetVnd * 0.1];
+            try {
+                $r = $this->knowledgeBuilder
+                    ? ($this->knowledgeBuilder)($site, $opts)
+                    : (new \App\Services\Knowledge\Build\BrainBuildService)->run($site, null, $opts);
+                $this->step($run, 'research', 'system', ($r['pages_read'] ?? 0) > 0 ? 'ok' : 'warn', 'Tự đọc website để bổ sung kiến thức',
+                    'Chủ đề rủi ro cao, kho chưa có kiến thức khớp nên AI tự đọc '.(int) ($r['pages_read'] ?? 0).'/'.(int) ($r['pages_planned'] ?? 0).' trang trên website công ty: '
+                    .(int) ($r['items_auto'] ?? 0).' mục tự nhận (tầng A, hoàn tác được), '.(int) ($r['items_proposed'] ?? 0).' mục chờ người duyệt.',
+                    $data + ['pages_read' => (int) ($r['pages_read'] ?? 0), 'items_auto' => (int) ($r['items_auto'] ?? 0), 'items_proposed' => (int) ($r['items_proposed'] ?? 0), 'build_run_id' => $r['run_id'] ?? null],
+                    null, 0, (float) ($r['cost_vnd'] ?? 0));
+            } catch (Throwable $e) {
+                $this->step($run, 'research', 'system', 'warn', 'Chưa tự đọc được website để bổ sung kiến thức', ErrorMasker::short($e->getMessage(), 160).' Vẫn viết; bài sẽ được gắn nhãn cần chuyên gia xem lại.', $data);
+            }
         }
-        $why = implode(' ', $assess->reasons);
-        $this->step($run, 'guard', 'system', 'blocked', 'Dừng trước bước viết: chủ đề rủi ro cao, kho chưa có kiến thức',
-            'Hạng rủi ro: '.$this->levelLabel($assess->level).($why !== '' ? ' ('.$why.')' : '').'. Kho có 0 mục kiến thức đã duyệt khớp chủ đề nên đội AI không viết (chưa tốn token AI nào). Cách xử lý: bổ sung kho (Kho trí tuệ / Xây kho từ website) rồi giao lại, hoặc giao lại và chọn "Vẫn viết dù kho chưa có kiến thức".', $data);
-        $article->update(['workflow_status' => $previousStatus]);
-
-        return true;
+        try {
+            $left = \App\Services\Agent\Readiness\ArticleReadiness::for($article, $this->campaignId)['knowledge']['count'];
+        } catch (Throwable) {
+            $left = 0;
+        }
+        $this->needsExpert = $left === 0;
     }
 
     private function execute(AgentRun $run, Article $article, string $previousStatus): AgentRun
     {
         $site = $article->website;
+        $attached = [];
+        if ($site && $site->status === 'active') {
+            try {
+                $attached = \App\Services\Agent\Readiness\BrainAutoAttach::ensureFor($article, $run->triggered_by ? User::find($run->triggered_by) : null);
+            } catch (Throwable $e) {
+                report($e); // tự gắn Trí tuệ lỗi thì chạy tiếp như cũ
+            }
+        }
         $this->brandProfile = BrandProfileData::forWebsite($article->website_id);
         $this->brainCtx = BrainContext::forArticle($article, $this->campaignId); // AG-B1
         $this->kb = (new KnowledgeContext())->scopeToBrains($this->brainCtx->ids()); // AG-S20: mỗi lượt chạy truy xuất kiến thức riêng; AG-B1: trong phạm vi Trí tuệ
@@ -189,6 +219,9 @@ final class AgentRunOrchestrator
             return $this->finish($run, 'blocked', 'Website không hoạt động.');
         }
         $this->step($run, 'guard', 'system', 'ok', 'Được phép chạy', 'Không có lệnh dừng, website hoạt động, bậc tin cậy '.$this->policy->trustTier.' (chỉ tạo bản nháp).');
+        if ($attached !== []) {
+            $this->step($run, 'guard', 'system', 'ok', 'Đã tự gắn Trí tuệ cho website', implode(' ', array_map(fn ($b) => 'Đã tự gắn Trí tuệ «'.$b['name'].'» ('.lcfirst($b['reason']).'). Có thể gỡ lại ở trang Trí tuệ.', $attached)), ['auto_attached' => $attached]);
+        }
 
         // 2. Phân hạng rủi ro theo từ khóa (luật, không dùng AI).
         $assess = $this->risk->assess($article->primary_keyword);
@@ -203,10 +236,8 @@ final class AgentRunOrchestrator
             ($assess->reasons === [] && $brainRaise === '' ? 'Chủ đề thường, không chạm nhóm nhạy cảm.' : implode(' ', $assess->reasons).$brainRaise).($assess->level === 'high' ? ' Bài cần người có chuyên môn duyệt.' : ''),
             ['level' => $assess->level] + ($brainRaise !== '' ? ['raised_by_brain' => true] : []) + $this->brainCtx->stepData());
 
-        // 2b. Cổng kiến thức: rủi ro cao mà kho chưa có mục đã duyệt khớp thì dừng TRƯỚC khi gọi AI (trừ khi người dùng chọn vẫn viết).
-        if ($this->knowledgeGate($run, $article, $assess, $previousStatus)) {
-            return $this->finish($run, 'blocked', 'Dừng trước bước viết: chủ đề rủi ro cao, kho chưa có kiến thức đã duyệt khớp.');
-        }
+        // 2b. AI tự chuẩn bị kiến thức (không có cổng dừng).
+        $this->prepareKnowledge($run, $article, $assess);
 
         if ($this->router) {
             foreach (($this->roleOff('strategist') ? ['write'] : ['outline', 'write']) as $task) {
@@ -300,9 +331,21 @@ final class AgentRunOrchestrator
         $run->update(['final_version_id' => $version->id]);
         $this->kb?->recordUsage($version);
         $this->assets?->attachFeatured($version); // AG-S25
+        if ($passed) {
+            // Tạo ảnh (yêu cầu gốc: pipeline có "tạo ảnh"): bước luật, tự bỏ qua có lý do (chưa có nhà cung cấp, đã có ảnh thư viện, sức khỏe, hết trần); không làm hỏng phiên.
+            try {
+                (new \App\Services\Images\ArticleImageStep)->run($run, $article, $version, ++$this->seq, $this->policy->budgetVnd);
+                // Cùng quy ước với step(): mọi bước ghi vai trò và kỹ năng.
+                if ($imgStep = $run->steps()->where('stage', 'images')->latest('id')->first()) {
+                    $imgStep->update(['data' => ($imgStep->data ?? []) + ['role_key' => $imgStep->role, 'role_name' => $this->roles->roleName($imgStep->role), 'skill' => $this->pbData(null), 'skill_label' => 'Chỉ dẫn mặc định']]);
+                }
+            } catch (Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Bước tạo ảnh lỗi, bỏ qua: '.class_basename($e));
+            }
+        }
 
         if ($passed && $assess->level === 'high') {
-            $this->decision($run, 'high_risk_expert_review', 'Giữ cho người có chuyên môn duyệt', 'Đạt luật nhưng chủ đề rủi ro cao nên hệ thống không coi là xong; cần người có chuyên môn duyệt trước khi dùng.', ['risk_level' => 'high', 'score' => $score]);
+            $this->decision($run, 'high_risk_expert_review', 'Giữ cho người có chuyên môn duyệt', 'Đạt luật nhưng chủ đề rủi ro cao nên hệ thống không coi là xong; cần người có chuyên môn duyệt trước khi dùng.'.($this->needsExpert ? ' Kho chưa có kiến thức đã duyệt khớp chủ đề nên cần xem kỹ các khẳng định.' : ''), ['risk_level' => 'high', 'score' => $score] + ($this->needsExpert ? ['needs_expert' => true, 'reason' => 'high_risk_no_knowledge'] : []));
         }
         $brainMustCite = $this->brainCtx->reliance() === 'must_cite';
         if ($passed && $brainMustCite && $assess->level !== 'high') {
@@ -353,7 +396,7 @@ final class AgentRunOrchestrator
             'Đã nạp '.$kbData['knowledge']['count'].' mục kiến thức đã duyệt, '.$nImg.' ảnh gợi ý, '.$nLink.' liên kết nội bộ gợi ý, '.count($citableData).' nguồn được phép trích'
             .(($brand['brand_profile_fields'] ?? 0) > 0 ? ', hồ sơ doanh nghiệp ('.$brand['brand_profile_fields'].' trường).' : ', chưa có hồ sơ doanh nghiệp.')
             .($gap ? ' Kho kiến thức chưa có mục đã duyệt phù hợp; đã ghi khoảng trống kiến thức.' : ''),
-            $kbData + $assetData + ['citable_sources' => $citableData] + $brand + $this->brainCtx->stepData());
+            $kbData + $assetData + ['citable_sources' => $citableData] + $brand + $this->brainCtx->stepData() + ($this->needsExpert ? ['needs_expert' => true, 'reason' => 'high_risk_no_knowledge'] : []));
     }
 
     /** @return array<string, mixed> thuộc tính ArticleVersion (đã làm sạch HTML) */

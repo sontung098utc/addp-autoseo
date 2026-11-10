@@ -34,7 +34,7 @@ class JobTypeRegistryTest extends TestCase
     public function test_article_write_stage_labels(): void
     {
         $stages = JobTypeRegistry::stageLabels('article_write');
-        $this->assertSame(['guard', 'risk', 'brief', 'research', 'write', 'grade', 'repair', 'handoff'], array_keys($stages));
+        $this->assertSame(['guard', 'risk', 'brief', 'research', 'write', 'images', 'grade', 'repair', 'handoff'], array_keys($stages));
         $this->assertSame(array_keys($stages), array_keys(JobTypeRegistry::stageLabels('article_write', true)));
     }
 }
