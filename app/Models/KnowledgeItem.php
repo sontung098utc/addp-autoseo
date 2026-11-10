@@ -25,7 +25,7 @@ class KnowledgeItem extends Model
 
     protected $fillable = [
         'brain_id', 'website_id', 'source_id', 'topic_id', 'type', 'title', 'body', 'entity', 'field', 'value', 'value_unit', 'tags', 'status',
-        'valid_from', 'valid_until', 'confidence', 'source_span', 'created_by', 'approved_by', 'approved_at', 'content_hash', 'version', 'last_used_at',
+        'valid_from', 'valid_until', 'confidence', 'source_span', 'created_by', 'approved_by', 'approved_at', 'content_hash', 'version', 'last_used_at', 'risk_tier', 'review_mode',
     ];
 
     protected function casts(): array

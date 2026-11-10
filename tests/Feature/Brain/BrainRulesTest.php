@@ -196,7 +196,7 @@ class BrainRulesTest extends TestCase
                 return 0.0;
             }
         };
-        $run = (new AgentRunOrchestrator($ai, policy: new RunPolicy()))->run($article, null);
+        $run = (new AgentRunOrchestrator($ai, policy: new RunPolicy()))->run($article, null, 'manual', null, null, true);
 
         $this->assertCount(1, $ai->options[0]['knowledge_rules'], 'người viết nhận quy tắc dù chủ đề không khớp truy xuất');
         $grades = $run->steps->where('stage', 'grade')->values();

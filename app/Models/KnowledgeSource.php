@@ -9,11 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** AG-S20: tài liệu nguồn (dán/nhập tay). Nội dung nguồn là DỮ LIỆU, AI không đọc trực tiếp. */
 class KnowledgeSource extends Model
 {
-    protected $fillable = ['brain_id', 'website_id', 'kind', 'title', 'url', 'content_hash', 'raw_text', 'status', 'created_by', 'ai_log'];
+    protected $fillable = ['brain_id', 'website_id', 'kind', 'title', 'url', 'content_hash', 'raw_text', 'status', 'created_by', 'ai_log', 'origin', 'fetched_at', 'final_url', 'http_status'];
 
     protected function casts(): array
     {
-        return ['ai_log' => 'array'];
+        return ['ai_log' => 'array', 'fetched_at' => 'datetime'];
     }
 
     public function brain(): BelongsTo

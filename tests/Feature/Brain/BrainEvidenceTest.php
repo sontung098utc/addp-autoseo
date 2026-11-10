@@ -184,7 +184,7 @@ class BrainEvidenceTest extends TestCase
                 return 0.0;
             }
         };
-        $run = (new AgentRunOrchestrator($ai, policy: new RunPolicy()))->run($a, null);
+        $run = (new AgentRunOrchestrator($ai, policy: new RunPolicy()))->run($a, null, 'manual', null, null, true);
         $this->assertSame([['name' => 'Bộ Y tế', 'domain' => 'moh.gov.vn', 'tier' => '1']], $ai->options[0]['citable_sources'], 'chỉ nguồn đã xác nhận và không bị chặn');
         $write = $run->steps->firstWhere('stage', 'write');
         $this->assertStringContainsString('EVID01', $write->detail);
@@ -193,7 +193,7 @@ class BrainEvidenceTest extends TestCase
         [, , $a2] = $this->world('numbers');
         $ai2 = clone $ai;
         $ai2->options = [];
-        (new AgentRunOrchestrator($ai2, policy: new RunPolicy()))->run($a2, null);
+        (new AgentRunOrchestrator($ai2, policy: new RunPolicy()))->run($a2, null, "manual", null, null, true);
         $this->assertArrayNotHasKey('citable_sources', $ai2->options[0], 'không bắt buộc nguồn thì không đưa danh sách');
     }
 
