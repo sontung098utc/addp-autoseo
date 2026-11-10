@@ -152,7 +152,9 @@ class WebsiteResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->weight('bold'),
-                Tables\Columns\TextColumn::make('cms_type')->toggleable()->sortable()
+                // cms_type là ENUM: MariaDB sắp theo thứ tự khai báo, SQLite theo chữ cái → ép CAST để cả hai cùng theo chữ cái.
+                Tables\Columns\TextColumn::make('cms_type')->toggleable()
+                    ->sortable(query: fn ($query, string $direction) => $query->orderByRaw('CAST(cms_type AS CHAR) ' . ($direction === 'desc' ? 'desc' : 'asc')))
                     ->label('CMS')
                     ->badge()
                     ->color('gray')

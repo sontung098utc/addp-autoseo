@@ -50,7 +50,7 @@ class QualityDemoData
         $make('1 bài tốt', 'needs_review', [$good]);
         // (2) Bài ngắn + thiếu từ khóa + meta sai.
         $make('2 bài ngắn thiếu từ khóa', 'needs_review', [[
-            'html_content' => '<p>' . self::words(120, 4) . '</p>', 'seo_title' => str_repeat('Tiêu đề SEO quá dài ', 5),
+            'html_content' => '<p>' . self::words(120, 4) . '</p>', 'seo_title' => str_repeat('Tiêu đề SEO quá dài ', 3) . 'rất dài', // 67 ký tự: vượt ngưỡng luật (60) nhưng vừa cột seo_title (70)
             'meta_description' => 'Mô tả quá ngắn.', 'focus_keyword' => self::KW, 'review_status' => 'needs_review',
         ]]);
         // (3) Bài trùng ~60% với một bài đã đăng cùng website.

@@ -165,7 +165,7 @@ class CompetitorsPageTest extends TestCase
         $p = $this->loaded();
         $open = collect($p->instance()->gaps())->filter(fn ($g) => $g['existing'] === null)->values();
         // sau khi hiển thị, có người tạo trùng ở nơi khác (đua)
-        Article::create(['website_id' => $this->site->id, 'created_by' => 1, 'primary_keyword' => strtoupper($open[0]['keyword']), 'workflow_status' => 'planned']);
+        Article::create(['website_id' => $this->site->id, 'created_by' => $this->user('writer')->id, 'primary_keyword' => strtoupper($open[0]['keyword']), 'workflow_status' => 'planned']);
         $before = Article::count();
         $p->set('selected', [$open[1]['norm']])->call('addToPlan');
         $this->assertSame($before + 1, Article::count());
@@ -180,7 +180,7 @@ class CompetitorsPageTest extends TestCase
     {
         $this->actingAs($this->user('approver'));
         $kw = \App\Filament\Support\Demo\CompetitorsDemoData::keywordPool()[0]['keyword'];
-        $art = Article::create(['website_id' => $this->site->id, 'created_by' => 1, 'primary_keyword' => '  '.mb_strtoupper($kw).' ', 'workflow_status' => 'published']);
+        $art = Article::create(['website_id' => $this->site->id, 'created_by' => $this->user('writer')->id, 'primary_keyword' => '  '.mb_strtoupper($kw).' ', 'workflow_status' => 'published']);
         $p = $this->loaded();
         $row = collect($p->instance()->gaps())->first(fn ($g) => $g['norm'] === $kw);
         if ($row) { // từ khóa này có thể không được đối thủ giả lập xếp hạng; nếu có thì phải bị đánh dấu
@@ -249,7 +249,7 @@ class CompetitorsPageTest extends TestCase
     {
         $p = $this->loaded();
         $g = collect($p->instance()->gaps())->first(fn ($g) => $g['existing'] === null);
-        Article::create(['website_id' => $this->site->id, 'created_by' => 1, 'primary_keyword' => $g['keyword'], 'workflow_status' => 'planned']);
+        Article::create(['website_id' => $this->site->id, 'created_by' => $this->user('writer')->id, 'primary_keyword' => $g['keyword'], 'workflow_status' => 'planned']);
         $p->set('selected', [$g['norm']])->call('addToPlan');
         $this->assertSame(1, Article::count());
     }
