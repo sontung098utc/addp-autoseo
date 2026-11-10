@@ -259,7 +259,9 @@ class KeywordsPage extends Page
         $this->guard();
         $service = KeywordService::make();
         $this->proposalNames = [];
-        if (KeywordService::useReal() && KeywordAiResolver::availability('keyword_cluster')['ok']) {
+        $ai = KeywordAiResolver::availability('keyword_cluster');
+        // AI giả lập (môi trường local) không có kịch bản gom cụm: dùng bản theo luật có nhãn thay vì trả về rỗng.
+        if (KeywordService::useReal() && $ai['ok'] && ! $ai['demo']) {
             try {
                 $r = $service->proposeWithAi();
             } catch (KeywordAiUnavailable $e) {
@@ -268,7 +270,8 @@ class KeywordsPage extends Page
                 return;
             }
             if ($r['proposals'] === 0) {
-                Notification::make()->title('Không còn từ khóa chưa gom cụm')->warning()->send();
+                Notification::make()->title($r['stopped_reason'] ? 'AI chưa gom được cụm nào' : 'Không còn từ khóa chưa gom cụm')
+                    ->body($r['stopped_reason'] ?: null)->warning()->send();
             } else {
                 Notification::make()->title("AI đề xuất {$r['proposals']} cụm")
                     ->body('Chi phí '.number_format($r['cost_vnd'], 0, ',', '.').' đ'.($r['demo'] ? ' (AI giả lập)' : '').($r['stopped_reason'] ? '. '.$r['stopped_reason'] : '').' Bạn xem và nhận từng cụm.')->success()->send();

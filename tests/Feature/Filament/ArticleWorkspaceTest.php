@@ -216,6 +216,20 @@ class ArticleWorkspaceTest extends TestCase
             ->assertDontSee('data-testid="aw-cluster"', false);
     }
 
+    public function test_mo_hop_giao_doi_ai_khong_loi_500_khi_trang_render_lai(): void
+    {
+        // Hồi quy: nút "Giao đội AI" gắn quan hệ giả lastRun lên bài, rồi getViewData gọi refresh() và ném RelationNotFoundException (500).
+        $this->actingAs($this->user('admin'));
+        $a = $this->article('planned', false);
+
+        Livewire::test(ViewArticle::class, ['record' => $a->getRouteKey()])
+            ->mountAction('run_agent')
+            ->assertHasNoActionErrors()
+            ->assertActionMounted('run_agent')
+            ->callMountedAction()   // chạy xong nút (gọi $this->record->refresh()) cũng không được lỗi
+            ->assertHasNoActionErrors();
+    }
+
     public function test_phien_dang_chay_thi_tab_hoat_dong_co_hieu_ung_va_tu_lam_moi(): void
     {
         $this->actingAs($this->user('writer'));

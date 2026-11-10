@@ -71,6 +71,17 @@ class ViewArticle extends EditArticle
         return (string) ($this->latest()?->title ?: $this->record->primary_keyword);
     }
 
+    /**
+     * ArticleRows::lastRun gắn 'lastRun' lên bài như quan hệ giả (setRelation) mỗi khi một nút ở đầu trang tính hiển thị;
+     * refresh() sẽ cố nạp lại nó như quan hệ thật và ném RelationNotFoundException (500). Bỏ nó đi trước khi nạp lại.
+     */
+    private function refreshRecord(): Article
+    {
+        $this->record->unsetRelation('lastRun');
+
+        return $this->record->refresh();
+    }
+
     private function latest(): ?ArticleVersion
     {
         return $this->record->versions()->orderByDesc('version')->first();
@@ -95,7 +106,7 @@ class ViewArticle extends EditArticle
                 ->modalSubmitActionLabel('Giao việc')
                 ->action(function () {
                     ArticleResource::assignToAgent($this->record);
-                    $this->record->refresh();
+                    $this->refreshRecord();
                 }),
             Actions\Action::make('submit_review')->label('Gửi duyệt')->icon('heroicon-o-paper-airplane')
                 ->visible(fn () => ArticleResource::primaryActionFor($this->record) === 'submit_review')
@@ -104,7 +115,7 @@ class ViewArticle extends EditArticle
                 ->action(function () {
                     abort_unless(ReviewActions::canSubmit(), 403);
                     ReviewActions::run(fn () => (new ReviewWorkflow)->submitForReview(ReviewActions::user(), $this->latest()), 'Đã gửi duyệt');
-                    $this->record->refresh();
+                    $this->refreshRecord();
                 }),
             Actions\Action::make('approve')->label('Duyệt')->icon('heroicon-o-check')->color('primary')
                 ->visible(fn () => $this->record->workflow_status === 'needs_review' && $this->latest() !== null)
@@ -115,7 +126,7 @@ class ViewArticle extends EditArticle
                 ->action(function (array $data) {
                     abort_unless(ReviewActions::canApprove(), 403);
                     ReviewActions::run(fn () => (new ReviewWorkflow)->approve(ReviewActions::user(), $this->latest(), $data['note'] ?? null, $data['override_reason'] ?? null), 'Đã duyệt nội dung');
-                    $this->record->refresh();
+                    $this->refreshRecord();
                 }),
             Actions\Action::make('reject')->label('Từ chối')->icon('heroicon-o-x-mark')->color('danger')->outlined()
                 ->visible(fn () => $this->record->workflow_status === 'needs_review' && $this->latest() !== null)
@@ -124,7 +135,7 @@ class ViewArticle extends EditArticle
                 ->action(function (array $data) {
                     abort_unless(ReviewActions::canApprove(), 403);
                     ReviewActions::run(fn () => (new ReviewWorkflow)->reject(ReviewActions::user(), $this->latest(), $data['reason'] ?? null), 'Đã từ chối bản thảo');
-                    $this->record->refresh();
+                    $this->refreshRecord();
                 }),
             Actions\Action::make('schedule')->label('Xếp lịch')->icon('heroicon-o-clock')->color('primary')
                 ->visible(fn () => $this->record->workflow_status === 'approved' && $this->latest() !== null)
@@ -135,7 +146,7 @@ class ViewArticle extends EditArticle
                     ReviewActions::run(function () use ($data) {
                         (new ReviewWorkflow)->schedule(ReviewActions::user(), $this->latest(), ReviewActions::parseVn($data['scheduled_at_vn']), Website::findOrFail($data['website_id']));
                     }, 'Đã xếp lịch xuất bản');
-                    $this->record->refresh();
+                    $this->refreshRecord();
                 }),
             Actions\DeleteAction::make()->visible(fn () => ArticleResource::canDeleteAny()),
         ];
@@ -144,7 +155,7 @@ class ViewArticle extends EditArticle
     protected function getViewData(): array
     {
         /** @var Article $article */
-        $article = $this->record->refresh()->load('website');
+        $article = $this->refreshRecord()->load('website');
         $versions = $article->versions()->with(['reviewer', 'mediaAssets'])->orderByDesc('version')->get();
         $latest = $versions->first();
         $runs = AgentRun::query()->where('article_id', $article->id)->with('steps')->orderByDesc('id')->get();
