@@ -8,11 +8,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Keyword extends Model
 {
-    protected $fillable = ['website_id', 'keyword', 'keyword_key', 'volume', 'difficulty', 'intent', 'source', 'cluster_id', 'status', 'created_by'];
+    protected $fillable = ['website_id', 'keyword', 'keyword_key', 'volume', 'difficulty', 'intent', 'source', 'cluster_id', 'status', 'created_by', 'volume_source', 'metrics_at', 'competition', 'cpc_vnd'];
 
     protected function casts(): array
     {
-        return ['volume' => 'integer', 'difficulty' => 'integer'];
+        return ['volume' => 'integer', 'difficulty' => 'integer', 'metrics_at' => 'datetime', 'competition' => 'float', 'cpc_vnd' => 'integer'];
     }
 
     /** Khóa chuẩn hóa: chữ thường + gộp khoảng trắng (cùng luật với CsvKeywordParser::key). */

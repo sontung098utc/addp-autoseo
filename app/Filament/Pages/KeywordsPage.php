@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Resources\ArticleResource;
 use App\Filament\Support\Demo\DemoMode;
 use App\Filament\Support\Keywords\CsvKeywordParser;
 use App\Filament\Support\Keywords\KeywordArticleLinks;
@@ -12,6 +13,9 @@ use App\Models\User;
 use App\Models\Website;
 use App\Services\Keywords\KeywordAiResolver;
 use App\Services\Keywords\KeywordAiUnavailable;
+use App\Services\Keywords\KeywordMetricsEnricher;
+use App\Services\Keywords\KeywordMetricsResolver;
+use App\Services\Keywords\KeywordMetricsUnavailable;
 use App\Services\Keywords\KeywordResearchService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
@@ -19,6 +23,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 use Livewire\WithFileUploads;
@@ -149,6 +154,7 @@ class KeywordsPage extends Page
         $off = ! $av['ok'] ? $av['reason'] : ($site === null || ! KeywordService::useReal() ? 'Cần một website đang hoạt động và dữ liệu thật (không phải bản minh họa).' : null);
 
         return [
+            $this->fetchMetricsAction($site),
             Action::make('marketResearch')
                 ->label('Khảo sát thị trường (AI)')
                 ->icon('heroicon-o-sparkles')
@@ -167,6 +173,50 @@ class KeywordsPage extends Page
                     $this->runMarketResearch($site, (string) ($data['seeds'] ?? ''), (int) ($data['limit'] ?? 0));
                 }),
         ];
+    }
+
+    /** Nút "Lấy lượt tìm thật": hộp xác nhận nói rõ số từ khóa, chi phí ước tính và nguồn. Tắt kèm lý do khi chưa cấu hình. */
+    private function fetchMetricsAction(?Website $site): Action
+    {
+        $av = KeywordMetricsResolver::availability();
+        $real = $site !== null && KeywordService::useReal();
+        $pending = $real ? (new KeywordMetricsEnricher)->pendingCount($site) : 0;
+        $off = ! $av['ok'] ? $av['reason'] : (! $real ? 'Cần một website đang hoạt động và dữ liệu thật (không phải bản minh họa).' : ($pending === 0 ? 'Mọi từ khóa đã có số liệu hoặc đã được tra gần đây.' : null));
+        $est = (int) ceil($pending / 100) * (float) config('keywords.cost_per_100_keywords_vnd', 0);
+
+        return Action::make('fetchMetrics')
+            ->label('Lấy lượt tìm thật')
+            ->icon('heroicon-o-chart-bar')
+            ->visible(fn () => static::canAccess())
+            ->disabled($off !== null)
+            ->tooltip($off)
+            ->modalHeading('Lấy lượt tìm thật')
+            ->modalDescription('Sẽ tra '.$pending.' từ khóa chưa có số liệu (tối đa '.config('keywords.max_per_run').' mỗi lần) từ '.($av['label'] ?? 'nhà cung cấp số liệu').'. Chi phí ước tính khoảng '.number_format($est, 0, ',', '.').' đ — đây là ƯỚC TÍNH theo cấu hình, không phải bảng giá chính thức. Số bạn đã nhập (CSV, nhập tay) không bị ghi đè.')
+            ->modalSubmitActionLabel('Lấy lượt tìm')
+            ->action(function () use ($site) {
+                $this->guard();
+                $this->runFetchMetrics($site);
+            });
+    }
+
+    public function runFetchMetrics(?Website $site): void
+    {
+        $this->guard();
+        if ($site === null || ! KeywordService::useReal()) {
+            $this->fail('Chưa chạy được', 'Chưa có website đang hoạt động hoặc đang dùng dữ liệu minh họa.');
+
+            return;
+        }
+        try {
+            $r = (new KeywordMetricsEnricher)->enrich($site);
+        } catch (KeywordMetricsUnavailable $e) {
+            $this->fail('Chưa có nguồn số liệu', $e->getMessage());
+
+            return;
+        }
+        $body = $r['skipped'].' từ khóa chưa có số liệu ở nguồn (giữ trống). Chi phí ước tính '.number_format($r['cost_vnd'], 0, ',', '.').' đ ('.$r['provider'].').'.($r['provider'] === 'mock' ? ' Đây là số giả lập, không phải lượt tìm thật.' : '').($r['stopped_reason'] ? ' '.$r['stopped_reason'] : '');
+        $n = Notification::make()->title('Đã cập nhật lượt tìm cho '.$r['updated'].' từ khóa')->body($body);
+        $r['stopped_reason'] !== null ? $n->warning()->send() : $n->success()->send();
     }
 
     public function runMarketResearch(?Website $site, string $seedText, int $limit): void
@@ -191,7 +241,13 @@ class KeywordsPage extends Page
             return;
         }
         $n = Notification::make()->title('Đã thêm '.$r['added'].' từ khóa (AI đề xuất)')
-            ->body($r['skipped_duplicates'].' từ trùng đã bỏ. Chi phí '.$r['cost_vnd'].' đ ('.$r['label'].'). Lượt tìm để trống.'.($r['demo'] ? ' Đây là AI giả lập, không phải kết quả thật.' : ''));
+            ->body($r['skipped_duplicates'].' từ trùng đã bỏ. Chi phí '.$r['cost_vnd'].' đ ('.$r['label'].'). Lượt tìm chỉ có khi nguồn số liệu thật trả về.'.($r['demo'] ? ' Đây là AI giả lập, không phải kết quả thật.' : ''));
+        $m = $r['metrics'] ?? null;
+        if ($m !== null && $m['updated'] > 0) {
+            $n->body($n->getBody().' Đã lấy lượt tìm thật cho '.$m['updated'].' từ khóa ('.$m['provider'].', chi phí ước tính '.number_format($m['cost_vnd'], 0, ',', '.').' đ).');
+        } elseif ($m !== null && $m['message'] !== null) {
+            $n->body($n->getBody().' '.$m['message']);
+        }
         $r['message'] !== null ? $n->warning()->send() : $n->success()->send();
     }
 
@@ -365,7 +421,10 @@ class KeywordsPage extends Page
             'kwRows' => $this->keywordRows($all, $site),
             'real' => KeywordService::useReal() && $site !== null,
             'clusterColumns' => $this->clusterColumns(),
-            'clusterRows' => $this->clusterRows($clusters),
+            'clusterRows' => $this->clusterRows($clusters, $all),
+            'metricsInfo' => $demo === 'trong' ? null : $this->metricsInfo($site),
+            'chainInputs' => $this->chainInputs(),
+            'chainOutputs' => $this->chainOutputs(),
             'clusters' => $clusters,
             'proposals' => $repo->proposals(),
             'proposalSource' => $repo->proposalSource(),
@@ -373,6 +432,49 @@ class KeywordsPage extends Page
             'demoOn' => DemoMode::enabled(),
         ];
     }
+
+    /** @return list<array{label:string,url:?string,note?:string}> */
+    private function chainInputs(): array
+    {
+        return [
+            ['label' => 'Đối thủ', 'url' => CompetitorsPage::getUrl(), 'note' => 'khoảng trống'],
+            ['label' => 'CSV bạn nhập', 'url' => null],
+            ['label' => 'Khảo sát thị trường (AI)', 'url' => null, 'note' => 'nút ở đầu trang'],
+            ['label' => 'Search Console', 'url' => SearchConsolePage::getUrl()],
+        ];
+    }
+
+    /** @return list<array{label:string,url:?string,note?:string}> */
+    private function chainOutputs(): array
+    {
+        return [
+            ['label' => 'Kế hoạch nội dung', 'url' => ContentPlanPage::getUrl(), 'note' => 'bài đã lên kế hoạch'],
+            ['label' => 'Tab Từ khóa và kế hoạch của từng bài', 'url' => ArticleResource::getUrl('index')],
+        ];
+    }
+
+    /**
+     * Thẻ "Nguồn số liệu lượt tìm": nói thật từng nguồn và số đếm thật từ kho.
+     *
+     * @return array<string,mixed>
+     */
+    public function metricsInfo(?Website $site): array
+    {
+        $av = KeywordMetricsResolver::availability();
+        $info = ['available' => $av['ok'], 'label' => $av['label'], 'reason' => $av['reason'], 'demo' => $av['demo'], 'total' => 0, 'with' => 0, 'dataforseo' => 0, 'latest' => null, 'gsc' => 'Chưa kết nối.'];
+        if ($site !== null && KeywordService::useReal()) {
+            $q = Keyword::query()->where('website_id', $site->id);
+            $info['total'] = (clone $q)->count();
+            $info['with'] = (clone $q)->whereNotNull('volume')->count();
+            $info['dataforseo'] = (clone $q)->where('volume_source', 'dataforseo')->count();
+            $latest = (clone $q)->whereNotNull('volume')->max('metrics_at');
+            $info['latest'] = $latest ? Carbon::parse($latest)->timezone(config('app.timezone'))->format('d/m/Y H:i') : null;
+        }
+
+        return $info;
+    }
+
+    private const VOLUME_SOURCES = ['csv' => 'CSV', 'tay' => 'Nhập tay', 'dataforseo' => 'DataForSEO', 'gsc' => 'Search Console', 'mock' => 'Giả lập'];
 
     private const SOURCES = ['csv' => 'CSV', 'tay' => 'Nhập tay', 'ai' => 'AI đề xuất', 'gsc' => 'Search Console', 'crawl' => 'Trang đã quét', 'competitor' => 'Đối thủ'];
 
@@ -384,6 +486,7 @@ class KeywordsPage extends Page
             ['key' => 'intent', 'label' => 'Ý định', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'tones' => ['Thông tin' => 'info', 'Thương mại' => 'accent', 'Giao dịch' => 'warn', 'Điều hướng' => 'muted']],
             ['key' => 'cluster', 'label' => 'Cụm chủ đề', 'type' => 'text', 'sortable' => true, 'filter' => true],
             ['key' => 'volume', 'label' => 'Lượng tìm', 'type' => 'number', 'sortable' => true],
+            ['key' => 'volumeSource', 'label' => 'Nguồn số liệu', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'tones' => ['CSV' => 'info', 'DataForSEO' => 'ok', 'Nhập tay' => 'muted', 'Search Console' => 'ok', 'Giả lập' => 'warn', 'Chưa có số liệu' => 'muted']],
             ['key' => 'source', 'label' => 'Nguồn', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'tones' => ['CSV' => 'info', 'Nhập tay' => 'muted', 'AI đề xuất' => 'accent', 'Search Console' => 'ok', 'Trang đã quét' => 'muted', 'Đối thủ' => 'warn']],
             ['key' => 'article', 'label' => 'Bài', 'type' => 'link', 'sortable' => true],
             ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Xóa', 'method' => 'confirmDeleteKeyword', 'tone' => 'muted']]],
@@ -405,6 +508,7 @@ class KeywordsPage extends Page
             'intent' => KeywordIntent::LABELS[$r['intent']] ?? $r['intent'],
             'cluster' => $r['cluster'] ?? 'Chưa gom cụm',
             'volume' => $r['volume'],
+            'volumeSource' => $r['volume'] === null ? 'Chưa có số liệu' : (self::VOLUME_SOURCES[$r['volume_source'] ?? ''] ?? 'Không rõ nguồn'),
             'source' => self::SOURCES[$r['source']] ?? $r['source'],
         ], $all);
     }
@@ -415,21 +519,32 @@ class KeywordsPage extends Page
         return [
             ['key' => 'name', 'label' => 'Cụm', 'type' => 'text', 'sortable' => true],
             ['key' => 'count', 'label' => 'Số từ khóa', 'type' => 'number', 'sortable' => true],
+            ['key' => 'volume', 'label' => 'Tổng lượt tìm', 'type' => 'number', 'sortable' => true],
+            ['key' => 'missing', 'label' => 'Chưa có số liệu', 'type' => 'number', 'sortable' => true],
             ['key' => 'intent', 'label' => 'Ý định', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'tones' => ['Thông tin' => 'info', 'Thương mại' => 'accent', 'Giao dịch' => 'warn', 'Điều hướng' => 'muted']],
             ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Sửa tên', 'method' => 'startRenameById']]],
         ];
     }
 
     /**
+     * Cụm xếp theo tổng lượt tìm giảm dần (cụm nào được tìm nhiều nhất). Tổng chỉ cộng các từ khóa CÓ số; từ khóa chưa có số được đếm riêng.
+     *
      * @param  list<array<string,mixed>>  $clusters
+     * @param  list<array<string,mixed>>  $all  kho từ khóa (để tra volume theo từ khóa)
      * @return list<array<string,mixed>>
      */
-    public function clusterRows(array $clusters): array
+    public function clusterRows(array $clusters, array $all = []): array
     {
+        $vol = [];
+        foreach ($all as $r) {
+            $vol[$r['keyword']] = $r['volume'];
+        }
         $out = [];
         foreach (array_values($clusters) as $i => $c) {
-            $out[] = ['id' => $i, 'name' => $c['name'], 'count' => count($c['keywords']), 'intent' => KeywordIntent::LABELS[$c['intent']] ?? $c['intent']];
+            $with = array_filter(array_map(fn ($k) => $vol[$k] ?? null, $c['keywords']), fn ($v) => $v !== null);
+            $out[] = ['id' => $i, 'name' => $c['name'], 'count' => count($c['keywords']), 'volume' => array_sum($with), 'missing' => count($c['keywords']) - count($with), 'intent' => KeywordIntent::LABELS[$c['intent']] ?? $c['intent']];
         }
+        usort($out, fn ($a, $b) => [$b['volume'], $a['name']] <=> [$a['volume'], $b['name']]);
 
         return $out;
     }

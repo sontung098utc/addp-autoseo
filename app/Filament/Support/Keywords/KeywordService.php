@@ -78,7 +78,7 @@ final class KeywordService
                 continue;
             }
             $seen[$k] = true;
-            $list[] = ['id' => $next++, 'keyword' => CsvKeywordParser::normalizeKeyword($r['keyword']), 'volume' => $r['volume'] ?? null, 'difficulty' => null, 'intent' => $r['intent'] ?? KeywordIntent::DEFAULT, 'source' => $source, 'cluster' => null];
+            $list[] = ['id' => $next++, 'keyword' => CsvKeywordParser::normalizeKeyword($r['keyword']), 'volume' => $r['volume'] ?? null, 'volume_source' => ($r['volume'] ?? null) !== null && in_array($source, ['csv', 'tay', 'gsc'], true) ? $source : null, 'difficulty' => null, 'intent' => $r['intent'] ?? KeywordIntent::DEFAULT, 'source' => $source, 'cluster' => null];
             $added++;
         }
         $this->repo->saveList($list);

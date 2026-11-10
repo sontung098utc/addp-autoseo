@@ -53,6 +53,7 @@ final class DashboardQueries
                 return [
                     'kind' => 'review',
                     'version_id' => $v->id,
+                    'article_id' => $v->article_id,
                     'keyword' => $v->article?->primary_keyword,
                     'website' => $v->article?->website?->name,
                     'waiting_minutes' => (int) max(0, $waited),
@@ -68,6 +69,7 @@ final class DashboardQueries
             ->get()->map(fn (ArticleVersion $v) => [
                 'kind' => 'rejected',
                 'version_id' => $v->id,
+                    'article_id' => $v->article_id,
                 'keyword' => $v->article?->primary_keyword,
                 'website' => $v->article?->website?->name,
                 'waiting_minutes' => 0,
@@ -82,6 +84,7 @@ final class DashboardQueries
             ->get()->map(fn (Article $a) => [
                 'kind' => 'todo',
                 'version_id' => null,
+                'article_id' => $a->id,
                 'keyword' => $a->primary_keyword,
                 'website' => $a->website?->name,
                 'waiting_minutes' => 0,
@@ -123,6 +126,7 @@ final class DashboardQueries
             ->get()
             ->map(fn (Publication $p) => [
                 'id' => $p->id,
+                'article_id' => $p->articleVersion?->article_id,
                 'keyword' => $p->articleVersion?->article?->primary_keyword,
                 'website' => $p->website?->name,
                 'status' => $p->status,
@@ -183,6 +187,7 @@ final class DashboardQueries
             ->orderByDesc('reviewed_at')->limit(self::RECENT_ACTIVITY_LIMIT)->get()
             ->map(fn (ArticleVersion $v) => [
                 'version_id' => $v->id,
+                    'article_id' => $v->article_id,
                 'keyword' => $v->article?->primary_keyword,
                 'reviewer' => $v->reviewer?->name,
                 'status' => $v->review_status,

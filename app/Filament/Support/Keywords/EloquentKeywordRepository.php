@@ -29,6 +29,8 @@ final class EloquentKeywordRepository implements KeywordRepository
                 'id' => $k->id,
                 'keyword' => $k->keyword,
                 'volume' => $k->volume,
+                'volume_source' => $k->volume_source,
+                'metrics_at' => $k->metrics_at?->toDateTimeString(),
                 'difficulty' => $k->difficulty,
                 'intent' => $k->intent,
                 'source' => $k->source,
@@ -69,11 +71,16 @@ final class EloquentKeywordRepository implements KeywordRepository
                 ];
                 $existing = Keyword::where('website_id', $this->websiteId)->where('keyword_key', $key)->first();
                 if ($existing) {
+                    // Chỉ đổi nhãn nguồn số liệu khi chính số liệu đổi.
+                    if ($existing->volume !== $attrs['volume']) {
+                        $attrs['volume_source'] = $attrs['volume'] !== null ? ($r['volume_source'] ?? null) : null;
+                    }
                     $existing->update($attrs);
 
                     continue;
                 }
                 Keyword::create($attrs + [
+                    'volume_source' => $attrs['volume'] !== null ? ($r['volume_source'] ?? null) : null,
                     'website_id' => $this->websiteId,
                     'keyword_key' => $key,
                     'source' => $r['source'] ?? 'tay',

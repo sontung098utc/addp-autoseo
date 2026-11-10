@@ -10,6 +10,22 @@
     </style>
     @php $unclustered = $total - $clustered; @endphp
     <div class="ss-page">
+        <x-chain-context step="Khám phá" purpose="Kho từ khóa của website: nơi gom từ khóa từ CSV, AI đề xuất, đối thủ, Search Console; gom thành cụm để lập kế hoạch bài viết" :inputs="$chainInputs" :outputs="$chainOutputs" />
+        @if ($metricsInfo)
+            <div class="ss-card" style="margin-bottom:1rem" role="region" aria-label="Nguồn số liệu lượt tìm" data-testid="metrics-sources"><div class="ss-card__b">
+                <div class="ss-card__h">Nguồn số liệu lượt tìm <x-studio.hint text="AI không biết lượt tìm. Số liệu thật chỉ đến từ CSV bạn nhập, nhà cung cấp số liệu (DataForSEO) hoặc Search Console. Chi phí nêu ở đây là ước tính theo cấu hình." /></div>
+                <ul class="ss-text-sm" style="list-style:disc;padding-left:1.2rem">
+                    <li><strong>CSV</strong>: luôn có (tab "Nhập từ khóa", cột volume).</li>
+                    <li><strong>DataForSEO</strong>:
+                        @if ($metricsInfo['available'] && ! $metricsInfo['demo'])đã cấu hình. Nút "Lấy lượt tìm thật" tra theo lô.
+                        @elseif ($metricsInfo['demo'])chưa cấu hình; đang dùng số giả lập của môi trường local (không phải lượt tìm thật).
+                        @else chưa cấu hình. {{ $metricsInfo['reason'] }}@endif
+                    </li>
+                    <li><strong>Search Console</strong>: {{ $metricsInfo['gsc'] }}</li>
+                </ul>
+                <p class="ss-text-sm" data-testid="metrics-count">{{ $metricsInfo['with'] }}/{{ $metricsInfo['total'] }} từ khóa có số liệu, {{ $metricsInfo['dataforseo'] }} từ nguồn DataForSEO, cập nhật gần nhất {{ $metricsInfo['latest'] ?? 'chưa có' }}.</p>
+            </div></div>
+        @endif
         <x-studio.tabs persist="tu-khoa" :tabs="[
             ['key' => 'list', 'label' => 'Danh sách', 'count' => $total],
             ['key' => 'import', 'label' => 'Nhập từ khóa', 'tone' => $preview ? 'info' : null],
@@ -23,7 +39,7 @@
                 @else
                     <div class="kw-bar">
                         @if ($real)<x-studio.badge tone="ok">Dữ liệu thật</x-studio.badge>@endif
-                        <x-studio.hint text="Cột lượng tìm hiện — khi chưa có số. Chưa có dữ liệu lượng tìm — nhập CSV có cột volume. Hệ thống không tự điền số." />
+                        <x-studio.hint text="Cột lượng tìm hiện — (Chưa có số liệu) khi chưa có số. Muốn có số: bấm 'Lấy lượt tìm thật' hoặc nhập CSV có cột volume. Hệ thống không tự điền số. Cột 'Nguồn số liệu' cho biết số đến từ đâu." />
                     </div>
                     <x-studio.data-table id="keywords" :columns="$kwColumns" :rows="$kwRows" :page-size="25" search="Tìm từ khóa hoặc cụm" />
                 @endif

@@ -2,6 +2,7 @@
 
 namespace App\Services\Keywords;
 
+use App\Contracts\KeywordMetricsProvider;
 use App\Contracts\StructuredAiInterface;
 use App\Filament\Support\Keywords\KeywordIntent;
 use App\Filament\Support\Keywords\KeywordService;
@@ -37,7 +38,7 @@ final class KeywordResearchService
 
     public const DEMO_MESSAGE = 'AI giả lập chưa có kịch bản cho việc này.';
 
-    public function __construct(private readonly ?StructuredAiInterface $ai = null, private readonly ?float $cap = null, private readonly string $label = 'AI', private readonly bool $demo = false) {}
+    public function __construct(private readonly ?StructuredAiInterface $ai = null, private readonly ?float $cap = null, private readonly string $label = 'AI', private readonly bool $demo = false, private readonly ?KeywordMetricsProvider $metrics = null) {}
 
     /** Trần chi phí mỗi lần chạy (VND): nhỏ hơn giữa cấu hình route và ngân sách phiên của AgentAi::policy(). */
     public static function budgetVnd(?float $routeCap): float
@@ -87,7 +88,7 @@ final class KeywordResearchService
 
     /**
      * @param  list<string>|null  $seeds  null = hạt giống mặc định
-     * @return array{added:int, skipped_duplicates:int, invalid:int, injection_dropped:int, cost_vnd:float, tokens:int, model:string, label:string, demo:bool, stopped:?string, message:?string}
+     * @return array{added:int, skipped_duplicates:int, invalid:int, injection_dropped:int, cost_vnd:float, tokens:int, model:string, label:string, demo:bool, stopped:?string, message:?string, metrics?:array{updated:int, provider:?string, cost_vnd:float, available:bool, message:?string}}
      *
      * @throws KeywordAiUnavailable khi chưa kết nối AI
      */
@@ -136,8 +137,42 @@ final class KeywordResearchService
         } else {
             JobRunRecorder::finish($run, 'ready_for_review', $outputRef, $out['stopped'] === 'cost_cap' ? 'Chi phí vượt trần của route nhưng đã dùng kết quả.' : null);
         }
+        $out['metrics'] = $this->enrichNew($site, $ids);
 
         return $out;
+    }
+
+    /**
+     * Tự lấy lượt tìm thật cho các từ khóa AI vừa thêm. Chỉ khi có nguồn số liệu thật (không dùng bản giả lập, không im lặng).
+     * Lỗi nhà cung cấp không làm hỏng việc chính.
+     *
+     * @param  list<int>  $ids
+     * @return array{updated:int, provider:?string, cost_vnd:float, available:bool, message:?string}
+     */
+    private function enrichNew(Website $site, array $ids): array
+    {
+        $none = ['updated' => 0, 'provider' => null, 'cost_vnd' => 0.0, 'available' => false, 'message' => null];
+        if ($ids === []) {
+            return $none;
+        }
+        try {
+            if ($this->metrics !== null) {
+                $enricher = new KeywordMetricsEnricher($this->metrics);
+            } else {
+                $r = KeywordMetricsResolver::resolve();
+                if ($r['demo']) {
+                    return array_replace($none, ['message' => 'Chưa có số liệu lượt tìm: cấu hình DataForSEO hoặc nhập CSV.']);
+                }
+                $enricher = new KeywordMetricsEnricher($r['provider']);
+            }
+            $m = $enricher->enrich($site, $ids);
+
+            return ['updated' => $m['updated'], 'provider' => $m['provider'], 'cost_vnd' => $m['cost_vnd'], 'available' => true, 'message' => $m['stopped_reason']];
+        } catch (KeywordMetricsUnavailable) {
+            return array_replace($none, ['message' => 'Chưa có số liệu lượt tìm: cấu hình DataForSEO hoặc nhập CSV.']);
+        } catch (\Throwable $e) {
+            return array_replace($none, ['available' => true, 'message' => 'Chưa lấy được lượt tìm: '.class_basename($e)]);
+        }
     }
 
     /** @param ?array{ai:StructuredAiInterface,label:string,cap:?float,demo:bool} $resolved */
