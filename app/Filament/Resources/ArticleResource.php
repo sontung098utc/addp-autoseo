@@ -318,7 +318,6 @@ class ArticleResource extends Resource
                         ->modalDescription(static::ASSIGN_DESCRIPTION)
                         ->modalSubmitActionLabel('Giao việc')
                         ->action(fn (Article $record) => static::assignToAgent($record)),
-                    Tables\Actions\EditAction::make()->label('Sửa thông tin bài'),
                 ])->label('⋯')->icon('heroicon-m-ellipsis-horizontal')->iconButton()->tooltip('Thao tác khác'),
             ], position: Tables\Enums\ActionsPosition::AfterColumns)
             ->bulkActions([
@@ -330,9 +329,10 @@ class ArticleResource extends Resource
 
     private static function viewVersionAction(): Tables\Actions\Action
     {
+        // Cùng đích với việc bấm vào dòng: mọi lối "xem bài" ở màn này đều vào không gian bài viết.
         return Tables\Actions\Action::make('view_version')->size('sm')->label('Xem')->icon('heroicon-o-eye')->color('gray')
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'view_version' && $r->versions()->exists())
-            ->url(fn (Article $r) => ArticleVersionResource::getUrl('view', ['record' => $r->versions()->orderByDesc('version')->firstOrFail()]));
+            ->url(fn (Article $r) => static::getUrl('view', ['record' => $r]));
     }
 
     /** Kiểm chất lượng bản mới nhất; null nếu bài chưa có bản nào. */
@@ -412,7 +412,8 @@ class ArticleResource extends Resource
             'index' => Pages\ListArticles::route('/'),
             'create' => Pages\CreateArticle::route('/create'),
             'view' => Pages\ViewArticle::route('/{record}'),
-            'edit' => Pages\EditArticle::route('/{record}/edit'),
+            // Đường dẫn sửa cũ cũng mở không gian bài viết: thông tin bài được sửa ngay trong tab Thông tin bài.
+            'edit' => Pages\ViewArticle::route('/{record}/edit'),
         ];
     }
 }

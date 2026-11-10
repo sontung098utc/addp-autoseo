@@ -3,7 +3,6 @@
 namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\ArticleResource;
-use App\Filament\Resources\ArticleResource\Pages\EditArticle;
 use App\Filament\Resources\ArticleResource\Pages\ListArticles;
 use App\Filament\Resources\ArticleResource\Pages\ViewArticle;
 use App\Models\AgentRun;
@@ -125,17 +124,56 @@ class ArticleWorkspaceTest extends TestCase
         $this->assertSame('approved', $a->fresh()->workflow_status);
     }
 
-    public function test_form_sua_goi_dung_ten_va_luu_xong_quay_ve_trang_bai(): void
+    public function test_sua_thong_tin_ngay_trong_trang_bai_va_luu_xong_o_lai(): void
     {
         $this->actingAs($this->user('writer'));
         $a = $this->article('needs_review');
 
-        Livewire::test(EditArticle::class, ['record' => $a->getRouteKey()])
+        Livewire::test(ViewArticle::class, ['record' => $a->getRouteKey()])
+            ->assertSee('data-testid="aw-info-form"', false)
             ->assertSee('Thông tin bài viết')
             ->assertDontSee('Thông tin chiến dịch SEO')
             ->fillForm(['topic_cluster' => 'Lọc nước gia đình'])
             ->call('save')
             ->assertHasNoFormErrors()
-            ->assertRedirect(ArticleResource::getUrl('view', ['record' => $a]));
+            ->assertNoRedirect();
+
+        $this->assertSame('Lọc nước gia đình', $a->fresh()->topic_cluster);
+    }
+
+    public function test_duong_dan_sua_cu_cung_mo_khong_gian_bai(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $a = $this->article('needs_review');
+
+        $this->get("/admin/articles/{$a->id}/edit")->assertOk()->assertSee('data-testid="article-workspace"', false);
+    }
+
+    public function test_chon_phien_ban_ngay_trong_tab_noi_dung(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $a = $this->article('needs_review');
+        $old = $a->versions()->first();
+        $old->update(['review_status' => 'rejected', 'review_notes' => 'Thiếu số liệu']);
+        ArticleVersion::create(['article_id' => $a->id, 'version' => 2, 'title' => 'Bản hai', 'slug' => 'ban-hai', 'html_content' => '<p>Nội dung bản hai.</p>', 'review_status' => 'needs_review']);
+        $other = $this->article('needs_review')->versions()->first();
+
+        Livewire::test(ViewArticle::class, ['record' => $a->getRouteKey()])
+            ->assertSee('Nội dung bản hai.')->assertDontSee('Nội dung thử nghiệm.')
+            ->set('versionId', $old->id)
+            ->assertSee('Nội dung thử nghiệm.')->assertSee('Thiếu số liệu')->assertSee('Bạn đang xem bản cũ v1')
+            // bản của bài khác không được hiện: quay về bản mới nhất
+            ->set('versionId', $other->id)
+            ->assertSee('Nội dung bản hai.');
+    }
+
+    public function test_nut_xem_o_danh_sach_cung_dich_voi_bam_vao_dong(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $a = $this->article('published');
+
+        Livewire::test(ListArticles::class)
+            ->assertTableActionHasUrl('view_version', ArticleResource::getUrl('view', ['record' => $a]), $a)
+            ->assertTableActionDoesNotExist('edit');
     }
 }

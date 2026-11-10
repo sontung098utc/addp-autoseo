@@ -17,18 +17,37 @@ use App\Models\Publication;
 use App\Models\Website;
 use App\Services\Brain\BrainContext;
 use Filament\Actions;
-use Filament\Resources\Pages\ViewRecord;
+use Livewire\Attributes\Url;
 
 /**
- * AG-S27: không gian bài viết. Bấm vào một bài ở màn Bài viết sẽ vào đây: một nơi có đủ nội dung, SEO, chất lượng,
- * phiên bản, phiên chạy của đội AI, trí tuệ và nguồn đã dùng, ảnh, lịch xuất bản, cùng các thao tác của bài.
- * Trang chỉ ĐỌC dữ liệu sẵn có; mọi thao tác đi qua ReviewWorkflow / AgentRunOrchestrator như các màn cũ.
+ * AG-S27: không gian bài viết. Bấm vào một bài ở màn Bài viết sẽ vào đây: một nơi duy nhất cho bài, gồm 4 tab:
+ * Nội dung (chọn phiên bản ngay tại chỗ, kèm thẻ SEO, kiểm chất lượng, ảnh), Thông tin bài (sửa và lưu ngay trong tab),
+ * Hoạt động (phiên chạy của đội AI và lịch xuất bản), Trí tuệ và nguồn.
+ * Kế thừa EditArticle để dùng lại form và luật khóa trường; mọi thao tác duyệt đi qua ReviewWorkflow như các màn cũ.
  */
-class ViewArticle extends ViewRecord
+class ViewArticle extends EditArticle
 {
-    protected static string $resource = ArticleResource::class;
-
     protected static string $view = 'filament.article.workspace';
+
+    /** Phiên bản đang xem ở tab Nội dung; null = bản mới nhất. */
+    #[Url(as: 'ban')]
+    public ?int $versionId = null;
+
+    public function getBreadcrumb(): string
+    {
+        return 'Chi tiết';
+    }
+
+    /** Lưu thông tin xong ở lại trang bài. */
+    protected function getRedirectUrl(): ?string
+    {
+        return null;
+    }
+
+    protected function getFormActions(): array
+    {
+        return [$this->getSaveFormAction()->label('Lưu thông tin')];
+    }
 
     /** Tiêu đề trang là tên bài (tiêu đề bản mới nhất nếu có, không thì từ khóa chính). */
     public function getTitle(): string
@@ -94,7 +113,7 @@ class ViewArticle extends ViewRecord
                     }, 'Đã xếp lịch xuất bản');
                     $this->record->refresh();
                 }),
-            Actions\EditAction::make()->label('Sửa thông tin bài')->color('gray'),
+            Actions\DeleteAction::make()->visible(fn () => ArticleResource::canDeleteAny()),
         ];
     }
 
@@ -103,7 +122,9 @@ class ViewArticle extends ViewRecord
         /** @var Article $article */
         $article = $this->record->refresh()->load('website');
         $versions = $article->versions()->with('reviewer')->orderByDesc('version')->get();
-        $version = $versions->first();
+        $latest = $versions->first();
+        // Bản đang xem: theo lựa chọn của người dùng nếu bản đó thuộc bài này, không thì bản mới nhất.
+        $version = $versions->firstWhere('id', $this->versionId) ?? $latest;
         $runs = AgentRun::query()->where('article_id', $article->id)->with('steps')->orderByDesc('id')->get();
         $lastRun = $runs->first();
         $campaignId = $article->campaign_id ?: $lastRun?->campaign_id;
@@ -112,6 +133,7 @@ class ViewArticle extends ViewRecord
         return [
             'article' => $article,
             'version' => $version,
+            'latest' => $latest,
             'versions' => $versions,
             'runs' => $runs,
             'live' => $lastRun && RunActivity::isLive($lastRun) ? $lastRun : null,
