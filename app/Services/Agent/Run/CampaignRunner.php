@@ -30,6 +30,9 @@ final class CampaignRunner
 
     public const SYSTEM_EMAIL = 'ai-auto@system.local';
 
+    /** @var list<string> việc Autopilot đã làm trong nhịp hiện tại (hiện ở kết quả nhịp). */
+    private array $autopilotActions = [];
+
     /** @param callable(): ?AiProviderInterface $providerFactory trả null nếu chưa cấu hình AI thật */
     public function __construct(private $providerFactory, private ?EmergencyStopService $stop = null)
     {
@@ -41,6 +44,19 @@ final class CampaignRunner
      *                                                                result: ran | auto_approved | paused | stopped | limit | draft_cap | cost_cap | blocked_gap | no_keywords | no_ai | site_inactive
      */
     public function tick(Campaign $c, ?CarbonImmutable $now = null): array
+    {
+        $this->autopilotActions = [];
+        $out = $this->tickCore($c, $now);
+        if ($this->autopilotActions !== []) {
+            $out['actions'] = $this->autopilotActions;
+            $out['message'] = trim($out['message'].' '.implode(' ', $this->autopilotActions));
+        }
+
+        return $out;
+    }
+
+    /** @return array{result: string, message: string, run: ?AgentRun} */
+    private function tickCore(Campaign $c, ?CarbonImmutable $now = null): array
     {
         $now ??= CarbonImmutable::now();
         $c->update(['last_tick_at' => $now]);
@@ -71,6 +87,10 @@ final class CampaignRunner
         if ($spent >= $c->daily_cost_cap_vnd) {
             return $this->out('cost_cap', 'Chi phí AI hôm nay đã chạm trần '.number_format((int) $c->daily_cost_cap_vnd, 0, ',', '.').' đ (đã dùng '.number_format($spent, 0, ',', '.').' đ), chờ ngày mai.');
         }
+
+        // Autopilot (chỉ chế độ Toàn quyền): giữ hàng chờ kế hoạch đủ đầy trước khi chọn bài kế tiếp.
+        $autopilot = (new \App\Services\Agent\Autopilot\AutopilotRunner)->tick($c, $now);
+        $this->autopilotActions = $autopilot['actions'];
 
         $article = null;
         $keyword = null;

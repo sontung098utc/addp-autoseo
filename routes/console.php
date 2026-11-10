@@ -28,3 +28,10 @@ Schedule::command('agent:tick')
     ->timezone('Asia/Ho_Chi_Minh')
     ->withoutOverlapping()
     ->runInBackground();
+
+// Autopilot (chế độ Toàn quyền): giữ hàng chờ kế hoạch đủ đầy bằng khảo sát và lập kế hoạch. Đồng bộ theo nhịp; chạy nền thật là AG-B10.
+Schedule::command('autopilot:tick')
+    ->everyThirtyMinutes()
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->withoutOverlapping()
+    ->runInBackground();

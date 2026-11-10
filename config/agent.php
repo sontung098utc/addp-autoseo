@@ -17,4 +17,9 @@ return [
         // Chèn <figure> vào thân bài sau mục H2 tương ứng. Tắt thì chỉ gắn vào phiên bản (ảnh bìa + danh sách ảnh).
         'insert_inline' => true,
     ],
+    'autopilot' => [
+        // Chiến dịch Toàn quyền: giữ hàng chờ bài "đã lên kế hoạch" tối thiểu từng này; thêm mỗi lần tối đa plan_batch bài.
+        'queue_min' => (int) env('AGENT_AUTOPILOT_QUEUE_MIN', 3),
+        'plan_batch' => (int) env('AGENT_AUTOPILOT_PLAN_BATCH', 3),
+    ],
 ];
