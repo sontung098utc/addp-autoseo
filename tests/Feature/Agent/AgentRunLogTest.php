@@ -115,7 +115,7 @@ class AgentRunLogTest extends TestCase
     private function go(AiProviderInterface $ai, ?RunPolicy $p = null, ?Article $a = null): array
     {
         $slept = [];
-        $run = (new AgentRunOrchestrator($ai, policy: $p ?? new RunPolicy(), sleep: function (int $s) use (&$slept) { $slept[] = $s; }))->run($a ?? $this->article(), null);
+        $run = (new AgentRunOrchestrator($ai, policy: $p ?? new RunPolicy(), sleep: function (int $s) use (&$slept) { $slept[] = $s; }))->run($a ?? $this->article(), null, "manual", null, null, true);
 
         return [$run, $slept];
     }

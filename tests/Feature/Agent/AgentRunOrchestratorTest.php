@@ -191,7 +191,7 @@ class AgentRunOrchestratorTest extends TestCase
     public function test_chu_de_rui_ro_cao_van_viet_nhung_ghi_can_chuyen_gia(): void
     {
         $a = $this->article('cách điều trị tiểu đường');
-        $run = $this->go($a, $this->fake([QualityFixtures::goodAttrs('cách điều trị tiểu đường')]));
+        $run = (new AgentRunOrchestrator($this->fake([QualityFixtures::goodAttrs('cách điều trị tiểu đường')]), policy: new RunPolicy()))->run($a, null, 'manual', null, null, true); // kho trống: người dùng chọn vẫn viết
 
         $this->assertSame('high', $run->risk_level);
         $this->assertSame('ready_for_review', $run->status);
