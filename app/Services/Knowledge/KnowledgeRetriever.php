@@ -81,10 +81,11 @@ final class KnowledgeRetriever
 
     private function like(Website $website, array $terms, string $query, ?array $brainIds): array
     {
-        $esc = fn (string $t) => addcslashes($t, '\\%_');
+        // Ký tự thoát là '!' (không phải '\'): trong MariaDB/MySQL '\' là ký tự thoát của chuỗi SQL nên `escape '\'` là lỗi cú pháp.
+        $esc = fn (string $t) => preg_replace('/([!%_])/', '!$1', $t);
         $items = $this->eligible($website, $brainIds)->where(function ($q) use ($terms, $esc) {
             foreach ($terms as $t) {
-                $q->orWhereRaw("lower(title) like ? escape '\\'", ['%'.$esc($t).'%'])->orWhereRaw("lower(body) like ? escape '\\'", ['%'.$esc($t).'%']);
+                $q->orWhereRaw("lower(title) like ? escape '!'", ['%'.$esc($t).'%'])->orWhereRaw("lower(body) like ? escape '!'", ['%'.$esc($t).'%']);
             }
         })->limit(200)->get();
         $phrase = KnowledgeDedupe::normalize($query);
