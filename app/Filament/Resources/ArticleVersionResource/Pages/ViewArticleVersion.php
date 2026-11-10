@@ -2,24 +2,36 @@
 
 namespace App\Filament\Resources\ArticleVersionResource\Pages;
 
+use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\ArticleVersionResource;
+use App\Filament\Support\Article\VersionCompareAction;
+use App\Filament\Support\Explain\WhyAction;
 use App\Filament\Support\Review\ReviewActions;
 use App\Filament\Support\Review\ReviewWorkflow;
 use App\Models\Website;
+use App\Services\Agent\Handoff\CmsDraftHandoff;
 use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewArticleVersion extends ViewRecord
 {
     protected static string $resource = ArticleVersionResource::class;
 
+    public function compareAction(): Actions\Action
+    {
+        return VersionCompareAction::make(fn () => $this->record)
+            ->visible(fn () => VersionCompareAction::previous($this->record) !== null);
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             // AG-S27: quay về không gian bài (từ khóa, nguồn, các phiên bản khác, phiên AI, lịch xuất bản của bài này).
             Actions\Action::make('back_to_article')->label('Về bài viết')->icon('heroicon-o-arrow-uturn-left')->color('gray')
-                ->url(fn () => \App\Filament\Resources\ArticleResource::getUrl('view', ['record' => $this->record->article_id]).'#tab-content'),
-            \App\Filament\Support\Explain\WhyAction::page(),
+                ->url(fn () => ArticleResource::getUrl('view', ['record' => $this->record->article_id]).'#tab-content'),
+            $this->compareAction(),
+            WhyAction::page(),
             Actions\Action::make('approve')->label('Duyệt')->icon('heroicon-o-check')->color('primary')
                 ->visible(fn () => $this->record->review_status === 'needs_review')
                 ->authorize(fn () => ReviewActions::canApprove())
@@ -47,10 +59,10 @@ class ViewArticleVersion extends ViewRecord
                 ->action(function () {
                     abort_unless(ReviewActions::canApprove(), 403);
                     try {
-                        $msg = app(\App\Services\Agent\Handoff\CmsDraftHandoff::class)->cancel($this->record);
-                        \Filament\Notifications\Notification::make()->title($msg)->success()->send();
+                        $msg = app(CmsDraftHandoff::class)->cancel($this->record);
+                        Notification::make()->title($msg)->success()->send();
                     } catch (\RuntimeException $e) {
-                        \Filament\Notifications\Notification::make()->title($e->getMessage())->danger()->send();
+                        Notification::make()->title($e->getMessage())->danger()->send();
                     }
                     $this->record->refresh();
                 }),

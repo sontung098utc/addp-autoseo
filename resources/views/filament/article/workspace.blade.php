@@ -397,7 +397,8 @@
                                                 <td>{{ $v->mediaAssets->count() }}</td>
                                                 <td>@if ($vr && AgentRunResource::canViewAny())<a class="aw-link" href="{{ AgentRunResource::getUrl('view', ['record' => $vr]) }}">Phiên AI #{{ $vr->id }}</a>@elseif ($vr) Phiên AI #{{ $vr->id }} @else {{ $v->ai_model ? 'AI' : 'Người viết' }} @endif</td>
                                                 <td>{{ VnTime::format($v->created_at) }}</td>
-                                                <td>@if ($canOpenVersion)<a class="aw-btn" data-testid="aw-version-open" href="{{ V::getUrl('view', ['record' => $v]) }}">Xem</a>@endif</td>
+                                                <td>@if ($canOpenVersion)<a class="aw-btn" data-testid="aw-version-open" href="{{ V::getUrl('view', ['record' => $v]) }}">Xem</a>@endif
+                                                    @if (! $loop->last)<button type="button" class="aw-btn" data-testid="aw-compare-open" wire:click="mountAction('compare', @js(['version' => $v->id]))">So với bản trước</button>@endif</td>
                                             </tr>
                                         @endforeach
                                     </tbody>

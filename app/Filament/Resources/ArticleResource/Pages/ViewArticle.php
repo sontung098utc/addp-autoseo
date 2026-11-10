@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ArticleResource\Pages;
 use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\ArticleVersionResource;
 use App\Filament\Support\Agent\RunActivity;
+use App\Filament\Support\Article\VersionCompareAction;
 use App\Filament\Support\Review\ReviewActions;
 use App\Filament\Support\Review\ReviewWorkflow;
 use App\Models\AgentRun;
@@ -73,6 +74,14 @@ class ViewArticle extends EditArticle
     private function latest(): ?ArticleVersion
     {
         return $this->record->versions()->orderByDesc('version')->first();
+    }
+
+    /** Hộp so sánh; mở từ nút ở tab Nội dung kèm id phiên bản (mặc định bản mới nhất). */
+    public function compareAction(): Actions\Action
+    {
+        return VersionCompareAction::make(
+            fn (array $args) => $this->record->versions()->when(isset($args['version']), fn ($q) => $q->whereKey($args['version']))->orderByDesc('version')->first()
+        );
     }
 
     protected function getHeaderActions(): array
