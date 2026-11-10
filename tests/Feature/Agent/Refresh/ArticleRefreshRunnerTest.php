@@ -107,7 +107,8 @@ class ArticleRefreshRunnerTest extends TestCase
 
     private function longTitle(): array
     {
-        return ['seo_title' => str_repeat('Học bổng toàn phần rất dài ', 4)];
+        // 65 ký tự: vượt ngưỡng META01 (60) nhưng vừa cột seo_title (70) nên chạy được cả trên MariaDB strict.
+        return ['seo_title' => mb_substr(str_repeat('Học bổng toàn phần rất dài ', 4), 0, 65)];
     }
 
     public function test_chi_loi_meta_chi_goi_regenerate_meta_va_giu_nguyen_than_bai(): void
