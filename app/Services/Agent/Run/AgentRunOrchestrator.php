@@ -166,8 +166,11 @@ final class AgentRunOrchestrator
         }
         $site = $article->website;
         $data = ['reason' => 'high_risk_no_knowledge', 'risk_level' => $assess->level, 'purpose' => 'gap'];
+        $webAv = (new \App\Services\Search\WebSearchResolver)->availability();
+        $noWeb = $webAv['ok'] ? '' : ' Chưa cấu hình tìm kiếm web ('.$webAv['reason'].')';
+        $spent = 0.0;
         if (trim((string) $site->base_url) === '') {
-            $this->step($run, 'research', 'system', 'warn', 'Chưa tự đọc được website để bổ sung kiến thức', 'Chủ đề rủi ro cao, kho chưa có kiến thức khớp, nhưng website chưa có địa chỉ để đọc. Vẫn viết; bài sẽ được gắn nhãn cần chuyên gia xem lại.', $data);
+            $this->step($run, 'research', 'system', 'warn', 'Chưa tự đọc được website để bổ sung kiến thức', 'Chủ đề rủi ro cao, kho chưa có kiến thức khớp, nhưng website chưa có địa chỉ để đọc. Vẫn viết; bài sẽ được gắn nhãn cần chuyên gia xem lại.'.$noWeb, $data);
         } else {
             $opts = ['max_pages' => self::GAP_PAGES, 'purpose' => 'gap', 'as_system' => true, 'keyword' => (string) $article->primary_keyword, 'budget_cap_vnd' => $this->policy->budgetVnd * 0.1];
             try {
@@ -179,16 +182,60 @@ final class AgentRunOrchestrator
                     .(int) ($r['items_auto'] ?? 0).' mục tự nhận (tầng A, hoàn tác được), '.(int) ($r['items_proposed'] ?? 0).' mục chờ người duyệt.',
                     $data + ['pages_read' => (int) ($r['pages_read'] ?? 0), 'items_auto' => (int) ($r['items_auto'] ?? 0), 'items_proposed' => (int) ($r['items_proposed'] ?? 0), 'build_run_id' => $r['run_id'] ?? null],
                     null, 0, (float) ($r['cost_vnd'] ?? 0));
+                $spent = (float) ($r['cost_vnd'] ?? 0);
             } catch (Throwable $e) {
-                $this->step($run, 'research', 'system', 'warn', 'Chưa tự đọc được website để bổ sung kiến thức', ErrorMasker::short($e->getMessage(), 160).' Vẫn viết; bài sẽ được gắn nhãn cần chuyên gia xem lại.', $data);
+                $this->step($run, 'research', 'system', 'warn', 'Chưa tự đọc được website để bổ sung kiến thức', ErrorMasker::short($e->getMessage(), 160).' Vẫn viết; bài sẽ được gắn nhãn cần chuyên gia xem lại.'.$noWeb, $data);
             }
         }
+        $this->prepareFromWeb($run, $article, $webAv['ok'], $spent);
         try {
             $left = \App\Services\Agent\Readiness\ArticleReadiness::for($article, $this->campaignId)['knowledge']['count'];
         } catch (Throwable) {
             $left = 0;
         }
         $this->needsExpert = $left === 0;
+    }
+
+    /**
+     * Sau khi đọc website mà kho vẫn chưa có mục đã duyệt khớp: tìm nguồn trên web (Tavily), nạp tối đa 3 nguồn tin cậy.
+     * Tổng chi phí chuẩn bị kiến thức ≤ 15% ngân sách phiên. Lỗi mạng hay thiếu khóa không làm hỏng phiên.
+     */
+    private function prepareFromWeb(AgentRun $run, Article $article, bool $available, float $spent): void
+    {
+        if (! $available) {
+            return;
+        }
+        try {
+            if (\App\Services\Agent\Readiness\ArticleReadiness::for($article, $this->campaignId)['knowledge']['count'] > 0) {
+                return;
+            }
+        } catch (Throwable $e) {
+            report($e);
+
+            return;
+        }
+        $data = ['reason' => 'high_risk_no_knowledge', 'purpose' => 'web_discover'];
+        $cap = $this->policy->budgetVnd * 0.15 - $spent;
+        if ($cap <= 0) {
+            $this->step($run, 'research', 'system', 'warn', 'Chưa tìm thêm nguồn trên web', 'Đã dùng hết phần ngân sách dành cho chuẩn bị kiến thức (15% ngân sách phiên). Vẫn viết; bài sẽ được gắn nhãn cần chuyên gia xem lại.', $data);
+
+            return;
+        }
+        try {
+            $svc = app(\App\Services\Knowledge\Discover\SourceDiscoveryService::class);
+            $d = $svc->discover($article->website, (string) $article->primary_keyword);
+            $trusted = array_values(array_filter($d['candidates'], fn ($c) => $c['trust']['level'] === 'trusted'));
+            $imp = $svc->import($article->website, $trusted, null, ['as_system' => true, 'max_sources' => 3, 'only_trusted' => true, 'field' => $d['field'], 'budget_cap_vnd' => $cap, 'purpose' => 'gap',
+                'search' => ['query' => $d['query'], 'results' => count($d['candidates']), 'cost_vnd' => $d['cost_vnd'], 'provider' => $d['provider']]]);
+            $domains = implode(', ', array_map(fn ($p) => $p['domain'], array_filter($imp['pages'], fn ($p) => $p['ok'])));
+            $this->step($run, 'research', 'system', $imp['imported'] > 0 ? 'ok' : 'warn', 'Tự tìm nguồn trên web để bổ sung kiến thức',
+                'Đã tìm '.count($d['candidates']).' nguồn ('.count($trusted).' tin cậy), nạp '.$imp['imported'].' nguồn vào kho: '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, có đoạn nguyên văn, hoàn tác được), '.$imp['items_proposed'].' mục chờ duyệt'.($domains !== '' ? ' — '.$domains : '').'.'.($d['demo'] ? ' (Tìm kiếm mô phỏng, môi trường local.)' : ''),
+                $data + ['query' => $d['query'], 'candidates' => count($d['candidates']), 'trusted' => count($trusted), 'imported' => $imp['imported'], 'items_auto' => $imp['items_auto'], 'items_proposed' => $imp['items_proposed'], 'build_run_id' => $imp['run_id'],
+                    'web_sources' => array_values(array_map(fn ($p) => ['domain' => $p['domain'], 'url' => $p['url'], 'title' => $p['title'] ?? '', 'fetched_at' => $p['fetched_at'] ?? null, 'trust' => $p['trust']], array_filter($imp['pages'], fn ($p) => $p['ok'])))],
+                null, 0, (float) $imp['cost_vnd']); // cost_vnd của import đã gồm chi phí tìm
+        } catch (Throwable $e) {
+            $this->step($run, 'research', 'system', 'warn', 'Chưa tìm được nguồn trên web', ErrorMasker::short($e->getMessage(), 160).' Vẫn viết; bài sẽ được gắn nhãn cần chuyên gia xem lại.', $data);
+        }
     }
 
     private function execute(AgentRun $run, Article $article, string $previousStatus): AgentRun
@@ -204,7 +251,7 @@ final class AgentRunOrchestrator
         }
         $this->brandProfile = BrandProfileData::forWebsite($article->website_id);
         $this->brainCtx = BrainContext::forArticle($article, $this->campaignId); // AG-B1
-        $this->kb = (new KnowledgeContext())->scopeToBrains($this->brainCtx->ids()); // AG-S20: mỗi lượt chạy truy xuất kiến thức riêng; AG-B1: trong phạm vi Trí tuệ
+        $this->kb = (new KnowledgeContext())->scopeToBrains($this->writerBrainScope($this->brainCtx->ids())); // AG-S20: mỗi lượt chạy truy xuất kiến thức riêng; AG-B1: trong phạm vi Trí tuệ
         $this->assets = new ContextAssets();
 
         // 1. An toàn: dừng khẩn cấp và website phải hoạt động.
@@ -531,6 +578,18 @@ final class AgentRunOrchestrator
         return $n > 0 ? ['brand_profile_fields' => $n] + ($this->brandSource() ? ['brand_source' => $this->brandSource()] : []) : [];
     }
 
+    /** Agent Studio: nếu admin cấp quyền Trí tuệ cho Người viết thì chỉ truy xuất kiến thức trong giao của quyền đó và Trí tuệ đã gắn; rỗng = như cũ. @param list<int> $ids @return list<int> */
+    private function writerBrainScope(array $ids): array
+    {
+        try {
+            $grants = \App\Services\Agent\Roles\AgentProfiles::brainGrants('writer');
+        } catch (Throwable) {
+            $grants = [];
+        }
+
+        return $grants === [] ? $ids : array_values(array_intersect($ids, $grants));
+    }
+
     private function roleOff(string $key): bool
     {
         return in_array($key, $this->disabledRoles, true);
@@ -539,7 +598,16 @@ final class AgentRunOrchestrator
     /** Tùy chọn vai trò truyền cho adapter AI: khóa + tên tiếng Việt, để prompt có dòng "Bạn đang đóng vai". */
     private function roleOptions(string $key): array
     {
-        return ['role' => $key, 'role_name' => $this->roles->roleName($key)];
+        $opts = ['role' => $key, 'role_name' => $this->roles->roleName($key)];
+        try { // Agent Studio: hồ sơ do quản trị tùy chỉnh; lỗi (bảng thiếu...) không làm hỏng phiên chạy
+            $block = \App\Services\Agent\Roles\AgentProfiles::promptBlock($key);
+            if ($block !== null) {
+                $opts['role_profile'] = $block;
+            }
+        } catch (Throwable) {
+        }
+
+        return $opts;
     }
 
     /** @return array<string, string>|null */

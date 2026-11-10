@@ -5,7 +5,7 @@
 @forelse ($rows as $r)
 <div class="ss-dash-row">
 <div>
-<a href="{{ \App\Filament\Resources\PublicationResource::getUrl('view', ['record' => $r['id']]) }}">{{ $r['keyword'] ?? '—' }}</a>
+@if ($r['article_id'] ?? null)<a href="{{ \App\Filament\Resources\ArticleResource::getUrl('view', ['record' => $r['article_id']]) }}#tab-publish">{{ $r['keyword'] ?? '—' }}</a>@else<span>{{ $r['keyword'] ?? '—' }}</span>@endif · <a href="{{ \App\Filament\Resources\PublicationResource::getUrl('view', ['record' => $r['id']]) }}">lượt đăng</a>
 <div class="ss-dash-sub">{{ $r['website'] }}@if ($r['error']) · {{ $r['error'] }}@endif</div>
 </div>
 <x-filament::badge :color="\App\Filament\Support\StatusPresenter::color($r['status'], 'publication')">{{ \App\Filament\Support\StatusPresenter::label($r['status'], 'publication') }}</x-filament::badge>

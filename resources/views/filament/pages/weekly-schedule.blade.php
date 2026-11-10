@@ -1,11 +1,12 @@
 @php
     use App\Filament\Support\Schedule\VnTime;
     use App\Filament\Support\StatusPresenter;
-    $card = function ($p) use ($viewUrl) {
-        return $viewUrl($p);
+    $card = function ($p) use ($articleUrl) {
+        return $articleUrl($p);
     };
 @endphp
 <x-filament-panels::page>
+    <x-chain-context step="Xuất bản" purpose="Lịch tuần: sắp ngày dự kiến đăng cho bài. Lượt đăng thật theo giờ, trạng thái và đối soát nằm ở Lịch xuất bản." :inputs="[['label'=>'Bài đã duyệt','url'=>\App\Filament\Resources\ArticleResource::getUrl('index'),'note'=>'Bài viết']]" :outputs="[['label'=>'Lịch xuất bản','url'=>\App\Filament\Resources\PublicationResource::getUrl('index'),'note'=>'lượt đăng thật'],['label'=>'Search Console','url'=>\App\Filament\Pages\SearchConsolePage::getUrl(),'note'=>'đo sau khi bài lên']]" />
     <style>
         .ss-sched-bar{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
         .ss-sched-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.5rem}
@@ -68,7 +69,7 @@
                             x-on:dragstart="dragId = {{ $p->id }}; $el.classList.add('is-dragging')"
                             x-on:dragend="dragId = null; over = null; $el.classList.remove('is-dragging')"
                         @endif>
-                        <a href="{{ $viewUrl($p) }}" style="text-decoration:none;color:inherit;display:block" draggable="false">
+                        <a href="{{ $articleUrl($p) }}" style="text-decoration:none;color:inherit;display:block" draggable="false">
                             <span class="ss-sched-time">{{ VnTime::format($at, 'H:i') }}</span>
                             {{ $p->articleVersion?->article?->primary_keyword ?? '—' }}
                             <div class="ss-sched-muted">{{ $p->website?->name }} · {{ StatusPresenter::label($p->status, 'publication') }}</div>
@@ -88,7 +89,7 @@
     <div class="ss-sched-box">
         <div class="ss-sched-h">Hàng đợi hôm nay ({{ $todayQueue->count() }})</div>
         @forelse ($todayQueue as $p)
-            <div><a href="{{ $viewUrl($p) }}">{{ VnTime::format($p->scheduled_at_utc ? VnTime::fromRaw($p, 'scheduled_at_utc') : null, 'H:i') }} · {{ $p->articleVersion?->article?->primary_keyword ?? '—' }}</a>
+            <div><a href="{{ $articleUrl($p) }}">{{ VnTime::format($p->scheduled_at_utc ? VnTime::fromRaw($p, 'scheduled_at_utc') : null, 'H:i') }} · {{ $p->articleVersion?->article?->primary_keyword ?? '—' }}</a>
                 <span class="ss-sched-muted">{{ $p->website?->name }} · {{ StatusPresenter::label($p->status, 'publication') }}</span></div>
         @empty
             <div class="ss-sched-muted">Hôm nay chưa có lượt đăng nào.</div>
@@ -99,8 +100,8 @@
         <div class="ss-sched-h">Cần đối soát ({{ $reconcile->count() }})</div>
         <p class="ss-sched-muted">CMS không phản hồi sau khi gửi bài. Mở từng lượt để "Đối soát ngay" - hệ thống không tự đăng lại để tránh trùng bài.</p>
         @forelse ($reconcile as $p)
-            <div><a href="{{ $viewUrl($p) }}">{{ $p->articleVersion?->article?->primary_keyword ?? '—' }}</a>
-                <span class="ss-sched-muted">{{ $p->website?->name }} · {{ VnTime::format(VnTime::fromRaw($p, 'scheduled_at_utc')) }}</span></div>
+            <div><a href="{{ $articleUrl($p) }}">{{ $p->articleVersion?->article?->primary_keyword ?? '—' }}</a>
+                <span class="ss-sched-muted">{{ $p->website?->name }} · {{ VnTime::format(VnTime::fromRaw($p, 'scheduled_at_utc')) }} · <a href="{{ $viewUrl($p) }}">Đối soát lượt đăng</a></span></div>
         @empty
             <div class="ss-sched-muted">Không có lượt nào chờ đối soát.</div>
         @endforelse

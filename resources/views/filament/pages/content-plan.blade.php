@@ -5,6 +5,7 @@
     $tones = ['success' => 'ok', 'warning' => 'warn', 'danger' => 'danger', 'info' => 'info', 'gray' => 'muted'];
 @endphp
 <x-filament-panels::page>
+    <x-chain-context step="Kế hoạch" purpose="Quyết định viết gì, theo thứ tự ưu tiên." :inputs="[['label'=>'Từ khóa và cụm chủ đề','url'=>\App\Filament\Pages\KeywordsPage::getUrl()],['label'=>'Đề xuất làm mới từ Audit','url'=>\App\Filament\Pages\AuditPage::getUrl()]]" :outputs="[['label'=>'Bài «Đã lên kế hoạch» để đội AI viết','url'=>\App\Filament\Resources\ArticleResource::getUrl('index'),'note'=>'Bài viết']]" />
     <style>
         .cp-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.5rem}
         @media (max-width:1024px){.cp-week{grid-template-columns:repeat(2,minmax(0,1fr))}}

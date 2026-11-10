@@ -24,9 +24,9 @@ class SearchConsolePage extends Page
 
     protected static ?string $navigationLabel = 'Search Console';
 
-    protected static ?string $navigationGroup = 'Phân tích';
+    protected static ?string $navigationGroup = 'Khám phá';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 5;
 
     protected static ?string $title = 'Search Console';
 

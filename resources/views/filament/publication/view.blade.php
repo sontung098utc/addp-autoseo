@@ -15,6 +15,9 @@
     $stopInfo = $isStopped ? $emergencyService->getStopInfo($p->website_id) : null;
 @endphp
 <x-filament-panels::page>
+    @if ($p->articleVersion?->article_id)
+        <p class="ss-sched-muted"><a style="text-decoration:underline" href="{{ \App\Filament\Resources\ArticleResource::getUrl('view', ['record' => $p->articleVersion->article_id]) }}#tab-publish">← Xem bài viết «{{ $p->articleVersion->article?->primary_keyword }}»</a></p>
+    @endif
     <style>
         .ss-sched-box{border:1px solid rgba(128,128,128,.25);border-radius:.75rem;padding:1rem;margin-bottom:1rem}
         .ss-sched-h{font-weight:600;margin-bottom:.5rem}

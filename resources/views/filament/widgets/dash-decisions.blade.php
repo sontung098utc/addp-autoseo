@@ -4,7 +4,7 @@
 @forelse ($rows as $r)
 <div class="ss-dash-row">
 <div>
-@if ($r['version_id'])<a href="{{ \App\Filament\Resources\ArticleVersionResource::getUrl('view', ['record' => $r['version_id']]) }}">{{ $r['keyword'] }}</a>@else<span>{{ $r['keyword'] }}</span>@endif
+@if ($r['article_id'] ?? null)<a href="{{ \App\Filament\Resources\ArticleResource::getUrl('view', ['record' => $r['article_id']]) }}">{{ $r['keyword'] }}</a>@else<span>{{ $r['keyword'] }}</span>@endif
 <div class="ss-dash-sub">{{ $r['website'] }}@if ($r['note']) · Lý do: {{ $r['note'] }}@endif</div>
 </div>
 <div>@if ($r['overdue'])<x-studio.badge tone="danger">Quá hạn</x-studio.badge> @endif<span class="ss-dash-sub">{{ $r['waiting_label'] }}</span></div>

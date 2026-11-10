@@ -27,7 +27,7 @@ class AiUsagePage extends Page
 
     protected static ?string $navigationGroup = 'Cài đặt';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $title = 'Chi phí AI';
 
@@ -253,7 +253,7 @@ class AiUsagePage extends Page
         foreach ($articles as $a) {
             $rows[] = [
                 'id' => $a['article_id'],
-                'title' => ['text' => $a['title'], 'href' => \App\Filament\Resources\ArticleVersionResource::getUrl('view', ['record' => $a['version_id']])],
+                'title' => ['text' => $a['title'], 'href' => \App\Filament\Resources\ArticleResource::getUrl('view', ['record' => $a['article_id']])],
                 'website' => $a['website'],
                 'models' => implode(', ', $a['models']) ?: 'không rõ model',
                 'cost' => round($a['cost']),

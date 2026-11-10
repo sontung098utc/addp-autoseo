@@ -30,7 +30,7 @@ class HowItWorksPage extends Page
 
     protected static ?string $navigationGroup = 'Cài đặt';
 
-    protected static ?int $navigationSort = 8;
+    protected static ?int $navigationSort = 40;
 
     protected static ?string $title = 'Cách hoạt động của SEO Studio';
 

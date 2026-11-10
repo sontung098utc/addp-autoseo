@@ -32,9 +32,9 @@ class AuditPage extends Page
 
     protected static ?string $navigationLabel = 'Audit website';
 
-    protected static ?string $navigationGroup = 'Phân tích';
+    protected static ?string $navigationGroup = 'Khám phá';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 4;
 
     protected static ?string $title = 'Audit website';
 

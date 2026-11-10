@@ -1,4 +1,5 @@
 <x-filament-panels::page>
+    <x-chain-context step="Khám phá" purpose="Kiểm sức khỏe kỹ thuật và nội dung của website, rồi biến lỗi thành việc làm mới bài. Nút «Quét thật» đọc các trang website thật (giới hạn số trang); nút «Quét lại (dữ liệu mẫu)» chỉ chạy dữ liệu minh họa, không tạo việc." :inputs="[['label'=>'Website kết nối','url'=>\App\Filament\Resources\WebsiteResource::getUrl('index'),'note'=>'trang đã quét của website']]" :outputs="[['label'=>'Kế hoạch nội dung','url'=>\App\Filament\Pages\ContentPlanPage::getUrl(),'note'=>'đề xuất làm mới tạo bài loại làm mới (chỉ từ quét thật)'],['label'=>'Danh sách lỗi cho dev','url'=>null,'note'=>'ngay trên trang này'],['label'=>'Search Console','url'=>\App\Filament\Pages\SearchConsolePage::getUrl(),'note'=>'đối chiếu hiệu quả']]" />
     <style>
         .au-mono{font-family:ui-monospace,monospace}
         .au-code{margin:0;padding:.4rem .6rem;background:var(--ss-surface);border:1px solid var(--ss-border);border-radius:.3rem;white-space:pre-wrap;overflow-wrap:anywhere}

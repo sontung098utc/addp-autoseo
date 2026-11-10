@@ -259,6 +259,7 @@ class ViewArticle extends EditArticle
             'brand' => BrandProfile::query()->where('website_id', $article->website_id)->first(),
             'outline' => array_values(array_filter((array) ($briefStep?->data['outline'] ?? []), 'is_string')),
             'research' => (array) ($researchStep?->data ?? []) + (array) ($writeStep?->data ?? []),
+            'webSources' => (array) ($runs->flatMap->steps->where('stage', 'research')->filter(fn ($st) => ! empty($st->data['web_sources']))->sortByDesc('id')->first()?->data['web_sources'] ?? []),
             'publications' => $publications,
             'quality' => $latest ? ReviewActions::qualityFor($latest) : null,
             'totalCost' => (float) $runs->sum('cost_vnd'),

@@ -7,6 +7,7 @@
     $showGaps = $ready && $state === 'ket-noi' && ! $refreshError && count($domains) > 0 && $fetchedLabel;
 @endphp
 <x-filament-panels::page>
+    <x-chain-context step="Khám phá" purpose="Tìm khoảng trống nội dung so với đối thủ." :inputs="[['label'=>'Từ khóa đối thủ','url'=>null,'note'=>'nhập CSV']]" :outputs="[['label'=>'Kho từ khóa (trang Từ khóa)','url'=>\App\Filament\Pages\KeywordsPage::getUrl(),'note'=>'từ khóa đối thủ có mà mình chưa có'],['label'=>'Kế hoạch nội dung','url'=>\App\Filament\Pages\ContentPlanPage::getUrl()]]" />
     <div class="ss-page" data-co-state="{{ $state }}">
         <div class="ss-toolbar">
             <label for="co-site" class="ss-text-sm ss-muted">Website</label>

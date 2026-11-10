@@ -2,11 +2,13 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\PublicationResource;
-use App\Filament\Support\Schedule\VnTime;
-use App\Models\Publication;
 use App\Filament\Support\Schedule\RescheduleAction;
 use App\Filament\Support\Schedule\ReschedulePublication;
+use App\Filament\Support\Schedule\VnTime;
+use App\Models\Publication;
+use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -20,7 +22,7 @@ class WeeklySchedule extends Page
 
     protected static ?string $navigationGroup = 'Lịch đăng';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $title = 'Lịch tuần';
 
@@ -35,7 +37,7 @@ class WeeklySchedule extends Page
     {
         $u = Auth::user();
 
-        return $u instanceof \App\Models\User && $u->is_active && $u->isApprover();
+        return $u instanceof User && $u->is_active && $u->isApprover();
     }
 
     public function previousWeek(): void
@@ -62,10 +64,10 @@ class WeeklySchedule extends Page
                 throw new \InvalidArgumentException('Không tìm thấy lượt đăng, tải lại trang.');
             }
             $user = Auth::user();
-            if (! $user instanceof \App\Models\User) {
+            if (! $user instanceof User) {
                 throw new \InvalidArgumentException('Chưa đăng nhập.');
             }
-            $r = (new ReschedulePublication())->moveToDay($user, $p, $day);
+            $r = (new ReschedulePublication)->moveToDay($user, $p, $day);
             Notification::make()->title('Đã đổi lịch')
                 ->body('Đã đổi lịch sang '.VnTime::format(VnTime::fromRaw($r, 'scheduled_at_utc')).' (giờ VN).')->success()->send();
         } catch (\InvalidArgumentException $e) {
@@ -132,6 +134,9 @@ class WeeklySchedule extends Page
             'todayKey' => $today,
             'canDrag' => (bool) (Auth::user()?->isApprover()),
             'reasonFor' => fn (Publication $p): ?string => ReschedulePublication::reasonUnavailable(Auth::user(), $p),
+            'articleUrl' => fn (Publication $p): string => $p->articleVersion?->article_id
+                ? ArticleResource::getUrl('view', ['record' => $p->articleVersion->article_id]).'#tab-publish'
+                : PublicationResource::getUrl('view', ['record' => $p]),
             'viewUrl' => fn (Publication $p): string => PublicationResource::getUrl('view', ['record' => $p]),
         ];
     }

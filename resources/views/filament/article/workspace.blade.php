@@ -356,6 +356,9 @@
                                     @endforeach
                                 </p>
                             @endif
+                            @if ($buildPage)
+                                <p style="margin-top:.5rem"><a class="aw-link" data-testid="aw-find-sources" href="{{ \App\Filament\Pages\BrainBuildPage::getUrl(['topic' => (string) $article->primary_keyword]) }}">Tìm nguồn cho chủ đề này</a></p>
+                            @endif
                             @if ($usages->isEmpty())
                                 <p style="margin-top:.5rem">{{ $latest ? 'Bản mới nhất không dùng mục kiến thức nào từ kho.' : 'Chưa có bản nào nên chưa dùng kiến thức.' }}</p>
                             @else
@@ -373,6 +376,19 @@
                                 </ul>
                             @endif
                         </section>
+                        @if (! empty($webSources))
+                            <section class="ss-review-card" data-testid="aw-web-sources">
+                                <h2 class="ss-review-card__title">Nguồn web đã đọc cho bài này</h2>
+                                <ul class="aw-list">
+                                    @foreach ($webSources as $w)
+                                        <li>
+                                            <a class="aw-link" href="{{ $w['url'] }}" target="_blank" rel="noopener noreferrer">{{ $w['title'] ?: $w['domain'] }}</a>
+                                            <span class="aw-muted">· {{ $w['domain'] }}@if (! empty($w['fetched_at'])) · tải {{ \Illuminate\Support\Carbon::parse($w['fetched_at'])->format('d/m/Y') }}@endif · {{ ($w['trust'] ?? '') === 'trusted' ? 'tin cậy' : 'chưa rõ' }}</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </section>
+                        @endif
                         <section class="ss-review-card" data-testid="aw-products">
                             <h2 class="ss-review-card__title">Sản phẩm liên quan của công ty</h2>
                             @if ($products->isEmpty())

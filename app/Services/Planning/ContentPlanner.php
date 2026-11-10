@@ -19,10 +19,13 @@ use InvalidArgumentException;
  */
 final class ContentPlanner
 {
+    /** Nhãn nguồn số liệu lượt tìm hiện ở lý do đề xuất. */
+    private const VOLUME_SOURCES = ['csv' => 'CSV', 'tay' => 'nhập tay', 'dataforseo' => 'DataForSEO', 'gsc' => 'Search Console', 'mock' => 'giả lập'];
+
     /** Cụm đã có 0/1/2/3+ bài → điểm độ phủ. */
     private const COVERAGE = [30, 20, 10, 0];
 
-    /** @return list<array{keyword_id:int,keyword:string,cluster:?string,volume:?int,priority:int,reasons:list<string>,off_topic:bool}> */
+    /** @return list<array{keyword_id:int,keyword:string,cluster:?string,volume:?int,volume_source:?string,priority:int,reasons:list<string>,off_topic:bool}> */
     public function propose(Website $site, int $limit = 10): array
     {
         $profile = BrandProfileData::forWebsite($site->id);
@@ -47,7 +50,8 @@ final class ContentPlanner
             } else {
                 $v = $maxVol > 0 ? (int) round(50 * $k->volume / $maxVol) : 0;
                 $score += $v;
-                $reasons[] = 'lượt tìm '.number_format($k->volume, 0, ',', '.');
+                $src = self::VOLUME_SOURCES[$k->volume_source ?? ''] ?? null;
+                $reasons[] = 'lượt tìm '.number_format($k->volume, 0, ',', '.').($src ? ' ('.$src.')' : '');
             }
             if ($k->cluster_id) {
                 $n = (int) ($clusterPosts[$k->cluster_id] ?? 0);
@@ -64,7 +68,7 @@ final class ContentPlanner
                 $score = max(0, $score - 30);
                 $reasons[] = 'có vẻ lệch lĩnh vực trong hồ sơ doanh nghiệp';
             }
-            $rows[] = ['keyword_id' => $k->id, 'keyword' => $k->keyword, 'cluster' => $k->cluster?->name, 'volume' => $k->volume,
+            $rows[] = ['keyword_id' => $k->id, 'keyword' => $k->keyword, 'cluster' => $k->cluster?->name, 'volume' => $k->volume, 'volume_source' => $k->volume_source,
                 'priority' => min(100, $score), 'reasons' => $reasons, 'off_topic' => $off];
         }
         usort($rows, fn ($a, $b) => [$a['off_topic'], $b['priority'], $b['volume'] === null ? -1 : $b['volume'], $a['keyword']]

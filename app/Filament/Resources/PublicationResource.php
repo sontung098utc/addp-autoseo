@@ -32,7 +32,7 @@ class PublicationResource extends Resource
 
     protected static ?string $navigationGroup = 'Lịch đăng';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $recordTitleAttribute = 'publication_key';
 
@@ -142,6 +142,7 @@ class PublicationResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->header(view('filament.publication.chain'))
             ->persistFiltersInSession()
             ->persistSortInSession()
             ->persistSearchInSession()
@@ -179,6 +180,9 @@ class PublicationResource extends Resource
                     ->description(fn (Publication $r): ?string => $r->articleVersion?->title)
                     ->searchable()
                     ->wrap()
+                    ->url(fn (Publication $r): ?string => $r->articleVersion?->article_id
+                        ? ArticleResource::getUrl('view', ['record' => $r->articleVersion->article_id]).'#tab-publish'
+                        : null)
                     // Cột nội dung là cột quan trọng nhất: cho rộng, các cột phụ bên dưới gọn lại.
                     ->extraHeaderAttributes(['style' => 'min-width:22rem'])
                     ->extraCellAttributes(['style' => 'min-width:22rem'])

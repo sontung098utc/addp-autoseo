@@ -72,7 +72,7 @@ class AiUsagePageTest extends TestCase
     {
         $this->actingAs($this->user('admin'))->get('/admin/chi-phi-ai')->assertOk();
         $this->assertSame('Cài đặt', AiUsagePage::getNavigationGroup());
-        $this->assertSame(3, AiUsagePage::getNavigationSort());
+        $this->assertSame(1, AiUsagePage::getNavigationSort());
     }
 
     public function test_writer_livewire_mount_forbidden(): void
@@ -153,7 +153,7 @@ class AiUsagePageTest extends TestCase
         $dear = $this->version('đắt', 1, 5000.0);
         $rows = $this->as('approver')->instance()->getViewData()['topRows'];
         $this->assertSame(['Tiêu đề đắt', 'Tiêu đề rẻ'], array_map(fn ($r) => $r['title']['text'], $rows));
-        $this->assertSame(ArticleVersionResource::getUrl('view', ['record' => $dear->id]), $rows[0]['title']['href']);
+        $this->assertSame(\App\Filament\Resources\ArticleResource::getUrl('view', ['record' => $dear->article_id]), $rows[0]['title']['href']);
     }
 
     public function test_set_threshold_through_drawer_as_approver_and_admin(): void

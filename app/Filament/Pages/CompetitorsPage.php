@@ -38,9 +38,9 @@ class CompetitorsPage extends Page
 
     protected static ?string $navigationLabel = 'Đối thủ';
 
-    protected static ?string $navigationGroup = 'Phân tích';
+    protected static ?string $navigationGroup = 'Khám phá';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $title = 'Đối thủ và khoảng trống nội dung';
 

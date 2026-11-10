@@ -49,7 +49,7 @@ class KeywordsPageTest extends TestCase
         $this->actingAs($this->user('writer'));
         $d = Livewire::test(KeywordsPage::class)->viewData('kwRows');
         $this->assertContains('học bổng du học Nhật Bản', array_column($d, 'keyword'));
-        $this->assertSame(['article', 'id', 'keyword', 'intent', 'cluster', 'volume', 'source'], array_keys($d[0]));
+        $this->assertSame(['article', 'id', 'keyword', 'intent', 'cluster', 'volume', 'volumeSource', 'source'], array_keys($d[0]));
         $cols = Livewire::test(KeywordsPage::class)->viewData('kwColumns');
         // Gói B #13: nút Xóa chỉ mở hộp xác nhận và dùng tông xám, không còn đỏ gạch chân ở mọi dòng.
         $act = collect($cols)->firstWhere('type', 'actions')['actions'][0];

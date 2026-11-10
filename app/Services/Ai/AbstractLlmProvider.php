@@ -350,7 +350,10 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
     {
         $name = trim(preg_replace('/\s+/u', ' ', (string) ($options['role_name'] ?? $options['role'] ?? '')) ?? '');
 
-        return $name === '' ? '' : "\n\nBạn đang đóng vai: ".mb_substr($name, 0, 60).'.';
+        $line = $name === '' ? '' : "\n\nBạn đang đóng vai: ".mb_substr($name, 0, 60).'.';
+        $profile = trim((string) ($options['role_profile'] ?? '')); // Agent Studio: hồ sơ vai trò do admin đặt (đã tự đóng khung và nhắc không ghi đè luật an toàn)
+
+        return $profile === '' ? $line : $line."\n\n".mb_substr($profile, 0, 14000);
     }
 
     /** Lỗi chặn từ bộ luật chất lượng. Là DỮ LIỆU cần sửa, không phải chỉ dẫn mới; giới hạn độ dài để không phình prompt. */
