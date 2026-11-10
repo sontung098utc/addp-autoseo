@@ -30,6 +30,7 @@ use App\Services\Content\Quality\ContentQualityChecker;
 use App\Services\Content\Quality\QualityReport;
 use App\Services\Agent\Context\ContextAssets;
 use App\Services\Brain\BrainContext;
+use App\Services\Brain\BrainSourceRegistry;
 use App\Services\Knowledge\KnowledgeContext;
 use App\Services\Publishing\EmergencyStopService;
 use Illuminate\Support\Facades\DB;
@@ -291,6 +292,10 @@ final class AgentRunOrchestrator
         $this->kb ??= new KnowledgeContext();
         $this->kb->load($article, $outline); // AG-S20: kiến thức đã duyệt, truy xuất một lần mỗi lượt chạy
         $options += $this->kb->options();
+        $citable = $this->brainCtx->reliance() === 'must_cite' ? BrainSourceRegistry::forBrains($this->brainCtx->ids())->citable() : collect();
+        if ($citable->isNotEmpty()) {
+            $options['citable_sources'] = $citable->map(fn ($s) => ['name' => $s->name, 'domain' => $s->domain, 'tier' => (string) $s->tier])->all(); // AG-B3
+        }
         $this->assets ??= new ContextAssets();
         $this->assets->load($article, $outline); // AG-S25: truy xuất một lần mỗi lượt chạy
         $options += $this->assets->options();
@@ -307,7 +312,7 @@ final class AgentRunOrchestrator
         $silentMock = $fellBack && ! $this->ai instanceof MockAiProvider;
         $mustCite = $this->brainCtx->reliance() === 'must_cite' && $feedback === [];
         $this->step($run, $stage, 'writer', $silentMock || $mustCite ? 'warn' : 'ok', $title, ($silentMock ? 'Nhà cung cấp AI đã rơi về bản giả lập (thiếu khóa hoặc phản hồi hỏng); nội dung không phải AI thật. ' : '').($feedback === []
-            ? 'Viết theo dàn ý; HTML được làm sạch trước khi chấm.'.$this->brandNote().$this->brainCtx->note().($mustCite ? ' Lĩnh vực bắt buộc nguồn: cần người có chuyên môn duyệt (P1 mới ghi nhận và cảnh báo, chưa tự kiểm từng khẳng định).' : '').$kbNote.$assetNote
+            ? 'Viết theo dàn ý; HTML được làm sạch trước khi chấm.'.$this->brandNote().$this->brainCtx->note().($mustCite ? ' Lĩnh vực bắt buộc nguồn: cần người có chuyên môn duyệt (luật EVID01 kiểm bằng chứng theo Sổ nguồn ở mức cả bài, chưa nối từng khẳng định với từng nguồn; hiện có '.$citable->count().' nguồn đã xác nhận).' : '').$kbNote.$assetNote
             : 'Gửi lại cho AI '.count($feedback).' lỗi chặn cần sửa: '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
             ['words' => str_word_count(strip_tags($html)) ?: mb_strlen(strip_tags($html)), 'playbook' => $this->pbData($pb)] + $this->brandData() + $this->brainCtx->stepData() + ($mustCite ? ['needs_expert_review' => true] : []) + $kbData + $assetData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
 
