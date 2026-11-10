@@ -8,6 +8,7 @@ use App\Filament\Support\Agent\AgentFlowBlueprint;
 use App\Filament\Support\Agent\FeatureRegistry;
 use App\Models\AgentRun;
 use App\Models\Article;
+use App\Models\Publication;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Agent\Run\AgentRunOrchestrator;
@@ -42,7 +43,7 @@ class AgentRunUiTest extends TestCase
 
     private function realRun(): AgentRun
     {
-        return (new AgentRunOrchestrator(new MockAiProvider()))->run($this->article(), null);
+        return (new AgentRunOrchestrator(new MockAiProvider))->run($this->article(), null);
     }
 
     public function test_trang_danh_sach_va_chi_tiet_hien_nhat_ky_va_nhan_ai_gia_lap(): void
@@ -87,15 +88,15 @@ class AgentRunUiTest extends TestCase
         $this->app->detectEnvironment(fn () => 'local');
         Livewire::test(ListArticles::class)->callTableAction('run_agent', $a)->assertHasNoTableActionErrors();
         $this->assertSame(1, AgentRun::count());
-        $this->assertSame(0, \App\Models\Publication::count());
+        $this->assertSame(0, Publication::count());
     }
 
-    public function test_bien_tap_vien_khong_thay_nut_giao_doi_ai(): void
+    public function test_bien_tap_vien_thay_nut_giao_doi_ai(): void
     {
+        // Chủ dự án: cho phép vai writer giao đội AI (duyệt/đăng vẫn chỉ approver).
         $a = $this->article();
         $this->actingAs($this->user('writer'));
-
-        Livewire::test(ListArticles::class)->assertTableActionHidden('run_agent', $a);
+        Livewire::test(ListArticles::class)->assertTableActionVisible('run_agent', $a);
     }
 
     public function test_trang_cach_hoat_dong_hien_ban_thiet_ke_song(): void

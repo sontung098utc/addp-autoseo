@@ -115,7 +115,7 @@ class ArticleWorkspaceTest extends TestCase
         Livewire::test(ViewArticle::class, ['record' => $review->getRouteKey()])
             ->assertActionHidden('approve')->assertActionHidden('reject');
         Livewire::test(ViewArticle::class, ['record' => $planned->getRouteKey()])
-            ->assertActionHidden('run_agent');
+            ->assertActionVisible('run_agent');
     }
 
     public function test_duyet_ngay_tren_trang_bai(): void

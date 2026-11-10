@@ -136,6 +136,7 @@
     <div class="aw-stack" data-testid="article-workspace" @if ($live) wire:poll.{{ $pollSeconds }}s @endif>
         <div class="aw-meta" data-testid="aw-meta">
             <x-filament::badge :color="$statusColor">{{ $statusLabel }}</x-filament::badge>
+            @if ($needsExpert)<x-filament::badge color="warning" data-testid="aw-expert">{{ ArticleResource::EXPERT_LABEL }}</x-filament::badge>@endif
             @if ($live)
                 <span class="ss-live-pill" data-testid="aw-live-pill"><span class="ss-spin" aria-hidden="true"></span>Đội AI đang chạy · {{ W::runStages()[$liveStage] ?? 'sắp xong' }}</span>
             @endif
@@ -153,7 +154,12 @@
                     <p class="aw-next" data-testid="aw-next"><strong>Việc tiếp theo:</strong> {{ $next }}</p>
                     @if ($showPreflight)
                         <section class="ss-review-card" data-testid="aw-preflight">
-                            <h2 class="ss-review-card__title">Sẵn sàng trước khi giao</h2>
+                            <h2 class="ss-review-card__title">AI sẽ tự chuẩn bị</h2>
+                            @if (! empty($readiness['auto_actions']))
+                                <ul class="aw-list" data-testid="pf-auto">
+                                    @foreach ($readiness['auto_actions'] as $act)<li>{{ $act }}</li>@endforeach
+                                </ul>
+                            @endif
                             <dl class="ss-review-dl">
                                 <dt>Rủi ro chủ đề</dt>
                                 <dd data-testid="pf-risk"><strong>{{ $riskLabel }}</strong>@if (! empty($readiness['risk']['reasons'])) <span class="aw-muted">· {{ implode(' ', array_slice($readiness['risk']['reasons'], 0, 2)) }}</span>@endif</dd>
@@ -179,21 +185,23 @@
                             </dl>
                             @if ($readiness['brains']['suggested'] !== [])
                                 <div data-testid="pf-suggested" style="margin-top:.6rem">
-                                    <strong>Trí tuệ khớp chủ đề, chưa gắn:</strong>
-                                    <ul class="aw-list">
-                                        @foreach ($readiness['brains']['suggested'] as $sg)
-                                            <li>{{ $sg['name'] }} <span class="aw-muted">· {{ $sg['reason'] }}</span>
-                                                @if ($canAttachBrain && $article->website)
-                                                    <button type="button" class="aw-btn" data-testid="pf-attach" wire:click="mountAction('attachBrain', @js(['brain' => $sg['id']]))">Gắn cho website</button>
-                                                @endif
-                                            </li>
-                                        @endforeach
-                                    </ul>
+                                    @foreach ($readiness['brains']['suggested'] as $sg)
+                                        <p class="aw-muted">Trí tuệ sẽ tự gắn khi giao: «{{ $sg['name'] }}» · {{ $sg['reason'] }}</p>
+                                    @endforeach
+                                </div>
+                            @endif
+                            @if (! empty($autoAttached))
+                                <div data-testid="pf-auto-attached" style="margin-top:.6rem">
+                                    @foreach ($autoAttached as $at)
+                                        <p class="aw-muted" data-testid="pf-auto-row">Đã tự gắn «{{ $at['name'] }}» lúc {{ \Illuminate\Support\Carbon::parse($at['at'])->timezone('Asia/Ho_Chi_Minh')->format('d/m H:i') }}
+                                            @if ($canUndoAttach && $article->website) · <button type="button" class="aw-link" data-testid="pf-undo" wire:click="mountAction('undoAutoAttach', @js(['brain' => $at['brain_id']]))">Hoàn tác</button>@endif
+                                        </p>
+                                    @endforeach
                                 </div>
                             @endif
                             @foreach ($readiness['issues'] as $is)
                                 @if ($is['severity'] !== 'info' || in_array($is['code'], ['brand_incomplete'], true))
-                                    <p class="aw-note" data-testid="pf-issue" data-code="{{ $is['code'] }}" data-severity="{{ $is['severity'] }}" @if ($is['severity'] === 'block') style="color:#b91c1c" @endif>
+                                    <p class="aw-note aw-muted" data-testid="pf-issue" data-code="{{ $is['code'] }}" data-severity="{{ $is['severity'] }}">
                                         {{ $is['message'] }}
                                         @if ($is['code'] === 'kb_empty')
                                             @if (BrainLibraryPage::canAccess()) <a class="aw-link" href="{{ BrainLibraryPage::getUrl() }}">Mở Kho trí tuệ</a>@endif
@@ -206,8 +214,8 @@
                                     </p>
                                 @endif
                             @endforeach
-                            @if ($readiness['holds_writing'])
-                                <p class="aw-note" data-testid="pf-hold" style="color:#b91c1c"><strong>{{ ArticleResource::HOLD_WARNING }}</strong></p>
+                            @if (! empty($readiness['needs_expert']))
+                                <p class="aw-note" data-testid="pf-expert" style="color:#b45309">Chủ đề này cần người có chuyên môn: sau khi viết sẽ chuyển cho người có chuyên môn xem lại.</p>
                             @endif
                         </section>
                     @endif
@@ -334,7 +342,7 @@
             <x-studio.panel key="research">
                 <div class="aw-stack">
                     @if ($knowledgeGap)
-                        <p class="aw-note" data-testid="aw-gap"><strong>Kho thiếu kiến thức cho chủ đề này.</strong> Lần viết gần nhất AI không tìm được mục kiến thức phù hợp trong Kho trí tuệ, nên bài dựa chủ yếu vào hiểu biết chung của AI. Nên bổ sung tài liệu vào kho rồi giao lại.</p>
+                        <p class="aw-note" data-testid="aw-gap" style="color:#b45309">{{ ArticleResource::GAP_NOTE }}</p>
                     @endif
                     <div class="aw-grid">
                         <section class="ss-review-card" data-testid="aw-knowledge">

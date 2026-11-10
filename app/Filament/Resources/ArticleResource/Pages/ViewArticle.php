@@ -20,11 +20,10 @@ use App\Models\KnowledgeItemUsage;
 use App\Models\Publication;
 use App\Models\Website;
 use App\Services\Agent\Pipeline\JobTypeRegistry;
+use App\Services\Agent\Readiness\BrainAutoAttach;
 use App\Services\Brain\BrainContext;
-use App\Services\Brain\BrainService;
 use Filament\Actions;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Log;
 
 /**
  * AG-S27: không gian bài viết. Bấm vào một bài ở màn Bài viết sẽ vào đây. Các tab đi theo đúng chuỗi làm ra một bài:
@@ -99,28 +98,36 @@ class ViewArticle extends EditArticle
         );
     }
 
-    /** Gắn một Trí tuệ gợi ý cho website của bài; người xác nhận mới gắn (quyền approver trở lên, như BrainService). */
-    public function attachBrainAction(): Actions\Action
+    /** Hoàn tác việc hệ thống tự gắn một Trí tuệ cho website của bài; một cú bấm, mọi vai writer trở lên. */
+    public function undoAutoAttachAction(): Actions\Action
     {
-        return Actions\Action::make('attachBrain')
-            ->label('Gắn cho website')
+        return Actions\Action::make('undoAutoAttach')
+            ->label('Hoàn tác')
             ->requiresConfirmation()
-            ->modalHeading('Gắn Trí tuệ cho website')
-            ->modalDescription('Mọi bài của website này sẽ dùng Trí tuệ này khi viết. Có thể gỡ ở trang Trí tuệ.')
-            ->modalSubmitActionLabel('Gắn')
-            ->authorize(fn () => BrainService::canManage(ReviewActions::user()))
+            ->modalHeading('Gỡ Trí tuệ vừa được tự gắn')
+            ->modalDescription('Trí tuệ sẽ không còn dùng cho website này. AI có thể tự gắn lại ở lần giao sau nếu vẫn thấy khớp chủ đề.')
+            ->modalSubmitActionLabel('Gỡ')
+            ->authorize(fn () => ReviewActions::user()?->isWriter() ?? false)
             ->action(function (array $arguments) {
                 $user = ReviewActions::user();
-                abort_unless(BrainService::canManage($user), 403);
-                $brain = Brain::query()->where('status', 'active')->findOrFail((int) ($arguments['brain'] ?? 0));
+                abort_unless($user?->isWriter(), 403);
                 $site = $this->record->website;
                 abort_if($site === null, 422);
-                $map = $brain->websites->mapWithKeys(fn ($w) => [$w->id => (int) $w->pivot->priority])->all();
-                $map[$site->id] = ($map ? max($map) : 0) + 10;
-                (new BrainService)->linkWebsites($brain, $map, $user);
-                Log::info('Gắn Trí tuệ cho website từ trang bài', ['brain_id' => $brain->id, 'website_id' => $site->id, 'article_id' => $this->record->id, 'user_id' => $user?->id]);
-                Notification::make()->title('Đã gắn "'.$brain->name.'" cho '.$site->name)->body('Người gắn: '.$user?->name.'.')->success()->send();
+                $brain = Brain::query()->findOrFail((int) ($arguments['brain'] ?? 0));
+                BrainAutoAttach::detach($site, $brain, $user);
+                Notification::make()->title('Đã gỡ "'.$brain->name.'" khỏi '.$site->name)->success()->send();
             });
+    }
+
+    /** Các Trí tuệ hệ thống đã tự gắn gần đây cho website của bài (rỗng nếu V1 chưa có lớp BrainAutoAttach). @return list<array<string, mixed>> */
+    private function recentAutoAttached(): array
+    {
+        $site = $this->record->website;
+        if ($site === null || ! class_exists(BrainAutoAttach::class)) {
+            return [];
+        }
+
+        return array_values(BrainAutoAttach::recent($site));
     }
 
     protected function getHeaderActions(): array
@@ -130,10 +137,9 @@ class ViewArticle extends EditArticle
                 ->visible(fn () => ArticleResource::canAssignToAgent($this->record))
                 ->modalHeading('Giao bài này cho đội AI')
                 ->modalDescription(fn () => ArticleResource::assignContent($this->record))
-                ->form(fn () => [ArticleResource::allowField(ArticleResource::readiness($this->record)['holds_writing'])])
                 ->modalSubmitActionLabel('Giao việc')
-                ->action(function (array $data) {
-                    ArticleResource::assignToAgent($this->record, (bool) ($data['allow_without_knowledge'] ?? false));
+                ->action(function () {
+                    ArticleResource::assignToAgent($this->record);
                     $this->refreshRecord();
                 }),
             Actions\Action::make('submit_review')->label('Gửi duyệt')->icon('heroicon-o-paper-airplane')
@@ -229,7 +235,9 @@ class ViewArticle extends EditArticle
             'readiness' => $readiness,
             'showPreflight' => $unwritten,
             'tabDefault' => $tabDefault,
-            'canAttachBrain' => BrainService::canManage(ReviewActions::user()),
+            'canUndoAttach' => ReviewActions::user()?->isWriter() ?? false,
+            'autoAttached' => $this->recentAutoAttached(),
+            'needsExpert' => (bool) ($readiness['needs_expert'] ?? false) || ! empty($writeStep?->data['needs_expert_review']),
             'article' => $article,
             'latest' => $latest,
             'versions' => $versions,

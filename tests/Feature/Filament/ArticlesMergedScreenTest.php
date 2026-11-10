@@ -4,6 +4,7 @@ namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\ArticleResource\Pages\ListArticles;
+use App\Filament\Resources\ArticleVersionResource;
 use App\Models\AgentRun;
 use App\Models\AgentRunStep;
 use App\Models\Article;
@@ -11,7 +12,9 @@ use App\Models\ArticleVersion;
 use App\Models\Campaign;
 use App\Models\User;
 use App\Models\Website;
+use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -33,7 +36,7 @@ class ArticlesMergedScreenTest extends TestCase
         return User::create(['name' => $role, 'email' => uniqid().'@x.vn', 'password' => 'secret123', 'role' => $role, 'is_active' => true]);
     }
 
-    private function article(string $status, string $kw = null, bool $withVersion = true): Article
+    private function article(string $status, ?string $kw = null, bool $withVersion = true): Article
     {
         $a = Article::create(['website_id' => $this->site->id, 'primary_keyword' => $kw ?? 'kw'.uniqid(), 'workflow_status' => $status]);
         if ($withVersion) {
@@ -92,7 +95,7 @@ class ArticlesMergedScreenTest extends TestCase
         $this->assertNull(ArticleResource::getNavigationBadge());
         $this->article('needs_review');
         $this->assertSame('1', ArticleResource::getNavigationBadge());
-        $this->assertFalse(\App\Filament\Resources\ArticleVersionResource::shouldRegisterNavigation());
+        $this->assertFalse(ArticleVersionResource::shouldRegisterNavigation());
     }
 
     public function test_nut_chinh_theo_trang_thai(): void
@@ -133,7 +136,7 @@ class ArticlesMergedScreenTest extends TestCase
         $this->assertStringContainsString('position: sticky; right: 0', $css);
         $this->assertStringContainsString('tr.ss-sticky-row > td:last-child', $css);
         $this->assertContains('ss-sticky-row', $table->getRecordClasses(new Article));
-        foreach (['campaign_name' => 16, 'last_run' => 18] as $name => $limit) {
+        foreach (['campaign_name' => 16, 'last_run' => 40] as $name => $limit) {
             $this->assertSame($limit, $table->getColumn($name)->getCharacterLimit(), $name);
         }
         foreach (['campaign_name', 'last_run', 'updated_at'] as $name) {
@@ -145,7 +148,7 @@ class ArticlesMergedScreenTest extends TestCase
         foreach (['website.name', 'topic_cluster', 'search_intent', 'created_at'] as $name) {
             $this->assertTrue($table->getColumn($name)->isToggledHiddenByDefault(), $name);
         }
-        $this->assertSame(\Filament\Tables\Enums\ActionsPosition::AfterColumns, $table->getActionsPosition());
+        $this->assertSame(ActionsPosition::AfterColumns, $table->getActionsPosition());
     }
 
     public function test_hieu_ung_va_poll_chi_khi_co_phien_running(): void
@@ -182,7 +185,7 @@ class ArticlesMergedScreenTest extends TestCase
         $a = $this->article('planned');
         $run = $this->mkRun($a, 'running');
         $t = now()->utc()->subHour()->format('Y-m-d H:i:s');
-        \Illuminate\Support\Facades\DB::table('agent_runs')->where('id', $run->id)->update(['started_at' => $t, 'created_at' => $t]);
+        DB::table('agent_runs')->where('id', $run->id)->update(['started_at' => $t, 'created_at' => $t]);
 
         Livewire::test(ListArticles::class)->assertDontSee('ss-badge-live', false)->assertTableActionVisible('run_agent', $a);
     }
