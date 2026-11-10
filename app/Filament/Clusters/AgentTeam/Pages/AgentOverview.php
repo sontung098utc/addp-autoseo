@@ -134,7 +134,13 @@ class AgentOverview extends Page
     /** AG-S19: tính THẬT theo hồ sơ của các website đang hoạt động: done khi mọi website hoạt động đều có hồ sơ đủ trường bắt buộc. */
     private function brandStep(int $activeSites): array
     {
+        // AG-B2: hồ sơ doanh nghiệp nằm trong Trí tuệ Thương hiệu. Một website đã có Trí tuệ thương hiệu → mở thẳng tab; còn lại → URL cũ (tự chuyển hướng, tạo khi cần).
         $url = \App\Filament\Pages\BrandProfilePage::getUrl();
+        if ($activeSites === 1 && Schema::hasTable('brains')) {
+            $site = Website::query()->where('status', 'active')->first();
+            $brain = $site ? (new \App\Services\Brain\BrainService())->findBrandBrain($site) : null;
+            $url = $brain ? \App\Filament\Pages\BrainPage::getUrl(['brain' => $brain->id]).'#tab-brand' : $url;
+        }
         $profiles = Schema::hasTable('brand_profiles')
             ? \App\Models\BrandProfile::query()->whereIn('website_id', Website::query()->where('status', 'active')->select('id'))->get()
             : collect();

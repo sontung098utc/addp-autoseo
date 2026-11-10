@@ -3,7 +3,9 @@
 namespace Tests\Feature\Agent;
 
 use App\Contracts\AiProviderInterface;
-use App\Filament\Pages\BrandProfilePage;
+use App\Filament\Pages\BrainLibraryPage;
+use App\Filament\Pages\BrainPage;
+use App\Services\Brain\BrainService;
 use App\Models\Article;
 use App\Models\ArticleVersion;
 use App\Models\BrandProfile;
@@ -51,6 +53,12 @@ class BrandProfileTest extends TestCase
         return Website::create(['name' => $name, 'cms_type' => 'wordpress', 'base_url' => 'https://'.uniqid().'.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
     }
 
+    /** AG-B2: hồ sơ doanh nghiệp được sửa trong tab của Trí tuệ Thương hiệu gắn website. */
+    private function brandBrain(Website $w): int
+    {
+        return (new BrainService())->createFromTemplate('Thương hiệu '.$w->name, 'thuong_hieu', [$w], $this->user('admin'))->id;
+    }
+
     private function profile(Website $w, array $a = []): BrandProfile
     {
         return BrandProfile::create($a + ['website_id' => $w->id, 'business_field' => 'Giáo dục du học', 'audience' => 'Học sinh', 'voice' => 'than_thien', 'key_messages' => ['Uy tín']]);
@@ -60,11 +68,11 @@ class BrandProfileTest extends TestCase
     {
         $w = $this->site();
         $this->actingAs($this->user('approver'));
-        $t = Livewire::test(BrandProfilePage::class)->set('websiteId', $w->id)
-            ->set('data.business_field', '  Du   học <b>Úc</b> ')->set('data.audience', 'Học sinh lớp 12')->set('data.voice', 'chuyen_gia')
-            ->set('data.forbidden_terms', ['Rẻ nhất', 'rẻ nhất', ' ', 'Số 1'])->set('data.key_messages', ['A', 'B'])
-            ->call('save')->assertHasNoErrors();
-        $t->call('save');
+        $t = Livewire::test(BrainPage::class, ['brain' => $this->brandBrain($w)])
+            ->set('brandData.business_field', '  Du   học <b>Úc</b> ')->set('brandData.audience', 'Học sinh lớp 12')->set('brandData.voice', 'chuyen_gia')
+            ->set('brandData.forbidden_terms', ['Rẻ nhất', 'rẻ nhất', ' ', 'Số 1'])->set('brandData.key_messages', ['A', 'B'])
+            ->call('saveBrand')->assertHasNoErrors();
+        $t->call('saveBrand');
         $this->assertSame(1, BrandProfile::count());
         $p = $w->brandProfile;
         $this->assertSame('Du học Úc', $p->business_field);
@@ -78,19 +86,20 @@ class BrandProfileTest extends TestCase
     {
         $w = $this->site();
         $this->actingAs($this->user('admin'));
-        Livewire::test(BrandProfilePage::class)->set('websiteId', $w->id)
-            ->set('data.business_field', str_repeat('a', 301))->set('data.key_messages', ['1', '2', '3', '4', '5', '6'])
-            ->call('save')->assertHasErrors(['data.business_field', 'data.key_messages']);
-        $this->assertSame(0, BrandProfile::count());
+        Livewire::test(BrainPage::class, ['brain' => $this->brandBrain($w)])
+            ->set('brandData.business_field', str_repeat('a', 301))->set('brandData.key_messages', ['1', '2', '3', '4', '5', '6'])
+            ->call('saveBrand')->assertHasErrors(['brandData.business_field', 'brandData.key_messages']);
+        $this->assertSame(0, BrandProfile::where('business_field', '!=', null)->count());
     }
 
     public function test_quyen_bien_tap_vien_chi_xem(): void
     {
         $w = $this->site();
+        $id = $this->brandBrain($w);
         $this->actingAs($this->user('writer'));
-        $this->get('/admin/ho-so-doanh-nghiep')->assertOk();
-        Livewire::test(BrandProfilePage::class)->set('websiteId', $w->id)->set('data.audience', 'x')->call('save')->assertForbidden();
-        $this->assertSame(0, BrandProfile::count());
+        $this->get(BrainPage::getUrl(['brain' => $id]))->assertOk();
+        Livewire::test(BrainPage::class, ['brain' => $id])->set('brandData.audience', 'x')->call('saveBrand')->assertForbidden();
+        $this->assertNull($w->fresh()->brandProfile?->audience);
 
         $pol = new BrandProfilePolicy();
         $p = new BrandProfile();
@@ -233,7 +242,7 @@ class BrandProfileTest extends TestCase
             return $m->invoke($c)['steps'][1];
         };
         $this->assertSame('todo', $steps()['state']);
-        $this->assertSame(BrandProfilePage::getUrl(), $steps()['url']);
+        $this->assertSame(\App\Filament\Pages\BrandProfilePage::getUrl(), $steps()['url']);
         $p = $this->profile($w, ['audience' => null]);
         $this->assertSame('todo', $steps()['state']);
         $p->update(['audience' => 'Học sinh']);

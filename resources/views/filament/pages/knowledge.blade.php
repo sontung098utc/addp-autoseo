@@ -29,6 +29,9 @@
             $tabs = array_map(fn ($t) => $t['key'] === 'all' ? ['key' => 'all', 'label' => 'Hiểu biết'] : $t, $tabs);
             array_unshift($tabs, ['key' => 'profile', 'label' => 'Hồ sơ lĩnh vực', 'count' => $completeness[0].'/'.$completeness[1], 'tone' => $completeness[0] < 3 ? 'warn' : null]);
             if ($manage) { $tabs[] = ['key' => 'settings', 'label' => 'Cài đặt']; }
+            if ($isBrand) { // AG-B2: Hồ sơ doanh nghiệp thuộc Trí tuệ Thương hiệu, đặt ngay sau Hồ sơ lĩnh vực
+                array_splice($tabs, 1, 0, [['key' => 'brand', 'label' => 'Hồ sơ doanh nghiệp', 'count' => $brandCompleteness['filled'].'/'.$brandCompleteness['total'], 'tone' => $brandCompleteness['filled'] < $brandCompleteness['total'] ? 'warn' : null]]);
+            }
         }
         $topicOptions = fn () => $topics;
     @endphp
@@ -126,7 +129,7 @@
             </div></div>
         @endif
 
-        <x-studio.tabs :persist="$brain ? 'tri-tue' : 'kho-kien-thuc'" :default="$brain ? 'profile' : ($manage && $inbox->count() ? 'inbox' : 'all')" :tabs="$tabs">
+        <x-studio.tabs :persist="$brain ? 'tri-tue' : 'kho-kien-thuc'" :default="$brain ? ($isBrand ? 'brand' : 'profile') : ($manage && $inbox->count() ? 'inbox' : 'all')" :tabs="$tabs">
             @if ($brain)
                 @include('filament.pages.partials.brain-panels')
             @endif

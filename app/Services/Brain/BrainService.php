@@ -4,6 +4,7 @@ namespace App\Services\Brain;
 
 use App\Models\Brain;
 use App\Models\BrainProfile;
+use App\Models\BrandProfile;
 use App\Models\KnowledgeTopic;
 use App\Models\User;
 use App\Models\Website;
@@ -33,9 +34,11 @@ final class BrainService
     /**
      * @param list<int|Website> $websites website liên kết (thứ tự = mức ưu tiên)
      */
-    public function createFromTemplate(string $name, ?string $templateKey, array $websites, ?User $by): Brain
+    public function createFromTemplate(string $name, ?string $templateKey, array $websites, ?User $by, bool $skipAuth = false): Brain
     {
-        $this->authorize($by);
+        if (! $skipAuth) {
+            $this->authorize($by);
+        }
         $name = trim(mb_substr(strip_tags($name), 0, 160));
         if ($name === '') {
             throw new \InvalidArgumentException('Nhập tên Trí tuệ.');
@@ -47,7 +50,8 @@ final class BrainService
             $brain = Brain::create([
                 'name' => $name, 'slug' => $this->uniqueSlug($name), 'domain_key' => $tpl['domain_key'], 'template_key' => $key, 'language' => 'vi',
                 'description' => $tpl['description'], 'status' => 'active',
-                'settings' => ['ai_reliance' => $tpl['ai_reliance'], 'risk_class' => $tpl['risk_class']], 'created_by' => $by?->id,
+                'settings' => array_filter(['ai_reliance' => $tpl['ai_reliance'], 'risk_class' => $tpl['risk_class'], 'reliance_reason' => $tpl['reliance_reason'] ?? null, 'suggested_sources' => $tpl['suggested_sources'] ?? null, 'sample_label' => ! empty($tpl['suggested_sources']) ? self::SAMPLE_LABEL : null], fn ($v) => $v !== null),
+                'created_by' => $by?->id,
             ]);
             $p = $tpl['profile'];
             $brain->profile()->create(['voice' => $p['voice'], 'structure' => $p['structure'], 'terminology' => $p['terminology'], 'reasoning' => $p['reasoning'], 'rubric_notes' => $p['rubric_notes'], 'exemplars' => $p['exemplars'], 'updated_by' => $by?->id]);
@@ -58,9 +62,71 @@ final class BrainService
                 }
             }
             $this->syncWebsites($brain, $websites, $by, false);
+            // AG-B2: Trí tuệ Thương hiệu gắn đúng một website thì tự có hồ sơ doanh nghiệp RỖNG của website đó (nếu chưa có). Không đụng hồ sơ đã có.
+            if ($key === 'thuong_hieu' && $brain->websites()->count() === 1) {
+                BrandProfile::query()->firstOrCreate(['website_id' => $brain->websites()->value('websites.id')], ['updated_by' => $by?->id]);
+            }
 
             return $brain->load('profile');
         });
+    }
+
+    public const SAMPLE_LABEL = 'Mẫu: chưa có kiến thức nào được duyệt';
+
+    /**
+     * AG-B2: cài các Trí tuệ từ mẫu. Idempotent theo (template_key + tên): đã có thì BỎ QUA, không ghi đè bản đã sửa, không tạo trùng.
+     * Không tự gắn website (trừ khi truyền $site). Không tạo nguồn/mục kiến thức nào: chỉ khung.
+     *
+     * @param list<string>|null $keys null = 14 mẫu sức khỏe
+     * @return array{created:list<Brain>,skipped:list<string>,unknown:list<string>}
+     */
+    public function installTemplates(?array $keys = null, ?Website $site = null, ?User $by = null): array
+    {
+        // Dòng lệnh/seeder không có người dùng (null) được phép; giao diện chỉ admin. Người duyệt chỉ xem.
+        if ($by !== null && ! ($by->is_active && $by->isAdmin())) {
+            throw new KnowledgeError('Chỉ quản trị viên được cài các trí tuệ mẫu.');
+        }
+        $keys ??= BrainTemplates::HEALTH_KEYS;
+        $out = ['created' => [], 'skipped' => [], 'unknown' => []];
+        foreach (array_values(array_unique($keys)) as $key) {
+            $tpl = BrainTemplates::get($key);
+            if ($tpl === null) {
+                $out['unknown'][] = (string) $key;
+
+                continue;
+            }
+            if (Brain::query()->where('template_key', $key)->where('name', $tpl['name'])->exists()) {
+                $out['skipped'][] = $key;
+
+                continue;
+            }
+            $out['created'][] = $this->createFromTemplate($tpl['name'], $key, $site ? [$site] : [], $by, true);
+        }
+
+        return $out;
+    }
+
+    /**
+     * AG-B2: Trí tuệ Thương hiệu của một website (tạo nếu chưa có). Dùng cho URL cũ /admin/ho-so-doanh-nghiep và bước cài đặt.
+     * Chọn Trí tuệ thương hiệu đang hoạt động ưu tiên cao nhất đã gắn website; không có thì tạo mới "Thương hiệu – {tên website}" (cần quyền sửa).
+     */
+    public function brandBrainFor(Website $site, ?User $by): ?Brain
+    {
+        $existing = $this->findBrandBrain($site);
+        if ($existing || ! self::canManage($by)) {
+            return $existing;
+        }
+
+        return $this->createFromTemplate('Thương hiệu – '.$site->name, 'thuong_hieu', [$site], $by);
+    }
+
+    /** Trí tuệ Thương hiệu đang hoạt động ưu tiên cao nhất của website (không tạo mới). */
+    public function findBrandBrain(Website $site): ?Brain
+    {
+        return Brain::query()->where('template_key', 'thuong_hieu')->where('status', 'active')
+            ->whereHas('websites', fn ($q) => $q->where('websites.id', $site->id))
+            ->join('brain_website', fn ($j) => $j->on('brain_website.brain_id', '=', 'brains.id')->where('brain_website.website_id', $site->id))
+            ->orderBy('brain_website.priority')->orderBy('brains.id')->select('brains.*')->first();
     }
 
     private function uniqueSlug(string $name): string

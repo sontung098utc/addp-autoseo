@@ -3,6 +3,7 @@
 /** AG-B1: mẫu CẤU TRÚC cho lĩnh vực y khoa/dược. Không chứa sự kiện, số liệu, tên thuốc hay phác đồ: người dùng/chuyên gia tự điền. */
 return [
     'name' => 'Y khoa / Dược',
+    'group' => 'suc_khoe',
     'description' => 'Lĩnh vực nhạy cảm sức khỏe (YMYL): mặc định bắt buộc nguồn, hạng rủi ro cao, cần người có chuyên môn duyệt.',
     'domain_key' => 'y_khoa',
     'ai_reliance' => 'must_cite',

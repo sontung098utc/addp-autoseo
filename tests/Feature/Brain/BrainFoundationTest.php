@@ -99,13 +99,16 @@ class BrainFoundationTest extends TestCase
     public function test_mau_tri_tue_chi_co_cau_truc_khong_co_su_kien(): void
     {
         $all = BrainTemplates::all();
-        $this->assertEqualsCanonicalizing(['y_khoa_duoc', 'giao_duc', 'ngoai_ngu', 'khoa_hoc', 'thuong_hieu', 'san_pham', 'trong'], array_keys($all));
+        $this->assertEqualsCanonicalizing(array_merge(['y_khoa_duoc', 'giao_duc', 'ngoai_ngu', 'khoa_hoc', 'thuong_hieu', 'san_pham', 'trong'], BrainTemplates::HEALTH_KEYS), array_keys($all));
         $forbiddenKeys = ['value', 'price', 'gia', 'url', 'link', 'brand', 'product'];
         foreach ($all as $key => $t) {
             $this->assertNotEmpty($t['name']);
             $this->assertArrayHasKey($t['ai_reliance'], Brain::RELIANCE, $key);
             $this->assertArrayHasKey($t['risk_class'], Brain::RISK, $key);
-            $this->assertSame([], $t['profile']['terminology']['preferred'], "$key: thuật ngữ phải để trống");
+            foreach ($t['profile']['terminology']['preferred'] as $term) { // AG-B2: mẫu sức khỏe chỉ có TÊN thuật ngữ, định nghĩa luôn trống
+                $this->assertSame('', $term['definition'], "$key: thuật ngữ không được có định nghĩa");
+            }
+            $this->assertTrue($t['profile']['terminology']['preferred'] === [] || in_array($key, array_merge(['y_khoa_duoc'], BrainTemplates::HEALTH_KEYS), true), "$key: chỉ mẫu sức khỏe được có tên thuật ngữ");
             $this->assertSame([], $t['profile']['terminology']['abbreviations'], $key);
             $this->assertSame([], $t['profile']['exemplars'], "$key: bài mẫu để trống");
             $this->assertSame('', $t['profile']['voice']['tone']);
@@ -125,6 +128,9 @@ class BrainFoundationTest extends TestCase
                         $walk($v, $path.'.'.$k);
                     }
                 } elseif (is_string($node)) {
+                    if (str_contains($path, 'terminology') && in_array($node, ['HbA1c'], true)) { // ngoại lệ rõ ràng: TÊN thuật ngữ có chữ số
+                        return;
+                    }
                     $this->assertDoesNotMatchRegularExpression('/\d/', $node, "$key: chuỗi chứa chữ số (số liệu) tại $path: $node");
                     $this->assertDoesNotMatchRegularExpression('#https?://#i', $node, "$key: URL tại $path");
                 }

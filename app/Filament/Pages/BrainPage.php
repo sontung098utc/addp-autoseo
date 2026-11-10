@@ -4,7 +4,10 @@ namespace App\Filament\Pages;
 
 use App\Models\Brain;
 use App\Models\BrainProfile;
+use App\Filament\Support\BrandProfileEditor;
+use App\Models\BrandProfile;
 use App\Models\Website;
+use App\Services\Brand\BrandProfileData;
 use App\Services\Brain\BrainService;
 use App\Services\Knowledge\KnowledgeError;
 use Filament\Forms;
@@ -38,6 +41,17 @@ class BrainPage extends KnowledgePage implements HasForms
     /** @var array<int,array{on:bool,priority:int}> website_id => liên kết */
     public array $siteLinks = [];
 
+    /** AG-B2: hồ sơ doanh nghiệp (brand_profiles) của website được chọn, chỉ dùng cho Trí tuệ Thương hiệu. */
+    public ?int $brandWebsiteId = null;
+
+    /** @var array<string,mixed> */
+    public array $brandData = [];
+
+    protected function getForms(): array
+    {
+        return ['form', 'brandForm'];
+    }
+
     public function mount(int|string $brain = 0): void
     {
         $b = Brain::query()->with(['profile', 'websites'])->findOrFail((int) $brain);
@@ -61,6 +75,50 @@ class BrainPage extends KnowledgePage implements HasForms
         $linked = $b->websites->mapWithKeys(fn ($w) => [$w->id => (int) $w->pivot->priority]);
         $this->siteLinks = Website::query()->orderBy('name')->pluck('id')->mapWithKeys(fn ($id) => [$id => ['on' => $linked->has($id), 'priority' => (int) ($linked[$id] ?? 10)]])->all();
         $this->form->fill($this->profileToForm($b->profile));
+        $ids = $b->websites->pluck('id')->all();
+        if ($this->isBrandBrain($b) && ! in_array($this->brandWebsiteId, $ids, true)) {
+            $this->brandWebsiteId = $ids[0] ?? null;
+        }
+        $this->loadBrand();
+    }
+
+    private function isBrandBrain(Brain $b): bool
+    {
+        return $b->template_key === 'thuong_hieu';
+    }
+
+    private function loadBrand(): void
+    {
+        $this->brandForm->fill(BrandProfileEditor::formState($this->brandWebsiteId));
+    }
+
+    public function updatedBrandWebsiteId(): void
+    {
+        // Chỉ cho chọn website đã gắn với Trí tuệ này.
+        if (! $this->brain()->websites->contains('id', (int) $this->brandWebsiteId)) {
+            $this->brandWebsiteId = $this->brain()->websites->first()?->id;
+        }
+        $this->loadBrand();
+    }
+
+    public function brandForm(Form $form): Form
+    {
+        return $form->disabled(fn () => ! BrandProfileEditor::canEdit(Auth::user()))->statePath('brandData')->schema(BrandProfileEditor::schema());
+    }
+
+    /** Lưu vào CHÍNH bảng brand_profiles của website (mỗi website một bản). Cùng kiểm tra và quyền như trang Hồ sơ doanh nghiệp cũ. */
+    public function saveBrand(): void
+    {
+        abort_unless(BrandProfileEditor::canEdit(Auth::user()), 403);
+        $b = $this->brain();
+        abort_unless($this->isBrandBrain($b), 404);
+        $site = $b->websites->firstWhere('id', (int) $this->brandWebsiteId);
+        if (! $site) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['brandWebsiteId' => 'Hãy gắn website cho Trí tuệ này (tab Cài đặt) rồi chọn website.']);
+        }
+        BrandProfileEditor::save($site, $this->brandData, Auth::user());
+        $this->loadBrand();
+        Notification::make()->title('Đã lưu hồ sơ doanh nghiệp')->success()->send();
     }
 
     /** @return array<string,mixed> */
@@ -175,9 +233,16 @@ class BrainPage extends KnowledgePage implements HasForms
     protected function getViewData(): array
     {
         $b = $this->brain();
+        $isBrand = $this->isBrandBrain($b);
+        $bp = $isBrand && $this->brandWebsiteId ? BrandProfile::query()->where('website_id', $this->brandWebsiteId)->first() : null;
+        $bc = BrandProfileData::completeness($bp);
 
         return array_merge(parent::getViewData(), [
             'brain' => $b,
+            'isBrand' => $isBrand, 'brandSites' => $b->websites, 'brandExists' => (bool) $bp,
+            'brandCompleteness' => $bc, 'canEditBrand' => BrandProfileEditor::canEdit(Auth::user()),
+            'suggestedSources' => (array) ($b->settings['suggested_sources'] ?? []),
+            'sampleLabel' => (string) ($b->settings['sample_label'] ?? ''),
             'completeness' => ($b->profile ?? new BrainProfile())->completeness(),
             'missingFields' => collect(BrainProfile::FIELDS)->filter(fn ($l, $path) => ! ($b->profile ?? new BrainProfile())->hasValue($path))->values()->all(),
             'allSites' => Website::query()->orderBy('name')->get(['id', 'name']),

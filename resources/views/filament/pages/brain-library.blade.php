@@ -1,6 +1,6 @@
 <x-filament-panels::page>
     <style>
-        .bl-grid{display:grid;gap:.8rem;grid-template-columns:repeat(auto-fill,minmax(19rem,1fr))}
+        .bl-grid{display:grid;gap:.8rem;grid-template-columns:repeat(auto-fill,minmax(16rem,1fr))}
         .bl-card{display:flex;flex-direction:column;gap:.5rem;height:100%}
         .bl-row{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}
         .bl-in{border:1px solid rgba(128,128,128,.5);border-radius:.4rem;padding:.3rem .5rem;max-width:100%;width:100%}
@@ -14,6 +14,14 @@
             @if ($manage && ! $archived)
                 <x-filament::button size="sm" wire:click="openCreate" icon="heroicon-o-plus">Tạo trí tuệ</x-filament::button>
             @endif
+            @if ($canInstall && ! $archived)
+                <x-filament::button size="sm" color="gray" wire:click="openInstall" icon="heroicon-o-arrow-down-tray">Cài các trí tuệ mẫu</x-filament::button>
+            @endif
+            <input type="search" class="bl-in" style="max-width:14rem" wire:model.live.debounce.300ms="search" placeholder="Tìm theo tên" aria-label="Tìm trí tuệ theo tên">
+            <select class="bl-in" style="max-width:11rem" wire:model.live="group" aria-label="Lọc theo nhóm">
+                <option value="">Tất cả nhóm</option>
+                @foreach ($groups as $gk => $gl)<option value="{{ $gk }}">{{ $gl }}</option>@endforeach
+            </select>
             <label class="ss-muted ss-text-xs" style="margin-left:auto"><input type="checkbox" wire:model.live="showArchived"> Xem đã lưu trữ ({{ $archivedCount }})</label>
         </div>
 
@@ -28,7 +36,11 @@
                             <a href="{{ \App\Filament\Pages\BrainPage::getUrl(['brain' => $b->id]) }}" style="font-weight:600;font-size:1.05rem">{{ $b->name }}</a>
                             <x-studio.badge tone="info">{{ $reliances[$b->reliance()] ?? $b->reliance() }}</x-studio.badge>
                         </div>
-                        <div class="ss-muted ss-text-xs">Mẫu: {{ $c['template'] }} · Hồ sơ {{ $c['filled'] }}/{{ $c['total'] }} trường</div>
+                        <div class="ss-muted ss-text-xs">Mẫu: {{ $c['template'] }} · Hồ sơ {{ $c['filled'] }}/{{ $c['total'] }} trường
+                            @if ($c['sample'])<x-studio.hint text="Mẫu: chưa có kiến thức nào được duyệt. Trí tuệ này mới chỉ có khung; chuyên gia cần điền thuật ngữ, nguồn và kiến thức." />@endif</div>
+                        @if ($c['brand'])
+                            <div class="ss-muted ss-text-xs" data-testid="brand-completeness">Hồ sơ doanh nghiệp {{ $c['brand']['filled'] }}/{{ $c['brand']['total'] }} trường @if (! $c['brand']['has_site'])(chưa gắn website)@endif</div>
+                        @endif
                         <div class="bl-row ss-text-xs">
                             <span>{{ $c['sources'] }} nguồn</span><span>·</span><span>{{ $c['items'] }} mục</span>
                             @if ($c['proposed'])<x-studio.badge tone="warn">{{ $c['proposed'] }} chờ duyệt</x-studio.badge>@endif
@@ -48,6 +60,25 @@
                         <div style="margin-top:auto"><x-filament::button size="sm" color="gray" tag="a" :href="\App\Filament\Pages\BrainPage::getUrl(['brain' => $b->id])">Mở</x-filament::button></div>
                     </div></div>
                 @endforeach
+            </div>
+        @endif
+
+        @if ($showInstall)
+            <div class="bl-modal" role="dialog" aria-modal="true" aria-label="Cài các trí tuệ mẫu" wire:key="install-modal" x-data x-on:keydown.escape.window="$wire.closeInstall()">
+                <div class="bl-modal__b">
+                    <div class="ss-card__h" style="display:flex;gap:.4rem;align-items:center">Cài các trí tuệ mẫu
+                        <x-studio.hint tone="warning" text="Mẫu chỉ mang khung cấu trúc, quy tắc an toàn, tên thuật ngữ (chưa có định nghĩa) và gợi ý nguồn chưa xác nhận. Chưa có kiến thức nào được duyệt; cần chuyên gia điền và duyệt trước khi dùng. Mẫu đã cài thì bỏ qua, không ghi đè bản bạn đã sửa. Không tự gắn website." />
+                    </div>
+                    <form wire:submit="installSelected" style="display:flex;flex-direction:column;gap:.5rem">
+                        @foreach ($healthTemplates as $k => $n)
+                            <label style="display:block"><input type="checkbox" wire:model="installKeys" value="{{ $k }}"> {{ $n }}@if (isset($installed[$k])) <span class="ss-muted ss-text-xs">(đã có)</span>@endif</label>
+                        @endforeach
+                        <div class="bl-row" style="justify-content:flex-end">
+                            <x-filament::button type="button" color="gray" wire:click="closeInstall">Hủy</x-filament::button>
+                            <x-filament::button type="submit">Cài</x-filament::button>
+                        </div>
+                    </form>
+                </div>
             </div>
         @endif
 

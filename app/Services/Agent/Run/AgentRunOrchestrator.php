@@ -382,7 +382,19 @@ final class AgentRunOrchestrator
     {
         $n = BrandProfileData::forPrompt($this->brandProfile)['fields_used'] ?? 0;
 
-        return $n > 0 ? " Đã dùng hồ sơ thương hiệu ({$n} trường)." : '';
+        $src = $this->brandSource();
+
+        return $n > 0 ? " Đã dùng hồ sơ thương hiệu ({$n} trường)".($src ? ", nguồn: {$src}" : '').'.' : '';
+    }
+
+    /** AG-B2: nhãn nguồn "Trí tuệ X · Hồ sơ doanh nghiệp" khi website có Trí tuệ Thương hiệu (chỉ nhãn; dữ liệu vẫn qua options['brand']). */
+    private function brandSource(): ?string
+    {
+        $wid = $this->brandProfile?->website_id;
+        $site = $wid ? \App\Models\Website::query()->find($wid) : null;
+        $brain = $site ? (new \App\Services\Brain\BrainService())->findBrandBrain($site) : null;
+
+        return $brain ? 'Trí tuệ '.$brain->name.' · Hồ sơ doanh nghiệp' : null;
     }
 
     /** @return array<string, mixed> */
@@ -390,7 +402,7 @@ final class AgentRunOrchestrator
     {
         $n = BrandProfileData::forPrompt($this->brandProfile)['fields_used'] ?? 0;
 
-        return $n > 0 ? ['brand_profile_fields' => $n] : [];
+        return $n > 0 ? ['brand_profile_fields' => $n] + ($this->brandSource() ? ['brand_source' => $this->brandSource()] : []) : [];
     }
 
     private function roleOff(string $key): bool

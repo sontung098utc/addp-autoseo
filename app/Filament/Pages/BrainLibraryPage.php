@@ -41,6 +41,16 @@ class BrainLibraryPage extends Page
 
     public bool $showArchived = false;
 
+    /** AG-B2: lọc theo nhóm (suc_khoe | thuong_hieu | khac | rỗng = tất cả) và tìm theo tên. */
+    public string $group = '';
+
+    public string $search = '';
+
+    public bool $showInstall = false;
+
+    /** @var array<int,string> khóa mẫu được tick trong hộp "Cài các trí tuệ mẫu" */
+    public array $installKeys = [];
+
     /** @var array{name:string,template:string,websites:array<int,string>} */
     public array $create = ['name' => '', 'template' => 'thuong_hieu', 'websites' => []];
 
@@ -61,6 +71,45 @@ class BrainLibraryPage extends Page
         abort_unless(static::canAccess() && static::canManage(), 403);
         $this->create = ['name' => '', 'template' => 'thuong_hieu', 'websites' => []];
         $this->showCreate = true;
+    }
+
+    public static function canInstall(): bool
+    {
+        $u = Auth::user();
+
+        return $u instanceof User && $u->is_active && $u->isAdmin();
+    }
+
+    public function openInstall(): void
+    {
+        abort_unless(static::canAccess() && static::canInstall(), 403);
+        $this->installKeys = BrainTemplates::HEALTH_KEYS;
+        $this->showInstall = true;
+    }
+
+    public function closeInstall(): void
+    {
+        $this->showInstall = false;
+    }
+
+    public function installSelected(): void
+    {
+        abort_unless(static::canAccess() && static::canInstall(), 403);
+        $keys = array_values(array_intersect((array) $this->installKeys, array_keys(BrainTemplates::all())));
+        if ($keys === []) {
+            Notification::make()->title('Hãy tick ít nhất một mẫu')->warning()->send();
+
+            return;
+        }
+        try {
+            $r = (new BrainService())->installTemplates($keys, null, Auth::user());
+        } catch (KnowledgeError $e) {
+            Notification::make()->title('Chưa cài được')->body($e->getMessage())->danger()->send();
+
+            return;
+        }
+        $this->showInstall = false;
+        Notification::make()->title('Đã cài '.count($r['created']).' trí tuệ mẫu')->body(count($r['skipped']) ? count($r['skipped']).' mẫu đã có nên bỏ qua (không ghi đè). Chưa gắn website nào: hãy gắn ở tab Cài đặt của từng Trí tuệ.' : 'Chưa gắn website nào: hãy gắn ở tab Cài đặt của từng Trí tuệ.')->success()->send();
     }
 
     public function closeCreate(): void
@@ -88,7 +137,10 @@ class BrainLibraryPage extends Page
     protected function getViewData(): array
     {
         $archived = $this->showArchived;
-        $brains = Brain::query()->with(['profile', 'websites'])->where('status', $archived ? 'archived' : 'active')->orderBy('name')->get();
+        $brains = Brain::query()->with(['profile', 'websites'])->where('status', $archived ? 'archived' : 'active')
+            ->when(trim($this->search) !== '', fn ($q) => $q->where('name', 'like', '%'.str_replace(['%', '_'], ['\\%', '\\_'], trim($this->search)).'%'))
+            ->orderBy('name')->get()
+            ->filter(fn (Brain $b) => $this->group === '' || BrainTemplates::groupOf($b->template_key) === $this->group)->values();
         $ids = $brains->pluck('id')->all();
         $by = fn ($q) => $q->whereIn('brain_id', $ids)->selectRaw('brain_id, count(*) c')->groupBy('brain_id')->pluck('c', 'brain_id');
         $sources = $by(KnowledgeSource::query());
@@ -100,12 +152,19 @@ class BrainLibraryPage extends Page
 
         $cards = $brains->map(function (Brain $b) use ($sources, $items, $proposed, $gaps, $conflicts, $expired) {
             [$f, $t] = ($b->profile ?? new \App\Models\BrainProfile())->completeness();
+            $brand = null;
+            if ($b->template_key === 'thuong_hieu') { // AG-B2: số trường THẬT của hồ sơ doanh nghiệp (website đầu tiên đã gắn)
+                $sid = $b->websites->first()?->id;
+                $c = \App\Services\Brand\BrandProfileData::completeness($sid ? \App\Models\BrandProfile::query()->where('website_id', $sid)->first() : null);
+                $brand = ['filled' => $c['filled'], 'total' => $c['total'], 'has_site' => (bool) $sid];
+            }
 
             return [
                 'brain' => $b, 'template' => BrainTemplates::get($b->template_key)['name'] ?? ($b->template_key ? $b->template_key : 'Tự tạo'),
                 'sources' => (int) ($sources[$b->id] ?? 0), 'items' => (int) ($items[$b->id] ?? 0), 'proposed' => (int) ($proposed[$b->id] ?? 0),
                 'conflicts' => (int) ($conflicts[$b->id] ?? 0), 'expired' => (int) ($expired[$b->id] ?? 0), 'gaps' => (int) ($gaps[$b->id] ?? 0),
-                'filled' => $f, 'total' => $t, 'sites' => $b->websites->pluck('name')->all(),
+                'filled' => $f, 'total' => $t, 'sites' => $b->websites->pluck('name')->all(), 'brand' => $brand,
+                'group' => BrainTemplates::groupOf($b->template_key), 'sample' => (string) ($b->settings['sample_label'] ?? '') !== '' && (int) ($sources[$b->id] ?? 0) === 0 && (int) ($items[$b->id] ?? 0) === 0,
             ];
         });
 
@@ -113,7 +172,9 @@ class BrainLibraryPage extends Page
             'cards' => $cards, 'manage' => static::canManage(), 'archived' => $archived,
             'archivedCount' => Brain::query()->where('status', 'archived')->count(),
             'templates' => BrainTemplates::all(), 'sites' => Website::query()->orderBy('name')->get(['id', 'name']),
-            'reliances' => Brain::RELIANCE,
+            'reliances' => Brain::RELIANCE, 'groups' => BrainTemplates::GROUPS, 'canInstall' => static::canInstall(),
+            'healthTemplates' => collect(BrainTemplates::HEALTH_KEYS)->mapWithKeys(fn ($k) => [$k => (string) (BrainTemplates::get($k)['name'] ?? $k)])->all(),
+            'installed' => Brain::query()->whereIn('template_key', BrainTemplates::HEALTH_KEYS)->pluck('name', 'template_key')->all(),
         ];
     }
 }
