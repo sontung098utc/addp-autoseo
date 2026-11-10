@@ -87,7 +87,7 @@ final class CampaignRunner
         $fromPlan = $article !== null;
         $article ??= Article::create(['website_id' => $c->website_id, 'created_by' => $c->created_by, 'primary_keyword' => $keyword, 'workflow_status' => 'planned', 'origin' => 'keyword', 'campaign_id' => $c->id]);
         try {
-            $run = (new AgentRunOrchestrator($ai, stop: $this->stop, policy: \App\Services\Agent\Settings\AgentAi::policy(), handoff: app(\App\Services\Agent\Handoff\CmsDraftHandoff::class)))->run($article, null, 'schedule', $c->id);
+            $run = \App\Services\Agent\Refresh\AgentRunDispatcher::run($article, $ai, null, 'schedule', $c->id, stop: $this->stop, policy: \App\Services\Agent\Settings\AgentAi::policy(), handoff: app(\App\Services\Agent\Handoff\CmsDraftHandoff::class));
         } catch (\Throwable $e) {
             // Không để lại bài mồ côi làm mất lượt của từ khóa này ở nhịp sau.
             if (! $fromPlan && ! AgentRun::query()->where('article_id', $article->id)->exists()) {

@@ -100,7 +100,7 @@ class ArticleResource extends Resource
 
             return;
         }
-        $run = (new \App\Services\Agent\Run\AgentRunOrchestrator($ai, policy: \App\Services\Agent\Settings\AgentAi::policy()))->run($record, \Illuminate\Support\Facades\Auth::user());
+        $run = \App\Services\Agent\Refresh\AgentRunDispatcher::run($record, $ai, \Illuminate\Support\Facades\Auth::user(), policy: \App\Services\Agent\Settings\AgentAi::policy());
         $n = \Filament\Notifications\Notification::make()->title('Phiên chạy #'.$run->id.': '.(AgentRunResource::STATUS[$run->status][0] ?? $run->status))
             ->body($run->outcome_reason ?: 'Đã có bản nháp chờ duyệt.')
             ->actions([\Filament\Notifications\Actions\Action::make('xem')->label('Xem diễn biến')->url(AgentRunResource::getUrl('view', ['record' => $run]))]);

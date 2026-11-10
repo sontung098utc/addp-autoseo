@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\Article;
-use App\Services\Agent\Run\AgentRunOrchestrator;
 use App\Services\Ai\DemoScriptedAiProvider;
 use App\Services\Ai\MockAiProvider;
 use Illuminate\Console\Command;
@@ -24,7 +23,7 @@ class AgentRunCommand extends Command
             return self::FAILURE;
         }
         $ai = $this->option('demo') ? new DemoScriptedAiProvider() : (\App\Services\Agent\Settings\AgentAi::real() ?? new MockAiProvider());
-        $run = (new AgentRunOrchestrator($ai, policy: \App\Services\Agent\Settings\AgentAi::policy()))->run($article, null, 'manual');
+        $run = \App\Services\Agent\Refresh\AgentRunDispatcher::run($article, $ai, null, 'manual', policy: \App\Services\Agent\Settings\AgentAi::policy());
         $this->info("Phiên #{$run->id}: {$run->status}".($run->outcome_reason ? " — {$run->outcome_reason}" : ''));
 
         return self::SUCCESS;
