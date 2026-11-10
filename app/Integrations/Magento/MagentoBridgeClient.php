@@ -28,17 +28,32 @@ class MagentoBridgeClient implements PublisherInterface
     public function testConnection(Website $website): bool
     {
         $baseUrl = rtrim($website->base_url, '/');
-        $store = $website->store_scope ?: 'default';
-        $endpoint = "{$baseUrl}/rest/{$store}/V1/store/websites";
+        // Trong Magento 2 REST API, endpoint /V1/store/websites là API toàn cục thuộc scope 'all'
+        $endpoint = "{$baseUrl}/rest/all/V1/store/websites";
+        $creds = $website->encrypted_credentials ?? [];
 
         try {
-            $headers = $this->getAuthHeaders('GET', $endpoint, $website->encrypted_credentials ?? []);
+            $headers = $this->getAuthHeaders('GET', $endpoint, $creds);
             $response = $this->httpClient->get($endpoint, [
                 'headers' => $headers,
             ]);
 
             return $response->getStatusCode() === 200;
         } catch (\Throwable $e) {
+            // Fallback: Thử với Bearer token (chuẩn Magento 2 Integration Token)
+            if (!empty($creds['access_token'])) {
+                try {
+                    $response = $this->httpClient->get($endpoint, [
+                        'headers' => [
+                            'Authorization' => 'Bearer ' . $creds['access_token'],
+                            'Accept' => 'application/json',
+                        ],
+                    ]);
+                    return $response->getStatusCode() === 200;
+                } catch (\Throwable $e2) {
+                    Log::warning("Kiểm tra kết nối Magento 2 (Bearer) thất bại cho {$website->name}: " . $e2->getMessage());
+                }
+            }
             Log::warning("Kiểm tra kết nối Magento 2 thất bại cho {$website->name}: " . $e->getMessage());
             return false;
         }
