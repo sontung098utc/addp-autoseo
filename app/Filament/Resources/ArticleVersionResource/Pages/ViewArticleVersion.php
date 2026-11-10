@@ -16,6 +16,9 @@ class ViewArticleVersion extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            // AG-S27: quay về không gian bài (từ khóa, nguồn, các phiên bản khác, phiên AI, lịch xuất bản của bài này).
+            Actions\Action::make('back_to_article')->label('Về bài viết')->icon('heroicon-o-arrow-uturn-left')->color('gray')
+                ->url(fn () => \App\Filament\Resources\ArticleResource::getUrl('view', ['record' => $this->record->article_id]).'#tab-content'),
             \App\Filament\Support\Explain\WhyAction::page(),
             Actions\Action::make('approve')->label('Duyệt')->icon('heroicon-o-check')->color('primary')
                 ->visible(fn () => $this->record->review_status === 'needs_review')

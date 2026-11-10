@@ -5,9 +5,14 @@ namespace Tests\Feature\Filament;
 use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\ArticleResource\Pages\ListArticles;
 use App\Filament\Resources\ArticleResource\Pages\ViewArticle;
+use App\Filament\Resources\ArticleVersionResource;
+use App\Filament\Support\Review\ReviewActions;
 use App\Models\AgentRun;
+use App\Models\AgentRunStep;
 use App\Models\Article;
 use App\Models\ArticleVersion;
+use App\Models\Keyword;
+use App\Models\KeywordCluster;
 use App\Models\Publication;
 use App\Models\User;
 use App\Models\Website;
@@ -66,13 +71,16 @@ class ArticleWorkspaceTest extends TestCase
             ->assertSee('data-testid="article-workspace"', false)
             ->assertSee('Chọn máy lọc nước')
             ->assertSee('Việc tiếp theo')
-            ->assertSee('Nội dung thử nghiệm.')
-            ->assertSee('SEO title thử')
-            ->assertSee('Mô tả meta thử')
-            ->assertSee('data-testid="aw-quality"', false)
+            ->assertSee('data-testid="aw-chain"', false)
+            ->assertSee('data-testid="aw-keyword"', false)
+            ->assertSee('data-testid="aw-plan"', false)
+            ->assertSee('data-testid="aw-knowledge"', false)
             ->assertSee('data-testid="aw-versions"', false)
+            ->assertSee(ArticleVersionResource::getUrl('view', ['record' => $v]), false)
+            ->assertDontSee('Nội dung thử nghiệm.')
             ->assertSee('data-testid="aw-runs"', false)
             ->assertSee('data-testid="aw-publications"', false)
+            ->assertDontSee('data-testid="aw-live"', false)
             ->assertDontSee('wire:poll', false);
     }
 
@@ -114,7 +122,7 @@ class ArticleWorkspaceTest extends TestCase
         $a->update(['created_by' => $author->id]);
         $this->actingAs($this->user('approver'));
 
-        $quality = \App\Filament\Support\Review\ReviewActions::qualityFor($a->versions()->first());
+        $quality = ReviewActions::qualityFor($a->versions()->first());
         $data = $quality->hasBlocking() ? ['override_reason' => 'Bài thử nghiệm, chấp nhận ngoại lệ để kiểm luồng.'] : [];
 
         Livewire::test(ViewArticle::class, ['record' => $a->getRouteKey()])
@@ -149,22 +157,75 @@ class ArticleWorkspaceTest extends TestCase
         $this->get("/admin/articles/{$a->id}/edit")->assertOk()->assertSee('data-testid="article-workspace"', false);
     }
 
-    public function test_chon_phien_ban_ngay_trong_tab_noi_dung(): void
+    public function test_tab_noi_dung_la_danh_sach_phien_ban_co_nut_xem_sang_trang_chi_tiet(): void
     {
         $this->actingAs($this->user('writer'));
         $a = $this->article('needs_review');
         $old = $a->versions()->first();
         $old->update(['review_status' => 'rejected', 'review_notes' => 'Thiếu số liệu']);
-        ArticleVersion::create(['article_id' => $a->id, 'version' => 2, 'title' => 'Bản hai', 'slug' => 'ban-hai', 'html_content' => '<p>Nội dung bản hai.</p>', 'review_status' => 'needs_review']);
-        $other = $this->article('needs_review')->versions()->first();
+        $new = ArticleVersion::create(['article_id' => $a->id, 'version' => 2, 'title' => 'Bản hai', 'slug' => 'ban-hai', 'html_content' => '<p>Nội dung bản hai.</p>', 'review_status' => 'needs_review']);
 
-        Livewire::test(ViewArticle::class, ['record' => $a->getRouteKey()])
-            ->assertSee('Nội dung bản hai.')->assertDontSee('Nội dung thử nghiệm.')
-            ->set('versionId', $old->id)
-            ->assertSee('Nội dung thử nghiệm.')->assertSee('Thiếu số liệu')->assertSee('Bạn đang xem bản cũ v1')
-            // bản của bài khác không được hiện: quay về bản mới nhất
-            ->set('versionId', $other->id)
-            ->assertSee('Nội dung bản hai.');
+        $html = $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()
+            ->assertSee('Bản hai')->assertSee('Chọn máy lọc nước')->assertSee('Thiếu số liệu')
+            ->assertSee(ArticleVersionResource::getUrl('view', ['record' => $old]), false)
+            ->assertSee(ArticleVersionResource::getUrl('view', ['record' => $new]), false)
+            ->assertDontSee('Nội dung bản hai.')
+            ->getContent();
+
+        // Tổng quan là tab đầu tiên; bản mới nhất đứng trên.
+        $this->assertLessThan(strpos($html, 'data-key="keyword"'), strpos($html, 'data-key="overview"'));
+        $this->assertLessThan(strpos($html, 'data-version="1"'), strpos($html, 'data-version="2"'));
+    }
+
+    public function test_tu_khoa_cum_va_ke_hoach_hien_dung_lien_ket_cua_bai(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $cluster = KeywordCluster::create(['website_id' => $this->site->id, 'name' => 'Lọc nước gia đình']);
+        $kw = Keyword::create(['website_id' => $this->site->id, 'keyword' => 'máy lọc nước', 'keyword_key' => 'máy lọc nước', 'volume' => 12400, 'difficulty' => 35, 'intent' => 'commercial', 'source' => 'csv', 'cluster_id' => $cluster->id, 'status' => 'has_article']);
+        Keyword::create(['website_id' => $this->site->id, 'keyword' => 'lõi lọc nước', 'keyword_key' => 'lõi lọc nước', 'volume' => 900, 'source' => 'csv', 'cluster_id' => $cluster->id, 'status' => 'new']);
+        $a = $this->article('needs_review');
+        $a->update(['keyword_id' => $kw->id, 'cluster_id' => $cluster->id, 'origin' => 'plan', 'priority' => 80]);
+
+        $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()
+            ->assertSee('12.400')->assertSee('35/100')->assertSee('Thương mại')
+            ->assertSee('Kế hoạch nội dung')
+            ->assertSee('data-testid="aw-cluster"', false)
+            ->assertSee('lõi lọc nước')->assertSee('Chưa có bài')
+            ->assertDontSee('dò theo tên');
+
+        // Bài không gắn keyword_id: dò theo tên và nói rõ.
+        $b = $this->article('needs_review');
+        $this->get(ArticleResource::getUrl('view', ['record' => $b]))->assertOk()->assertSee('12.400')->assertSee('dò theo tên');
+    }
+
+    public function test_bai_khong_co_trong_kho_tu_khoa_thi_noi_ro(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $a = $this->article('needs_review');
+
+        $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()
+            ->assertSee('chưa có trong kho từ khóa')
+            ->assertSee('chưa có hồ sơ doanh nghiệp')
+            ->assertDontSee('data-testid="aw-cluster"', false);
+    }
+
+    public function test_phien_dang_chay_thi_tab_hoat_dong_co_hieu_ung_va_tu_lam_moi(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $a = $this->article('planned', false);
+        $run = AgentRun::create(['website_id' => $this->site->id, 'article_id' => $a->id, 'triggered_by' => null, 'trigger' => 'manual', 'status' => 'running', 'started_at' => now()->subMinute()]);
+        foreach (['guard' => 'Được phép chạy', 'risk' => 'Hạng rủi ro: thấp', 'brief' => 'Lập dàn ý (3 mục)'] as $stage => $title) {
+            AgentRunStep::create(['agent_run_id' => $run->id, 'seq' => AgentRunStep::count() + 1, 'stage' => $stage, 'role' => 'system', 'status' => 'ok', 'title' => $title, 'data' => $stage === 'brief' ? ['outline' => ['Tổng quan', 'Cách chọn']] : []]);
+        }
+
+        $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()
+            ->assertSee('wire:poll', false)
+            ->assertSee('data-testid="aw-live"', false)
+            ->assertSee('data-live-stage="write"', false)
+            ->assertSee('ss-stage-live', false)
+            ->assertSee('data-link="write" data-state="run"', false)
+            ->assertSee('Lập dàn ý (3 mục)')
+            ->assertSee('Cách chọn');
     }
 
     public function test_nut_xem_o_danh_sach_cung_dich_voi_bam_vao_dong(): void
@@ -175,5 +236,16 @@ class ArticleWorkspaceTest extends TestCase
         Livewire::test(ListArticles::class)
             ->assertTableActionHasUrl('view_version', ArticleResource::getUrl('view', ['record' => $a]), $a)
             ->assertTableActionDoesNotExist('edit');
+    }
+
+    public function test_trang_chi_tiet_phien_ban_co_nut_ve_bai_viet(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $a = $this->article('needs_review');
+        $v = $a->versions()->first();
+
+        $this->get(ArticleVersionResource::getUrl('view', ['record' => $v]))->assertOk()
+            ->assertSee('Về bài viết')
+            ->assertSee(ArticleResource::getUrl('view', ['record' => $a]).'#tab-content', false);
     }
 }
