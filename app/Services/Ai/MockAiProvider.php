@@ -3,10 +3,12 @@
 namespace App\Services\Ai;
 
 use App\Contracts\AiProviderInterface;
+use App\Contracts\PartialRefreshInterface;
 use App\Models\Article;
+use App\Models\ArticleVersion;
 use Illuminate\Support\Str;
 
-class MockAiProvider implements AiProviderInterface
+class MockAiProvider implements AiProviderInterface, PartialRefreshInterface
 {
     protected string $promptVersion = 'v1.0-seo-vn-mock';
 
@@ -88,6 +90,30 @@ class MockAiProvider implements AiProviderInterface
             'model' => 'mock-gemini-pro',
             'prompt_version' => $this->promptVersion,
         ];
+    }
+
+    /** G5: tất định, không gọi AI. */
+    public function regenerateMeta(Article $article, ArticleVersion $current, array $issues, array $options = []): array
+    {
+        $kw = $article->primary_keyword;
+
+        return [
+            'seo_title' => mb_substr('Hướng dẫn '.$kw.' chi tiết', 0, 60),
+            'meta_description' => mb_substr("Tìm hiểu {$kw}: khái niệm, cách thực hiện, lưu ý quan trọng và lời khuyên thực tế từ chuyên gia, trình bày rõ ràng, dễ hiểu giúp bạn áp dụng ngay hôm nay vào công việc.", 0, 160),
+            'tokens_used' => 150, 'cost_vnd' => 0.0, 'model' => 'mock-gemini-pro', 'prompt_version' => 'v1.0-refresh-meta',
+        ];
+    }
+
+    /** G5: tất định; giữ đúng h2 của mục và thêm một đoạn giả lập. */
+    public function repairSections(Article $article, ArticleVersion $current, array $sections, array $feedback, array $options = []): array
+    {
+        $out = [];
+        foreach ($sections as $s) {
+            $h = trim(strip_tags((string) ($s['heading'] ?? '')));
+            $out[(int) $s['index']] = '<h2>'.e($h).'</h2><p>Nội dung mục đã được sửa (giả lập) cho từ khóa <strong>'.e($article->primary_keyword).'</strong>.</p>';
+        }
+
+        return ['sections' => $out, 'tokens_used' => 200 * max(1, count($out)), 'cost_vnd' => 0.0, 'model' => 'mock-gemini-pro', 'prompt_version' => 'v1.0-refresh-section'];
     }
 
     public function calculateCostVnd(int $promptTokens, int $completionTokens, string $model): float

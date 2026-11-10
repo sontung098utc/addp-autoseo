@@ -3,8 +3,10 @@
 namespace App\Services\Ai;
 
 use App\Contracts\AiProviderInterface;
+use App\Contracts\PartialRefreshInterface;
 use App\Contracts\StructuredAiInterface;
 use App\Models\Article;
+use App\Models\ArticleVersion;
 use Illuminate\Support\Str;
 
 /**
@@ -12,7 +14,7 @@ use Illuminate\Support\Str;
  * Lần viết đầu cố ý ngắn và thiếu từ khóa; khi nhận danh sách lỗi chặn (options['feedback']) thì trả bản đầy đủ.
  * Phiên chạy dùng nó luôn được ghi nhãn "AI giả lập"; nội dung chỉ là chữ ghép để qua luật, không có giá trị biên tập.
  */
-final class DemoScriptedAiProvider implements AiProviderInterface, StructuredAiInterface
+final class DemoScriptedAiProvider implements AiProviderInterface, PartialRefreshInterface, StructuredAiInterface
 {
     private const LEX = ['khách', 'hàng', 'dịch', 'vụ', 'giải', 'pháp', 'doanh', 'nghiệp', 'quy', 'trình', 'chất', 'lượng', 'kinh', 'nghiệm', 'thực', 'tế', 'hiệu', 'quả',
         'chi', 'phí', 'thời', 'gian', 'tư', 'vấn', 'triển', 'khai', 'kết', 'quả', 'đánh', 'giá', 'kế', 'hoạch', 'mục', 'tiêu', 'người', 'dùng', 'nội', 'dung'];
@@ -35,6 +37,28 @@ final class DemoScriptedAiProvider implements AiProviderInterface, StructuredAiI
             'focus_keyword' => $kw, 'faq_schema' => [], 'sources_cited' => [],
             'tokens_used' => $fixed ? 1800 : 300, 'cost_vnd' => $fixed ? 90.0 : 15.0, 'model' => 'demo-kich-ban', 'prompt_version' => 'demo',
         ];
+    }
+
+    /** G5: kết quả hợp lệ tối thiểu, tất định, nhãn demo. KHÔNG phải AI thật. */
+    public function regenerateMeta(Article $article, ArticleVersion $current, array $issues, array $options = []): array
+    {
+        $kw = $article->primary_keyword;
+
+        return [
+            'seo_title' => mb_substr($kw.': điều cần biết', 0, 60),
+            'meta_description' => mb_substr("Hướng dẫn {$kw}: những điều cần biết, cách thực hiện và lưu ý quan trọng, trình bày dễ hiểu cho người mới bắt đầu, kèm ví dụ thực tế để áp dụng ngay.", 0, 160),
+            'tokens_used' => 100, 'cost_vnd' => 5.0, 'model' => 'demo-kich-ban', 'prompt_version' => 'demo',
+        ];
+    }
+
+    public function repairSections(Article $article, ArticleVersion $current, array $sections, array $feedback, array $options = []): array
+    {
+        $out = [];
+        foreach ($sections as $s) {
+            $out[(int) $s['index']] = '<h2>'.e(trim(strip_tags((string) ($s['heading'] ?? '')))).'</h2><p>'.$this->words(120, 5 + (int) $s['index'] + (crc32($article->primary_keyword) % 9000)).'</p>';
+        }
+
+        return ['sections' => $out, 'tokens_used' => 300, 'cost_vnd' => 15.0, 'model' => 'demo-kich-ban', 'prompt_version' => 'demo'];
     }
 
     /** AG-S21: "tách kiến thức" giả lập tất định (chỉ môi trường local): mỗi đoạn trong khung tài liệu thành một mục, độ tin cậy thấp. KHÔNG phải AI thật. */

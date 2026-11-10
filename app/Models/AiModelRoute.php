@@ -19,6 +19,9 @@ class AiModelRoute extends Model
         // G3: khảo sát thị trường (mắt xích Từ khóa). Chưa cấu hình riêng thì dùng route 'summary' (KeywordAiResolver).
         'keyword_suggest' => ['Đề xuất từ khóa', 'cheap'],
         'keyword_cluster' => ['Gom cụm từ khóa', 'cheap'],
+        // G5: làm mới bài MỘT PHẦN (PartialRefreshInterface): sinh lại meta (rẻ) và sửa các mục có lỗi (chuẩn), thay vì viết lại cả bài bằng bậc suy luận.
+        'meta_regen' => ['Sinh lại tiêu đề SEO và meta', 'cheap'],
+        'section_repair' => ['Sửa các mục có lỗi', 'standard'],
     ];
 
     public const TIERS = ['cheap' => 'Rẻ', 'standard' => 'Chuẩn', 'reasoning' => 'Suy luận'];
