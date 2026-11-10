@@ -28,21 +28,37 @@
         </div>
     </x-filament::section>
 
-    <x-filament::section heading="Mức tự động hiện tại" description="30 ngày gần nhất, tính từ các phiên chạy thật. Chưa đo được thì ghi 'Chưa có dữ liệu', không điền 0.">
-        <table class="text-sm" style="width:100%" data-testid="metrics">
-            <tbody>
-                <tr><td>Tỉ lệ phiên hoàn tất không cần người</td><td data-m="completion_rate">{{ $pct($metrics['completion_rate']) }}</td></tr>
-                <tr><td>Tỉ lệ tự sửa thành công</td><td data-m="repair_success_rate">{{ $pct($metrics['repair_success_rate']) }}</td></tr>
-                <tr><td>Số vòng sửa trung bình</td><td data-m="avg_repair_rounds">{{ $num($metrics['avg_repair_rounds'], ' vòng') }}</td></tr>
-                <tr><td>Tỉ lệ giữ nháp (cần người xem)</td><td data-m="hold_rate">{{ $pct($metrics['hold_rate']) }}</td></tr>
-                <tr><td>Tỉ lệ phiên lỗi</td><td data-m="fail_rate">{{ $pct($metrics['fail_rate']) }}</td></tr>
-                <tr><td>Chi phí mỗi bản nháp</td><td data-m="cost_per_draft">{{ $num($metrics['cost_per_draft'], ' đ', 0) }}</td></tr>
-                <tr><td>Thời gian từ giao việc tới bản nháp</td><td data-m="seconds_to_draft">{{ $dur }}</td></tr>
-                @foreach ($unmeasured as $label => $why)
-                    <tr><td>{{ $label }}</td><td>Chưa có dữ liệu <span class="text-xs" style="opacity:.6">({{ $why }})</span></td></tr>
-                @endforeach
-            </tbody>
-        </table>
+    @php
+        $rows = [
+            ['Tỉ lệ phiên hoàn tất không cần người', 'completion_rate', $metrics['completion_rate'], $pct($metrics['completion_rate'])],
+            ['Tỉ lệ tự sửa thành công', 'repair_success_rate', $metrics['repair_success_rate'], $pct($metrics['repair_success_rate'])],
+            ['Số vòng sửa trung bình', 'avg_repair_rounds', $metrics['avg_repair_rounds'], $num($metrics['avg_repair_rounds'], ' vòng')],
+            ['Tỉ lệ giữ nháp (cần người xem)', 'hold_rate', $metrics['hold_rate'], $pct($metrics['hold_rate'])],
+            ['Tỉ lệ phiên lỗi', 'fail_rate', $metrics['fail_rate'], $pct($metrics['fail_rate'])],
+            ['Chi phí mỗi bản nháp', 'cost_per_draft', $metrics['cost_per_draft'], $num($metrics['cost_per_draft'], ' đ', 0)],
+            ['Thời gian từ giao việc tới bản nháp', 'seconds_to_draft', $metrics['seconds_to_draft'], $dur],
+        ];
+        $measured = array_values(array_filter($rows, fn ($r) => $r[2]['value'] !== null));
+    @endphp
+    <x-filament::section heading="Mức tự động hiện tại">
+        <x-slot name="headerEnd"><x-studio.hint text="30 ngày gần nhất, tính từ các phiên chạy thật. Chỉ số nào chưa đo được thì không hiện, không điền 0." /></x-slot>
+        @if (count($measured) === 0)
+            <div class="text-sm" data-testid="metrics-empty">
+                Chưa có dữ liệu để đo. <span style="opacity:.75">Cần ít nhất một phiên chạy xong trong 30 ngày gần nhất.</span>
+            </div>
+        @else
+            <table class="text-sm" style="width:100%" data-testid="metrics">
+                <tbody>
+                    @foreach ($measured as $r)
+                        <tr><td>{{ $r[0] }}</td><td data-m="{{ $r[1] }}">{{ $r[3] }}</td></tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
+        <div class="text-sm" style="margin-top:.5rem" data-testid="unmeasured">
+            Chưa đo được: {{ implode(', ', array_keys($unmeasured)) }}
+            <x-studio.hint :text="collect($unmeasured)->map(fn ($why, $label) => $label.': '.$why)->implode(' ')" />
+        </div>
     </x-filament::section>
 
     <x-filament::section heading="Điều kiện để lên Mức 2" :collapsible="true" :collapsed="true">

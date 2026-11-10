@@ -217,6 +217,23 @@ class CompetitorsPageTest extends TestCase
         $this->assertSame(['a.vn'], \App\Models\Competitor::pluck('domain')->all());
     }
 
+    /** Gói B #4: 0 mục thì nút "Thêm vào kế hoạch" bị vô hiệu; chưa có đối thủ thì mở sẵn tab Đối thủ. */
+    public function test_add_to_plan_disabled_when_zero_selected_and_default_tab_is_competitors_when_empty(): void
+    {
+        $html = $this->page('approver', 'khong-doi-thu')->html();
+        $this->assertMatchesRegularExpression('/<button[^>]*disabled[^>]*>\s*(?:<[^>]+>\s*)*Thêm vào kế hoạch \(0\)/su', $html);
+        $this->assertStringContainsString("studioTabs('competitors'", $html);
+    }
+
+    public function test_default_tab_stays_gaps_when_competitors_exist(): void
+    {
+        $this->actingAs($this->user('approver'));
+        $this->app['env'] = 'production';
+        \App\Models\Competitor::create(['website_id' => $this->site->id, 'domain' => 'a.vn']);
+        $html = Livewire::test(CompetitorsPage::class)->html();
+        $this->assertStringContainsString("studioTabs('gaps'", $html);
+    }
+
     public function test_ui_has_tabs_single_primary_and_no_noise(): void
     {
         $html = $this->loaded()->html();

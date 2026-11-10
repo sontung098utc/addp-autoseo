@@ -30,6 +30,9 @@ class ArticleResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Bài viết';
 
+    /** Quy ước giao diện: câu thường ("Chiến dịch tự động"), không để Filament tự Viết Hoa Từng Chữ ở tiêu đề và breadcrumb. */
+    protected static bool $hasTitleCaseModelLabel = false;
+
     protected static ?string $navigationGroup = 'Chiến dịch';
 
     protected static ?int $navigationSort = 2;

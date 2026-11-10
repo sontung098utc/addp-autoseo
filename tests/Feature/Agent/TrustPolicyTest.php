@@ -45,6 +45,21 @@ class TrustPolicyTest extends TestCase
         }
         $this->actingAs($this->user('approver'));
         $this->get('/admin/chinh-sach-tin-cay')->assertOk()->assertSee('Chưa có dữ liệu')->assertDontSee('(0 phiên)');
+        // Gói B #6: một trạng thái trống duy nhất thay cho từng dòng "Chưa có dữ liệu" (7 chỉ số + 3 chưa đo được).
+        $html = $this->get('/admin/chinh-sach-tin-cay')->getContent();
+        $this->assertSame(1, substr_count(strip_tags(substr($html, 0, strpos($html, 'Điều kiện để lên Mức 2'))), 'Chưa có dữ liệu'));
+        $this->assertStringContainsString('data-testid="metrics-empty"', $html);
+        $this->assertStringNotContainsString('data-m="completion_rate"', $html);
+    }
+
+    public function test_chi_hien_chi_so_co_so(): void
+    {
+        $this->run_('ready_for_review', ['repair_rounds' => 0, 'cost_vnd' => 1000]);
+        $this->actingAs($this->user('approver'));
+        $html = $this->get('/admin/chinh-sach-tin-cay')->getContent();
+        $this->assertStringContainsString('data-m="completion_rate"', $html);
+        $this->assertStringNotContainsString('data-testid="metrics-empty"', $html);
+        $this->assertStringContainsString('Chưa đo được: Kiểm mẫu sau đăng', $html);
     }
 
     public function test_tinh_dung_tren_du_lieu_mau(): void

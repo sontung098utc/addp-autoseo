@@ -45,7 +45,7 @@
                 </div>
             @endif
 
-            <x-studio.tabs persist="doi-thu" :tabs="[
+            <x-studio.tabs persist="doi-thu" :default="count($domains) === 0 ? 'competitors' : 'gaps'" :tabs="[
                 ['key' => 'gaps', 'label' => 'Khoảng trống', 'count' => $showGaps ? count($gapRows) : null, 'tone' => ($state === 'loi-api' || $refreshError) ? 'danger' : null],
                 ['key' => 'competitors', 'label' => 'Đối thủ', 'count' => count($domains)],
                 ['key' => 'source', 'label' => 'Nguồn và chi phí'],
