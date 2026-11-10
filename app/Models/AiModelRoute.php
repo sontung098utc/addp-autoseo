@@ -22,6 +22,8 @@ class AiModelRoute extends Model
         // G5: làm mới bài MỘT PHẦN (PartialRefreshInterface): sinh lại meta (rẻ) và sửa các mục có lỗi (chuẩn), thay vì viết lại cả bài bằng bậc suy luận.
         'meta_regen' => ['Sinh lại tiêu đề SEO và meta', 'cheap'],
         'section_repair' => ['Sửa các mục có lỗi', 'standard'],
+        // Tạo ảnh minh họa: KHÔNG qua AiModelRouter::target (không phải chat); ImageGeneratorResolver đọc route này (provider kiểu gemini/openai_compat).
+        'image_gen' => ['Tạo ảnh minh họa', 'cheap'],
     ];
 
     public const TIERS = ['cheap' => 'Rẻ', 'standard' => 'Chuẩn', 'reasoning' => 'Suy luận'];
