@@ -33,6 +33,15 @@
             </div>
         @endif
 
+        @php
+            $report = \App\Filament\Support\Agent\RunReport::for($run);
+        @endphp
+        <section class="ss-review-card" data-testid="run-report" style="margin:0 0 1rem">
+            <h2 class="ss-review-card__title">{{ $report['title'] }}</h2>
+            <ul style="margin:0 0 .5rem 1rem;list-style:disc">@foreach ($report['lines'] as $l)<li>{{ $l }}</li>@endforeach</ul>
+            @foreach ($report['links'] as $lk)<a class="rv-chip rv-chip--link" href="{{ $lk['url'] }}">{{ $lk['label'] }}</a> @endforeach
+        </section>
+
         {{-- Dòng phụ: số phiên, giờ bắt đầu và các chip ngữ cảnh. Tên bài là tiêu đề trang phía trên. --}}
         <div class="rv-meta" data-testid="run-meta">
             <span class="rv-sub">#{{ $run->id }} · bắt đầu lúc {{ $startedAt ? VnTime::format($startedAt, 'd/m/Y H:i') : '—' }} (giờ VN)</span>
