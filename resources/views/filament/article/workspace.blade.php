@@ -152,6 +152,9 @@
             <x-studio.panel key="overview">
                 <div class="aw-stack">
                     <p class="aw-next" data-testid="aw-next"><strong>Việc tiếp theo:</strong> {{ $next }}</p>
+                    @if (filled($article->guidance))
+                        <p class="aw-muted" data-testid="aw-guidance"><strong>Chỉ dẫn cho đội AI:</strong> {{ \Illuminate\Support\Str::limit($article->guidance, 240) }} <span>(đổi bằng nút "Chỉ dẫn cho đội AI" ở đầu trang)</span></p>
+                    @endif
                     @if ($showPreflight)
                         <section class="ss-review-card" data-testid="aw-preflight">
                             <h2 class="ss-review-card__title">AI sẽ tự chuẩn bị</h2>

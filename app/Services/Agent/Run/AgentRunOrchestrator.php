@@ -309,7 +309,7 @@ final class AgentRunOrchestrator
         } else {
             $this->skills['brief'] = $this->usePlaybook('brief', 'content-brief');
             [$briefPb, $briefNote] = $this->skills['brief'];
-            $briefOptions = ($briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : []) + $this->roleOptions('strategist') + $this->brandOptions() + $this->brainCtx->options($article);
+            $briefOptions = ($briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : []) + $this->guidanceOptions($article) + $this->roleOptions('strategist') + $this->brandOptions() + $this->brainCtx->options($article);
             $outline = $this->callAi($run, 'outline', 'lập dàn ý', fn (AiProviderInterface $ai) => $ai->generateOutline($article, $briefOptions));
             $offTopic = BrandProfileData::looksOffTopic($this->brandProfile, (string) $article->primary_keyword);
             $this->step($run, 'brief', 'strategist', $offTopic ? 'warn' : 'ok', 'Lập dàn ý ('.count($outline['outline'] ?? []).' mục)', 'Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. '.$briefNote.$this->brandNote().$this->brainCtx->note()
@@ -456,7 +456,7 @@ final class AgentRunOrchestrator
             $options['playbook'] = $pb->body;
             $options['playbook_ref'] = $pb->ref();
         }
-        $options += $this->roleOptions('writer') + $this->brandOptions() + $this->brainCtx->options($article);
+        $options += $this->guidanceOptions($article) + $this->roleOptions('writer') + $this->brandOptions() + $this->brainCtx->options($article);
         $this->kb ??= new KnowledgeContext();
         $this->kb->load($article, $outline); // AG-S20: kiến thức đã duyệt, truy xuất một lần mỗi lượt chạy
         $options += $this->kb->options();
@@ -596,6 +596,14 @@ final class AgentRunOrchestrator
     }
 
     /** Tùy chọn vai trò truyền cho adapter AI: khóa + tên tiếng Việt, để prompt có dòng "Bạn đang đóng vai". */
+    /** Chỉ dẫn thêm của người phụ trách cho riêng bài này (articles.guidance), nếu có. @return array<string,string> */
+    private function guidanceOptions(Article $article): array
+    {
+        $g = trim((string) $article->guidance);
+
+        return $g === '' ? [] : ['guidance' => $g];
+    }
+
     private function roleOptions(string $key): array
     {
         $opts = ['role' => $key, 'role_name' => $this->roles->roleName($key)];

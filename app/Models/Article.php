@@ -30,6 +30,7 @@ class Article extends Model
         'cluster_id',
         'priority',
         'campaign_id',
+        'guidance',
     ];
 
     protected function casts(): array

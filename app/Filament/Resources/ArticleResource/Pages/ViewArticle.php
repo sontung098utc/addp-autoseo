@@ -23,6 +23,7 @@ use App\Services\Agent\Pipeline\JobTypeRegistry;
 use App\Services\Agent\Readiness\BrainAutoAttach;
 use App\Services\Brain\BrainContext;
 use Filament\Actions;
+use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 
 /**
@@ -133,6 +134,24 @@ class ViewArticle extends EditArticle
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('guidance')->label('Chỉ dẫn cho đội AI')->icon('heroicon-o-chat-bubble-left-ellipsis')->color('gray')
+                ->visible(fn () => ArticleResource::canEdit($this->record))
+                ->modalHeading('Chỉ dẫn thêm cho đội AI')
+                ->modalDescription('Định hướng riêng cho bài này: góc nhìn, đối tượng, điều cần nhấn hoặc tránh. Đội AI dùng ở lần giao kế tiếp (lập dàn ý và viết); không thay được quy tắc an toàn, nguồn và từ cấm.')
+                ->modalSubmitActionLabel('Lưu chỉ dẫn')
+                ->fillForm(fn () => ['guidance' => $this->record->guidance])
+                ->form([
+                    Textarea::make('guidance')->label('Chỉ dẫn')->rows(6)->maxLength(1500)
+                        ->placeholder('Ví dụ: Viết cho người trên 50 tuổi, nhấn mạnh thay đổi ăn uống tại nhà, giọng gần gũi; không nhắc tên thuốc.')
+                        ->helperText('Để trống để xóa chỉ dẫn. Sau khi lưu, bấm "Giao đội AI" để áp dụng.'),
+                ])
+                ->action(function (array $data) {
+                    abort_unless(ArticleResource::canEdit($this->record), 403);
+                    $g = trim((string) ($data['guidance'] ?? ''));
+                    $this->record->update(['guidance' => $g === '' ? null : mb_substr($g, 0, 1500)]);
+                    Notification::make()->title($g === '' ? 'Đã xóa chỉ dẫn' : 'Đã lưu chỉ dẫn cho đội AI')->success()->send();
+                    $this->refreshRecord();
+                }),
             Actions\Action::make('run_agent')->label('Giao đội AI')->icon('heroicon-o-cpu-chip')
                 ->visible(fn () => ArticleResource::canAssignToAgent($this->record))
                 ->modalHeading('Giao bài này cho đội AI')

@@ -113,6 +113,37 @@
             @endif
         </section>
 
+        @php($bc = \App\Services\Brand\BrandCompliance::forVersion($record))
+        <section class="ss-review-card" aria-labelledby="ss-review-brand" data-testid="brand-compliance">
+            <h2 class="ss-review-card__title" id="ss-review-brand">Bản sắc thương hiệu và quy tắc lĩnh vực</h2>
+            <p style="font-size:.8rem;opacity:.75;margin:0 0 .5rem">Kiểm bằng luật, không phán đoán văn phong: chỉ nói điều đối chiếu được với hồ sơ doanh nghiệp và Trí tuệ.</p>
+            @foreach ($bc['notes'] as $n)<p style="color:#b45309;margin:.2rem 0">⚠ {{ $n }}</p>@endforeach
+            <dl class="ss-review-dl">
+                <dt>Hồ sơ doanh nghiệp</dt><dd>{{ $bc['brand']['profile_percent'] }}%@if ($bc['brand']['missing'] !== []) (thiếu: {{ implode(', ', $bc['brand']['missing']) }})@endif</dd>
+                <dt>Giọng đã cấu hình</dt><dd>{{ $bc['brand']['voice'] ?: '—' }}</dd>
+                <dt>Đối tượng</dt><dd>{{ $bc['brand']['audience'] ?: '—' }}</dd>
+                <dt>Thông điệp chính</dt>
+                <dd>
+                    @forelse ($bc['brand']['messages'] as $m)
+                        <div>{{ $m['covered'] ? '✔ Có trong bài' : '○ Chưa thấy' }}: {{ $m['text'] }}</div>
+                    @empty — @endforelse
+                </dd>
+                <dt>Từ cấm trong bài</dt><dd>{{ $bc['brand']['forbidden_hits'] === [] ? 'Không có' : implode(', ', $bc['brand']['forbidden_hits']) }}</dd>
+                <dt>Trí tuệ áp dụng</dt>
+                <dd>
+                    @forelse ($bc['domain']['brains'] as $b)
+                        <div>{{ $b['name'] }} · nguồn: {{ \App\Models\Brain::RELIANCE[$b['reliance']] ?? $b['reliance'] }} · rủi ro: {{ \App\Models\Brain::RISK[$b['risk']] ?? $b['risk'] }}</div>
+                    @empty Chưa gắn Trí tuệ nào @endforelse
+                </dd>
+                <dt>Quy tắc chuyên gia đã đưa cho AI</dt>
+                <dd>
+                    @forelse ($bc['domain']['rules_applied'] as $r)
+                        <div>{{ $r['type'] === 'forbidden' ? 'Không được nói' : 'Quan niệm sai' }}: {{ $r['title'] }}</div>
+                    @empty Chưa có quy tắc nào @endforelse
+                </dd>
+                <dt>Mục kiến thức đã đưa cho AI</dt><dd>{{ $bc['domain']['knowledge_items'] }}</dd>
+            </dl>
+        </section>
         <section class="ss-review-card" aria-labelledby="ss-review-seo">
             <h2 class="ss-review-card__title" id="ss-review-seo">Thẻ SEO</h2>
             <dl class="ss-review-dl">
