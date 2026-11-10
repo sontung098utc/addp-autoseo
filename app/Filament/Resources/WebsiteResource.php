@@ -38,6 +38,9 @@ class WebsiteResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Website kết nối';
 
+    /** Quy ước giao diện: câu thường ("Chiến dịch tự động"), không để Filament tự Viết Hoa Từng Chữ ở tiêu đề và breadcrumb. */
+    protected static bool $hasTitleCaseModelLabel = false;
+
     protected static ?string $navigationGroup = 'Cài đặt';
 
     protected static ?int $navigationSort = 1;

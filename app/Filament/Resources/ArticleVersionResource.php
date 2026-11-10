@@ -22,6 +22,9 @@ class ArticleVersionResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Phiên bản bài';
 
+    /** Quy ước giao diện: câu thường ("Chiến dịch tự động"), không để Filament tự Viết Hoa Từng Chữ ở tiêu đề và breadcrumb. */
+    protected static bool $hasTitleCaseModelLabel = false;
+
     /** AG-S16: không còn mục menu riêng; việc duyệt nằm ở màn Bài viết. Resource giữ lại để xem chi tiết bản bài. */
     protected static bool $shouldRegisterNavigation = false;
 
