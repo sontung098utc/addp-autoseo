@@ -36,11 +36,11 @@
         @if ($monthExceeds)
             <div class="ss-alert ss-alert--danger" role="alert" data-ai="month-over"><strong>▲ Chi phí {{ $monthLabel }} đã vượt ngưỡng tháng:</strong> {{ Vnd::format($monthCost) }} / {{ Vnd::format($th['month']) }} (vượt {{ Vnd::format($monthCost - $th['month']) }}).</div>
         @endif
-        @if ($avgExceeds)
-            <div class="ss-alert ss-alert--warn" role="alert" data-ai="avg-over"><strong>▲ Trung bình {{ Vnd::format($avg) }}/bài, vượt ngưỡng {{ Vnd::format($th['article']) }}/bài.</strong></div>
-        @endif
-        @if (count($overArticles) > 0)
-            <div class="ss-alert ss-alert--warn" data-ai="articles-over">▲ {{ count($overArticles) }} bài vượt ngưỡng {{ Vnd::format($th['article']) }}: {{ $overArticles[0]['title'] }} {{ Vnd::format($overArticles[0]['cost']) }}</div>
+        @if ($avgExceeds || count($overArticles) > 0)
+            <div class="ss-alert ss-alert--warn" role="alert" data-ai="over-threshold"><strong>▲ Vượt ngưỡng {{ Vnd::format($th['article']) }}/bài:</strong>
+                @if ($avgExceeds)trung bình {{ Vnd::format($avg) }}/bài @endif
+                @if (count($overArticles) > 0)<span data-ai="articles-over">{{ $avgExceeds ? 'và ' : '' }}{{ count($overArticles) }} bài vượt{{ count($overArticles) > 1 ? ', cao nhất' : '' }}: {{ $overArticles[0]['title'] }} {{ Vnd::format($overArticles[0]['cost']) }}</span>@endif
+            </div>
         @endif
 
         @if (! $summary)

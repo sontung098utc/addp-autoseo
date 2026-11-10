@@ -104,9 +104,19 @@ class AiUsagePageTest extends TestCase
     public function test_avg_over_threshold_banner_and_boundary(): void
     {
         $this->version('k1', 1, 3412.0);
-        $this->as('approver')->assertSee('Trung bình 3.412 ₫/bài, vượt ngưỡng 3.000 ₫/bài', false)->assertSee('▲ Vượt ngưỡng');
+        $this->as('approver')->assertSee('▲ Vượt ngưỡng 3.000 ₫/bài:', false)->assertSee('trung bình 3.412 ₫/bài', false)->assertSee('▲ Vượt ngưỡng');
         $this->version('k2', 1, 2588.0); // TB = 3000 -> đúng bằng ngưỡng: không vượt
-        $this->as('approver')->assertDontSee('vượt ngưỡng 3.000 ₫/bài', false);
+        $this->as('approver')->assertDontSee('trung bình 3.000 ₫/bài', false); // chỉ còn dải 'bài vượt' vì k1 một mình 3.412 > 3.000
+    }
+
+    /** Gói B #7: trung bình vượt và bài vượt gộp thành MỘT dải cảnh báo, vẫn nêu bài vượt ngưỡng. */
+    public function test_avg_and_article_warnings_are_one_banner(): void
+    {
+        $this->version('k1', 1, 3412.0);
+        $html = $this->as('approver')->html();
+        $this->assertSame(1, substr_count($html, 'data-ai="over-threshold"'));
+        $this->assertStringNotContainsString('data-ai="avg-over"', $html);
+        $this->assertStringContainsString('1 bài vượt', $html);
     }
 
     public function test_month_threshold_banner(): void
