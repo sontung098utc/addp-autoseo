@@ -17,6 +17,7 @@ use App\Models\KeywordCluster;
 use App\Models\KnowledgeItemUsage;
 use App\Models\Publication;
 use App\Models\Website;
+use App\Services\Agent\Pipeline\JobTypeRegistry;
 use App\Services\Brain\BrainContext;
 use Filament\Actions;
 
@@ -40,11 +41,12 @@ class ViewArticle extends EditArticle
 
     public const KEYWORD_STATUSES = ['new' => 'Mới', 'planned' => 'Đã lên kế hoạch', 'has_article' => 'Đã có bài'];
 
-    /** Chặng của phiên chạy, theo thứ tự, cho dải chặng ở tab Hoạt động. */
-    public const RUN_STAGES = [
-        'guard' => 'Kiểm điều kiện', 'risk' => 'Xét rủi ro', 'brief' => 'Lập dàn ý', 'write' => 'Viết',
-        'grade' => 'Chấm điểm', 'repair' => 'Sửa', 'handoff' => 'Bàn giao',
-    ];
+    /** Chặng của phiên chạy, theo thứ tự, lấy từ registry loại việc (mã => nhãn), cho dải chặng ở tab Hoạt động. */
+    /** @return array<string, string> */
+    public static function runStages(): array
+    {
+        return JobTypeRegistry::stageLabels('article_write');
+    }
 
     public function getBreadcrumb(): string
     {

@@ -130,7 +130,7 @@
         <div class="aw-meta" data-testid="aw-meta">
             <x-filament::badge :color="$statusColor">{{ $statusLabel }}</x-filament::badge>
             @if ($live)
-                <span class="ss-live-pill" data-testid="aw-live-pill"><span class="ss-spin" aria-hidden="true"></span>Đội AI đang chạy · {{ W::RUN_STAGES[$liveStage] ?? 'sắp xong' }}</span>
+                <span class="ss-live-pill" data-testid="aw-live-pill"><span class="ss-spin" aria-hidden="true"></span>Đội AI đang chạy · {{ W::runStages()[$liveStage] ?? 'sắp xong' }}</span>
             @endif
             <span class="aw-chip">Từ khóa: {{ $article->primary_keyword }}</span>
             @if ($article->website)<span class="aw-chip">{{ $article->website->name }}</span>@endif
@@ -405,14 +405,14 @@
             <x-studio.panel key="activity">
                 <div class="aw-stack">
                     @if ($live)
-                        @php $stageKeys = array_keys(W::RUN_STAGES); $at = array_search($liveStage, $stageKeys, true); @endphp
+                        @php $stageKeys = array_keys(W::runStages()); $at = array_search($liveStage, $stageKeys, true); @endphp
                         <section class="aw-live" data-testid="aw-live">
                             <div class="aw-head">
                                 <span class="ss-live-pill"><span class="ss-spin" aria-hidden="true"></span>Phiên #{{ $live->id }} đang chạy · {{ RunActivity::formatElapsed(RunActivity::elapsedSeconds($live)) }}</span>
                                 @if (AgentRunResource::canViewAny())<a class="aw-link aw-muted" href="{{ AgentRunResource::getUrl('view', ['record' => $live]) }}">Xem diễn biến đầy đủ</a>@endif
                             </div>
                             <div class="aw-rail" data-testid="aw-rail">
-                                @foreach (W::RUN_STAGES as $code => $label)
+                                @foreach (W::runStages() as $code => $label)
                                     @php $done = $live->steps->contains('stage', $code) && $code !== $liveStage; @endphp
                                     <span @class(['aw-stage', 'aw-stage--run ss-stage-live' => $code === $liveStage, 'aw-stage--done' => $done]) data-stage="{{ $code }}" @if ($code === $liveStage) data-live-stage="{{ $code }}" @endif>
                                         @if ($code === $liveStage)<span class="ss-spin" aria-hidden="true"></span>@elseif ($done)✓@endif {{ $label }}
@@ -447,7 +447,7 @@
                                             <tr>
                                                 <td>#{{ $r->id }}</td>
                                                 <td>
-                                                    @if ($isLive)<span class="ss-running"><span class="ss-spin" aria-hidden="true"></span>Đang chạy · {{ W::RUN_STAGES[$liveStage] ?? 'sắp xong' }}</span>
+                                                    @if ($isLive)<span class="ss-running"><span class="ss-spin" aria-hidden="true"></span>Đang chạy · {{ W::runStages()[$liveStage] ?? 'sắp xong' }}</span>
                                                     @else {{ AgentRunResource::STATUS[$r->status][0] ?? $r->status }}
                                                     @endif
                                                     @if ($r->outcome_reason)<div class="aw-muted">{{ Str::limit($r->outcome_reason, 140) }}</div>@endif

@@ -1,5 +1,31 @@
 <x-filament-panels::page>
     <div data-testid="pipeline" class="space-y-3">
+        <div class="text-sm" style="opacity:.85">Chuỗi làm ra một bài <x-studio.hint text="Mỗi mắt xích có các loại việc phục vụ nó. 'Chưa có mã' nghĩa là mới khai báo, chưa chạy được." /></div>
+        <div data-testid="pipeline-chain" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:.6rem;align-items:start">
+            @foreach ($chain as $i => $link)
+                <div data-link="{{ $link['key'] }}" class="space-y-2">
+                    <div style="font-weight:600;border-bottom:2px solid rgba(128,128,128,.5);padding-bottom:.25rem">{{ $i + 1 }} · {{ $link['label'] }}</div>
+                    @forelse ($link['jobs'] as $j)
+                        @php($llm = collect($j['steps'])->where('kind', 'llm')->pluck('label')->all())
+                        <div data-job="{{ $j['id'] }}" class="text-xs space-y-1" style="border:1px solid rgba(128,128,128,.35);border-radius:.6rem;padding:.6rem .7rem">
+                            <div style="font-weight:600;font-size:.85rem">{{ $j['title'] }}</div>
+                            <div style="opacity:.55">{{ $j['status'] === 'active' ? 'Đã có mã chạy' : 'Chưa có mã' }}</div>
+                            <div style="opacity:.8">{{ $j['summary'] }}</div>
+                            <div><strong>Ghi:</strong> {{ implode(', ', $j['writes']) ?: 'chưa khai' }}</div>
+                            <div><strong>Hiện:</strong> {{ implode('; ', $j['shown_at']) ?: 'chưa khai' }}</div>
+                            <div><strong>Ai dùng tiếp:</strong> {{ collect($j['used_by'])->map(fn ($u) => $names[$u] ?? $u)->implode(', ') ?: 'chưa khai' }}</div>
+                            <div>{{ count($j['steps']) }} bước. {{ $llm ? 'Tốn token: '.implode(', ', $llm).'.' : 'Không tốn token.' }}</div>
+                            <x-filament::button size="xs" color="gray" wire:click="mountAction('job', {job: '{{ $j['id'] }}'})">Chi tiết</x-filament::button>
+                        </div>
+                    @empty
+                        <div class="text-xs" style="opacity:.6">Chưa có loại việc</div>
+                    @endforelse
+                </div>
+            @endforeach
+        </div>
+        <details data-testid="pipeline-map9" style="margin-top:.5rem">
+            <summary class="text-sm" style="cursor:pointer;font-weight:600">Bản đồ 9 giai đoạn (trạng thái bằng chứng)</summary>
+        <div class="space-y-3" style="margin-top:.5rem">
         <div class="text-sm" style="opacity:.85">9 giai đoạn <x-studio.hint text="Trạng thái mỗi giai đoạn được tính từ sổ tính năng và các phiên chạy thật, không tô tay. Giai đoạn chưa chạy trong phiên của đội AI không bao giờ hiện 'Đang hoạt động'." /></div>
         <div class="space-y-2">
             @foreach ($stages as $s)
@@ -23,6 +49,8 @@
                 </div>
             @endforeach
         </div>
+        </div>
+        </details>
         <div class="text-xs" data-testid="pipeline-controls">
             @if ($controls)
                 {{-- Nút điều khiển chỉ được thêm ở đây khi job nền và API pipeline có thật. --}}

@@ -4,6 +4,8 @@ namespace App\Filament\Support\Agent;
 
 use App\Filament\Support\Schedule\VnTime;
 use App\Models\AgentRun;
+use App\Models\AgentRunStep;
+use App\Services\Agent\Pipeline\JobTypeRegistry;
 use App\Services\Agent\Run\RunPolicy;
 use App\Services\Agent\Run\RunScorer;
 use Illuminate\Support\Collection;
@@ -15,7 +17,11 @@ use Illuminate\Support\Collection;
 final class RunFlow
 {
     /** Các chặng chính theo thứ tự luồng thật; 'grade' và 'repair' được vẽ thành vòng lặp riêng. */
-    public const MAIN = ['guard', 'risk', 'brief', 'write', 'grade', 'repair', 'handoff'];
+    /** @return list<string> */
+    public static function main(): array
+    {
+        return array_keys(JobTypeRegistry::stageLabels('article_write'));
+    }
 
     public const STATE = [
         'done' => ['Xong', 'heroicon-m-check-circle'],
@@ -56,7 +62,7 @@ final class RunFlow
     }
 
     /**
-     * @param  Collection<int, \App\Models\AgentRunStep>  $steps  đã sắp theo seq
+     * @param  Collection<int, AgentRunStep>  $steps  đã sắp theo seq
      * @return array<string, mixed>
      */
     public static function build(AgentRun $run, Collection $steps, bool $live, bool $stale, ?string $currentStage): array
@@ -85,7 +91,7 @@ final class RunFlow
                 continue;
             }
             if ($pendingInc !== []) {
-                $target = in_array($s->stage, self::MAIN, true) ? $s->stage : 'write';
+                $target = in_array($s->stage, self::main(), true) ? $s->stage : 'write';
                 $incidents[$target] = array_merge($incidents[$target] ?? [], $pendingInc);
                 $pendingInc = [];
             }
@@ -95,7 +101,7 @@ final class RunFlow
         }
 
         $nodes = [];
-        foreach (self::MAIN as $code) {
+        foreach (self::main() as $code) {
             $b = $blueprint[$code] ?? ['title' => $code, 'role' => ''];
             $ran = $steps->where('stage', $code)->values();
             $isNow = $live && $currentStage === $code;
@@ -152,7 +158,7 @@ final class RunFlow
 
         $total = $steps->sum('tokens_used');
         $cost = (float) $steps->sum('cost_vnd');
-        $budget = (new RunPolicy())->budgetVnd;
+        $budget = (new RunPolicy)->budgetVnd;
         $end = VnTime::fromRaw($run, 'finished_at');
         $start = VnTime::fromRaw($run, 'started_at') ?? VnTime::fromRaw($run, 'created_at');
         $seconds = $end && $start ? max(0, (int) abs($end->diffInSeconds($start, false))) : RunActivity::elapsedSeconds($run);

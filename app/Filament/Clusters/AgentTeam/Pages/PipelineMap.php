@@ -4,6 +4,7 @@ namespace App\Filament\Clusters\AgentTeam\Pages;
 
 use App\Filament\Clusters\AgentTeam;
 use App\Models\User;
+use App\Services\Agent\Pipeline\JobTypeRegistry;
 use App\Services\Agent\Pipeline\PipelineBlueprint;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
@@ -58,8 +59,39 @@ class PipelineMap extends Page
             ->modalCancelActionLabel('Đóng');
     }
 
+    /** Cửa sổ trượt của một loại việc (thẻ dưới mắt xích). */
+    public function jobAction(): Action
+    {
+        return Action::make('job')
+            ->modalHeading(fn (array $arguments): string => ($j = JobTypeRegistry::find($arguments['job'] ?? '')) ? 'Loại việc · '.$j['title'] : 'Loại việc')
+            ->slideOver()
+            ->modalContent(fn (array $arguments) => view('filament.clusters.agent-team.pipeline-job', [
+                'j' => JobTypeRegistry::find($arguments['job'] ?? ''),
+                'names' => $this->jobNames(),
+                'chain' => JobTypeRegistry::CHAIN,
+            ]))
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Đóng');
+    }
+
+    /** @return array<string, string> mã loại việc => tên; 'human' => 'Người' */
+    private function jobNames(): array
+    {
+        return ['human' => 'Người'] + array_column(JobTypeRegistry::all(), 'title', 'id');
+    }
+
     protected function getViewData(): array
     {
-        return ['stages' => PipelineBlueprint::stages(), 'controls' => PipelineBlueprint::controlsWired()];
+        $chain = [];
+        foreach (JobTypeRegistry::CHAIN as $key => $label) {
+            $chain[] = ['key' => $key, 'label' => $label, 'jobs' => JobTypeRegistry::forLink($key)];
+        }
+
+        return [
+            'stages' => PipelineBlueprint::stages(),
+            'controls' => PipelineBlueprint::controlsWired(),
+            'chain' => $chain,
+            'names' => $this->jobNames(),
+        ];
     }
 }
