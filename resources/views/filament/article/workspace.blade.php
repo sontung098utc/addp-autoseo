@@ -488,19 +488,13 @@
                     @if ($latest)
                         <section class="ss-review-card" data-testid="aw-images">
                             <h2 class="ss-review-card__title">Ảnh của bài</h2>
-                            @if ($images->isEmpty())
-                                <p>Chưa có ảnh nào gắn với bài.@if ($imageNote) Lần viết gần nhất: {{ $imageNote }}.@endif</p>
-                            @else
-                                <div class="aw-thumbs">
-                                    @foreach ($images as $img)
-                                        <figure>
-                                            <img src="{{ $img->thumbnail_url ?: $img->url }}" alt="{{ $img->alt_text }}" loading="lazy">
-                                            <figcaption>{{ $dash($img->alt_text ?: $img->title) }}</figcaption>
-                                        </figure>
-                                    @endforeach
-                                </div>
-                            @endif
-                            <p class="aw-muted" style="margin-top:.5rem">Ảnh do AI chọn từ thư viện ảnh của website; hệ thống hiện chưa tự tạo ảnh mới.</p>
+                            {{-- Bản mới nhất luôn hiện (kể cả khi chưa có ảnh, kèm lý do); bản cũ chỉ hiện nếu có ảnh. --}}
+                            @foreach ($versions as $v)
+                                @if ($v->is($latest) || $v->mediaAssets->isNotEmpty())
+                                    @if (! $v->is($latest))<p class="aw-muted" style="margin-top:.75rem">Bản v{{ $v->version }}</p>@endif
+                                    @include('filament.article.images-gallery', ['version' => $v])
+                                @endif
+                            @endforeach
                         </section>
                     @endif
                 </div>
