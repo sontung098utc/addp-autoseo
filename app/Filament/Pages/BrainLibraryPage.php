@@ -52,7 +52,7 @@ class BrainLibraryPage extends Page
     public array $installKeys = [];
 
     /** @var array{name:string,template:string,websites:array<int,string>} */
-    public array $create = ['name' => '', 'template' => 'thuong_hieu', 'websites' => []];
+    public array $create = ['name' => '', 'template' => 'trong', 'websites' => []];
 
     public static function canAccess(): bool
     {
@@ -69,7 +69,7 @@ class BrainLibraryPage extends Page
     public function openCreate(): void
     {
         abort_unless(static::canAccess() && static::canManage(), 403);
-        $this->create = ['name' => '', 'template' => 'thuong_hieu', 'websites' => []];
+        $this->create = ['name' => '', 'template' => 'trong', 'websites' => []];
         $this->showCreate = true;
     }
 
@@ -83,8 +83,22 @@ class BrainLibraryPage extends Page
     public function openInstall(): void
     {
         abort_unless(static::canAccess() && static::canInstall(), 403);
-        $this->installKeys = BrainTemplates::HEALTH_KEYS;
+        $this->installKeys = $this->notInstalledKeys();
         $this->showInstall = true;
+    }
+
+    /** @return array<int,string> các mẫu chưa cài (mẫu đã có không tick sẵn) */
+    private function notInstalledKeys(): array
+    {
+        $have = Brain::query()->whereIn('template_key', BrainTemplates::HEALTH_KEYS)->pluck('template_key')->all();
+
+        return array_values(array_diff(BrainTemplates::HEALTH_KEYS, $have));
+    }
+
+    public function selectNotInstalled(): void
+    {
+        abort_unless(static::canAccess() && static::canInstall(), 403);
+        $this->installKeys = $this->notInstalledKeys();
     }
 
     public function closeInstall(): void
@@ -144,13 +158,15 @@ class BrainLibraryPage extends Page
         $ids = $brains->pluck('id')->all();
         $by = fn ($q) => $q->whereIn('brain_id', $ids)->selectRaw('brain_id, count(*) c')->groupBy('brain_id')->pluck('c', 'brain_id');
         $sources = $by(KnowledgeSource::query());
+        $confirmedSrc = \App\Models\BrainSource::query()->whereIn('brain_id', $ids)->where('status', 'confirmed')->whereNotNull('tier')->where('tier', '!=', 'blocked')
+            ->selectRaw('brain_id, count(*) c')->groupBy('brain_id')->pluck('c', 'brain_id');
         $items = $by(KnowledgeItem::query());
         $proposed = $by(KnowledgeItem::query()->where('status', 'proposed'));
         $gaps = $by(KnowledgeGap::query()->where('status', 'open'));
         $conflicts = collect((new KnowledgeConflicts())->all())->groupBy(fn ($p) => $p['a']->brain_id)->map->count();
         $expired = (new KnowledgeFreshness())->expired()->groupBy('brain_id')->map->count();
 
-        $cards = $brains->map(function (Brain $b) use ($sources, $items, $proposed, $gaps, $conflicts, $expired) {
+        $cards = $brains->map(function (Brain $b) use ($sources, $confirmedSrc, $items, $proposed, $gaps, $conflicts, $expired) {
             [$f, $t] = ($b->profile ?? new \App\Models\BrainProfile())->completeness();
             $brand = null;
             if ($b->template_key === 'thuong_hieu') { // AG-B2: số trường THẬT của hồ sơ doanh nghiệp (website đầu tiên đã gắn)
@@ -161,7 +177,7 @@ class BrainLibraryPage extends Page
 
             return [
                 'brain' => $b, 'template' => BrainTemplates::get($b->template_key)['name'] ?? ($b->template_key ? $b->template_key : 'Tự tạo'),
-                'sources' => (int) ($sources[$b->id] ?? 0), 'items' => (int) ($items[$b->id] ?? 0), 'proposed' => (int) ($proposed[$b->id] ?? 0),
+                'sources' => (int) ($sources[$b->id] ?? 0), 'confirmed_sources' => (int) ($confirmedSrc[$b->id] ?? 0), 'needs_source' => $b->reliance() === 'must_cite' && (int) ($confirmedSrc[$b->id] ?? 0) === 0, 'items' => (int) ($items[$b->id] ?? 0), 'proposed' => (int) ($proposed[$b->id] ?? 0),
                 'conflicts' => (int) ($conflicts[$b->id] ?? 0), 'expired' => (int) ($expired[$b->id] ?? 0), 'gaps' => (int) ($gaps[$b->id] ?? 0),
                 'filled' => $f, 'total' => $t, 'sites' => $b->websites->pluck('name')->all(), 'brand' => $brand,
                 'group' => BrainTemplates::groupOf($b->template_key), 'sample' => (string) ($b->settings['sample_label'] ?? '') !== '' && (int) ($sources[$b->id] ?? 0) === 0 && (int) ($items[$b->id] ?? 0) === 0,
