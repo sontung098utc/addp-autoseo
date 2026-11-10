@@ -27,6 +27,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('SEO Studio')
+            ->favicon(asset('favicon.svg'))
             ->colors([
                 // Teal #0F6B5C (Editorial Ledger); 600 = màu gốc, nút/chữ sáng dùng 600, tối dùng 400/500.
                 'primary' => [
