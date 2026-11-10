@@ -322,7 +322,7 @@ final class AgentRunOrchestrator
 
     private function grade(AgentRun $run, Article $article, array $attrs, string $title, int $round, ?Playbook $editorPb = null, string $note = ''): QualityReport
     {
-        $report = $this->checker->check(new ArticleVersion($attrs), $article);
+        $report = $this->checker->check(new ArticleVersion($attrs), $article, $this->brainCtx->ids() ?: null);
         $c = $report->counts();
         $failed = array_map(fn ($r) => ['code' => $r->code, 'severity' => $r->severity, 'message' => $r->message], array_slice($report->failed(), 0, 8));
         $block = $report->blockingCodes();

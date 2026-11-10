@@ -15,7 +15,8 @@ class QualityContext
     /** @var list<array{level:int,text:string}>|null */
     private ?array $headings = null;
 
-    public function __construct(public readonly ArticleVersion $version, public readonly ?Article $article)
+    /** @param list<int>|null $brainIds Trí tuệ do ngữ cảnh chạy (chiến dịch) chọn; null = chỉ suy từ website của bài (AG-B3) */
+    public function __construct(public readonly ArticleVersion $version, public readonly ?Article $article, public readonly ?array $brainIds = null)
     {
     }
 

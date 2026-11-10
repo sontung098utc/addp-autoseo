@@ -368,12 +368,12 @@
                         <div class="ss-card__h">Thêm 1 mục kiến thức</div>
                         <div class="kb-grid">
                             <label>Tiêu đề<input class="kb-in" style="width:100%" wire:model="new.title" maxlength="200"></label>
-                            <label>Loại<select class="kb-in" style="width:100%" wire:model="new.type">@foreach ($types as $k => $l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></label>
+                            <label>Loại <x-studio.hint text="Quan niệm sai: tiêu đề là điều hay bị hiểu sai, nội dung là bản đúng (kèm nguồn). Không được nói: điều AI tuyệt đối không được viết; nhập cụm từ cần chặn ở ô Giá trị nếu muốn hệ thống chặn tự động. Hai loại này áp cho mọi bài của Trí tuệ, không dùng như sự thật để trích."/><select class="kb-in" style="width:100%" wire:model="new.type">@foreach ($types as $k => $l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></label>
                             <label>Website<select class="kb-in" style="width:100%" wire:model="new.website_id"><option value="">Chung</option>@foreach ($sites as $s)<option value="{{ $s->id }}">{{ $s->name }}</option>@endforeach</select></label>
                             <label>Chủ đề<select class="kb-in" style="width:100%" wire:model="new.topic_id"><option value="">—</option>@foreach ($topics as $t)<option value="{{ $t->id }}">{{ $t->fullName() }}</option>@endforeach</select></label>
                             <label>Thực thể <x-studio.hint text="Tùy chọn. Ví dụ 'Gói Cơ bản' + trường 'giá' + giá trị '8000000' giúp máy phát hiện mâu thuẫn." /><input class="kb-in" style="width:100%" wire:model="new.entity"></label>
                             <label>Trường<input class="kb-in" style="width:100%" wire:model="new.field"></label>
-                            <label>Giá trị<input class="kb-in" style="width:100%" wire:model="new.value"></label>
+                            <label>Giá trị <x-studio.hint text="Với loại Không được nói: các cụm từ cần chặn, cách nhau bằng dấu | (mỗi cụm tối thiểu 3 ký tự). Bài chứa cụm này sẽ bị chặn."/><input class="kb-in" style="width:100%" wire:model="new.value"></label>
                             <label>Đơn vị<input class="kb-in" style="width:100%" wire:model="new.value_unit"></label>
                             <label>Thẻ<input class="kb-in" style="width:100%" wire:model="new.tags" placeholder="giá, học phí"></label>
                             <label>Hiệu lực đến<input type="date" class="kb-in" style="width:100%" wire:model="new.valid_until"></label>

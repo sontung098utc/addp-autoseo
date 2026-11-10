@@ -24,6 +24,9 @@ final class KnowledgeContext
 
     private bool $gap = false;
 
+    /** AG-B3: quy tắc chuyên gia (quan niệm sai, không được nói) áp cho mọi bài của phạm vi; nạp riêng, không qua truy xuất theo chủ đề. @var list<array<string,mixed>> */
+    private array $rules = [];
+
     /** AG-B1: phạm vi Trí tuệ của lượt chạy (null = như cũ, không lọc). */
     private ?array $brainIds = null;
 
@@ -51,6 +54,7 @@ final class KnowledgeContext
             if (! $site) {
                 return;
             }
+            $this->rules = $this->retriever->rules($site, $this->brainIds);
             $query = $article->primary_keyword.' '.implode(' ', array_map(fn ($o) => is_scalar($o) ? (string) $o : '', array_slice($outline, 0, 12)));
             foreach ($this->retriever->search($site, $query, self::LIMIT, $this->brainIds) as $r) {
                 $this->items[] = ['id' => $r['id'], 'version' => $r['version'], 'title' => $r['title'], 'body' => mb_substr($r['body'], 0, self::BODY_MAX), 'source' => $r['source']];
@@ -68,16 +72,19 @@ final class KnowledgeContext
     /** @return array<string,mixed> options cho adapter AI (rỗng nếu không có atom) */
     public function options(): array
     {
-        return $this->items ? ['knowledge' => $this->items] : [];
+        return ($this->items ? ['knowledge' => $this->items] : []) + ($this->rules ? ['knowledge_rules' => $this->rules] : []);
     }
 
     /** Dữ liệu ghi vào bước 'write' và đoạn ghi chú ngắn. @return array{0:array<string,mixed>,1:string} */
     public function stepInfo(): array
     {
         $ids = array_column($this->items ?? [], 'id');
-        $data = ['knowledge' => ['count' => count($ids), 'ids' => $ids, 'gap' => $this->gap]];
+        $data = ['knowledge' => ['count' => count($ids), 'ids' => $ids, 'gap' => $this->gap] + ($this->rules ? ['rule_ids' => array_column($this->rules, 'id')] : [])];
         $note = $ids !== [] ? ' Dùng '.count($ids).' mục kiến thức đã duyệt (KB#'.implode(', KB#', $ids).').'
             : ($this->gap ? ' Kho kiến thức chưa có mục đã duyệt phù hợp; đã ghi khoảng trống kiến thức để bổ sung.' : '');
+        if ($this->rules) {
+            $note .= ' Áp '.count($this->rules).' quy tắc của chuyên gia (quan niệm sai / không được nói): KB#'.implode(', KB#', array_column($this->rules, 'id')).'.';
+        }
 
         return [$data, $note];
     }
@@ -86,7 +93,7 @@ final class KnowledgeContext
     public function recordUsage(ArticleVersion $version): void
     {
         try {
-            foreach ($this->items ?? [] as $i) {
+            foreach (array_merge($this->items ?? [], $this->rules) as $i) {
                 KnowledgeItemUsage::updateOrCreate(['article_version_id' => $version->id, 'item_id' => $i['id']], ['item_version' => $i['version']]);
                 KnowledgeItem::whereKey($i['id'])->update(['last_used_at' => now()]);
             }

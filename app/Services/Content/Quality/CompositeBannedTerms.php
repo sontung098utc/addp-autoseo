@@ -2,7 +2,7 @@
 
 namespace App\Services\Content\Quality;
 
-/** AG-S19: gộp nhiều nguồn từ cấm (nhóm cùng tên cộng dồn). Mặc định: file + hồ sơ thương hiệu. */
+/** AG-S19: gộp nhiều nguồn từ cấm (nhóm cùng tên cộng dồn). Mặc định: file + hồ sơ thương hiệu + mục "Không được nói" của kho (AG-B3). */
 final class CompositeBannedTerms implements BannedTermsProvider
 {
     /** @var list<BannedTermsProvider> */
@@ -10,7 +10,7 @@ final class CompositeBannedTerms implements BannedTermsProvider
 
     public function __construct(BannedTermsProvider ...$providers)
     {
-        $this->providers = $providers ?: [new FileBannedTerms(), new BrandProfileBannedTerms()];
+        $this->providers = $providers ?: [new FileBannedTerms(), new BrandProfileBannedTerms(), new KnowledgeForbiddenTerms()];
     }
 
     public function termsFor(QualityContext $ctx): array

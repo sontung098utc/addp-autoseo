@@ -12,7 +12,14 @@ class KnowledgeItem extends Model
 {
     use SoftDeletes;
 
-    public const TYPES = ['fact' => 'Sự kiện', 'price' => 'Giá/số liệu', 'policy' => 'Chính sách', 'process' => 'Quy trình', 'faq' => 'FAQ', 'messaging' => 'Giọng/thông điệp'];
+    public const TYPES = ['fact' => 'Sự kiện', 'price' => 'Giá/số liệu', 'policy' => 'Chính sách', 'process' => 'Quy trình', 'faq' => 'FAQ', 'messaging' => 'Giọng/thông điệp', 'myth' => 'Quan niệm sai', 'forbidden' => 'Không được nói'];
+
+    /**
+     * AG-B3 (P2, Tầng 2): loại mục là QUY TẮC của chuyên gia, không phải sự thật để trích. 'myth' = điều hay bị hiểu sai (title) kèm bản đúng (body);
+     * 'forbidden' = điều không được viết (title/body là lý do), `value` = các cụm từ cần chặn tự động, cách nhau bằng dấu '|' (có thể để trống).
+     * Không bao giờ vào truy xuất thường (search) để AI không dùng chúng như sự thật; được nạp riêng cho mọi bài của Trí tuệ.
+     */
+    public const RULE_TYPES = ['myth', 'forbidden'];
 
     public const STATUSES = ['proposed' => 'Đề xuất', 'approved' => 'Đã duyệt', 'outdated' => 'Cũ', 'rejected' => 'Bị loại'];
 

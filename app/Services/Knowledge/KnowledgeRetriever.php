@@ -55,6 +55,43 @@ final class KnowledgeRetriever
             ->where(fn ($q) => $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', $today));
     }
 
+    /** Như eligible() nhưng bỏ các mục QUY TẮC (quan niệm sai / không được nói): chúng không phải sự thật để trích. */
+    public function searchable(Website $website, ?array $brainIds = null): Builder
+    {
+        return $this->eligible($website, $brainIds)->whereNotIn('type', KnowledgeItem::RULE_TYPES);
+    }
+
+    /**
+     * AG-B3: các QUY TẮC của chuyên gia (quan niệm sai, không được nói) đã duyệt và còn hiệu lực, áp cho MỌI bài của phạm vi này
+     * (không phụ thuộc truy xuất theo chủ đề). Tối đa $limit mục, 'không được nói' trước.
+     *
+     * @return list<array{id:int,version:int,type:string,title:string,body:string,phrases:list<string>,source:?string}>
+     */
+    public function rules(Website $website, ?array $brainIds = null, int $limit = 20): array
+    {
+        $out = [];
+        foreach ($this->eligible($website, $brainIds)->whereIn('type', KnowledgeItem::RULE_TYPES)
+            ->orderByRaw("case when type='forbidden' then 0 else 1 end")->orderBy('id')->limit($limit)->get() as $i) {
+            $out[] = [
+                'id' => $i->id, 'version' => (int) $i->version, 'type' => $i->type, 'title' => $i->title, 'body' => $i->body,
+                'phrases' => self::phrases($i), 'source' => $i->source?->title,
+            ];
+        }
+
+        return $out;
+    }
+
+    /** Cụm từ cần chặn của một mục 'không được nói' (trường `value`, cách nhau '|'); mỗi cụm tối thiểu 3 ký tự để không chặn nhầm. @return list<string> */
+    public static function phrases(KnowledgeItem $item): array
+    {
+        if ($item->type !== 'forbidden') {
+            return [];
+        }
+        $parts = array_map('trim', explode('|', (string) $item->value));
+
+        return array_values(array_unique(array_filter($parts, fn ($p) => mb_strlen($p) >= 3)));
+    }
+
     /** @return list<string> */
     public function terms(string $query): array
     {
@@ -67,7 +104,7 @@ final class KnowledgeRetriever
     private function fulltext(Website $website, string $query, ?array $brainIds): array
     {
         try {
-            $items = $this->eligible($website, $brainIds)
+            $items = $this->searchable($website, $brainIds)
                 ->selectRaw('knowledge_items.*, MATCH(title, body) AGAINST (? IN NATURAL LANGUAGE MODE) as ft_score', [$query])
                 ->whereRaw('MATCH(title, body) AGAINST (? IN NATURAL LANGUAGE MODE)', [$query])
                 ->orderByDesc('ft_score')->limit(50)->get();
@@ -83,7 +120,7 @@ final class KnowledgeRetriever
     {
         // Ký tự thoát là '!' (không phải '\'): trong MariaDB/MySQL '\' là ký tự thoát của chuỗi SQL nên `escape '\'` là lỗi cú pháp.
         $esc = fn (string $t) => preg_replace('/([!%_])/', '!$1', $t);
-        $items = $this->eligible($website, $brainIds)->where(function ($q) use ($terms, $esc) {
+        $items = $this->searchable($website, $brainIds)->where(function ($q) use ($terms, $esc) {
             foreach ($terms as $t) {
                 $q->orWhereRaw("lower(title) like ? escape '!'", ['%'.$esc($t).'%'])->orWhereRaw("lower(body) like ? escape '!'", ['%'.$esc($t).'%']);
             }

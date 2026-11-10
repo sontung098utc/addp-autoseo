@@ -41,9 +41,10 @@ class ContentQualityChecker
         ];
     }
 
-    public function check(ArticleVersion $version, ?Article $article = null): QualityReport
+    /** @param list<int>|null $brainIds Trí tuệ do chiến dịch chọn (AG-B3); null = suy từ website của bài */
+    public function check(ArticleVersion $version, ?Article $article = null, ?array $brainIds = null): QualityReport
     {
-        $ctx = new QualityContext($version, $article ?? $version->article);
+        $ctx = new QualityContext($version, $article ?? $version->article, $brainIds);
         $results = [];
         foreach ($this->rules as $rule) {
             foreach ($rule->evaluate($ctx) as $r) {
