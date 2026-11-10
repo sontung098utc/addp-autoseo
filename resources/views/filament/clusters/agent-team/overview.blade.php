@@ -41,11 +41,11 @@
             <x-filament::section heading="Đang chạy" compact>
                 @foreach ($live as $r)
                     @php
-                        $cur = \App\Filament\Support\Agent\RunActivity::currentStage($r->steps);
+                        $cur = \App\Filament\Support\Agent\RunActivity::currentStageOf($r, $r->steps);
                         $curTitle = $stages[$cur]['title'] ?? 'Hoàn tất';
                     @endphp
                     <a href="{{ \App\Filament\Resources\AgentRunResource::getUrl('view', ['record' => $r]) }}" data-live-run="{{ $r->id }}" style="display:grid;grid-template-columns:minmax(12rem,1fr) auto auto;gap:1rem;align-items:center;text-decoration:none;color:inherit;padding:.45rem 0;border-bottom:1px solid rgba(128,128,128,.15)">
-                        <span style="font-size:.88rem;font-weight:500">{{ $r->article?->primary_keyword }}</span>
+                        <span style="font-size:.88rem;font-weight:500">{{ $r->article?->primary_keyword ?: (\App\Services\Agent\Pipeline\JobTypeRegistry::find((string) $r->job_type)['title'] ?? $r->job_type) }}</span>
                         <x-studio.running size="sm" label="{{ $curTitle }}" />
                         <span class="text-xs" style="opacity:.6;white-space:nowrap">{{ \App\Filament\Support\Agent\RunActivity::formatElapsed(\App\Filament\Support\Agent\RunActivity::elapsedSeconds($r)) }}</span>
                     </a>

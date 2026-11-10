@@ -24,7 +24,7 @@
         @if ($live)
             <div class="ss-live-pill rv-live" data-testid="run-live">
                 <x-studio.running label="Đang chạy" />
-                <span>· Đang ở: <strong>{{ $blueprint[$currentStage]['title'] ?? 'hoàn tất, đang đóng phiên' }}</strong> · đã chạy {{ $elapsed }}</span>
+                <span>· Đang ở: <strong>{{ collect($flow['nodes'])->firstWhere('code', $currentStage)['title'] ?? $blueprint[$currentStage]['title'] ?? 'hoàn tất, đang đóng phiên' }}</strong> · đã chạy {{ $elapsed }}</span>
             </div>
         @elseif ($stale)
             <div data-testid="run-stale" class="rv-stale">
@@ -41,6 +41,7 @@
                 <a class="rv-chip rv-chip--link" href="{{ \App\Filament\Resources\CampaignResource::getUrl('edit', ['record' => $campaign]) }}">Chiến dịch: {{ $campaign->name }}</a>
                 <span class="rv-chip">Chế độ {{ $modeLabels[$campaign->mode] ?? $campaign->mode }}</span>
             @endif
+            @if ($run->job_type && $run->job_type !== 'article_write')<span class="rv-chip">Loại việc: {{ \App\Services\Agent\Pipeline\JobTypeRegistry::find($run->job_type)['title'] ?? $run->job_type }}</span>@endif
             @if ($run->article?->primary_keyword)<span class="rv-chip">Từ khóa: {{ $run->article->primary_keyword }}</span>@endif
         </div>
 
@@ -162,6 +163,8 @@
                 @if ($run->outcome_reason)<div class="rv-result__reason"><span class="rv-k">Lý do kết thúc</span> {{ $run->outcome_reason }}</div>@endif
                 @if ($run->finalVersion)
                     <div>Bản nháp v{{ $run->finalVersion->version }}: <a class="underline" href="{{ \App\Filament\Resources\ArticleVersionResource::getUrl('view', ['record' => $run->finalVersion]) }}">xem bài</a></div>
+                @elseif ($run->job_type !== 'article_write')
+                    <div class="rv-small">Loại việc này không tạo bài.</div>
                 @else
                     <div class="rv-small">Phiên này không tạo bản nháp.</div>
                 @endif

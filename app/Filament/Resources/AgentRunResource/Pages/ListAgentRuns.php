@@ -16,6 +16,6 @@ class ListAgentRuns extends ListRecords
 
     public function getHeading(): string|Htmlable
     {
-        return new HtmlString(e(static::$title).' '.Blade::render('<x-studio.hint :text="$t" />', ['t' => 'Phiên chạy = một lần đội AI xử lý MỘT bài (do một chiến dịch giao): kiểm an toàn → phân hạng → dàn ý → viết → chấm → sửa → bàn giao bản nháp. Chưa có gì được tự đăng.']));
+        return new HtmlString(e(static::$title).' '.Blade::render('<x-studio.hint :text="$t" />', ['t' => 'Phiên chạy = một lần đội AI làm một việc: thường là xử lý MỘT bài (do một chiến dịch giao), hoặc việc không gắn bài như khảo sát từ khóa. Với bài: kiểm an toàn → phân hạng → dàn ý → viết → chấm → sửa → bàn giao bản nháp. Chưa có gì được tự đăng.']));
     }
 }

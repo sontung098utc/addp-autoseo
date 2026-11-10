@@ -19,7 +19,7 @@ final class TrustMetrics
     /** @return array<string, array{value: float|null, n: int}> */
     public static function compute(?CarbonInterface $since = null): array
     {
-        $q = AgentRun::query()->whereIn('status', self::FINISHED);
+        $q = AgentRun::query()->whereIn('status', self::FINISHED)->where('job_type', 'article_write'); // mức tự động của việc viết bài; loại việc khác có thước đo riêng
         if ($since) {
             $q->where('created_at', '>=', $since);
         }

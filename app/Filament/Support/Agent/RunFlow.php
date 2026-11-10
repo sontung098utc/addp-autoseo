@@ -68,6 +68,7 @@ final class RunFlow
     public static function build(AgentRun $run, Collection $steps, bool $live, bool $stale, ?string $currentStage): array
     {
         $blueprint = AgentFlowBlueprint::byStage();
+        [$codes, $labels] = self::stagesOf($run, $steps);
         $closed = $run->status !== 'running';
 
         // Thời lượng mỗi bước: khoảng cách giữa mốc ghi của bước này và bước trước (bước đầu: từ lúc bắt đầu phiên). Chỉ là ước lượng theo mốc ghi.
@@ -91,7 +92,7 @@ final class RunFlow
                 continue;
             }
             if ($pendingInc !== []) {
-                $target = in_array($s->stage, self::main(), true) ? $s->stage : 'write';
+                $target = in_array($s->stage, $codes, true) ? $s->stage : $codes[0] ?? 'write';
                 $incidents[$target] = array_merge($incidents[$target] ?? [], $pendingInc);
                 $pendingInc = [];
             }
@@ -101,8 +102,9 @@ final class RunFlow
         }
 
         $nodes = [];
-        foreach (self::main() as $code) {
+        foreach ($codes as $code) {
             $b = $blueprint[$code] ?? ['title' => $code, 'role' => ''];
+            $b['title'] = $labels[$code] ?? $b['title'];
             $ran = $steps->where('stage', $code)->values();
             $isNow = $live && $currentStage === $code;
             $isStale = $stale && $currentStage === $code;
@@ -177,6 +179,30 @@ final class RunFlow
             'clock' => $clock,
             'decisions' => $steps->where('stage', 'decision')->values()->map(fn ($d) => self::decision($d))->all(),
         ];
+    }
+
+    /**
+     * Chặng của phiên: article_write dùng luồng cố định; loại việc khác lấy từ JobTypeRegistry, rồi thêm các chặng thật đã ghi trong agent_run_steps (theo seq).
+     *
+     * @return array{0: list<string>, 1: array<string, string>} [mã chặng theo thứ tự, mã => nhãn]
+     */
+    public static function stagesOf(AgentRun $run, Collection $steps): array
+    {
+        $type = (string) ($run->job_type ?: 'article_write');
+        if ($type === 'article_write') {
+            return [self::main(), []];
+        }
+        $labels = JobTypeRegistry::stageLabels($type, true);
+        $codes = array_map('strval', array_keys($labels));
+        foreach ($steps->sortBy('seq') as $s) {
+            if (in_array($s->stage, ['retry', 'failover', 'decision'], true) || in_array($s->stage, $codes, true)) {
+                continue;
+            }
+            $codes[] = $s->stage;
+            $labels[$s->stage] = $s->title ?: $s->stage;
+        }
+
+        return [$codes, $labels];
     }
 
     /** @return array<string, mixed> */

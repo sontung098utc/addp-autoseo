@@ -8,9 +8,14 @@ use App\Filament\Support\Agent\AgentFlowBlueprint;
 use App\Filament\Support\Agent\RunActivity;
 use App\Filament\Support\Agent\RunFlow;
 use App\Filament\Support\Review\ReviewActions;
+use App\Models\AgentRun;
 use App\Models\Campaign;
+use App\Services\Agent\Handoff\CmsDraftHandoff;
+use App\Services\Agent\Pipeline\JobTypeRegistry;
 use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Support\Str;
 
 class ViewAgentRun extends ViewRecord
 {
@@ -18,14 +23,17 @@ class ViewAgentRun extends ViewRecord
 
     protected static string $view = 'filament.agent.run-view';
 
-    /** AG-S15: tiêu đề trang là TÊN BÀI VIẾT (tiêu đề bản bài nếu có, không thì từ khóa chính), không phải số phiên. */
+    /** AG-S15: tiêu đề trang là TÊN BÀI VIẾT (phiên không gắn bài: tên loại việc) (tiêu đề bản bài nếu có, không thì từ khóa chính), không phải số phiên. */
     public function getTitle(): string
     {
         return self::articleName($this->record);
     }
 
-    public static function articleName(\App\Models\AgentRun $run): string
+    public static function articleName(AgentRun $run): string
     {
+        if (! $run->article_id && $run->job_type && $run->job_type !== 'article_write') {
+            return JobTypeRegistry::find($run->job_type)['title'] ?? $run->job_type;
+        }
         $title = trim((string) $run->finalVersion?->title);
 
         return $title !== '' ? $title : (trim((string) $run->article?->primary_keyword) ?: 'Phiên chạy #'.$run->id);
@@ -36,7 +44,7 @@ class ViewAgentRun extends ViewRecord
         $crumbs = parent::getBreadcrumbs();
         // Cluster đã thêm "Đội AI"; thay mục cuối ("Xem") bằng tên bài để có Đội AI › Phiên chạy › <tên bài>.
         array_pop($crumbs);
-        $crumbs[] = \Illuminate\Support\Str::limit($this->getTitle(), 60);
+        $crumbs[] = Str::limit($this->getTitle(), 60);
 
         return $crumbs;
     }
@@ -56,10 +64,10 @@ class ViewAgentRun extends ViewRecord
                 ->action(function () use ($version) {
                     abort_unless(ReviewActions::canApprove(), 403);
                     try {
-                        $msg = app(\App\Services\Agent\Handoff\CmsDraftHandoff::class)->cancel($version);
-                        \Filament\Notifications\Notification::make()->title($msg)->success()->send();
+                        $msg = app(CmsDraftHandoff::class)->cancel($version);
+                        Notification::make()->title($msg)->success()->send();
                     } catch (\RuntimeException $e) {
-                        \Filament\Notifications\Notification::make()->title($e->getMessage())->danger()->send();
+                        Notification::make()->title($e->getMessage())->danger()->send();
                     }
                     $this->record->refresh();
                 }),
@@ -73,7 +81,7 @@ class ViewAgentRun extends ViewRecord
         $run = $this->record;
         $live = RunActivity::isLive($run);
         $stale = RunActivity::isStale($run);
-        $current = ($live || $stale) ? RunActivity::currentStage($run->steps) : null;
+        $current = ($live || $stale) ? RunActivity::currentStageOf($run, $run->steps) : null;
 
         return [
             'run' => $run,

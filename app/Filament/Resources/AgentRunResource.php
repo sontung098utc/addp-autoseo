@@ -2,11 +2,15 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Clusters\AgentTeam;
 use App\Filament\Resources\AgentRunResource\Pages;
-use App\Filament\Support\Schedule\VnTime;
 use App\Filament\Support\Agent\AgentFlowBlueprint;
 use App\Filament\Support\Agent\RunActivity;
+use App\Filament\Support\Schedule\VnTime;
 use App\Models\AgentRun;
+use App\Models\User;
+use App\Services\Agent\Pipeline\JobTypeRegistry;
+use Filament\Pages\SubNavigationPosition;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -30,11 +34,11 @@ class AgentRunResource extends Resource
 
     protected static ?string $navigationLabel = 'Phiên chạy';
 
-    protected static ?string $cluster = \App\Filament\Clusters\AgentTeam::class;
+    protected static ?string $cluster = AgentTeam::class;
 
     protected static ?string $slug = 'phien-chay';
 
-    protected static \Filament\Pages\SubNavigationPosition $subNavigationPosition = \Filament\Pages\SubNavigationPosition::Top;
+    protected static SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
     protected static ?string $modelLabel = 'Phiên chạy';
 
@@ -49,7 +53,7 @@ class AgentRunResource extends Resource
     {
         $u = Auth::user();
 
-        return $u instanceof \App\Models\User && $u->is_active && $u->isApprover();
+        return $u instanceof User && $u->is_active && $u->isApprover();
     }
 
     public static function canView(Model $record): bool
@@ -77,6 +81,13 @@ class AgentRunResource extends Resource
         return false;
     }
 
+    public static function jobTypeLabel(?string $type): string
+    {
+        $type = $type ?: 'article_write';
+
+        return JobTypeRegistry::find($type)['title'] ?? $type;
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -87,14 +98,18 @@ class AgentRunResource extends Resource
             ->columns([
                 // Cột nội dung là cột quan trọng nhất: cho rộng; các cột phụ gọn lại, không xuống dòng.
                 Tables\Columns\TextColumn::make('article.primary_keyword')->label('Bài / từ khóa')->searchable()->wrap()
+                    ->state(fn (AgentRun $r) => $r->article?->primary_keyword ?: self::jobTypeLabel($r->job_type))
                     ->description(fn (AgentRun $r) => $r->website?->name)
                     ->extraHeaderAttributes(['class' => 'ss-col-main'])->extraCellAttributes(['class' => 'ss-col-main']),
+                Tables\Columns\TextColumn::make('job_type')->label('Loại việc')->badge()->color('gray')->visibleFrom('lg')
+                    ->formatStateUsing(fn (?string $state) => self::jobTypeLabel($state))
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
                 Tables\Columns\TextColumn::make('status')->label('Kết quả')->badge()
                     ->formatStateUsing(fn (string $state, AgentRun $r) => RunActivity::isStale($r) ? 'Có thể bị treo' : (self::STATUS[$state][0] ?? $state))
                     ->color(fn (string $state, AgentRun $r) => RunActivity::isStale($r) ? 'warning' : (self::STATUS[$state][1] ?? 'gray'))
                     ->icon(fn (string $state, AgentRun $r) => RunActivity::isLive($r) ? 'heroicon-o-arrow-path' : null)
                     ->extraAttributes(fn (AgentRun $r) => RunActivity::isLive($r) ? ['class' => 'ss-badge-live', 'data-running' => '1'] : [])
-                    ->description(fn (AgentRun $r) => RunActivity::isLive($r) ? 'Đang ở: '.(AgentFlowBlueprint::byStage()[RunActivity::currentStage($r->steps)]['title'] ?? 'hoàn tất') : null)
+                    ->description(fn (AgentRun $r) => RunActivity::isLive($r) ? 'Đang ở: '.(AgentFlowBlueprint::byStage()[$cur = RunActivity::currentStageOf($r, $r->steps)]['title'] ?? JobTypeRegistry::stageLabels((string) $r->job_type, true)[$cur] ?? $cur ?? 'hoàn tất') : null)
                     ->tooltip(fn (AgentRun $r) => $r->outcome_reason ?: null)
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
                 Tables\Columns\TextColumn::make('score')->label('Điểm')->alignCenter()->placeholder('—')
@@ -113,6 +128,10 @@ class AgentRunResource extends Resource
                 Tables\Columns\TextColumn::make('started_at')->label('Bắt đầu (giờ VN)')->sortable()
                     ->formatStateUsing(fn (AgentRun $r) => VnTime::format(VnTime::fromRaw($r, 'started_at')))
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
+            ])
+            ->filters([
+                Tables\Filters\SelectFilter::make('job_type')->label('Loại việc')
+                    ->options(fn () => collect(JobTypeRegistry::all())->pluck('title', 'id')->all()),
             ])
             ->actions([Tables\Actions\ViewAction::make()->label('Xem diễn biến')]);
     }

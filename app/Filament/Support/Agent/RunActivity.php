@@ -4,6 +4,8 @@ namespace App\Filament\Support\Agent;
 
 use App\Filament\Support\Schedule\VnTime;
 use App\Models\AgentRun;
+use App\Models\AgentRunStep;
+use App\Services\Agent\Pipeline\JobTypeRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -62,7 +64,7 @@ final class RunActivity
      * Chặng đang chạy suy từ bước cuối: guard→risk→brief→write→grade→(repair→grade | handoff); retry→write.
      * Sau bước chấm: đạt (ok) thì bàn giao, chưa đạt thì sửa. Bàn giao xong thì phiên sắp đóng (null).
      *
-     * @param  Collection<int, \App\Models\AgentRunStep>  $steps  đã sắp theo seq
+     * @param  Collection<int, AgentRunStep>  $steps  đã sắp theo seq
      */
     public static function currentStage(Collection $steps): ?string
     {
@@ -82,6 +84,19 @@ final class RunActivity
             'decision' => 'handoff',
             default => null,
         };
+    }
+
+    /**
+     * Như currentStage() nhưng biết loại việc: luồng bài là luồng cố định; loại việc khác chưa có luồng cố định nên lấy chặng
+     * của bước cuối đã ghi (chưa có bước nào: chặng khai đầu tiên của loại việc, hoặc null).
+     */
+    public static function currentStageOf(AgentRun $run, Collection $steps): ?string
+    {
+        if (! $run->job_type || $run->job_type === 'article_write') {
+            return self::currentStage($steps);
+        }
+
+        return $steps->last()?->stage ?? (array_key_first(JobTypeRegistry::stageLabels($run->job_type, true)) ?: null);
     }
 
     /** @return Collection<int, AgentRun> các phiên running còn sống */

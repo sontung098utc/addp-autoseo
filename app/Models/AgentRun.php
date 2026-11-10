@@ -9,13 +9,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class AgentRun extends Model
 {
     protected $fillable = [
-        'website_id', 'article_id', 'campaign_id', 'triggered_by', 'trigger', 'status', 'trust_tier', 'risk_level', 'ai_mode',
+        'website_id', 'job_type', 'article_id', 'parent_run_id', 'campaign_id', 'triggered_by', 'trigger', 'status', 'trust_tier', 'risk_level', 'ai_mode',
         'outcome_reason', 'final_version_id', 'repair_rounds', 'tokens_used', 'cost_vnd', 'started_at', 'finished_at',
+        'input_refs', 'output_ref', 'tokens_budget',
     ];
 
     protected function casts(): array
     {
-        return ['started_at' => 'datetime', 'finished_at' => 'datetime', 'cost_vnd' => 'float'];
+        return ['started_at' => 'datetime', 'finished_at' => 'datetime', 'cost_vnd' => 'float', 'input_refs' => 'array', 'output_ref' => 'array'];
     }
 
     public function website(): BelongsTo
@@ -26,6 +27,11 @@ class AgentRun extends Model
     public function article(): BelongsTo
     {
         return $this->belongsTo(Article::class);
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_run_id');
     }
 
     public function finalVersion(): BelongsTo
