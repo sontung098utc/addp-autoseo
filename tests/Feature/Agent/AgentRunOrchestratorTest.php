@@ -102,7 +102,7 @@ class AgentRunOrchestratorTest extends TestCase
         $this->assertSame('needs_review', $a->refresh()->workflow_status);
         $this->assertSame('needs_review', $run->finalVersion->review_status);
         $this->assertSame(0, Publication::count(), 'Bậc T1 không bao giờ tạo lượt xuất bản');
-        $this->assertSame(['guard', 'risk', 'brief', 'write', 'grade', 'handoff'], $run->steps->pluck('stage')->all());
+        $this->assertSame(['guard', 'risk', 'brief', 'research', 'write', 'grade', 'handoff'], $run->steps->pluck('stage')->all());
         $this->assertSame(1000.0, $run->cost_vnd);
         $this->assertSame(600, $run->tokens_used);
     }

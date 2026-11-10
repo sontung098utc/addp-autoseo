@@ -7,6 +7,7 @@ use App\Models\ArticleVersion;
 use App\Services\Content\Quality\Rules\BannedTermsRule;
 use App\Services\Content\Quality\Rules\DuplicateRule;
 use App\Services\Content\Quality\Rules\EvidenceRule;
+use App\Services\Content\Quality\Rules\SourceRule;
 use App\Services\Content\Quality\Rules\FactRule;
 use App\Services\Content\Quality\Rules\FaqRule;
 use App\Services\Content\Quality\Rules\HeadingRule;
@@ -38,7 +39,7 @@ class ContentQualityChecker
     {
         return [
             new LengthRule(), new HeadingRule(), new KeywordRule(), new MetaRule(), new DuplicateRule(),
-            new ImageRule(), new SafetyRule(), new FactRule(), new FaqRule(), new BannedTermsRule(), new KnowledgeFigureRule(), new LinkRule(), new EvidenceRule(),
+            new ImageRule(), new SafetyRule(), new FactRule(), new FaqRule(), new BannedTermsRule(), new KnowledgeFigureRule(), new LinkRule(), new EvidenceRule(), new SourceRule(),
         ];
     }
 

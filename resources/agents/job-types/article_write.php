@@ -19,7 +19,7 @@ return [
         ['id' => 'guard', 'label' => 'Kiểm điều kiện', 'kind' => 'rule'],
         ['id' => 'risk', 'label' => 'Xét rủi ro', 'kind' => 'rule'],
         ['id' => 'brief', 'label' => 'Lập dàn ý', 'kind' => 'llm', 'task' => 'outline', 'when' => 'Bỏ qua nếu vai trò Chiến lược tắt'],
-        ['id' => 'research', 'label' => 'Nghiên cứu', 'kind' => 'rule', 'planned' => true, 'when' => 'G4: tách khỏi bước viết; hiện kiến thức nạp trong bước viết'],
+        ['id' => 'research', 'label' => 'Nghiên cứu', 'kind' => 'rule', 'when' => 'Chạy sau dàn ý, trước bước viết; nạp kiến thức, ảnh, liên kết nội bộ, nguồn được trích'],
         ['id' => 'write', 'label' => 'Viết', 'kind' => 'llm', 'task' => 'write'],
         ['id' => 'grade', 'label' => 'Chấm điểm', 'kind' => 'rule'],
         ['id' => 'repair', 'label' => 'Sửa', 'kind' => 'llm', 'task' => 'repair', 'when' => 'Chỉ khi còn lỗi chặn; tối đa 3 vòng'],

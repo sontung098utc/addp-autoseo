@@ -91,8 +91,12 @@ final class AgentRunOrchestrator
     /** @var list<string> vai trò đang tắt (đã lọc: chỉ vai trò được phép tắt) tại thời điểm bắt đầu phiên */
     private array $disabledRoles = [];
 
-    public function run(Article $article, ?User $actor = null, string $trigger = 'manual', ?int $campaignId = null): AgentRun
+    /** @var list<mixed>|null dàn ý có sẵn do người gọi truyền vào (G4); null = tự lập dàn ý như cũ */
+    private ?array $presetOutline = null;
+
+    public function run(Article $article, ?User $actor = null, string $trigger = 'manual', ?int $campaignId = null, ?array $presetOutline = null): AgentRun
     {
+        $this->presetOutline = $presetOutline === [] ? null : $presetOutline;
         $this->seq = 0;
         $this->trigger = $trigger;
         $this->campaignId = $campaignId;
@@ -180,7 +184,11 @@ final class AgentRunOrchestrator
 
         // 3. Dàn ý (vai trò Chiến lược; tắt được: bỏ bước này, người viết tự bố cục, các bước sau không phụ thuộc).
         $this->skills['write'] = $this->usePlaybook('writer', 'article-draft');
-        if ($this->roleOff('strategist')) {
+        if ($this->presetOutline !== null) {
+            $outline = ['outline' => $this->presetOutline];
+            $this->skills['brief'] = [null, 'Dàn ý có sẵn.'];
+            $this->step($run, 'brief', 'strategist', 'skipped', 'Dùng dàn ý có sẵn', 'Dàn ý do người gọi truyền vào ('.count($this->presetOutline).' mục) nên không gọi AI lập dàn ý.', ['outline' => $this->presetOutline, 'preset' => true]);
+        } elseif ($this->roleOff('strategist')) {
             $outline = ['outline' => []];
             $this->skills['brief'] = [null, 'Vai trò Chiến lược đang tắt.'];
             $this->step($run, 'brief', 'strategist', 'skipped', 'Bỏ qua bước dàn ý', 'Vai trò Chiến lược đang bị tắt trên tab Vai trò nên không lập dàn ý riêng; người viết tự bố cục theo từ khóa. Cổng an toàn (chấm luật) vẫn chạy đủ.', ['outline' => []]);
@@ -197,13 +205,24 @@ final class AgentRunOrchestrator
         $this->skills['grade'] = $this->skills['repair'] = $this->usePlaybook('editor', 'qa-review');
         [$editorPb, $editorNote] = $this->skills['grade'];
 
-        // 4. Viết.
+        // 4. Nghiên cứu: nạp ngữ cảnh bằng luật (không gọi AI), rồi kiểm ngân sách trước khi viết.
+        $this->research($run, $article, $outline['outline'] ?? []);
+        if ($this->spent($run) >= $this->policy->budgetVnd) {
+            $reason = 'Hết ngân sách cho phiên chạy ('.number_format($this->policy->budgetVnd, 0, ',', '.').' ₫) trước bước viết nên không gọi AI viết.';
+            $this->step($run, 'handoff', 'system', 'warn', 'Dừng trước bước viết vì hết ngân sách', 'Đã chi '.number_format($this->spent($run), 0, ',', '.').' ₫ trên ngân sách '.number_format($this->policy->budgetVnd, 0, ',', '.').' ₫. Chưa có bản nháp nào; bài được trả về trạng thái cũ.', ['spent_vnd' => $this->spent($run), 'budget_vnd' => $this->policy->budgetVnd]);
+            $this->decision($run, 'budget_exhausted_before_write', 'Dừng trước bước viết vì hết ngân sách', $reason, ['spent_vnd' => $this->spent($run), 'budget_vnd' => $this->policy->budgetVnd]);
+            $article->update(['workflow_status' => $previousStatus]);
+
+            return $this->finish($run, 'blocked', $reason);
+        }
+
+        // 5. Viết.
         $attrs = $this->write($run, $article, $outline['outline'] ?? [], [], 'write', 'Viết bản đầu', null);
         $report = $this->grade($run, $article, $attrs, 'Chấm bản đầu', 0, $editorPb, $editorNote);
         $penalty = $this->penalty($report);
         $score = RunScorer::score($report);
 
-        // 5. Vòng sửa có giới hạn.
+        // 6. Vòng sửa có giới hạn.
         $reason = null;
         $round = 0;
         while ($report->hasBlocking() && $round < $this->policy->maxRepairRounds) {
@@ -239,7 +258,7 @@ final class AgentRunOrchestrator
         }
         $run->update(['repair_rounds' => $round]);
 
-        // 6. Bàn giao: chỉ tạo BẢN NHÁP. Không bao giờ xuất bản ở bậc T1.
+        // 7. Bàn giao: chỉ tạo BẢN NHÁP. Không bao giờ xuất bản ở bậc T1.
         $passed = ! $report->hasBlocking();
         $version = $this->persist($article, $attrs, $passed);
         $run->update(['final_version_id' => $version->id]);
@@ -276,6 +295,29 @@ final class AgentRunOrchestrator
         $this->step($run, 'handoff', 'system', 'warn', 'Giữ nháp, chờ người xem', $reason.' Bản nháp v'.$version->version.' được lưu để người xem, không vào hàng chờ duyệt.', ['blocking' => $report->blockingCodes()]);
 
         return $this->finish($run, 'held', $reason);
+    }
+
+    /** Bước 'research': chỉ nạp và ghi lại ngữ cảnh; write() dùng lại vì load() chỉ chạy một lần. */
+    private function research(AgentRun $run, Article $article, array $outline): void
+    {
+        $this->kb ??= new KnowledgeContext();
+        $this->kb->load($article, $outline);
+        $this->assets ??= new ContextAssets();
+        $this->assets->load($article, $outline);
+        $citable = $this->brainCtx->reliance() === 'must_cite' ? BrainSourceRegistry::forBrains($this->brainCtx->ids())->citable() : collect();
+        $citableData = $citable->map(fn ($s) => ['name' => $s->name, 'domain' => $s->domain, 'tier' => (string) $s->tier])->values()->all();
+        [$kbData] = $this->kb->stepInfo();
+        [$assetData] = $this->assets->stepInfo();
+        unset($assetData['images']['inserted_ids'], $assetData['internal_links']['inserted']); // chỉ biết sau khi viết
+        $nImg = count($assetData['images']['selected']);
+        $nLink = count($assetData['internal_links']['suggested']);
+        $brand = $this->brandData();
+        $gap = (bool) ($kbData['knowledge']['gap'] ?? false);
+        $this->step($run, 'research', 'system', $gap ? 'warn' : 'ok', 'Chuẩn bị tài liệu',
+            'Đã nạp '.$kbData['knowledge']['count'].' mục kiến thức đã duyệt, '.$nImg.' ảnh gợi ý, '.$nLink.' liên kết nội bộ gợi ý, '.count($citableData).' nguồn được phép trích'
+            .(($brand['brand_profile_fields'] ?? 0) > 0 ? ', hồ sơ doanh nghiệp ('.$brand['brand_profile_fields'].' trường).' : ', chưa có hồ sơ doanh nghiệp.')
+            .($gap ? ' Kho kiến thức chưa có mục đã duyệt phù hợp; đã ghi khoảng trống kiến thức.' : ''),
+            $kbData + $assetData + ['citable_sources' => $citableData] + $brand + $this->brainCtx->stepData());
     }
 
     /** @return array<string, mixed> thuộc tính ArticleVersion (đã làm sạch HTML) */
