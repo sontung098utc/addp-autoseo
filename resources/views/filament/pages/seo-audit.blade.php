@@ -45,7 +45,6 @@
             @endif
             <span style="flex:1"></span>
             @if ($hasData)
-                <x-filament::button color="gray" wire:click="suggestRefresh" :disabled="! $canAct || ! $realRun" title="{{ ! $realRun ? 'Dữ liệu mẫu: không tạo việc.' : (! $canAct ? 'Chỉ approver trở lên được tạo đề xuất.' : 'Tạo đề xuất làm mới bài từ lỗi P0/P1') }}">Đề xuất làm mới</x-filament::button>
                 <x-filament::button wire:click="createBrief" :disabled="! $canBrief" title="{{ ! $canAct ? 'Chỉ approver trở lên được tạo brief.' : ($scanning ? 'Đang quét nên chưa tạo được.' : 'Tạo brief từ nhóm lỗi đang chọn') }}">Tạo brief từ lỗi</x-filament::button>
             @endif
         </div>
@@ -109,7 +108,7 @@
                                         @forelse ($related as $x)
                                             <div class="ss-text-sm"><span class="au-mono">{{ $x['url'] }}</span> · {{ $x['status_label'] }}@if ($x['task']) · bài làm mới {{ $x['task'] }}@endif</div>
                                         @empty
-                                            <div class="ss-text-sm ss-muted">Chưa có đề xuất cho lỗi này. Dùng nút "Đề xuất làm mới" ở thanh trên (lỗi P2 không sinh đề xuất).</div>
+                                            <div class="ss-text-sm ss-muted">Chưa có đề xuất cho lỗi này. Bấm "Tạo đề xuất" ở tab Đề xuất làm mới (lỗi P2 không sinh đề xuất).</div>
                                         @endforelse
                                     @endif
                                 </div>
@@ -131,6 +130,7 @@
                             <strong>Đề xuất làm mới bài</strong>
                             <x-studio.hint text="Hệ thống sinh đề xuất từ lỗi P0/P1 của lần quét thật gần nhất. Không có gì tự thành việc: approver chấp nhận thì bài làm mới mới vào Kế hoạch để chiến dịch giao cho đội AI. Trang không phải bài viết chỉ sửa thủ công trên CMS." />
                             <span style="flex:1"></span>
+                            <x-filament::button color="gray" wire:click="suggestRefresh" :disabled="! $canAct || ! $realRun" title="{{ ! $realRun ? 'Dữ liệu mẫu: không tạo việc.' : (! $canAct ? 'Chỉ approver trở lên được tạo đề xuất.' : 'Tạo đề xuất làm mới bài từ lỗi P0/P1') }}">Tạo đề xuất</x-filament::button>
                             @if ($realRun)
                                 <x-filament::button color="gray" wire:click="acceptAllSuggestions" wire:confirm="Chấp nhận tất cả đề xuất đang chờ có bài khớp? Mỗi đề xuất sẽ tạo một bài làm mới trong Kế hoạch." :disabled="! $canAct" title="{{ $canAct ? 'Chấp nhận hàng loạt (có xác nhận)' : 'Chỉ approver trở lên.' }}">Chấp nhận tất cả đang chờ</x-filament::button>
                             @endif
@@ -157,7 +157,7 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="6" class="ss-muted">Chưa có đề xuất. Bấm "Đề xuất làm mới" ở thanh trên.</td></tr>
+                                    <tr><td colspan="6" class="ss-muted">Chưa có đề xuất. Bấm "Tạo đề xuất" ở trên.</td></tr>
                                 @endforelse
                                 </tbody>
                             </table></div>

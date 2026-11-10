@@ -266,6 +266,11 @@ class AuditSuggestionTest extends TestCase
         $this->page('/bai-a', ['missing_title']);
         $c = Livewire::test(AuditPage::class)->set('websiteId', $this->site->id)->call('suggestRefresh');
         $this->assertSame(1, AuditSuggestion::count());
+        // Gói B #8: "Đề xuất làm mới" chỉ là nhãn tab; nút tạo nằm trong tab và tên là "Tạo đề xuất".
+        $html = $c->html();
+        $this->assertSame(1, substr_count($html, '>Đề xuất làm mới<'));
+        $this->assertSame(1, substr_count($html, 'wire:click="suggestRefresh"'));
+        $this->assertMatchesRegularExpression('/>\s*Tạo đề xuất\s*</u', $html);
         $c->assertSee('Đề xuất làm mới')->assertSee('Chấp nhận')->assertSee('Bỏ qua')->assertSee('https://a.vn/bai-a');
 
         $c->call('acceptSuggestion', AuditSuggestion::first()->id);
