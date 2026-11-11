@@ -71,7 +71,7 @@ final class KnowledgeAiIngest
                     return ['ai' => $t->ai, 'label' => $t->label(), 'cap' => $t->costCapVnd, 'demo' => false];
                 }
             }
-            throw new KnowledgeError('Chưa kết nối AI. '.($router->why('knowledge') ?? 'Chưa có route phù hợp.').' Cấu hình ở Cài đặt → Tích hợp AI.');
+            throw new KnowledgeError('Chưa kết nối AI. '.($router->why('knowledge') ?? 'Chưa có route phù hợp.').' Cấu hình ở Cấu hình AI → Tích hợp AI.');
         }
         $real = AgentAi::real();
         if ($real instanceof StructuredAiInterface) {
@@ -80,7 +80,7 @@ final class KnowledgeAiIngest
         if (app()->environment('local')) {
             return ['ai' => new DemoScriptedAiProvider(), 'label' => 'AI giả lập (môi trường local)', 'cap' => null, 'demo' => true];
         }
-        throw new KnowledgeError('Chưa kết nối AI. Cấu hình ở Cài đặt → Tích hợp AI.');
+        throw new KnowledgeError('Chưa kết nối AI. Cấu hình ở Cấu hình AI → Tích hợp AI.');
     }
 
     /** @return array{ok: bool, reason: ?string, label: ?string, demo: bool} cho giao diện (nút ẩn/disable khi chưa có AI) */

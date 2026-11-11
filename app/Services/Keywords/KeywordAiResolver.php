@@ -25,7 +25,7 @@ final class KeywordAiResolver
                     return ['ai' => $target->ai, 'label' => $target->label(), 'cap' => $target->costCapVnd, 'demo' => false];
                 }
             }
-            throw new KeywordAiUnavailable('Chưa kết nối AI. '.($router->why($task) ?? 'Chưa có route phù hợp.').' Cấu hình ở Cài đặt → Tích hợp AI.');
+            throw new KeywordAiUnavailable('Chưa kết nối AI. '.($router->why($task) ?? 'Chưa có route phù hợp.').' Cấu hình ở Cấu hình AI → Tích hợp AI.');
         }
         $real = AgentAi::real();
         if ($real instanceof StructuredAiInterface) {
@@ -34,7 +34,7 @@ final class KeywordAiResolver
         if (app()->environment('local')) {
             return ['ai' => new DemoScriptedAiProvider, 'label' => 'AI giả lập (môi trường local)', 'cap' => null, 'demo' => true];
         }
-        throw new KeywordAiUnavailable('Chưa kết nối AI. Cấu hình ở Cài đặt → Tích hợp AI.');
+        throw new KeywordAiUnavailable('Chưa kết nối AI. Cấu hình ở Cấu hình AI → Tích hợp AI.');
     }
 
     /** @return array{ok: bool, reason: ?string, label: ?string, demo: bool} cho giao diện */

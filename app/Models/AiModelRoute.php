@@ -15,7 +15,7 @@ class AiModelRoute extends Model
         'repair' => ['Sửa bài theo lỗi chặn', 'standard'],
         'summary' => ['Tóm tắt audit', 'cheap'],
         // AG-S21: tách kho kiến thức bằng AI. Chưa cấu hình riêng thì KnowledgeAiIngest dùng route 'summary' (cùng bậc rẻ, cùng kiểu việc trích xuất/tóm tắt).
-        'knowledge' => ['Nạp kiến thức (tách mục)', 'cheap'],
+        'knowledge' => ['Đọc và tách mục kiến thức', 'cheap'],
         // G3: khảo sát thị trường (mắt xích Từ khóa). Chưa cấu hình riêng thì dùng route 'summary' (KeywordAiResolver).
         'keyword_suggest' => ['Đề xuất từ khóa', 'cheap'],
         'keyword_cluster' => ['Gom cụm từ khóa', 'cheap'],

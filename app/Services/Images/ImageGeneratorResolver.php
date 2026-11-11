@@ -7,7 +7,7 @@ use App\Models\AiModelRoute;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Chọn nhà cung cấp ảnh từ route 'image_gen' (Cài đặt → Tích hợp AI → Định tuyến): provider + model, khóa mã hóa có sẵn.
+ * Chọn nhà cung cấp ảnh từ route 'image_gen' (Cấu hình AI → Tích hợp AI): provider + model, khóa mã hóa có sẵn.
  * Hỗ trợ provider kiểu gemini (Imagen/Gemini ảnh) và openai_compat; kiểu khác (anthropic) không tạo ảnh.
  * Không có route/khóa: ném ImageGeneratorUnavailable. Riêng môi trường local và CHƯA có route nào mới dùng Mock (có nhãn).
  * Giá một ảnh: pricing['image_vnd'] của provider nếu có, không thì config('agent.images.cost_vnd_per_image') (ước tính, chưa đo thật).
@@ -22,7 +22,7 @@ final class ImageGeneratorResolver
             if (app()->environment('local')) {
                 return ['generator' => new MockImageGenerator, 'label' => 'Ảnh giả lập (môi trường local)', 'demo' => true];
             }
-            throw new ImageGeneratorUnavailable('Chưa cấu hình nhà cung cấp tạo ảnh (route "Tạo ảnh minh họa" ở Cài đặt → Tích hợp AI).');
+            throw new ImageGeneratorUnavailable('Chưa cấu hình nhà cung cấp tạo ảnh (route "Tạo ảnh minh họa" ở Cấu hình AI → Tích hợp AI).');
         }
         $p = $route->primaryProvider;
         if (! $route->primary_provider_id || ! $route->primary_model || ! $p) {

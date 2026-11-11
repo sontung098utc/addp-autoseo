@@ -7,19 +7,18 @@
 @endphp
 @once
 <style>
-    /* Kiểu tab ngang giống hàng tab cụm Đội AI (Filament sub-navigation): thanh bo tròn, ô bo tròn, nền nhạt + chữ đậm khi chọn. Ghi đè seo-studio.css bằng độ ưu tiên cao hơn. */
-    .ss-tabs-wrap > .ss-tabs-scroller { background: var(--ss-surface); border: 1px solid var(--ss-border); border-radius: 0.75rem; box-shadow: 0 1px 2px rgb(0 0 0 / .04); }
-    .ss-tabs-wrap .ss-tabs { gap: 0.25rem; align-items: center; padding: 0.375rem; border-bottom: 0; scrollbar-width: none; }
+    /* Hàng tab phẳng như hàng tab cũ của trang Chi phí AI: đường kẻ mảnh dưới cả hàng, tab mờ, tab chọn đậm + gạch chân 2px. Ghi đè seo-studio.css bằng độ ưu tiên cao hơn. */
+    .ss-tabs-wrap > .ss-tabs-scroller { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+    .ss-tabs-wrap .ss-tabs { gap: 0.25rem; align-items: stretch; padding: 0; border-bottom: 1px solid rgba(128,128,128,.3); scrollbar-width: none; }
     .ss-tabs-wrap .ss-tabs::-webkit-scrollbar { display: none; }
-    .ss-tabs-wrap .ss-tab { gap: 0.5rem; padding: 0.5rem 0.75rem; margin-bottom: 0; font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; border: 0; border-radius: 0.5rem; box-shadow: none; color: var(--ss-text-muted); background: transparent; transition: background-color .15s, color .15s; }
-    .ss-tabs-wrap .ss-tab:hover { background: var(--ss-surface-sunk); color: var(--ss-text); }
-    .ss-tabs-wrap .ss-tab.is-active { background: var(--ss-accent-bg); color: var(--ss-accent-fg); font-weight: 600; border: 0; box-shadow: none; }
-    .ss-tabs-wrap .ss-tab:focus-visible { outline: 2px solid var(--ss-focus); outline-offset: 1px; }
-    .ss-tabs-wrap .ss-tab__icon { width: 1.25rem; height: 1.25rem; flex: none; }
-    .ss-tabs-wrap .ss-tab.is-active .ss-tab__count { background: var(--ss-surface); }
-    .ss-tabs-wrap .ss-tabs-scroller::before, .ss-tabs-wrap .ss-tabs-scroller::after { bottom: 0; border-radius: 0.75rem; --ss-bg-edge: var(--ss-surface); }
+    .ss-tabs-wrap .ss-tab { gap: 0.5rem; padding: 0.55rem 1rem; margin-bottom: -1px; font-size: 0.9rem; line-height: 1.4; font-weight: 400; border: 0; border-bottom: 2px solid transparent; border-radius: 0; box-shadow: none; color: inherit; background: transparent; opacity: .7; }
+    .ss-tabs-wrap .ss-tab:hover { background: transparent; color: inherit; opacity: 1; }
+    .ss-tabs-wrap .ss-tab.is-active { background: transparent; opacity: 1; font-weight: 600; color: #0f6b5c; border: 0; border-bottom: 2px solid #0f6b5c; box-shadow: none; }
+    :root[data-theme=dark] .ss-tabs-wrap .ss-tab.is-active, .dark .ss-tabs-wrap .ss-tab.is-active { color: #5eead4; border-bottom-color: #5eead4; }
+    .ss-tabs-wrap .ss-tab:focus-visible { outline: 2px solid var(--ss-focus); outline-offset: -2px; }
+    .ss-tabs-wrap .ss-tab__icon { width: 1.1rem; height: 1.1rem; flex: none; }
+    .ss-tabs-wrap .ss-tabs-scroller::before, .ss-tabs-wrap .ss-tabs-scroller::after { border-radius: 0; }
     .ss-tabs-wrap [class*=ss-tabs__arrow] { bottom: 0; padding: 0; }
-    @media (prefers-reduced-motion: reduce) { .ss-tabs-wrap .ss-tab { transition: none; } }
 </style>
 @endonce
 <div class="ss-tabs-wrap" x-data="studioTabs(@js($default), @js($persist))" data-tabs="{{ $uid }}">
