@@ -4,7 +4,6 @@
     $sec = fn (string $t) => '<div class="text-sm" style="font-weight:600;margin:.9rem 0 .3rem">'.e($t).'</div>';
 @endphp
 <div data-testid="skill-detail" class="space-y-2 text-sm">
-    <div class="text-xs"><code>{{ $s['ref'] }}</code></div>
     @if (! $pb)
         <div class="text-xs" style="color:#b91c1c">Playbook lỗi định dạng, không đọc được nội dung: {{ $s['error'] }}</div>
     @else
@@ -19,17 +18,7 @@
             @if ($s['roles'])Vai trò: {{ implode(', ', array_column($s['roles'], 'name')) }}.@endif
         </div>
 
-        {!! $sec('Xuất xứ') !!}
-        <table class="text-xs" style="width:100%"><tbody data-testid="skill-lineage">
-            <tr><td style="opacity:.7;width:25%">Nguồn</td><td>{{ $pb->lineage['source'] }}</td></tr>
-            <tr><td style="opacity:.7">Phiên bản nguồn</td><td>{{ $pb->lineage['source_version'] }}</td></tr>
-            <tr><td style="opacity:.7">Giấy phép</td><td>{{ $pb->lineage['license'] }}</td></tr>
-            <tr><td style="opacity:.7">Đã chỉnh</td><td>{{ $pb->lineage['adaptations'] }}</td></tr>
-            <tr><td style="opacity:.7">Rà soát lần cuối</td><td>{{ $pb->reviewedAt }}</td></tr>
-            <tr><td style="opacity:.7">Checksum</td><td><code>{{ substr($pb->checksum, 0, 12) }}</code></td></tr>
-        </tbody></table>
-
-        {!! $sec('Luật chất lượng liên quan (rubric_refs)') !!}
+        {!! $sec('Luật chất lượng áp dụng') !!}
         @if ($rubric === [])
             <div class="text-xs" style="opacity:.7">Không gắn luật nào.</div>
         @else
@@ -49,7 +38,20 @@
             </tbody></table>
         @endif
 
-        {!! $sec('Nội dung playbook (chỉ đọc)') !!}
+        {!! $sec('Nội dung hướng dẫn') !!}
         <div class="skill-md text-xs" data-testid="skill-body" style="max-height:24rem;overflow:auto;border:1px solid rgba(128,128,128,.25);border-radius:.5rem;padding:.6rem">{!! $html !!}</div>
+        <details class="text-xs" style="margin-top:.9rem" data-testid="skill-tech"><summary style="cursor:pointer;font-weight:600">Thông tin kỹ thuật</summary>
+        
+        <table class="text-xs" style="width:100%"><tbody data-testid="skill-lineage">
+            <tr><td style="opacity:.7;width:25%">Mã kỹ năng</td><td><code>{{ $s['ref'] }}</code></td></tr>
+            <tr><td style="opacity:.7;width:25%">Tác giả gốc</td><td>{{ $pb->lineage['source'] }}</td></tr>
+            <tr><td style="opacity:.7">Phiên bản gốc</td><td>{{ $pb->lineage['source_version'] }}</td></tr>
+            <tr><td style="opacity:.7">Giấy phép sử dụng</td><td>{{ $pb->lineage['license'] }}</td></tr>
+            <tr><td style="opacity:.7">Đã điều chỉnh</td><td>{{ $pb->lineage['adaptations'] }}</td></tr>
+            <tr><td style="opacity:.7">Rà soát lần cuối</td><td>{{ $pb->reviewedAt }}</td></tr>
+            <tr><td style="opacity:.7">Mã kiểm tra</td><td><code>{{ substr($pb->checksum, 0, 12) }}</code></td></tr>
+        </tbody></table>
+
+        </details>
     @endif
 </div>
