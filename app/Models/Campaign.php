@@ -19,7 +19,7 @@ class Campaign extends Model
     }
 
     /** Giai đoạn có thể đặt điểm dừng chờ người. */
-    public const CHECKPOINTS = ['outline' => 'Sau dàn ý', 'draft' => 'Sau bản nháp', 'publish' => 'Trước khi đăng'];
+    public const CHECKPOINTS = ['plan' => 'Sau khi đề xuất kế hoạch', 'outline' => 'Sau dàn ý', 'draft' => 'Sau bản nháp', 'publish' => 'Trước khi đăng'];
 
     public function website(): BelongsTo
     {
