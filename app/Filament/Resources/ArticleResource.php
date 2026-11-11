@@ -364,13 +364,13 @@ class ArticleResource extends Resource
                     ->limit(16)
                     ->tooltip(fn (Article $r) => static::campaignOf($r) ? 'Mở chiến dịch' : 'Không thuộc chiến dịch nào')
                     ->url(fn (Article $r) => ($c = static::campaignOf($r)) && CampaignResource::canViewAny() ? CampaignResource::getUrl('view', ['record' => $c]) : null)
-                    ->visibleFrom('md')),
+                    ->visibleFrom('xl')),
                 static::narrow(Tables\Columns\TextColumn::make('brains')
                     ->label('Trí tuệ')
                     ->state(fn (Article $r) => ($n = BrainContext::forArticle($r, ArticleRows::lastRun($r)?->campaign_id)->names()) !== '' ? $n : '—')
                     ->limit(18)
                     ->tooltip(fn (Article $r) => 'Trí tuệ đang dùng: '.BrainContext::forArticle($r, ArticleRows::lastRun($r)?->campaign_id)->names())
-                    ->visibleFrom('xl')),
+                    ->visibleFrom('2xl')),
                 static::narrow(Tables\Columns\TextColumn::make('last_run')
                     ->label('Phiên gần nhất')
                     ->state(fn (Article $r) => ($run = ArticleRows::lastRun($r)) ? static::runSummary($run) : '—')
@@ -378,10 +378,10 @@ class ArticleResource extends Resource
                     ->tooltip(fn (Article $r) => ($run = ArticleRows::lastRun($r)) ? static::runSummary($run).' · bấm để xem diễn biến' : null)
                     ->url(fn (Article $r) => ($run = ArticleRows::lastRun($r)) && AgentRunResource::canViewAny() ? AgentRunResource::getUrl('view', ['record' => $run]) : null)
                     ->color('gray')
-                    ->visibleFrom('xl')),
+                    ->visibleFrom('2xl')),
                 static::narrow(Tables\Columns\TextColumn::make('updated_at')->label('Cập nhật')->since()->sortable()
                     ->tooltip(fn (Article $r) => $r->updated_at?->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y H:i'))
-                    ->visibleFrom('md')),
+                    ->visibleFrom('xl')),
                 Tables\Columns\TextColumn::make('website.name')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Website')->badge()->color('info')->sortable(),
                 Tables\Columns\TextColumn::make('topic_cluster')->toggleable(isToggledHiddenByDefault: true)->sortable()
