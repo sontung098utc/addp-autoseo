@@ -6,8 +6,10 @@ use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\ArticleVersionResource;
 use App\Filament\Support\Agent\RunActivity;
 use App\Filament\Support\Article\VersionCompareAction;
+use App\Filament\Support\Explain\WhyAction;
 use App\Filament\Support\Review\ReviewActions;
 use App\Filament\Support\Review\ReviewWorkflow;
+use App\Filament\Support\Schedule\RescheduleAction;
 use App\Models\AgentRun;
 use App\Models\Article;
 use App\Models\ArticleVersion;
@@ -198,6 +200,38 @@ class ViewArticle extends EditArticle
     {
         return Actions\Action::make('resumePublication')->label('Tiếp tục đăng')->color('success')
             ->action(fn (array $arguments) => $this->holdPublication((int) ($arguments['id'] ?? 0), pause: false));
+    }
+
+    /** Lượt đăng của CHÍNH bài đang mở (không cho thao tác lượt của bài khác qua tham số). */
+    private function publicationFor(array $arguments): Publication
+    {
+        $p = Publication::query()->whereKey((int) ($arguments['id'] ?? 0))->whereHas('articleVersion', fn ($q) => $q->where('article_id', $this->record->id))->first();
+        abort_if($p === null, 404);
+
+        return $p;
+    }
+
+    /** Đổi giờ đăng một lượt (người duyệt trở lên); trước đây chỉ có ở trang xem lượt đăng. */
+    public function reschedulePublicationAction(): Actions\Action
+    {
+        return Actions\Action::make('reschedulePublication')->label('Đổi lịch')->icon('heroicon-o-clock')->color('gray')
+            ->modalHeading('Đổi giờ đăng')
+            ->modalDescription(fn (array $arguments): string => RescheduleAction::description($this->publicationFor($arguments)))
+            ->form(fn (array $arguments): array => RescheduleAction::form(fn () => $this->publicationFor($arguments)))
+            ->action(function (array $arguments, array $data) {
+                abort_unless(ReviewActions::user()?->isApprover(), 403);
+                RescheduleAction::run($this->publicationFor($arguments), $data);
+                $this->refreshRecord();
+            });
+    }
+
+    /** Giải thích vì sao lượt đăng chưa lên (hoặc trạng thái đăng nếu đã đăng). */
+    public function whyPublicationAction(): Actions\Action
+    {
+        return Actions\Action::make('whyPublication')->label('Vì sao chưa đăng?')->icon('heroicon-o-question-mark-circle')->color('gray')
+            ->modalHeading('Vì sao bài này chưa được đăng?')
+            ->modalContent(fn (array $arguments) => view('filament.explain.why-not-published', ['result' => WhyAction::explain($this->publicationFor($arguments))]))
+            ->modalSubmitAction(false)->modalCancelAction(false)->modalCloseButton();
     }
 
     private function holdPublication(int $id, bool $pause): void

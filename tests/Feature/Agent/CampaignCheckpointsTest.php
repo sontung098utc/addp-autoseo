@@ -22,6 +22,7 @@ use App\Services\Agent\Run\CampaignRunner;
 use App\Services\Publishing\EmergencyStopService;
 use App\Services\Publishing\PublicationHold;
 use App\Services\Publishing\PublisherManager;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
@@ -304,6 +305,43 @@ class CampaignCheckpointsTest extends TestCase
         $p->update(['status' => 'publishing']);
         $this->expectException(\InvalidArgumentException::class);
         (new PublicationHold)->pause($this->user('approver'), $p);
+    }
+
+    public function test_trang_bai_doi_lich_va_giai_thich_ngay_tai_tab_xuat_ban(): void
+    {
+        $this->actingAs($this->user('approver'));
+        $a = Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'a', 'workflow_status' => 'scheduled']);
+        $b = Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'b', 'workflow_status' => 'scheduled']);
+        $pa = $this->scheduled($a, 'ka');
+        $pb = $this->scheduled($b, 'kb');
+        $pa->update(['scheduled_at_utc' => now()->addDays(2)->utc()]);
+        $new = now()->addDays(3)->setTimezone('Asia/Ho_Chi_Minh')->format('Y-m-d H:i:s');
+
+        Livewire::test(ViewArticle::class, ['record' => $a->getKey()])
+            ->assertSee('data-testid="aw-pub-reschedule"', false)->assertSee('data-testid="aw-pub-why"', false)
+            ->call('mountAction', 'whyPublication', ['id' => $pa->id])->assertSee('Vì sao bài này chưa được đăng?');
+
+        Livewire::test(ViewArticle::class, ['record' => $a->getKey()])
+            ->callAction('reschedulePublication', ['scheduled_at_vn' => $new], ['id' => $pa->id])->assertNotified('Đã đổi lịch');
+
+        $this->assertSame(CarbonImmutable::parse($new, 'Asia/Ho_Chi_Minh')->utc()->format('Y-m-d H:i'), CarbonImmutable::parse($pa->fresh()->getRawOriginal('scheduled_at_utc'), 'UTC')->format('Y-m-d H:i'));
+
+        // Lượt của bài khác không đổi được qua tham số.
+        $before = $pb->fresh()->getRawOriginal('scheduled_at_utc');
+        try {
+            Livewire::test(ViewArticle::class, ['record' => $a->getKey()])->call('mountAction', 'reschedulePublication', ['id' => $pb->id])->setActionData(['scheduled_at_vn' => $new])->callMountedAction()->assertNotified('Đã đổi lịch');
+        } catch (\Throwable) {
+        }
+        $this->assertSame($before, $pb->fresh()->getRawOriginal('scheduled_at_utc'));
+    }
+
+    public function test_bien_tap_vien_khong_co_nut_doi_lich(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $a = Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'a', 'workflow_status' => 'scheduled']);
+        $this->scheduled($a, 'kw');
+
+        Livewire::test(ViewArticle::class, ['record' => $a->getKey()])->assertDontSee('data-testid="aw-pub-reschedule"', false);
     }
 
     public function test_trang_bai_nut_tam_dung_tung_bai_va_khong_dung_bai_khac(): void
