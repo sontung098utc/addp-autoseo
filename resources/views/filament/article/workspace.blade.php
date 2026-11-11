@@ -105,6 +105,7 @@
         .aw-table th{font-weight:600;opacity:.8;white-space:nowrap}
         .aw-table tr.is-current td{font-weight:600}
         .aw-scroll{overflow-x:auto}
+        @media (max-width:1400px){.aw-opt{display:none}}
         .aw-muted{opacity:.75;font-size:.85rem}
         .aw-list{margin:0;padding-left:1.1rem;list-style:disc;display:grid;gap:.25rem}
         .aw-link{text-decoration:underline}
@@ -579,10 +580,10 @@
                         @if ($runs->isEmpty())
                             <p>Bài này chưa được giao cho đội AI.</p>
                         @else
-                            @if ($noGrounding)<div class="aw-note" data-testid="aw-score-gap" style="color:#b45309">Bài chưa có căn cứ từ kho kiến thức. <x-help tone="warning" title="Vì sao cần xem lại"><p>{{ ArticleResource::GAP_NOTE }}</p></x-help></div>@endif
+                            
                             <div class="aw-scroll">
                                 <table class="aw-table" data-testid="aw-runs">
-                                    <thead><tr><th>Phiên</th><th>Kết quả</th><th>Điểm hình thức</th><th>Tạo ra bản</th><th>AI</th><th>Vòng sửa</th><th>Chi phí</th><th>Bắt đầu</th><th></th></tr></thead>
+                                    <thead><tr><th>Phiên</th><th>Kết quả</th><th class="aw-opt">Điểm hình thức</th><th class="aw-opt">Tạo ra bản</th><th class="aw-opt">AI</th><th class="aw-opt">Vòng sửa</th><th>Chi phí</th><th>Bắt đầu</th><th></th></tr></thead>
                                     <tbody>
                                         @foreach ($runs as $r)
                                             @php $isLive = $live && $r->id === $live->id; $fv = $r->final_version_id ? $versions->firstWhere('id', $r->final_version_id) : null; @endphp
@@ -594,10 +595,10 @@
                                                     @endif
                                                     @if ($r->outcome_reason)<div class="aw-muted">{{ Str::limit($r->outcome_reason, 140) }}</div>@endif
                                                 </td>
-                                                <td>{{ ArticleRows::score($r) ?? '—' }}</td>
-                                                <td>{{ $fv ? 'v'.$fv->version : '—' }}</td>
-                                                <td>{{ $r->ai_mode === 'real' ? 'AI thật' : 'AI giả lập' }}</td>
-                                                <td>{{ (int) $r->repair_rounds }}</td>
+                                                <td class="aw-opt">{{ ArticleRows::score($r) ?? '—' }}</td>
+                                                <td class="aw-opt">{{ $fv ? 'v'.$fv->version : '—' }}</td>
+                                                <td class="aw-opt">{{ $r->ai_mode === 'real' ? 'AI thật' : 'AI giả lập' }}</td>
+                                                <td class="aw-opt">{{ (int) $r->repair_rounds }}</td>
                                                 <td>{{ V::formatVnd($r->cost_vnd) }}</td>
                                                 <td>{{ VnTime::format($r->started_at ?? $r->created_at) }}</td>
                                                 <td>@if (AgentRunResource::canViewAny())<a class="aw-link" href="{{ AgentRunResource::getUrl('view', ['record' => $r]) }}">Xem diễn biến</a>@endif</td>
