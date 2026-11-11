@@ -145,10 +145,17 @@ final class KeywordService
     public function propose(): int
     {
         $free = array_values(array_map(fn ($r) => $r['keyword'], array_filter($this->repo->all(), fn ($r) => $r['cluster'] === null)));
-        $groups = (new MockClusterer)->cluster($free);
         $byKw = [];
         foreach ($this->repo->all() as $r) {
             $byKw[$r['keyword']] = $r['intent'];
+        }
+        // Tách theo ý định trước khi gom: từ khóa tìm hiểu (thông tin) không chung cụm với từ khóa mua/so sánh dù trùng cụm từ
+        // ("chỉ số đường huyết" ≠ "mua máy đo đường huyết"). Cụm thương mại có hậu tố để không trùng tên (nhận cụm trùng tên sẽ nhập vào nhau).
+        $info = array_values(array_filter($free, fn ($k) => ($byKw[$k] ?? 'informational') === 'informational'));
+        $shop = array_values(array_diff($free, $info));
+        $groups = (new MockClusterer)->cluster($info);
+        foreach ((new MockClusterer)->cluster($shop) as $g) {
+            $groups[] = ['name' => $g['name'].' (mua/so sánh)', 'keywords' => $g['keywords']];
         }
         $props = [];
         foreach ($groups as $i => $g) {

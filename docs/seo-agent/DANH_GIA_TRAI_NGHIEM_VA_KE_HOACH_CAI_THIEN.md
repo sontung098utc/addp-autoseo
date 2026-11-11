@@ -147,3 +147,13 @@ Migration: `2026_11_20_000001` (job_type), `2026_11_21_000001` (nguồn gốc/t�
 
 Còn mở sau lượt này: gom cụm cần AI thật; không có nút duyệt kế hoạch tường minh; trường "Từ khóa cần viết" bắt buộc oan; tab "Đang chạy" nhiều lượt Xây kho tự sinh; **mọi chất lượng nội dung AI vẫn chưa được đánh giá** (AI giả lập, không có mạng).
 
+### Xử lý các mục còn mở sau lượt chạy lại
+
+| Mục còn mở | Xử lý |
+|---|---|
+| Gom cụm theo luật gộp thô | Tách theo ý định trước khi gom: từ khóa tìm hiểu không chung cụm với từ khóa mua/so sánh; cụm mua/so sánh có hậu tố "(mua/so sánh)" để không trùng tên. Gom đúng nghĩa vẫn cần AI thật |
+| "Chờ bạn duyệt" nhưng không có nút duyệt kế hoạch | Không thêm cổng mới (ngược nguyên tắc ít rào cản): sửa lời thông báo thành "Bài ở trạng thái Đã lên kế hoạch. Giao đội AI ở trang Bài viết, hoặc để chiến dịch tự lấy bài" |
+| "Từ khóa cần viết" bắt buộc oan | Chỉ bắt buộc khi nguồn từ khóa là danh sách nhập tay |
+| Tab "Đang chạy" bị lấn bởi lượt Xây kho tự sinh | Ẩn các lượt chuẩn bị kiến thức tự động, thay bằng một dòng ghi chú có số lượng; vẫn xem ở tab Phiên chạy |
+| Bài lạc chủ đề trong kế hoạch | Khối "AI sẽ tự chuẩn bị" cảnh báo khi chủ đề có vẻ ngoài lĩnh vực của website. **Chỉ hoạt động khi hồ sơ doanh nghiệp đã có lĩnh vực** (tự điền từ website khi đọc được); trong bản xem thử hồ sơ trống nên không thấy cảnh báo |
+

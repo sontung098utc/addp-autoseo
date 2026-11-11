@@ -169,4 +169,16 @@ class PipelineVisualTest extends TestCase
 
         $this->assertSame('2 phút 5 giây', $row['elapsed']);
     }
+
+    public function test_luot_xay_kho_tu_dong_bi_an_khoi_danh_sach_dang_chay_va_co_ghi_chu(): void
+    {
+        $w = Website::create(['name' => 'Site A', 'cms_type' => 'wordpress', 'base_url' => 'https://'.uniqid().'.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+        AgentRun::create(['website_id' => $w->id, 'job_type' => 'brain_build', 'status' => 'ready_for_review', 'trigger' => 'manual', 'input_refs' => ['purpose' => 'gap']]);
+        AgentRun::create(['website_id' => $w->id, 'job_type' => 'brain_build', 'status' => 'ready_for_review', 'trigger' => 'manual', 'input_refs' => ['max_pages' => 30]]);
+
+        $rows = PipelineVisual::runs();
+
+        $this->assertCount(1, $rows, 'chỉ còn lượt xây kho do người bấm');
+        $this->assertSame(1, PipelineVisual::autoPrepareCount());
+    }
 }

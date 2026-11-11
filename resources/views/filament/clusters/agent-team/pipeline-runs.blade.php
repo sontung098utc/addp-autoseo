@@ -19,4 +19,6 @@
     @empty
         <div class="text-sm" style="opacity:.7" data-testid="pipeline-runs-empty">Chưa có phiên nào trong 24 giờ qua.</div>
     @endforelse
+    @php($auto = \App\Services\Agent\Pipeline\PipelineVisual::autoPrepareCount())
+    @if ($auto > 0)<div class="text-xs" style="opacity:.7;margin-top:.5rem" data-testid="pipeline-auto-prepare">Đã ẩn {{ $auto }} lượt chuẩn bị kiến thức tự động (đội AI tự đọc website trước khi viết bài). Xem ở tab Phiên chạy.</div>@endif
 </div>

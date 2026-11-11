@@ -265,7 +265,7 @@ class ContentPlanPage extends Page
             return;
         }
         $n = Notification::make()->title("Đã thêm {$r['created']} bài vào kế hoạch")
-            ->body($r['skipped'] ? 'Bỏ qua: '.implode('; ', $r['skipped']) : 'Bài ở trạng thái Đã lên kế hoạch, chờ bạn duyệt.');
+            ->body($r['skipped'] ? 'Bỏ qua: '.implode('; ', $r['skipped']) : 'Bài ở trạng thái Đã lên kế hoạch. Giao đội AI ở trang Bài viết, hoặc để chiến dịch tự lấy bài.');
         $r['skipped'] ? $n->warning() : $n->success();
         $n->send();
         $this->planPick = [];

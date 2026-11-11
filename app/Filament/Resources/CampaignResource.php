@@ -111,8 +111,8 @@ class CampaignResource extends Resource
             Forms\Components\Section::make('Mục tiêu')->schema([
                 Forms\Components\TextInput::make('name')->label('Tên chiến dịch')->required()->maxLength(120),
                 Forms\Components\Select::make('website_id')->label('Website')->relationship('website', 'name')->required(),
-                Forms\Components\TagsInput::make('keywords')->label('Từ khóa cần viết')->required()
-                    ->hintIcon('heroicon-o-information-circle', 'Mỗi từ khóa một bài, giao lần lượt; từ khóa website đã có bài sẽ bị bỏ qua.'),
+                Forms\Components\TagsInput::make('keywords')->label('Từ khóa cần viết')->default([])->required(fn (Get $get): bool => $get('source') === 'keywords')
+                    ->hintIcon('heroicon-o-information-circle', 'Mỗi từ khóa một bài, giao lần lượt; từ khóa website đã có bài sẽ bị bỏ qua. Chỉ bắt buộc khi nguồn từ khóa là danh sách nhập tay.'),
                 Forms\Components\Select::make('brain_ids')->label('Trí tuệ được dùng')->multiple()->options(fn () => Brain::query()->where('status', 'active')->orderBy('name')->pluck('name', 'id')->all())
                     ->hintIcon('heroicon-o-information-circle', 'Để trống: dùng các Trí tuệ của website theo thứ tự ưu tiên. Chọn nhiều thì thứ tự chọn là thứ tự ưu tiên; AI lấy giọng, khung bài và kiến thức từ các Trí tuệ này.')
                     ->columnSpanFull(),
@@ -144,7 +144,7 @@ class CampaignResource extends Resource
                     ->validationMessages(['accepted' => 'Cần tích "Tôi đã đọc" để bật chế độ Toàn quyền.'])
                     ->helperText(fn (?Model $record) => $record?->mode === 'autonomous' ? 'Chiến dịch này đã xác nhận chính sách trước đó.' : null)
                     ->default(fn (?Model $record) => $record?->mode === 'autonomous'),
-                Forms\Components\Select::make('source')->label('Nguồn từ khóa')->options(['plan' => 'Kế hoạch nội dung (hết thì dùng danh sách nhập tay)', 'keywords' => 'Danh sách nhập tay'])->default('plan')->required()
+                Forms\Components\Select::make('source')->label('Nguồn từ khóa')->options(['plan' => 'Kế hoạch nội dung (hết thì dùng danh sách nhập tay)', 'keywords' => 'Danh sách nhập tay'])->default('plan')->live()->required()
                     ->hintIcon('heroicon-o-information-circle', 'Kế hoạch nội dung: lấy bài đã lên kế hoạch trước. Danh sách nhập tay: chỉ dùng các từ khóa bạn nhập ở trên.'),
                 Forms\Components\TextInput::make('daily_cost_cap_vnd')->label('Trần chi phí AI mỗi ngày (đ)')->numeric()->minValue(0)->maxValue(100000000)->default(150000)->required()
                     ->hintIcon('heroicon-o-information-circle', 'Chạm trần thì chiến dịch dừng giao bài tới ngày mai (giờ Việt Nam).'),

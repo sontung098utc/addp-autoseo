@@ -150,6 +150,9 @@ final class PipelineVisual
         $out = [];
         foreach ($runs as $r) {
             $jt = $r->job_type ?: 'article_write';
+            if (self::isAutoPrepare($r)) {
+                continue; // lượt xây kho tự sinh theo từng bài: gom vào dòng ghi chú, không lấn át việc chính
+            }
             $job = JobTypeRegistry::find($jt);
             $live = RunActivity::isLive($r);
             $current = $live ? RunActivity::currentStageOf($r, $r->steps) : null;
@@ -172,6 +175,18 @@ final class PipelineVisual
         }
 
         return $out;
+    }
+
+    /** Lượt xây kho do đội AI tự chạy để chuẩn bị kiến thức cho MỘT bài (purpose 'gap'); vẫn xem được ở trang Phiên chạy. */
+    public static function isAutoPrepare(AgentRun $r): bool
+    {
+        return ($r->job_type ?? null) === 'brain_build' && (($r->input_refs['purpose'] ?? null) === 'gap');
+    }
+
+    /** Số lượt chuẩn bị kiến thức tự động trong 24 giờ qua (hiện thành ghi chú dưới danh sách "Đang chạy"). */
+    public static function autoPrepareCount(): int
+    {
+        return AgentRun::query()->where('job_type', 'brain_build')->where('created_at', '>=', now()->subDay())->get()->filter(fn ($r) => self::isAutoPrepare($r))->count();
     }
 
     private static function resultUrl(AgentRun $r, string $jt): ?string

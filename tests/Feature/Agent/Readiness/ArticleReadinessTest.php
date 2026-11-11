@@ -4,6 +4,7 @@ namespace Tests\Feature\Agent\Readiness;
 
 use App\Models\Article;
 use App\Models\Brain;
+use App\Models\BrandProfile;
 use App\Models\KnowledgeItem;
 use App\Models\Website;
 use App\Services\Agent\Readiness\ArticleReadiness;
@@ -111,5 +112,17 @@ class ArticleReadinessTest extends TestCase
         $this->assertContains('no_brain', array_column(ArticleReadiness::for($a)['issues'], 'code'));
         // Đã gắn thì không gợi ý nữa.
         $this->assertSame([], BrainSuggester::forArticle($a, [$s[0]['id']]));
+    }
+
+    public function test_chu_de_lech_linh_vuc_website_duoc_canh_bao_khi_co_ho_so(): void
+    {
+        $w = $this->site();
+        BrandProfile::create(['website_id' => $w->id, 'business_field' => 'Thực phẩm chức năng cho người tiểu đường']);
+
+        $off = ArticleReadiness::for($this->article($w, 'cách viết thư xin học bổng'));
+        $on = ArticleReadiness::for($this->article($w, 'thực phẩm cho người tiểu đường'));
+
+        $this->assertContains('off_topic', array_column($off['issues'], 'code'));
+        $this->assertNotContains('off_topic', array_column($on['issues'], 'code'));
     }
 }

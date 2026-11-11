@@ -83,6 +83,9 @@ final class ArticleReadiness
             $issues[] = ['code' => 'brand_incomplete', 'severity' => $profile['percent'] === 0 ? 'warn' : 'info',
                 'message' => 'Hồ sơ doanh nghiệp '.($profile['percent'] === 0 ? 'chưa có' : 'chưa đủ ('.$profile['percent'].'%)').': AI thiếu giọng thương hiệu, thông điệp, từ cấm.'];
         }
+        if ($site && $keyword !== '' && BrandProfileData::looksOffTopic(BrandProfileData::forWebsite($site->id), $keyword)) {
+            $issues[] = ['code' => 'off_topic', 'severity' => 'warn', 'message' => 'Chủ đề «'.mb_substr($keyword, 0, 80).'» có vẻ ngoài lĩnh vực của website (theo hồ sơ doanh nghiệp). Kiểm tra lại trước khi giao, hoặc xóa khỏi kế hoạch.'];
+        }
         if ($products['count'] === 0) {
             $issues[] = ['code' => 'no_product', 'severity' => 'info', 'message' => 'Chưa có sản phẩm nào của công ty khớp chủ đề này trong kho.'];
         }
