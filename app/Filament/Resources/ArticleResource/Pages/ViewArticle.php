@@ -22,6 +22,7 @@ use App\Models\Website;
 use App\Services\Agent\Pipeline\JobTypeRegistry;
 use App\Services\Agent\Readiness\BrainAutoAttach;
 use App\Services\Brain\BrainContext;
+use App\Services\Publishing\EmergencyStopService;
 use Filament\Actions;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
@@ -256,6 +257,7 @@ class ViewArticle extends EditArticle
             'tabDefault' => $tabDefault,
             'canUndoAttach' => ReviewActions::user()?->isWriter() ?? false,
             'autoAttached' => $this->recentAutoAttached(),
+            'stopInfo' => ($stop = app(EmergencyStopService::class))->isStopped($article->website_id) ? $stop->getStopInfo($article->website_id) : null,
             'needsExpert' => (bool) ($readiness['needs_expert'] ?? false) || ! empty($writeStep?->data['needs_expert_review']),
             'article' => $article,
             'latest' => $latest,

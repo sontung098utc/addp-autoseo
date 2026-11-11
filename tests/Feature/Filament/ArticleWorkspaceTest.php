@@ -19,6 +19,7 @@ use App\Models\KnowledgeSource;
 use App\Models\Publication;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Publishing\EmergencyStopService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -302,5 +303,20 @@ class ArticleWorkspaceTest extends TestCase
         $step(2, 'research', ['knowledge' => ['gap' => false], 'images' => ['warning' => 'ẢNH-MỚI'], 'citable_sources' => [['title' => 'Bộ Y tế'], ['title' => 'WHO']]]);
         $this->get($url)->assertSee('ẢNH-MỚI')->assertDontSee('ẢNH-CŨ')->assertDontSee('data-testid="aw-gap"', false)
             ->assertSee('Nguồn được phép trích: 2')->assertSee('Bộ Y tế');
+    }
+
+    public function test_trang_bai_hien_banner_khi_he_thong_dang_dung_khan_cap(): void
+    {
+        $admin = $this->user('admin');
+        $this->actingAs($admin);
+        $a = $this->article('planned', false);
+
+        $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()->assertDontSee('aw-stopped', false);
+
+        $svc = app(EmergencyStopService::class);
+        $svc->resetForTesting();
+        $svc->stop($admin, 'Sự cố kiểm thử');
+        $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()->assertSee('aw-stopped', false)->assertSee('DỪNG KHẨN CẤP')->assertSee('Sự cố kiểm thử');
+        $svc->resetForTesting();
     }
 }
