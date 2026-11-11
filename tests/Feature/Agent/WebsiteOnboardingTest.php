@@ -68,6 +68,19 @@ class WebsiteOnboardingTest extends TestCase
         $this->assertSame(0, Article::count(), 'không tạo bài');
     }
 
+    public function test_doc_0_trang_hoac_them_0_tu_khoa_khong_duoc_bao_xong(): void
+    {
+        $site = $this->site();
+        [$b, $r] = $this->fakes(['pages_read' => 0, 'items_auto' => 0, 'items_proposed' => 0], ['added' => 0]);
+
+        $by = collect((new WebsiteOnboarding($b, $r))->run($site)['steps'])->keyBy('key');
+
+        $this->assertSame('skipped', $by['kb']['status']);
+        $this->assertStringContainsString('Chưa đọc được trang nào', $by['kb']['message']);
+        $this->assertSame('skipped', $by['keywords']['status']);
+        $this->assertStringContainsString('Chưa thêm được từ khóa nào', $by['keywords']['message']);
+    }
+
     public function test_mot_buoc_loi_khong_dung_cac_buoc_sau(): void
     {
         $site = $this->site();

@@ -596,12 +596,23 @@ final class AgentRunOrchestrator
     }
 
     /** Tùy chọn vai trò truyền cho adapter AI: khóa + tên tiếng Việt, để prompt có dòng "Bạn đang đóng vai". */
-    /** Chỉ dẫn thêm của người phụ trách cho riêng bài này (articles.guidance), nếu có. @return array<string,string> */
+    /**
+     * Định hướng của người cho riêng bài này: chỉ dẫn thêm (articles.guidance) và, nếu bản mới nhất vừa bị người duyệt từ chối kèm ghi chú,
+     * góp ý của người duyệt (để giao lại không phải gõ lại góp ý). Chỉ là dữ liệu định hướng, không thay quy tắc an toàn. @return array<string,string>
+     */
     private function guidanceOptions(Article $article): array
     {
+        $parts = [];
         $g = trim((string) $article->guidance);
+        if ($g !== '') {
+            $parts[] = $g;
+        }
+        $latest = $article->versions()->orderByDesc('version')->first();
+        if ($latest && $latest->review_status === 'rejected' && trim((string) $latest->review_notes) !== '') {
+            $parts[] = 'Góp ý của người duyệt ở bản trước (bản đó bị từ chối, hãy sửa theo): '.trim((string) $latest->review_notes);
+        }
 
-        return $g === '' ? [] : ['guidance' => $g];
+        return $parts === [] ? [] : ['guidance' => implode("\n\n", $parts)];
     }
 
     private function roleOptions(string $key): array

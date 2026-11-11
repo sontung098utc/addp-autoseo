@@ -7,6 +7,7 @@ use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\ArticleResource\Pages\ViewArticle;
 use App\Models\AgentRun;
 use App\Models\Article;
+use App\Models\ArticleVersion;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Agent\Run\AgentRunOrchestrator;
@@ -112,5 +113,38 @@ class ArticleGuidanceTest extends TestCase
         $run = AgentRun::first();
         $this->assertStringContainsString('chỉ dẫn thêm', mb_strtolower($run->steps->firstWhere('stage', 'brief')->detail), 'người dùng thấy chỉ dẫn đã được áp dụng');
         $this->assertStringContainsString('chỉ dẫn thêm', mb_strtolower($run->steps->firstWhere('stage', 'write')->detail));
+    }
+
+    public function test_gop_y_nguoi_duyet_o_ban_bi_tu_choi_tu_di_vao_lan_giao_lai(): void
+    {
+        $a = $this->article();
+        $a->update(['workflow_status' => 'rejected']);
+        ArticleVersion::create(['article_id' => $a->id, 'version' => 1, 'title' => 'T', 'slug' => 't', 'html_content' => '<p>x</p>', 'review_status' => 'rejected', 'review_notes' => 'Thiếu phần biến chứng mắt và thận.']);
+        $seen = [];
+        $spy = new class(new MockAiProvider, $seen) implements AiProviderInterface
+        {
+            public function __construct(private $inner, public array &$seen) {}
+
+            public function generateOutline(Article $article, array $options = []): array
+            {
+                $this->seen['outline'] = $options['guidance'] ?? null;
+
+                return $this->inner->generateOutline($article, $options);
+            }
+
+            public function generateArticle(Article $article, array $outline, array $options = []): array
+            {
+                return $this->inner->generateArticle($article, $outline, $options);
+            }
+
+            public function calculateCostVnd(int $promptTokens, int $completionTokens, string $model): float
+            {
+                return 0.0;
+            }
+        };
+        (new AgentRunOrchestrator($spy))->run($a);
+
+        $this->assertStringContainsString('Thiếu phần biến chứng mắt và thận.', (string) $seen['outline']);
+        $this->assertStringContainsString('bị từ chối', (string) $seen['outline']);
     }
 }

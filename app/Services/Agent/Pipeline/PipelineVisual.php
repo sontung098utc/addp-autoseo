@@ -3,11 +3,11 @@
 namespace App\Services\Agent\Pipeline;
 
 use App\Filament\Support\Agent\RunActivity;
+use App\Filament\Support\Schedule\VnTime;
 use App\Models\AgentRun;
 use App\Models\AgentRunStep;
 use App\Models\AiModelRoute;
 use App\Services\Agent\Roles\RoleRegistry;
-use Carbon\CarbonImmutable;
 use Filament\Resources\Resource;
 use Illuminate\Support\Facades\Schema;
 
@@ -165,7 +165,7 @@ final class PipelineVisual
                 'run' => $r, 'job_type' => $jt, 'job_title' => $job['title'] ?? $jt, 'live' => $live, 'status' => $r->status,
                 'subject' => $r->article ? 'Bài: '.($r->article->primary_keyword ?: $r->article->title ?? '#'.$r->article_id) : ($r->website ? 'Website: '.$r->website->name : 'Không gắn bài hay website'),
                 'current' => $current ? ($labels[$current] ?? $current) : null, 'bar' => $bar, 'who' => $who,
-                'elapsed' => RunActivity::formatElapsed(RunActivity::elapsedSeconds($r, $r->status === 'running' ? null : ($r->finished_at ? CarbonImmutable::parse($r->finished_at) : null))),
+                'elapsed' => RunActivity::formatElapsed(RunActivity::elapsedSeconds($r, $r->status === 'running' ? null : (VnTime::fromRaw($r, 'finished_at') ?? null))),
                 'cost' => (float) $r->cost_vnd,
                 'result_url' => self::resultUrl($r, $jt),
             ];

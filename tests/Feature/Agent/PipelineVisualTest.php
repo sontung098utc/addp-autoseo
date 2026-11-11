@@ -158,4 +158,15 @@ class PipelineVisualTest extends TestCase
         Livewire::test(PipelineMap::class)->call('mountAction', 'step', ['job' => 'site_audit', 'step' => 'crawl'])
             ->assertSee('1 lần chạy')->assertDontSee('Chưa có lần chạy nào');
     }
+
+    public function test_phien_da_xong_hien_thoi_luong_that_khong_phai_tu_luc_bat_dau_den_bay_gio(): void
+    {
+        $w = Website::create(['name' => 'Site A', 'cms_type' => 'wordpress', 'base_url' => 'https://'.uniqid().'.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+        AgentRun::create(['website_id' => $w->id, 'job_type' => 'market_research', 'status' => 'ready_for_review', 'trigger' => 'manual',
+            'started_at' => now()->subHours(8), 'finished_at' => now()->subHours(8)->addMinutes(2)->addSeconds(5)]);
+
+        $row = PipelineVisual::runs()[0];
+
+        $this->assertSame('2 phút 5 giây', $row['elapsed']);
+    }
 }

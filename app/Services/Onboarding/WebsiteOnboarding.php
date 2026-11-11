@@ -35,10 +35,14 @@ final class WebsiteOnboarding
         try {
             $build = $this->buildFactory ? ($this->buildFactory)() : new BrainBuildService;
             $r = $build->run($site, $by, ['max_pages' => 15]);
-            $add('kb', 'Đọc website và xây kho', 'ok',
-                'Đã đọc '.(int) ($r['pages_read'] ?? 0).' trang; '.(int) ($r['items_auto'] ?? 0).' mục tự nhận, '.(int) ($r['items_proposed'] ?? 0).' mục chờ duyệt'
-                .(! empty($r['brand_profile']['applied']) ? '; đã tự điền hồ sơ doanh nghiệp ('.count((array) ($r['brand_profile']['fields'] ?? [])).' trường)' : '').'.'
-                .(! empty($r['stopped_reason']) ? ' '.$r['stopped_reason'] : ''));
+            if ((int) ($r['pages_read'] ?? 0) === 0) {
+                $add('kb', 'Đọc website và xây kho', 'skipped', 'Chưa đọc được trang nào, nên kho chưa có gì mới'.(! empty($r['stopped_reason']) ? ': '.$r['stopped_reason'] : ' (website không truy cập được từ máy chủ này, hoặc chưa có AI)').'. Thử lại ở trang Xây kho từ website.');
+            } else {
+                $add('kb', 'Đọc website và xây kho', 'ok',
+                    'Đã đọc '.(int) $r['pages_read'].' trang; '.(int) ($r['items_auto'] ?? 0).' mục tự nhận, '.(int) ($r['items_proposed'] ?? 0).' mục chờ duyệt'
+                    .(! empty($r['brand_profile']['applied']) ? '; đã tự điền hồ sơ doanh nghiệp ('.count((array) ($r['brand_profile']['fields'] ?? [])).' trường)' : '').'.'
+                    .(! empty($r['stopped_reason']) ? ' '.$r['stopped_reason'] : ''));
+            }
         } catch (\Throwable $e) {
             $add('kb', 'Đọc website và xây kho', 'skipped', $this->why($e, 'Chưa xây được kho (cần AI và website truy cập được).'));
         }
@@ -61,7 +65,11 @@ final class WebsiteOnboarding
         try {
             $research = $this->researchFactory ? ($this->researchFactory)() : new KeywordResearchService;
             $r = $research->suggest($site);
-            $add('keywords', 'Khảo sát từ khóa', 'ok', 'Đã thêm '.(int) ($r['added'] ?? 0).' từ khóa mới'.(((int) ($r['metrics']['updated'] ?? 0)) > 0 ? ' (có lượt tìm thật cho '.$r['metrics']['updated'].')' : ' (chưa có lượt tìm thật: nhập CSV hoặc cấu hình DataForSEO)').'.');
+            if ((int) ($r['added'] ?? 0) === 0) {
+                $add('keywords', 'Khảo sát từ khóa', 'skipped', 'Chưa thêm được từ khóa nào'.(! empty($r['message']) ? ': '.$r['message'] : ' (chưa có AI thật hoặc AI không đề xuất được từ mới)').'.');
+            } else {
+                $add('keywords', 'Khảo sát từ khóa', 'ok', 'Đã thêm '.(int) ($r['added'] ?? 0).' từ khóa mới'.(((int) ($r['metrics']['updated'] ?? 0)) > 0 ? ' (có lượt tìm thật cho '.$r['metrics']['updated'].')' : ' (chưa có lượt tìm thật: nhập CSV hoặc cấu hình DataForSEO)').'.');
+            }
         } catch (\Throwable $e) {
             $add('keywords', 'Khảo sát từ khóa', 'skipped', $this->why($e, 'Chưa khảo sát được (cần AI).'));
         }

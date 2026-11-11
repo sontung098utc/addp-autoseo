@@ -134,7 +134,7 @@ class CampaignResource extends Resource
                         'autonomous' => 'AI tự lấy bài, tự viết và tự duyệt bài thường. Bài sức khỏe/rủi ro cao vẫn chờ người có chuyên môn.',
                     ])
                     ->in(['cautious', 'balanced', 'autonomous']),
-                Forms\Components\Placeholder::make('autonomous_policy')->hiddenLabel()->columnSpanFull()
+                Forms\Components\Placeholder::make('autonomous_policy')->label('Tóm tắt chính sách Toàn quyền')->hiddenLabel()->columnSpanFull()
                     ->visible(fn (Get $get) => $get('mode') === 'autonomous')
                     ->content(new HtmlString(self::POLICY_BOX)),
                 Forms\Components\Checkbox::make('policy_ack')->label('Tôi đã đọc và đồng ý với tóm tắt chính sách trên')->columnSpanFull()
