@@ -12,7 +12,7 @@ Ngày: 11/11/2026. Nhánh: `feat/m09/ag-s27/dev2/article-workspace`, nền `d8b4
 
 | | Đã làm | Chưa làm |
 |---|---|---|
-| Test | SQLite: 1382 đạt, 0 lỗi (chạy cuối). MariaDB 10.6: chỉ còn 5 test `PilotRunTest` của Dev1 (lỗi cũ, issue #6) | Chạy MariaDB lại sau các sửa cuối (bộ chọn ngày giờ, nhập vai) |
+| Test | Chạy cuối trên mã `9a92beb`: SQLite **1393 đạt, 0 lỗi, 2 bỏ qua**; MariaDB 10.6 **1388 đạt, 5 lỗi, 2 bỏ qua**. 5 lỗi đều là `PilotRunTest` của Dev1 (`QueryException`, lỗi cũ, issue #6); chênh 5 test so với SQLite đúng bằng số này, không có lỗi mới | MariaDB chỉ chạy một lần trên mã này; cần chạy lại nếu có commit mới |
 | Giao diện | Đi qua bằng tay trên bản xem thử cục bộ (writer, approver, admin) | Không có website thật |
 | **AI thật, API ngoài** | **Chưa lần nào**: chưa gọi model thật, Tavily, DataForSEO, API ảnh; mọi test dùng AI giả và `Http::fake` | Đo chất lượng, token, chi phí thật |
 
@@ -20,13 +20,15 @@ Chi phí mỗi ảnh (1.000 ₫), chi phí/100 từ khóa, trần chi phí: **ư
 
 ## 3. Migration (5, đều NULLABLE hoặc có mặc định; PR riêng theo quy ước)
 
+Kiểm trên MariaDB 10.6 (container tạm): chạy lên cả 28 migration, rollback 5 migration cuối (`2026_11_24` → `2026_11_20`) rồi chạy lại cả 5, đều thành công, không lỗi.
+
 | Tệp | Nội dung | Rủi ro | Kiểm |
 |---|---|---|---|
 | `2026_11_20_000001_add_job_type_to_agent_runs` | `agent_runs`: `job_type` (mặc định `article_write`), `parent_run_id`, `input_refs`, `output_ref`, `tokens_budget`; **`article_id` cho phép rỗng** | Đổi cột `article_id` NOT NULL → NULL trên bảng lõi. `down()` **xóa các phiên không gắn bài** trước khi trả NOT NULL | Up/down/up trên SQLite và MariaDB |
 | `2026_11_21_000001_add_origin_and_risk_tier_to_knowledge` | `knowledge_sources`: `origin`, `fetched_at`, `final_url`, `http_status`; `knowledge_items`: `risk_tier`, `review_mode` | Thấp (cột mới nullable) | Up/down/up MariaDB |
 | `2026_11_22_000001_create_agent_profiles_tables` | `agent_profiles`, `agent_profile_versions`, `agent_lessons`, `agent_documents` (hồ sơ agent) | Bảng mới | Up/down/up MariaDB |
 | `2026_11_23_000001_add_volume_source_to_keywords` | `keywords`: `volume_source`, `metrics_at`, `competition`, `cpc_vnd` | Thấp | Up/down/up MariaDB |
-| `2026_11_24_000001_add_guidance_to_articles` | `articles.guidance` (text, nullable) | Thấp | Chạy lên trên MariaDB (rollback đã chạy trong cùng lượt, kết quả bộ test sau đó sạch) |
+| `2026_11_24_000001_add_guidance_to_articles` | `articles.guidance` (text, nullable) | Thấp | Up/down/up MariaDB |
 
 Thứ tự rollback: 24 → 23 → 22 → 21 → 20.
 
