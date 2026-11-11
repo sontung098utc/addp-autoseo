@@ -352,9 +352,10 @@ class ArticleWorkspaceTest extends TestCase
         $a = $this->article('planned', false);
 
         $html = $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()
-            ->assertSee('data-testid="aw-primary"', false)->assertSee('Giao đội AI')->getContent();
+            ->assertSee('Giao đội AI')->getContent();
 
-        $this->assertSame(1, substr_count($html, 'data-testid="aw-primary"'));
+        // Nút chính nằm ở tiêu đề trang; không còn thanh nút ngay dưới hàng tab.
+        $this->assertStringNotContainsString('data-testid="aw-primary-bar"', $html);
         $this->assertSame(1, substr_count($html, 'data-testid="pf-chips"'));
         $this->assertSame(1, substr_count($html, 'data-testid="pf-risk"'));
         // Chip chỉ hiện khi có số liệu giúp quyết định: số 0 / "chưa có" bị bỏ.
@@ -387,7 +388,7 @@ class ArticleWorkspaceTest extends TestCase
         $a = $this->article('needs_review');
 
         $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()
-            ->assertSee('Đọc để duyệt')
-            ->assertSee('data-testid="aw-primary"', false);
+            ->assertSee('Duyệt')
+            ->assertDontSee('data-testid="aw-primary-bar"', false);
     }
 }

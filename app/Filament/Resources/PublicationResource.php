@@ -200,6 +200,9 @@ class PublicationResource extends Resource
                         return $out;
                     }),
             ])
+            ->recordUrl(fn (Publication $r): ?string => $r->status !== 'needs_reconcile' && $r->articleVersion?->article_id
+                ? ArticleResource::getUrl('view', ['record' => $r->articleVersion->article_id]).'#tab-publish'
+                : PublicationResource::getUrl('view', ['record' => $r]))
             ->columns([
                 Tables\Columns\TextColumn::make('articleVersion.article.primary_keyword')
                     ->label('Bài / từ khóa')
@@ -258,7 +261,11 @@ class PublicationResource extends Resource
                     ->tooltip('Khóa duy nhất chống đăng trùng (idempotency). Bấm để chép.'),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()->label('Xem'),
+                Tables\Actions\ViewAction::make()->label('Xem')
+                    // "Xem" mở trang chi tiết bài (đầy đủ nhất); chỉ lượt cần đối soát mới mở trang lượt đăng.
+                    ->url(fn (Publication $r): string => $r->status !== 'needs_reconcile' && $r->articleVersion?->article_id
+                        ? ArticleResource::getUrl('view', ['record' => $r->articleVersion->article_id]).'#tab-publish'
+                        : PublicationResource::getUrl('view', ['record' => $r])),
                 Tables\Actions\Action::make('publishNow')
                     ->label('Đăng ngay')
                     ->icon('heroicon-o-paper-airplane')

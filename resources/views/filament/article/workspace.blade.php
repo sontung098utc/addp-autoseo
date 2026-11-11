@@ -163,17 +163,6 @@
                     @if (! empty($stopInfo))
                         <p class="aw-note" data-testid="aw-stopped" style="color:#b91c1c;border:1px solid #b91c1c;border-radius:.5rem;padding:.5rem .75rem"><x-filament::icon icon="heroicon-o-exclamation-triangle" style="width:1.1rem;height:1.1rem;display:inline;vertical-align:-.2em" /> Hệ thống đang DỪNG KHẨN CẤP ({{ $stopInfo['reason'] ?? 'không ghi lý do' }}): đội AI sẽ không chạy cho đến khi được khôi phục ở Lịch xuất bản.</p>
                     @endif
-                    @if ($primary)
-                        <div class="aw-next" data-testid="aw-primary-bar">
-                            @if (isset($primary['url']))
-                                <a class="aw-cta" data-testid="aw-primary" href="{{ $primary['url'] }}">{{ $primary['label'] }}</a>
-                            @elseif (isset($primary['tab']))
-                                <button type="button" class="aw-cta" data-testid="aw-primary" x-on:click="set(@js($primary['tab']))">{{ $primary['label'] }}</button>
-                            @else
-                                <button type="button" class="aw-cta" data-testid="aw-primary" wire:click="mountAction(@js($primary['action']))">{{ $primary['label'] }}</button>
-                            @endif
-                        </div>
-                    @endif
                     @if ($outlineHold !== null)
                         <section class="ss-review-card" data-testid="aw-outline-hold" style="border-color:#d97706">
                             <div class="aw-head" style="justify-content:flex-start;gap:.4rem">

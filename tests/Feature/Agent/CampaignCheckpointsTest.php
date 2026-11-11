@@ -345,7 +345,7 @@ class CampaignCheckpointsTest extends TestCase
             ->assertSee('Nội dung chính')
             ->assertSee('Duyệt dàn ý và viết tiếp')->assertSee('Giao lại từ đầu')
             ->html();
-        $this->assertSame(1, substr_count($html, 'data-testid="aw-primary"'), 'nút chính vẫn ở đầu trang');
+        $this->assertStringNotContainsString('data-testid="aw-primary-bar"', $html, 'không còn thanh nút dưới hàng tab');
 
     }
 
