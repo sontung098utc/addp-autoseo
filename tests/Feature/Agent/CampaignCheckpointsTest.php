@@ -343,7 +343,7 @@ class CampaignCheckpointsTest extends TestCase
             ->assertDontSee('data-testid="aw-next"', false)->assertDontSee('Việc tiếp theo')
             ->assertSee('data-testid="aw-outline-hold"', false)->assertSee('Dàn ý chờ bạn xem')
             ->assertSee('Nội dung chính')
-            ->assertSee('Duyệt dàn ý và viết tiếp')->assertSee('Giao lại từ đầu')
+            ->assertSee('data-testid="aw-outline-approve"', false)->assertSee('Duyệt dàn ý và viết tiếp')->assertSee('Giao lại từ đầu')
             ->html();
         $this->assertStringNotContainsString('data-testid="aw-primary-bar"', $html, 'không còn thanh nút dưới hàng tab');
 

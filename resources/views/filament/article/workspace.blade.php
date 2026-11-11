@@ -180,7 +180,8 @@
                                 </ol>
                             @endif
                             @if ($canOutline)
-                                <div class="aw-chips">
+                                <div class="aw-chips" style="align-items:center;gap:.75rem">
+                                    <x-filament::button size="sm" icon="heroicon-o-check" wire:click="mountAction('approveOutline')" data-testid="aw-outline-approve">Duyệt dàn ý và viết tiếp</x-filament::button>
                                     <button type="button" class="aw-link" data-testid="aw-outline-redo" wire:click="mountAction('regenerateOutline')">Giao lại từ đầu</button>
                                 </div>
                             @else

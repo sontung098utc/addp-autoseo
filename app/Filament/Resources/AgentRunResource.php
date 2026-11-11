@@ -101,7 +101,7 @@ class AgentRunResource extends Resource
                     ->state(fn (AgentRun $r) => $r->article?->primary_keyword ?: self::jobTypeLabel($r->job_type))
                     ->description(fn (AgentRun $r) => $r->website?->name)
                     ->extraHeaderAttributes(['class' => 'ss-col-main'])->extraCellAttributes(['class' => 'ss-col-main']),
-                Tables\Columns\TextColumn::make('job_type')->label('Loại việc')->badge()->color('gray')->visibleFrom('lg')
+                Tables\Columns\TextColumn::make('job_type')->label('Loại việc')->badge()->color('gray')->visibleFrom('xl')
                     ->formatStateUsing(fn (?string $state) => self::jobTypeLabel($state))
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
                 Tables\Columns\TextColumn::make('status')->label('Kết quả')->badge()
@@ -112,20 +112,20 @@ class AgentRunResource extends Resource
                     ->description(fn (AgentRun $r) => RunActivity::isLive($r) ? 'Đang ở: '.(AgentFlowBlueprint::byStage()[$cur = RunActivity::currentStageOf($r, $r->steps)]['title'] ?? JobTypeRegistry::stageLabels((string) $r->job_type, true)[$cur] ?? $cur ?? 'hoàn tất') : null)
                     ->tooltip(fn (AgentRun $r) => $r->outcome_reason ?: null)
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
-                Tables\Columns\TextColumn::make('score')->label('Điểm')->alignCenter()->placeholder('—')
+                Tables\Columns\TextColumn::make('score')->label('Điểm')->visibleFrom('xl')->alignCenter()->placeholder('—')
                     ->state(fn (AgentRun $r) => $r->steps->where('stage', 'grade')->last()?->data['score'] ?? null)
                     ->tooltip('Điểm 0–100 của lần chấm gần nhất. Quyết định đạt/không do luật, điểm chỉ để theo dõi.')
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%']),
-                Tables\Columns\TextColumn::make('ai_mode')->label('AI')->visibleFrom('lg')->badge()
+                Tables\Columns\TextColumn::make('ai_mode')->label('AI')->visibleFrom('2xl')->badge()
                     ->formatStateUsing(fn (string $state) => $state === 'real' ? 'AI thật' : 'AI giả lập')
                     ->color(fn (string $state) => $state === 'real' ? 'success' : 'gray')
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
                 Tables\Columns\TextColumn::make('repair_rounds')->label('Vòng sửa')->alignCenter()->toggleable(isToggledHiddenByDefault: true)
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%']),
-                Tables\Columns\TextColumn::make('cost_vnd')->label('Chi phí')->visibleFrom('lg')->toggleable()->alignEnd()
+                Tables\Columns\TextColumn::make('cost_vnd')->label('Chi phí')->visibleFrom('xl')->toggleable()->alignEnd()
                     ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', '.').' ₫')
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
-                Tables\Columns\TextColumn::make('started_at')->label('Bắt đầu (giờ VN)')->sortable()
+                Tables\Columns\TextColumn::make('started_at')->label('Bắt đầu (giờ VN)')->visibleFrom('xl')->sortable()
                     ->formatStateUsing(fn (AgentRun $r) => VnTime::format(VnTime::fromRaw($r, 'started_at')))
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
             ])

@@ -188,11 +188,11 @@ class CampaignResource extends Resource
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
                 Tables\Columns\TextColumn::make('progress')->label('Bài con')->state(fn (Campaign $r) => (int) $r->articles_total.' bài · '.(int) $r->articles_planned.' kế hoạch · '.(int) $r->articles_review.' chờ duyệt')->description(fn (Campaign $r) => self::MODE_LABELS[$r->mode] ?? $r->mode)->visibleFrom('md')
                     ->extraHeaderAttributes(['style' => 'white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
-                Tables\Columns\TextColumn::make('today')->label('Hôm nay')->state(fn (Campaign $r) => self::todayCount($r).' / '.$r->daily_limit)->alignCenter()
+                Tables\Columns\TextColumn::make('today')->label('Hôm nay')->visibleFrom('xl')->state(fn (Campaign $r) => self::todayCount($r).' / '.$r->daily_limit)->alignCenter()
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%;white-space:nowrap']),
-                Tables\Columns\TextColumn::make('left')->label('Từ khóa còn lại')->visibleFrom('lg')->state(fn (Campaign $r) => self::remaining($r))->alignCenter()
+                Tables\Columns\TextColumn::make('left')->label('Từ khóa còn lại')->visibleFrom('2xl')->state(fn (Campaign $r) => self::remaining($r))->alignCenter()
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%;white-space:nowrap']),
-                Tables\Columns\TextColumn::make('last_tick_at')->label('Nhịp gần nhất (giờ VN)')->visibleFrom('lg')->placeholder('Chưa chạy')
+                Tables\Columns\TextColumn::make('last_tick_at')->label('Nhịp gần nhất (giờ VN)')->visibleFrom('2xl')->placeholder('Chưa chạy')
                     ->formatStateUsing(fn (Campaign $r) => VnTime::format(VnTime::fromRaw($r, 'last_tick_at')))
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
             ])
