@@ -101,7 +101,7 @@ class AgentOverview extends Page
         $ai = AgentAi::status();
         $liveCount = RunActivity::liveCount();
         $steps = $this->setupSteps($ai);
-        [$from, $to] = VnTime::todayRangeUtc();
+        [$from, $to] = VnTime::todayRangeApp();
         $today = AgentRun::query()->where('started_at', '>=', $from)->where('started_at', '<', $to);
         $costCap = Schema::hasColumn('campaigns', 'daily_cost_cap_vnd') ? (float) Campaign::query()->where('status', 'active')->sum('daily_cost_cap_vnd') : 0.0;
 

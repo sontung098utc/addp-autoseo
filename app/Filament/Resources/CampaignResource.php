@@ -232,7 +232,7 @@ class CampaignResource extends Resource
 
     public static function todayCount(Campaign $c): int
     {
-        [$from, $to] = VnTime::todayRangeUtc();
+        [$from, $to] = VnTime::todayRangeApp();
 
         return AgentRun::query()->where('campaign_id', $c->id)->where('started_at', '>=', $from)->where('started_at', '<', $to)->count();
     }
@@ -258,7 +258,7 @@ class CampaignResource extends Resource
     /** Hạn mức hôm nay (giờ VN) cộng các chiến dịch đang chạy. */
     public static function budget(): array
     {
-        [$from, $to] = VnTime::todayRangeUtc();
+        [$from, $to] = VnTime::todayRangeApp();
         $active = Campaign::query()->where('status', 'active');
         $ids = (clone $active)->pluck('id');
         $runs = AgentRun::query()->whereIn('campaign_id', $ids)->where('started_at', '>=', $from)->where('started_at', '<', $to);

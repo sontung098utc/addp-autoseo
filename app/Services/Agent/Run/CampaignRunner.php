@@ -73,7 +73,7 @@ final class CampaignRunner
             return $this->out('site_inactive', 'Website không hoạt động.');
         }
 
-        [$from, $to] = VnTime::dayRangeUtc(VnTime::toVn($now) ?? $now);
+        [$from, $to] = VnTime::dayRangeApp(VnTime::toVn($now) ?? $now);
         $today = AgentRun::query()->where('campaign_id', $c->id)->where('started_at', '>=', $from)->where('started_at', '<', $to)->count();
         if ($today >= $c->daily_limit) {
             return $this->out('limit', "Đã đủ {$today}/{$c->daily_limit} bài hôm nay, chờ ngày mai.");
