@@ -107,8 +107,9 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             'title' => $data['title'] ?? Str::title($article->primary_keyword),
             'slug' => $data['slug'] ?? Str::slug($article->primary_keyword),
             'html_content' => $data['html_content'],
-            'seo_title' => $data['seo_title'] ?? ($data['title'] ?? null),
-            'meta_description' => $data['meta_description'] ?? null,
+            // Cột articles/article_versions: seo_title string(70), meta_description string(160). Cắt để MariaDB strict không báo "Data too long".
+            'seo_title' => self::fit($data['seo_title'] ?? ($data['title'] ?? null), 70),
+            'meta_description' => self::fit($data['meta_description'] ?? null, 160),
             'focus_keyword' => $article->primary_keyword,
             'faq_schema' => is_array($data['faq_schema'] ?? null) ? $data['faq_schema'] : [],
             'sources_cited' => is_array($data['sources_cited'] ?? null) ? $data['sources_cited'] : [],
@@ -117,6 +118,12 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             'model' => $this->model,
             'prompt_version' => $this->promptVersion,
         ];
+    }
+
+    /** Cắt chuỗi theo ký tự (mb) tới $max; null giữ null. */
+    private static function fit(mixed $v, int $max): ?string
+    {
+        return is_string($v) ? mb_substr($v, 0, $max) : null;
     }
 
     /** G5: sinh lại seo_title + meta. Chỉ gửi từ khóa, tiêu đề, meta hiện tại, H1/H2, vài dòng mở đầu và lỗi; không gửi cả bài. */

@@ -11,7 +11,7 @@ class Campaign extends Model
     protected $fillable = ['website_id', 'created_by', 'name', 'status', 'keywords', 'daily_limit', 'last_tick_at', 'mode', 'daily_cost_cap_vnd', 'daily_draft_cap', 'source', 'brain_ids', 'checkpoints'];
 
     /** Khớp mặc định ở migration để mô hình mới tạo chưa nạp lại vẫn có giá trị đúng. */
-    protected $attributes = ['mode' => 'balanced', 'daily_cost_cap_vnd' => 150000, 'daily_draft_cap' => 5, 'source' => 'plan'];
+    protected $attributes = ['status' => 'paused', 'mode' => 'balanced', 'daily_cost_cap_vnd' => 150000, 'daily_draft_cap' => 5, 'source' => 'plan'];
 
     protected function casts(): array
     {

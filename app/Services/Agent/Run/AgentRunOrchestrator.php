@@ -493,7 +493,7 @@ final class AgentRunOrchestrator
 
         return [
             'article_id' => $article->id, 'title' => $r['title'] ?? $article->primary_keyword, 'slug' => $r['slug'] ?? 'bai-viet', 'outline' => $outline,
-            'html_content' => $html, 'seo_title' => $r['seo_title'] ?? null, 'meta_description' => $r['meta_description'] ?? null,
+            'html_content' => $html, 'seo_title' => is_string($r['seo_title'] ?? null) ? mb_substr($r['seo_title'], 0, 70) : null, 'meta_description' => is_string($r['meta_description'] ?? null) ? mb_substr($r['meta_description'], 0, 160) : null,
             'focus_keyword' => $r['focus_keyword'] ?? $article->primary_keyword, 'faq_schema' => $r['faq_schema'] ?? [], 'sources_cited' => $r['sources_cited'] ?? [],
             'ai_provider' => $r['model'] ?? 'ai-engine', 'ai_model' => $r['model'] ?? 'unknown', 'prompt_version' => $r['prompt_version'] ?? 'v1.0',
             'tokens_used' => (int) ($r['tokens_used'] ?? 0), 'cost_vnd' => (float) ($r['cost_vnd'] ?? 0),

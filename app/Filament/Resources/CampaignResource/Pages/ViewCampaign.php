@@ -83,8 +83,10 @@ class ViewCampaign extends Page
                 ])
                 ->action(fn (array $data) => $this->addArticle((string) $data['keyword'], (string) $data['intent'])),
             Action::make('toggle')->label($c->status === 'active' ? 'Tạm dừng' : 'Bật chạy')->icon($c->status === 'active' ? 'heroicon-o-pause' : 'heroicon-o-play-circle')->color('gray')
+                // Chiến dịch ở vòng đời của lô A (planning/draft/completed/archived) không bật/tắt được bằng nút này, tránh bật lại chiến dịch đã hoàn thành.
+                ->visible(fn () => in_array($c->status, ['active', 'paused'], true))
                 ->action(function () use ($c) {
-                    abort_unless(CampaignResource::canEdit($c), 403);
+                    abort_unless(CampaignResource::canEdit($c) && in_array($c->status, ['active', 'paused'], true), 403);
                     $c->update(['status' => $c->status === 'active' ? 'paused' : 'active']);
                     $this->record = $c->refresh();
                 }),

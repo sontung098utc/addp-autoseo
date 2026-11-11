@@ -253,7 +253,8 @@ final class CampaignRunner
     public function nextKeyword(Campaign $c): ?string
     {
         $used = Article::query()->where('website_id', $c->website_id)->pluck('primary_keyword')->map(fn ($k) => mb_strtolower(trim($k)))->all();
-        foreach ((array) $c->keywords as $k) {
+        // target_keywords: cột cùng nghĩa của lô migration A (Dev1); đọc dự phòng cho chiến dịch tạo theo lô A.
+        foreach ((array) ($c->keywords ?? $c->target_keywords ?? []) as $k) {
             $k = trim((string) $k);
             if ($k !== '' && ! in_array(mb_strtolower($k), $used, true)) {
                 return $k;
