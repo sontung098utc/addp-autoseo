@@ -378,3 +378,11 @@ select:not([multiple]) {
   /* Liên kết đứng một mình trên một dòng trong thẻ (tên thẻ, "xem thêm"…) */
   .ss-card :is([class$="-row"], .ss-actions) > a { display: inline-flex; align-items: center; min-height: 2.25rem; }
 }
+
+/* Ô tải tệp của Filament (FilePond): cùng ngôn ngữ với khung thả tệp dùng chung (x-upload-zone) */
+.filepond--root .filepond--panel-root { background: rgba(128,128,128,.05); border: 1.5px dashed rgba(128,128,128,.5); border-radius: .9rem; }
+.filepond--root .filepond--drop-label { min-height: 6rem; color: inherit; }
+.filepond--root .filepond--drop-label label { display: flex; align-items: center; justify-content: center; gap: .35rem; cursor: pointer; font-size: .875rem; }
+.filepond--root .filepond--drop-label .filepond--label-action { text-decoration: none; font-weight: 600; color: #0f6b5c; }
+:root[data-theme=dark] .filepond--root .filepond--drop-label .filepond--label-action, .dark .filepond--root .filepond--drop-label .filepond--label-action { color: #5eead4; }
+.filepond--root:hover .filepond--panel-root { border-color: #6366f1; background: rgba(99,102,241,.07); }

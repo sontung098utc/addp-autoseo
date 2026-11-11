@@ -42,6 +42,7 @@ class MediaAssetResource extends Resource
                             ->image()
                             ->imageEditor()
                             ->maxSize(10240)
+                            ->helperText('PNG, JPG hoặc WebP · tối đa 10 MB')
                             ->required(fn (string $context): bool => $context === 'create'),
                         Forms\Components\Select::make('website_id')
                             ->label('Gán cho Website')
