@@ -73,7 +73,7 @@ Nhánh đã merge `origin/develop` @ `6942f8c` (merge commit `570337e`). **Khôn
 
 **Cần Dev1 quyết (đã ghi trong issue):** (1) ai sở hữu schema/mặc định/vòng đời `campaigns` và gộp cột trùng; (2) danh sách trạng thái xuất bản thống nhất (`held` so với `paused`/`awaiting_confirm`); (3) ý nghĩa `approved_version_id`; (4) ai ghi `website_connection_checks` (hiện `testConnection` không còn hạ site lỗi sang `error` nên automation của ta vẫn coi site `active`). Ghi chú: `DatabaseAuditSink` chưa bind (khi bind, tự duyệt ghi là user hệ thống `self_approved`); `agent_runs.status='held'` trùng tên với `publications.status='held'`.
 
-**Kiểm sau merge:** SQLite 1533 đạt / 2 bỏ qua; MariaDB 10.6 1533 đạt / 2 bỏ qua (kể cả 5 `PilotRunTest`, nay xanh). Migration: từ DB trống `migrate` → lùi 25 → `migrate` lại sạch; DB đã chạy lô A trước rồi chạy migration của ta sạch (bảng `campaigns` đủ cột hai bên). DB xem thử cũ phải `migrate:fresh --seed` (đã đổi tên migration). Mức bằng chứng không đổi: chỉ AI giả, chưa dùng AI/mạng thật; giao diện duyệt trên bản xem thử 8105, trang nào chưa xem ghi ở báo cáo.
+**Kiểm sau merge:** SQLite 1535 đạt / 2 bỏ qua; MariaDB 10.6 1535 đạt / 2 bỏ qua (chạy lại 11/11 tối, sau các đợt sửa giao diện) (kể cả 5 `PilotRunTest`, nay xanh). Migration: từ DB trống `migrate` → lùi 25 → `migrate` lại sạch; DB đã chạy lô A trước rồi chạy migration của ta sạch (bảng `campaigns` đủ cột hai bên). DB xem thử cũ phải `migrate:fresh --seed` (đã đổi tên migration). Mức bằng chứng không đổi: chỉ AI giả, chưa dùng AI/mạng thật; giao diện duyệt trên bản xem thử 8105, trang nào chưa xem ghi ở báo cáo.
 
 ## 5. Thay đổi hành vi cần Dev1 đồng ý (không chỉ là mã)
 
