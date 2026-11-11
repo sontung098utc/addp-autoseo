@@ -246,7 +246,8 @@
                             <input class="kb-in" wire:model="paste.title" placeholder="Tên tài liệu" aria-label="Tên tài liệu" maxlength="200">
                             <select class="kb-in" wire:model="paste.website_id" aria-label="Website áp dụng"><option value="">Chung (mọi website)</option>@foreach ($sites as $s)<option value="{{ $s->id }}">{{ $s->name }}</option>@endforeach</select>
                         </div>
-                        <textarea class="kb-in" style="width:100%" rows="9" wire:model="paste.text" placeholder="Dán văn bản: bảng giá, chính sách, quy trình, FAQ…" aria-label="Nội dung tài liệu"></textarea>
+                        <x-upload-zone name="kb-file" model="pasteFile" accept=".md,.txt" hint="MD, TXT · dưới 200 KB · hoặc dán văn bản bên dưới" />
+                        <textarea class="kb-in" style="width:100%;margin-top:.5rem" rows="7" wire:model="paste.text" placeholder="Dán văn bản: bảng giá, chính sách, quy trình, FAQ…" aria-label="Nội dung tài liệu"></textarea>
                         <div class="kb-bar" style="margin-top:.5rem">
                             <label><input type="checkbox" wire:model="paste.split"> Tách thành mục ngay</label>
                             <x-filament::button wire:click="pasteDoc">Lưu nguồn</x-filament::button>

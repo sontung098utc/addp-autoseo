@@ -13,10 +13,17 @@ use App\Services\Agent\Handoff\CmsDraftHandoff;
 use Filament\Actions;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Contracts\Support\Htmlable;
 
 class ViewArticleVersion extends ViewRecord
 {
     protected static string $resource = ArticleVersionResource::class;
+
+    /** Tiêu đề ngắn: các nút hành động bên phải chiếm chỗ, "Xem Phiên bản bài" bị xuống nhiều dòng ở khung hẹp. */
+    public function getTitle(): string|Htmlable
+    {
+        return 'Bản bài v'.($this->record->version ?? '');
+    }
 
     public function compareAction(): Actions\Action
     {

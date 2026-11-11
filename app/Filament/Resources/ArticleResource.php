@@ -356,6 +356,15 @@ class ArticleResource extends Resource
                     ->color(fn (?string $state) => StatusPresenter::color($state, 'article'))
                     ->icon(fn (?string $state, Article $r) => ArticleRows::liveRun($r) ? 'heroicon-o-arrow-path' : StatusPresenter::icon($state, 'article'))
                     ->extraAttributes(fn (Article $r) => ArticleRows::liveRun($r) ? ['class' => 'ss-badge-live', 'data-running' => '1'] : [])),
+                // Khung hẹp (< xl): cột Chiến dịch đầy đủ bị ẩn nên giữ một huy hiệu ngắn để vẫn thấy bài thuộc chiến dịch hay là bài lẻ.
+                static::narrow(Tables\Columns\TextColumn::make('campaign_short')
+                    ->label('Chiến dịch')
+                    ->state(fn (Article $r) => static::campaignOf($r)?->name ?? 'Bài lẻ')
+                    ->badge()
+                    ->color(fn (Article $r) => static::campaignOf($r) ? 'info' : 'gray')
+                    ->limit(10)
+                    ->tooltip(fn (Article $r) => static::campaignOf($r)?->name ?? 'Không thuộc chiến dịch nào')
+                    ->hiddenFrom('xl')),
                 static::narrow(Tables\Columns\TextColumn::make('campaign_name')
                     ->label('Chiến dịch')
                     ->state(fn (Article $r) => static::campaignOf($r)?->name ?? 'Bài lẻ')

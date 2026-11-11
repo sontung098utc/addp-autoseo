@@ -18,6 +18,7 @@ use App\Services\Knowledge\KnowledgeReview;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
+use Livewire\WithFileUploads;
 
 /**
  * AG-B1: màn này giờ là phần "Hiểu biết · Nguồn · Cảnh báo · Khoảng trống" của Kho trí tuệ. Nó vẫn chạy độc lập (xem kiến thức của TẤT CẢ Trí tuệ,
@@ -29,6 +30,11 @@ use Illuminate\Support\Facades\Auth;
  */
 class KnowledgePage extends Page
 {
+    use WithFileUploads;
+
+    /** Tệp .md/.txt người dùng thả vào thẻ "Dán tài liệu" (thay cho việc dán văn bản). */
+    public $pasteFile = null;
+
     protected static ?string $navigationIcon = 'heroicon-o-book-open';
 
     protected static ?string $navigationLabel = 'Tất cả kiến thức';
@@ -95,7 +101,7 @@ class KnowledgePage extends Page
 
     private function review(): KnowledgeReview
     {
-        return new KnowledgeReview();
+        return new KnowledgeReview;
     }
 
     protected function guard(): void
@@ -159,7 +165,7 @@ class KnowledgePage extends Page
     public function splitSource(int $sourceId): void
     {
         $this->act('Đã tách thành mục đề xuất', function () use ($sourceId) {
-            $r = (new KnowledgeIngest())->split(KnowledgeSource::query()->findOrFail($sourceId), Auth::user());
+            $r = (new KnowledgeIngest)->split(KnowledgeSource::query()->findOrFail($sourceId), Auth::user());
             Notification::make()->title("Tách được {$r['created']} mục".($r['duplicates'] ? ", bỏ {$r['duplicates']} mục trùng y hệt" : ''))->info()->send();
         });
     }
@@ -169,7 +175,7 @@ class KnowledgePage extends Page
     {
         $this->guard();
         try {
-            $r = (new KnowledgeAiIngest())->run(KnowledgeSource::query()->findOrFail($sourceId), Auth::user());
+            $r = (new KnowledgeAiIngest)->run(KnowledgeSource::query()->findOrFail($sourceId), Auth::user());
         } catch (KnowledgeError $e) {
             Notification::make()->title('Chưa tách được bằng AI')->body($e->getMessage())->danger()->send();
 
@@ -230,7 +236,7 @@ class KnowledgePage extends Page
     {
         $this->act('Đã thêm vào Hộp duyệt', function () {
             $site = $this->new['website_id'] !== '' ? Website::query()->findOrFail((int) $this->new['website_id']) : null;
-            (new KnowledgeIngest())->manual($this->new + ['brain_id' => $this->brainId], $site, Auth::user());
+            (new KnowledgeIngest)->manual($this->new + ['brain_id' => $this->brainId], $site, Auth::user());
             $this->new = array_merge($this->new, ['title' => '', 'body' => '', 'entity' => '', 'field' => '', 'value' => '', 'value_unit' => '', 'tags' => '', 'valid_until' => '']);
         });
     }
@@ -239,13 +245,27 @@ class KnowledgePage extends Page
     {
         $this->act('Đã lưu nguồn', function () {
             $site = $this->paste['website_id'] !== '' ? Website::query()->findOrFail((int) $this->paste['website_id']) : null;
-            $ingest = new KnowledgeIngest();
-            $src = $ingest->paste((string) $this->paste['title'], (string) $this->paste['text'], $site, Auth::user(), 'paste', null, $this->brainId);
+            $title = (string) $this->paste['title'];
+            $text = (string) $this->paste['text'];
+            if ($this->pasteFile) {
+                $ext = strtolower($this->pasteFile->getClientOriginalExtension());
+                if (! in_array($ext, ['md', 'txt'], true) || $this->pasteFile->getSize() > 200 * 1024) {
+                    throw new KnowledgeError('Chỉ nhận tệp .md hoặc .txt dưới 200 KB.');
+                }
+                $text = (string) file_get_contents($this->pasteFile->getRealPath());
+                if (! mb_check_encoding($text, 'UTF-8')) {
+                    throw new KnowledgeError('Tệp cần mã hóa UTF-8.');
+                }
+                $title = $title !== '' ? $title : pathinfo($this->pasteFile->getClientOriginalName(), PATHINFO_FILENAME);
+            }
+            $ingest = new KnowledgeIngest;
+            $src = $ingest->paste($title, $text, $site, Auth::user(), 'paste', null, $this->brainId);
             if ($this->paste['split']) {
                 $r = $ingest->split($src, Auth::user());
                 Notification::make()->title("Tách được {$r['created']} mục đề xuất".($r['duplicates'] ? ", bỏ {$r['duplicates']} mục trùng" : ''))->info()->send();
             }
             $this->paste = ['website_id' => $this->paste['website_id'], 'title' => '', 'text' => '', 'split' => true];
+            $this->pasteFile = null;
         });
     }
 
@@ -269,8 +289,8 @@ class KnowledgePage extends Page
     protected function getViewData(): array
     {
         $manage = static::canManage();
-        $conflicts = new KnowledgeConflicts();
-        $dedupe = new KnowledgeDedupe();
+        $conflicts = new KnowledgeConflicts;
+        $dedupe = new KnowledgeDedupe;
 
         $flags = function (KnowledgeItem $i) use ($conflicts, $dedupe): array {
             $f = $dedupe->find($i);
@@ -304,7 +324,7 @@ class KnowledgePage extends Page
 
         $warn = ['pairs' => [], 'expired' => collect(), 'unused' => collect(), 'dups' => []];
         if ($manage) {
-            $fresh = new KnowledgeFreshness();
+            $fresh = new KnowledgeFreshness;
             $same = fn ($i) => $b === null || (int) $i->brain_id === $b;
             $warn = ['pairs' => array_values(array_filter($conflicts->all(), fn ($p) => $same($p['a']))), 'expired' => $fresh->expired()->filter($same)->values(), 'unused' => $fresh->unused()->filter($same)->values(), 'dups' => []];
             foreach (KnowledgeItem::query()->tap($inScope)->whereIn('status', ['proposed', 'approved'])->limit(300)->get() as $i) {
@@ -324,7 +344,7 @@ class KnowledgePage extends Page
             'selected' => $selected, 'selectedFlags' => $selected ? $flags($selected) : null,
             'warn' => $warn,
             'gaps' => $manage ? KnowledgeGap::query()->tap($inScope)->with(['website', 'article', 'filledItem'])->orderByRaw("status = 'open' desc")->orderByDesc('count')->limit(100)->get() : collect(),
-            'aiAvail' => $manage ? (new KnowledgeAiIngest())->availability() : ['ok' => false, 'reason' => null, 'label' => null, 'demo' => false],
+            'aiAvail' => $manage ? (new KnowledgeAiIngest)->availability() : ['ok' => false, 'reason' => null, 'label' => null, 'demo' => false],
             'topics' => KnowledgeTopic::query()->tap($inScope)->with('parent')->orderBy('name')->get(),
             'sites' => Website::query()->orderBy('name')->get(['id', 'name']),
             'types' => KnowledgeItem::TYPES, 'statuses' => KnowledgeItem::STATUSES,

@@ -8,6 +8,7 @@ use App\Models\KnowledgeSource;
 use App\Models\User;
 use App\Services\Knowledge\KnowledgeDedupe;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -64,6 +65,27 @@ class KnowledgePageTest extends TestCase
         $c->call('pickCorrect', $b->id);
         $this->assertSame('approved', $b->refresh()->status);
         $this->assertSame('outdated', $a->refresh()->status);
+    }
+
+    public function test_tha_tep_md_thanh_nguon_dat_ten_theo_tep_va_tach_muc(): void
+    {
+        $this->actingAs($this->user('admin'));
+        $file = UploadedFile::fake()->createWithContent('chinh-sach-doi-tra.md', "Hoàn tiền\nHoàn tiền trong bảy ngày làm việc.\n\nBảo hành\nBảo hành mười hai tháng cho mọi sản phẩm.");
+        Livewire::test(KnowledgePage::class)->set('pasteFile', $file)->call('pasteDoc');
+
+        $src = KnowledgeSource::first();
+        $this->assertNotNull($src);
+        $this->assertSame('chinh-sach-doi-tra', $src->title);
+        $this->assertSame(2, KnowledgeItem::where('source_id', $src->id)->where('status', 'proposed')->count());
+    }
+
+    public function test_tep_sai_dinh_dang_bi_tu_choi(): void
+    {
+        $this->actingAs($this->user('admin'));
+        $file = UploadedFile::fake()->createWithContent('bang.csv', 'a,b');
+        Livewire::test(KnowledgePage::class)->set('pasteFile', $file)->call('pasteDoc');
+
+        $this->assertSame(0, KnowledgeSource::count());
     }
 
     public function test_dan_tai_lieu_tach_va_duyet_ca_nguon(): void
