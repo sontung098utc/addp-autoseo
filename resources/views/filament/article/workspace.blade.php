@@ -92,7 +92,7 @@
         .aw-meta{display:flex;flex-wrap:wrap;gap:.4rem .5rem;align-items:center;margin-top:-.4rem}
         .aw-chip{font-size:.75rem;padding:.1rem .55rem;border-radius:999px;border:1px solid var(--ss-border,rgba(128,128,128,.35))}
         a.aw-chip{text-decoration:underline}
-        .aw-next{border-left:3px solid currentColor;padding:.5rem .75rem;font-size:.95rem;margin:0;display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;justify-content:space-between}
+        .aw-next{border:1px solid var(--ss-border,rgba(128,128,128,.35));border-radius:.5rem;background:rgba(128,128,128,.06);padding:.5rem .75rem;font-size:.95rem;margin:0;display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;justify-content:space-between}
         .aw-next p{margin:0}
         .aw-cta{display:inline-block;font-size:.875rem;font-weight:700;padding:.4rem 1rem;border-radius:.5rem;background:var(--ss-teal-700,#0F6B5C);color:#fff;cursor:pointer;text-decoration:none;white-space:nowrap}
         .aw-cta:hover{filter:brightness(1.1)}
@@ -111,7 +111,7 @@
         .aw-btn{display:inline-block;font-size:.8rem;font-weight:600;padding:.25rem .8rem;border-radius:.5rem;border:1px solid currentColor;white-space:nowrap}
         .aw-split{display:grid;gap:1rem;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);align-items:start}
         @media (max-width:1024px){.aw-split{grid-template-columns:minmax(0,1fr)}}
-        .aw-note{border-left:3px solid currentColor;padding:.4rem .7rem;font-size:.875rem;margin:.6rem 0 0}
+        .aw-note{border:1px solid rgba(128,128,128,.35);border-radius:.5rem;background:rgba(128,128,128,.06);padding:.4rem .7rem;font-size:.875rem;margin:.6rem 0 0}
         .aw-head{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:baseline;justify-content:space-between}
         /* Chuỗi mắt xích */
         .aw-chain{display:grid;gap:.5rem;grid-template-columns:repeat(6,minmax(0,1fr))}
@@ -153,11 +153,7 @@
             @if ($live)
                 <span class="ss-live-pill" data-testid="aw-live-pill"><span class="ss-spin" aria-hidden="true"></span>Đội AI đang chạy · {{ W::runStages()[$liveStage] ?? 'sắp xong' }}</span>
             @endif
-            <span class="aw-chip">Từ khóa: {{ $article->primary_keyword }}</span>
             @if ($article->website)<span class="aw-chip">{{ $article->website->name }}</span>@endif
-            @if ($campaign)
-                <a class="aw-chip" href="{{ CampaignResource::getUrl('edit', ['record' => $campaign]) }}">Chiến dịch: {{ $campaign->name }}</a>
-            @endif
         </div>
 
         <x-studio.tabs :persist="$showPreflight ? null : 'bai-viet-v4-'.$article->id" :default="$tabDefault" :tabs="$tabs">
@@ -165,7 +161,7 @@
             <x-studio.panel key="overview">
                 <div class="aw-stack">
                     @if (! empty($stopInfo))
-                        <p class="aw-note" data-testid="aw-stopped" style="color:#b91c1c;border:1px solid #b91c1c;border-radius:.5rem;padding:.5rem .75rem">⛔ Hệ thống đang DỪNG KHẨN CẤP ({{ $stopInfo['reason'] ?? 'không ghi lý do' }}): đội AI sẽ không chạy cho đến khi được khôi phục ở Lịch xuất bản.</p>
+                        <p class="aw-note" data-testid="aw-stopped" style="color:#b91c1c;border:1px solid #b91c1c;border-radius:.5rem;padding:.5rem .75rem"><x-filament::icon icon="heroicon-o-exclamation-triangle" style="width:1.1rem;height:1.1rem;display:inline;vertical-align:-.2em" /> Hệ thống đang DỪNG KHẨN CẤP ({{ $stopInfo['reason'] ?? 'không ghi lý do' }}): đội AI sẽ không chạy cho đến khi được khôi phục ở Lịch xuất bản.</p>
                     @endif
                     @if ($primary)
                         <div class="aw-next" data-testid="aw-primary-bar">
@@ -231,11 +227,11 @@
                             </div>
                             <div class="aw-chips" data-testid="pf-chips">
                                 <span class="aw-chip @if ($riskLevel === 'high') aw-chip--warn @endif" data-testid="pf-risk">Rủi ro: <strong>{{ $riskLabel }}</strong></span>
-                                <span class="aw-chip" data-testid="pf-kb">Kho: {{ $readiness['knowledge']['count'] }} mục</span>
-                                <span class="aw-chip" data-testid="pf-products">Sản phẩm: {{ $readiness['products']['count'] }}</span>
-                                <span class="aw-chip" data-testid="pf-brand">Hồ sơ: {{ $readiness['brand']['percent'] }}%</span>
-                                <span class="aw-chip" data-testid="pf-brains">Trí tuệ: {{ $readiness['brains']['attached'] === [] ? 'chưa gắn' : count($readiness['brains']['attached']) }}</span>
-                                <span class="aw-chip" data-testid="pf-cost">Ước tính: {{ $readiness['cost']['estimate_vnd'] === null ? 'chưa có' : '~'.$money($readiness['cost']['estimate_vnd']) }}</span>
+                                {{-- Chỉ chip có số liệu giúp quyết định; số 0 / "chưa có" đã có ghi chú kèm liên kết bên dưới. --}}
+                                @if ($readiness['knowledge']['count'] > 0)<span class="aw-chip" data-testid="pf-kb">Kho: {{ $readiness['knowledge']['count'] }} mục</span>@endif
+                                @if ($readiness['products']['count'] > 0)<span class="aw-chip" data-testid="pf-products">Sản phẩm: {{ $readiness['products']['count'] }}</span>@endif
+                                @if ($readiness['brand']['percent'] > 0)<span class="aw-chip" data-testid="pf-brand">Hồ sơ: {{ $readiness['brand']['percent'] }}%</span>@endif
+                                @if ($readiness['cost']['estimate_vnd'] !== null)<span class="aw-chip" data-testid="pf-cost">Ước tính: ~{{ $money($readiness['cost']['estimate_vnd']) }}</span>@endif
                             </div>
                             @if (! empty($autoAttached))
                                 <div class="aw-muted" data-testid="pf-auto-attached" style="margin-top:.5rem">Đã tự gắn {{ count($autoAttached) }} Trí tuệ: {{ collect($autoAttached)->pluck('name')->implode(', ') }}
@@ -276,19 +272,16 @@
                                 <button type="button" class="aw-node aw-node--{{ $st }} @if ($st === 'run') ss-stage-live @endif" data-link="{{ $n['key'] }}" data-state="{{ $st }}" x-on:click="set(@js($n['tab']))">
                                     <div class="aw-node__k">Bước {{ $i + 1 }} · {{ $stateLabel[$st] }}</div>
                                     <div class="aw-node__t">@if ($st === 'run')<span class="ss-spin" aria-hidden="true"></span>@endif{{ $n['label'] }}</div>
-                                    <div class="aw-node__d">{{ $n['text'] }}</div>
+                                    @if ($st !== 'todo' || ! in_array($n['text'], ['Chưa chạy', 'Chưa có bản nào', 'Chưa có gì để kiểm', 'Chưa có lịch'], true))<div class="aw-node__d">{{ $n['text'] }}</div>@endif
                                 </button>
                             @endforeach
                         </div>
                     </section>
-                    @if ($runs->isNotEmpty() || $versions->isNotEmpty())
+                    @if ($totalCost > 0)
                         <div class="aw-chips" data-testid="aw-stats">
-                            <span class="aw-chip">{{ $versions->count() }} phiên bản</span>
-                            <span class="aw-chip">{{ $runs->count() }} phiên AI</span>
-                            @if ($totalTokens > 0)<span class="aw-chip">{{ $num($totalTokens) }} token</span>@endif
-                            @if ($totalCost > 0)<span class="aw-chip">Chi phí AI {{ V::formatVnd($totalCost) }}</span>@endif
+                            <span class="aw-chip">Chi phí AI {{ V::formatVnd($totalCost) }}</span>
                             <x-help title="Số liệu của bài">
-                                <p>Trạng thái: {{ $statusLabel }}</p>
+                                <p>{{ $versions->count() }} phiên bản · {{ $runs->count() }} phiên AI · {{ $num($totalTokens) }} token</p>
                                 <p>Tạo: {{ VnTime::format($article->created_at) }} · Cập nhật: {{ VnTime::format($article->updated_at) }}</p>
                             </x-help>
                         </div>
@@ -406,9 +399,7 @@
                             @if ($buildPage)
                                 <p style="margin-top:.5rem"><a class="aw-link" data-testid="aw-find-sources" href="{{ \App\Filament\Pages\BrainBuildPage::getUrl(['topic' => (string) $article->primary_keyword]) }}">Tìm nguồn cho chủ đề này</a></p>
                             @endif
-                            @if ($usages->isEmpty())
-                                <p class="aw-muted" style="margin-top:.5rem">{{ $latest ? 'Bản mới nhất chưa dùng mục nào từ kho.' : 'Chưa có bản nào.' }}</p>
-                            @else
+                            @if ($usages->isNotEmpty())
                                 <ul class="aw-list" style="margin-top:.5rem">
                                     @foreach ($usages as $u)
                                         <li>
@@ -472,35 +463,33 @@
                                 <div>Website này chưa có hồ sơ doanh nghiệp. <x-help title="Hệ quả"><p>AI viết mà không có giọng thương hiệu, thông điệp chính hay danh sách từ cấm.</p></x-help></div>
                             @endif
                         </section>
+                        @php $citable = array_values(array_filter((array) ($research['citable_sources'] ?? []))); @endphp
+                        @if ($sources !== [] || $citable !== [])
                         <section class="ss-review-card" data-testid="aw-sources">
                             <h2 class="ss-review-card__title">Nguồn AI nêu trong bài @if ($sources !== [])<x-help tone="warning" title="Cần kiểm trước khi đăng"><p>Các nguồn này do AI tự nêu, hệ thống chưa kiểm chứng. Người duyệt cần kiểm trước khi đăng.</p></x-help>@endif</h2>
-                            @if ($sources === [])
-                                <p>Chưa có nguồn trích.</p>
-                            @else
+                            @if ($sources !== [])
                                 <ul class="aw-list">
                                     @foreach ($sources as $source)
                                         <li>{{ is_array($source) ? implode(' — ', array_map(fn ($v) => is_scalar($v) ? (string) $v : '', $source)) : (string) $source }}</li>
                                     @endforeach
                                 </ul>
                             @endif
-                            @php
-                                $citable = array_values(array_filter((array) ($research['citable_sources'] ?? [])));
-                            @endphp
                             @if ($citable !== [])
                                 <p style="margin-top:.5rem">Nguồn được phép trích: {{ count($citable) }} ({{ implode(', ', array_map(fn ($c) => is_array($c) ? (string) ($c['title'] ?? $c['name'] ?? $c['url'] ?? '') : (string) $c, array_slice($citable, 0, 6))) }})</p>
                             @endif
                         </section>
+                        @endif
+                        @if ($outline !== [])
                         <section class="ss-review-card" data-testid="aw-outline">
                             <h2 class="ss-review-card__title">Dàn ý AI lập</h2>
-                            @if ($outline === [])
-                                <p>Chưa có dàn ý.</p>
-                            @else
+                            @if ($outline !== [])
                                 <ol class="aw-list" style="list-style:decimal">@foreach ($outline as $o)<li>{{ $o }}</li>@endforeach</ol>
                             @endif
                             @if ($links !== [])
                                 <p style="margin-top:.6rem"><strong>Liên kết nội bộ đã chèn:</strong> {{ count($links) }}</p>
                             @endif
                         </section>
+                        @endif
                     </div>
                 </div>
             </x-studio.panel>
@@ -579,7 +568,7 @@
                                 @foreach (W::runStages() as $code => $label)
                                     @php $done = $live->steps->contains('stage', $code) && $code !== $liveStage; @endphp
                                     <span @class(['aw-stage', 'aw-stage--run ss-stage-live' => $code === $liveStage, 'aw-stage--done' => $done]) data-stage="{{ $code }}" @if ($code === $liveStage) data-live-stage="{{ $code }}" @endif>
-                                        @if ($code === $liveStage)<span class="ss-spin" aria-hidden="true"></span>@elseif ($done)✓@endif {{ $label }}
+                                        @if ($code === $liveStage)<span class="ss-spin" aria-hidden="true"></span>@elseif ($done)<x-filament::icon icon="heroicon-o-check" style="width:.85rem;height:.85rem;display:inline;vertical-align:-.15em" />@endif {{ $label }}
                                     </span>
                                 @endforeach
                             </div>
@@ -592,8 +581,6 @@
                                         </li>
                                     @endforeach
                                 </ul>
-                            @else
-                                <p class="aw-muted">Phiên vừa bắt đầu, chưa có bước nào xong.</p>
                             @endif
                         </section>
                     @endif

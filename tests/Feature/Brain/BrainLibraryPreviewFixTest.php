@@ -37,14 +37,14 @@ class BrainLibraryPreviewFixTest extends TestCase
         BrainSource::create(['brain_id' => $b->id, 'name' => 'B', 'domain' => 'b.org', 'status' => 'confirmed', 'tier' => 'blocked']);
         Livewire::test(BrainLibraryPage::class)->assertSee('Chưa có nguồn xác nhận');
         BrainSource::create(['brain_id' => $b->id, 'name' => 'C', 'domain' => 'c.org', 'status' => 'confirmed', 'tier' => '1']);
-        Livewire::test(BrainLibraryPage::class)->assertDontSee('Chưa có nguồn xác nhận')->assertSee('Không cảnh báo');
+        Livewire::test(BrainLibraryPage::class)->assertDontSee('Chưa có nguồn xác nhận')->assertDontSee('Độ khỏe'); // không cảnh báo thì không hiện dòng nào
     }
 
     public function test_tri_tue_khong_bat_buoc_nguon_van_khong_canh_bao(): void
     {
         Brain::create(['name' => 'Tự do', 'slug' => 'tu-do', 'status' => 'active', 'settings' => ['ai_reliance' => 'free']]);
         $this->actingAs($this->admin());
-        Livewire::test(BrainLibraryPage::class)->assertSee('Không cảnh báo')->assertDontSee('Chưa có nguồn xác nhận');
+        Livewire::test(BrainLibraryPage::class)->assertDontSee('Độ khỏe')->assertDontSee('Chưa có nguồn xác nhận');
     }
 
     public function test_hop_cai_mau_khong_tick_san_mau_da_co_va_co_chon_nhanh(): void

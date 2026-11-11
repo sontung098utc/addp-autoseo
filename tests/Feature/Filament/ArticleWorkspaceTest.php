@@ -356,9 +356,12 @@ class ArticleWorkspaceTest extends TestCase
 
         $this->assertSame(1, substr_count($html, 'data-testid="aw-primary"'));
         $this->assertSame(1, substr_count($html, 'data-testid="pf-chips"'));
-        foreach (['pf-risk', 'pf-kb', 'pf-products', 'pf-brand', 'pf-brains', 'pf-cost'] as $chip) {
-            $this->assertSame(1, substr_count($html, 'data-testid="'.$chip.'"'), $chip);
+        $this->assertSame(1, substr_count($html, 'data-testid="pf-risk"'));
+        // Chip chỉ hiện khi có số liệu giúp quyết định: số 0 / "chưa có" bị bỏ.
+        foreach (['pf-products', 'pf-brand', 'pf-brains', 'pf-cost'] as $chip) {
+            $this->assertStringNotContainsString('data-testid="'.$chip.'"', $html, $chip);
         }
+        $this->assertStringNotContainsString('<span class="aw-chip">Từ khóa:', $html); // trùng tiêu đề trang
         $this->assertStringNotContainsString('data-testid="aw-stats"', $html); // chưa có phiên nào thì không có số liệu
         $this->assertOnlyInHelp($html, 'Mỗi bước dùng kết quả của bước trước');
         $this->assertOnlyInHelp($html, 'Ngân sách phiên tối đa');

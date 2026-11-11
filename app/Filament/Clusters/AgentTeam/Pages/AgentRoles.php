@@ -3,6 +3,7 @@
 namespace App\Filament\Clusters\AgentTeam\Pages;
 
 use App\Filament\Clusters\AgentTeam;
+use App\Filament\Clusters\AgentTeam\Concerns\ManagesCustomSkills;
 use App\Filament\Pages\AiUsagePage;
 use App\Filament\Resources\AgentRunResource;
 use App\Models\AgentRunStep;
@@ -36,6 +37,7 @@ use Livewire\WithFileUploads;
  */
 class AgentRoles extends Page
 {
+    use ManagesCustomSkills;
     use WithFileUploads;
 
     /** Agent Studio: vai trò đang mở (null = đóng) và tab hiện tại. */
@@ -44,9 +46,12 @@ class AgentRoles extends Page
     public string $studioTab = 'overview';
 
     /** Khối nhỏ đang mở trong tab Huấn luyện. */
-    public string $trainSec = 'lessons';
+    public string $trainSec = 'instructions';
 
-    public const TRAIN_SECTIONS = ['lessons' => 'Bài học', 'docs' => 'Tài liệu', 'skills' => 'Kỹ năng', 'brain' => 'Trí tuệ'];
+    public const TRAIN_SECTIONS = ['instructions' => 'Chỉ dẫn', 'lessons' => 'Bài học', 'docs' => 'Tài liệu', 'skills' => 'Kỹ năng', 'brain' => 'Trí tuệ'];
+
+    /** Tên mục cũ → [mục mới, khối trong Huấn luyện] để liên kết cũ vẫn mở đúng chỗ. */
+    private const LEGACY_TABS = ['persona' => ['training', 'instructions'], 'model' => ['tech', null]];
 
     public string $fName = '';
 
@@ -81,15 +86,16 @@ class AgentRoles extends Page
     /** @var array<string, string> bản nháp bài học theo dòng ở Phòng huấn luyện */
     public array $teach = [];
 
-    /** Cột trái hồ sơ: 7 mục. "Huấn luyện" gộp bài học, tài liệu, kỹ năng, Trí tuệ, Phòng huấn luyện; "Chi tiết kỹ thuật" là mục riêng cho quản trị. */
+    /**
+     * Cột trái hồ sơ: 5 mục. "Huấn luyện" = nhân sự học và làm gì (chỉ dẫn, bài học, tài liệu, kỹ năng, Trí tuệ, lần chạy cần dạy lại);
+     * "Mô hình & kỹ thuật" = nhân sự chạy thế nào (model chính/dự phòng, công cụ, rubric, rào chắn, tự động hóa).
+     */
     public const STUDIO_TABS = [
         'overview' => ['Tổng quan', null],
-        'persona' => ['Vai trò & chỉ dẫn', null],
-        'model' => ['Mô hình', null],
         'training' => ['Huấn luyện', null],
+        'tech' => ['Mô hình & kỹ thuật', null],
         'position' => ['Vị trí trong luồng', null],
         'activity' => ['Hoạt động', null],
-        'tech' => ['Chi tiết kỹ thuật', null],
     ];
 
     protected static ?string $cluster = AgentTeam::class;
@@ -125,13 +131,17 @@ class AgentRoles extends Page
         return $u;
     }
 
-    public function openStudio(string $key, string $tab = 'overview'): void
+    public function openStudio(string $key, string $tab = 'overview', ?string $sec = null): void
     {
         $this->actor();
         abort_if((new RoleRegistry)->find($key) === null, 404);
         $this->studioRole = $key;
-        $this->studioTab = array_key_exists($tab, self::STUDIO_TABS) ? $tab : 'overview';
-        $this->trainSec = 'lessons';
+        $this->trainSec = 'instructions';
+        [$tab, $sec] = $this->resolveTab($tab, $sec);
+        $this->studioTab = $tab;
+        if ($sec !== null) {
+            $this->trainSec = $sec;
+        }
         $this->showHistory = false;
         $this->loadStudioForm();
     }
@@ -141,12 +151,26 @@ class AgentRoles extends Page
         $this->studioRole = null;
     }
 
+    /** @return array{0: string, 1: ?string} */
+    private function resolveTab(string $tab, ?string $sec): array
+    {
+        if (isset(self::LEGACY_TABS[$tab])) {
+            [$tab, $legacySec] = self::LEGACY_TABS[$tab];
+            $sec ??= $legacySec;
+        }
+        if (! array_key_exists($tab, self::STUDIO_TABS)) {
+            return ['overview', null];
+        }
+
+        return [$tab, $sec !== null && array_key_exists($sec, self::TRAIN_SECTIONS) ? $sec : null];
+    }
+
     public function setStudioTab(string $tab, ?string $sec = null): void
     {
-        if (array_key_exists($tab, self::STUDIO_TABS)) {
-            $this->studioTab = $tab;
+        if (array_key_exists($tab, self::STUDIO_TABS) || isset(self::LEGACY_TABS[$tab])) {
+            [$this->studioTab, $sec] = $this->resolveTab($tab, $sec);
             $this->showHistory = false;
-            if ($sec !== null && array_key_exists($sec, self::TRAIN_SECTIONS)) {
+            if ($sec !== null) {
                 $this->trainSec = $sec;
             }
         }
@@ -293,6 +317,7 @@ class AgentRoles extends Page
         }, 'Đã thêm kỹ năng tùy chỉnh.');
     }
 
+    /** Nạp playbook gốc vào cửa sổ "Thêm kỹ năng" để sửa thành bản riêng. */
     public function cloneSkill(string $ref): void
     {
         $pb = in_array($ref, (new RoleRegistry)->find((string) $this->studioRole)['skills'] ?? [], true) ? AgentStudioData::playbookBody($ref) : null;
@@ -301,9 +326,7 @@ class AgentRoles extends Page
 
             return;
         }
-        $this->skillTitle = mb_substr('Bản riêng: '.$pb['title'], 0, 160);
-        $this->skillBody = mb_substr($pb['body'], 0, AgentProfiles::INSTRUCTIONS_MAX);
-        Notification::make()->title('Đã nạp nội dung playbook gốc vào ô soạn. Sửa rồi bấm Thêm kỹ năng.')->success()->send();
+        $this->mountAction('createSkill', ['role' => $this->studioRole, 'title' => mb_substr('Bản riêng: '.$pb['title'], 0, 160), 'body' => mb_substr($pb['body'], 0, AgentProfiles::INSTRUCTIONS_MAX)]);
     }
 
     public function deleteDocument(int $id): void
@@ -333,12 +356,10 @@ class AgentRoles extends Page
         $d['canUndo'] = AgentProfiles::previousVersion($key) !== null;
         match ($this->studioTab) {
             'overview' => $d += $this->overviewData($key, $role, $d['profile'], $assign),
-            'persona' => $d['history'] = $this->showHistory ? AgentProfiles::history($key) : [],
-            'model' => $d += $this->modelData($key, $assign),
-            'training' => $d += $this->trainingData($key, $role, $reg),
+            'training' => $d += $this->trainingData($key, $role, $reg) + ['history' => $this->showHistory ? AgentProfiles::history($key) : []],
             'position' => $d += ['positions' => $this->orderedPositions(AgentStudioData::positions($key))],
             'activity' => $d += ['activity' => AgentStudioData::activity($key)],
-            'tech' => $d += ['skills' => $reg->skills($role), 'rubric' => $reg->rubric($role)],
+            'tech' => $d += $this->modelData($key, $assign) + ['rubric' => $reg->rubric($role)],
             default => null,
         };
 
@@ -375,7 +396,7 @@ class AgentRoles extends Page
             'sec' => $this->trainSec, 'sections' => self::TRAIN_SECTIONS,
             'lessons' => AgentProfiles::lessons($key), 'docs' => AgentProfiles::documents($key, 'knowledge'), 'chars' => AgentProfiles::knowledgeChars($key), 'max' => AgentProfiles::PROMPT_MAX,
             'issues' => AgentStudioData::trainingIssues($key),
-            'skills' => $reg->skills($role), 'custom' => AgentProfiles::documents($key, 'skill'), 'skillsUrl' => self::skillsTabUrl(),
+            'skills' => $reg->skills($role), 'custom' => AgentProfiles::documents($key, 'skill'),
             'brains' => $this->brains(), 'applied' => $key === 'writer',
         ];
     }
@@ -415,7 +436,7 @@ class AgentRoles extends Page
     }
 
     /**
-     * Bảng điều hành của một nhân sự: đang làm gì, checklist sẵn sàng (model, quy tắc, kỹ năng, bài học) và 3 số thật 7 ngày.
+     * Bảng điều hành của một nhân sự: đang làm gì, model, 3 số thật 7 ngày và việc cần làm tiếp (nếu có).
      *
      * @return array<string, mixed>
      */
@@ -428,8 +449,6 @@ class AgentRoles extends Page
                 $working = $d['working'];
             }
         }
-        $skillsHave = count(array_filter($reg->skills($role), fn ($s) => $s['exists'])) + count(AgentProfiles::documents($key, 'skill'));
-        $lessons = count(array_filter(AgentProfiles::lessons($key), fn ($l) => $l->active));
         $wired = isset(RoleAssignments::ROLE_TASKS[$key]);
         $week = ['runs' => 0, 'steps' => 0, 'ok_rate' => null, 'cost' => 0.0];
         try {
@@ -442,13 +461,32 @@ class AgentRoles extends Page
 
         return [
             'working' => $working, 'week' => $week,
-            'checks' => [
-                ['label' => 'Có model', 'ok' => (bool) $assign->summary($key), 'na' => ! $wired, 'tab' => 'model', 'sec' => null, 'note' => $wired ? null : 'Chưa nối luồng'],
-                ['label' => 'Có quy tắc', 'ok' => trim((string) $profile['instructions']) !== '', 'na' => false, 'tab' => 'persona', 'sec' => null, 'note' => null],
-                ['label' => 'Có kỹ năng', 'ok' => $skillsHave > 0, 'na' => false, 'tab' => 'training', 'sec' => 'skills', 'note' => $skillsHave > 0 ? $skillsHave.' kỹ năng' : null],
-                ['label' => 'Có bài học', 'ok' => $lessons > 0, 'na' => false, 'tab' => 'training', 'sec' => 'lessons', 'note' => $lessons > 0 ? $lessons.' bài' : null],
-            ],
+            'model' => $assign->summary($key), 'next' => $this->nextSteps($key, $role, $profile, $wired, $assign),
         ];
+    }
+
+    /**
+     * Việc cần làm tiếp (chỉ những gì thật sự thiếu): vai trò đã gọi AI mà chưa chọn model, chưa có chỉ dẫn, khai báo kỹ năng nhưng không còn kỹ năng nào bật.
+     *
+     * @return list<array{label: string, tab: string, sec: ?string}>
+     */
+    private function nextSteps(string $key, array $role, array $profile, bool $wired, RoleAssignments $assign): array
+    {
+        $next = [];
+        if ($wired && ! $assign->summary($key)) {
+            $next[] = ['label' => 'Chọn model', 'tab' => 'tech', 'sec' => null];
+        }
+        if (trim((string) $profile['instructions']) === '') {
+            $next[] = ['label' => 'Viết chỉ dẫn', 'tab' => 'training', 'sec' => 'instructions'];
+        }
+        $reg = new RoleRegistry;
+        $on = count(array_filter($reg->skills($role), fn ($s) => $s['exists'] && $s['enabled']))
+            + count(array_filter(AgentProfiles::documents($key, 'skill'), fn ($d) => $d->enabled !== false));
+        if (($role['skills'] ?? []) !== [] && $on === 0) {
+            $next[] = ['label' => 'Bật một kỹ năng', 'tab' => 'training', 'sec' => 'skills'];
+        }
+
+        return $next;
     }
 
     /** @return list<array{id: int, name: string}> */

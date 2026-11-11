@@ -14,7 +14,7 @@ use Throwable;
 
 /**
  * AG-S17: gán theo vai trò. Chỉ admin ghi; mỗi lần đổi ghi nhật ký audit (ai, vai trò, đổi gì, lúc nào) và lưu updated_by/updated_at.
- * Model: chỉ vai trò đã nối vào một loại việc (ROLE_TASKS) mới gán được. Kỹ năng: chỉ kỹ năng khai báo của vai trò, ghim chỉ phiên bản có thật,
+ * Model: gán được cho mọi vai trò; chỉ vai trò đã nối vào một loại việc (ROLE_TASKS) mới được luồng gọi AI dùng ngay. Kỹ năng: chỉ kỹ năng khai báo của vai trò, ghim chỉ phiên bản có thật,
  * hợp lệ và chưa retired. Đọc không bao giờ ném lỗi ra ngoài (bảng chưa migrate => coi như chưa gán gì).
  */
 final class RoleAssignments
@@ -93,9 +93,6 @@ final class RoleAssignments
     public function saveModel(string $role, ?int $providerId, ?string $model, ?int $fallbackProviderId, ?string $fallbackModel, bool $enabled, User $actor): AgentRoleAssignment
     {
         $this->guard($actor, $role);
-        if (! isset(self::ROLE_TASKS[$role])) {
-            throw new InvalidArgumentException('Vai trò này chưa nối vào luồng gọi AI nên chưa gán model được.');
-        }
         $model = trim((string) $model) ?: null;
         $fallbackModel = trim((string) $fallbackModel) ?: null;
         if (($providerId === null) !== ($model === null)) {

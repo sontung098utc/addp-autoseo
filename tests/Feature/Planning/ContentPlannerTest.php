@@ -134,4 +134,24 @@ class ContentPlannerTest extends TestCase
         $this->assertSame('plan', Article::where('keyword_id', $k->id)->value('origin'));
         $this->assertSame('planned', Article::where('keyword_id', $k->id)->value('workflow_status'));
     }
+
+    public function test_de_xuat_la_tab_ngay_sau_lich_tuan_va_chain_context_nam_trong_tab(): void
+    {
+        $this->kw('du học úc', 300);
+        $this->actingAs($this->user('writer'));
+        $html = Livewire::test(ContentPlanPage::class)->html();
+
+        $keys = [];
+        preg_match_all('/role="tab"[^>]*data-key="([^"]+)"/', $html, $m);
+        $keys = $m[1];
+        $this->assertSame(['lich-tuan', 'de-xuat', 'cum'], array_slice($keys, 0, 3));
+
+        $chain = strpos($html, 'data-testid="chain-context"');
+        $this->assertNotFalse($chain);
+        $this->assertSame(1, substr_count($html, 'data-testid="chain-context"'));
+        // Dải chain-context nằm sau hàng tab và trong panel đề xuất, cùng chỗ với hộp đề xuất.
+        $this->assertGreaterThan(strpos($html, 'role="tablist"'), $chain);
+        $this->assertLessThan(strpos($html, 'data-plan-proposals'), $chain);
+        $this->assertStringNotContainsString('ss-tabs__arrow', $html);
+    }
 }

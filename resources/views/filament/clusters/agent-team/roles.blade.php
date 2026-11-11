@@ -32,14 +32,14 @@
             <x-help title="Đội AI SEO">
                 <p>Mỗi nhân sự là một vai trò trong dây chuyền làm bài, học từ bộ claude-seo và chỉnh cho website tiếng Việt.</p>
                 <ul>
-                    <li>Bấm tên để mở hồ sơ: vai trò, mô hình, huấn luyện, vị trí trong luồng, chi tiết kỹ thuật.</li>
+                    <li>Bấm tên để mở hồ sơ: tổng quan, huấn luyện, mô hình & kỹ thuật, vị trí trong luồng, hoạt động.</li>
                     <li>Bấm chip model để mở danh sách model khả dụng và chọn; công tắc để bật/tắt (chỉ admin).</li>
                     <li>Trạng thái phản ánh việc thật sự được nối vào phiên chạy, không phải kế hoạch. Biên tập (chấm luật) và Người viết luôn bật.</li>
                 </ul>
             </x-help>
         </div>
-        @if (! $hasProviders && count(array_filter($cards, fn ($c) => $c['model_wired'])) > 0)
-            <div class="text-sm" style="color:#d97706" data-testid="roles-no-provider">(!) Chưa có tài khoản AI. <a href="{{ $connectionUrl }}" style="text-decoration:underline">Thêm ở Cấu hình AI</a></div>
+        @if (! $hasProviders)
+            <div class="text-sm" style="color:#d97706;display:flex;align-items:center;gap:.35rem" data-testid="roles-no-provider"><x-filament::icon icon="heroicon-o-exclamation-triangle" style="width:1rem;height:1rem" /> Chưa có tài khoản AI. <a href="{{ $connectionUrl }}" style="text-decoration:underline">Thêm ở Cấu hình AI</a></div>
         @endif
         <div class="rc-grid">
             @foreach ($cards as $c)
@@ -62,7 +62,6 @@
                     </div>
                     <div class="rc-goal" title="{{ $c['goal'] }}">{{ $c['goal'] }}</div>
                     <div class="rc-foot">
-                        @if ($c['model_wired'])
                             @if ($c['assigned'])
                                 @if ($canSwitch)
                                     <button type="button" class="rc-chip" wire:click="openStudio('{{ $k }}', 'model')" data-testid="role-model-chip-{{ $k }}" title="Bấm để chọn model từ danh sách"><span data-testid="role-model-{{ $k }}">{{ $c['assigned'] }}</span></button>
@@ -74,7 +73,6 @@
                             @else
                                 <span class="rc-chip rc-chip--empty" data-testid="role-model-chip-{{ $k }}"><span data-testid="role-model-{{ $k }}">Chưa gán model</span></span>
                             @endif
-                        @endif
                         @if ($c['working'])
                             @php $w = $c['working'][0]; @endphp
                             @if (\App\Filament\Resources\AgentRunResource::canViewAny())
@@ -83,10 +81,8 @@
                                 <span class="rc-chip rc-chip--live" data-testid="role-status-{{ $k }}" data-status="working"><span class="rc-dot"></span>Đang làm: {{ $w['current'] ?? $w['job_title'] }} · {{ preg_replace('/^(Bài|Website): /u', '', $w['subject']) }}</span>
                             @endif
                             @if (count($c['working']) > 1)<span class="rc-muted">+{{ count($c['working']) - 1 }} phiên</span>@endif
-                        @elseif ($c['model_wired'] || $c['joins'])
-                            <span class="rc-muted" data-testid="role-status-{{ $k }}" data-status="idle">Rảnh</span>
                         @else
-                            <span class="rc-muted" data-testid="role-status-{{ $k }}" data-status="unwired" title="Chưa gọi AI trong phiên chạy">Chưa nối vào luồng</span>
+                            <span class="rc-muted" data-testid="role-status-{{ $k }}" data-status="idle">Rảnh</span>
                         @endif
                     </div>
                 </article>

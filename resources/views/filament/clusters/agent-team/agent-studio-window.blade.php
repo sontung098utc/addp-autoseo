@@ -34,7 +34,7 @@
     .ags-sec{font-size:.72rem;letter-spacing:.04em;font-weight:600;opacity:.65;margin:1rem 0 .4rem;text-transform:uppercase}
     .rc-dot{width:.5rem;height:.5rem;border-radius:50%;background:rgb(14,165,233);animation:rc-blink 1.2s ease-in-out infinite}
     @keyframes rc-blink{50%{opacity:.25}}
-    .ags-subtabs{display:flex;gap:.25rem;border-bottom:1px solid rgba(128,128,128,.3);margin-bottom:.8rem;overflow-x:auto}
+    .ags-subtabs{display:flex;gap:.25rem;border-bottom:1px solid rgba(128,128,128,.3);margin-bottom:.8rem;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}.ags-subtabs::-webkit-scrollbar{display:none}
     .ags-subtab{padding:.4rem .8rem;border:0;border-bottom:2px solid transparent;background:transparent;color:inherit;cursor:pointer;font-size:.82rem;opacity:.7;margin-bottom:-1px;white-space:nowrap}
     .ags-subtab[aria-selected=true]{opacity:1;font-weight:600;border-bottom-color:#2563eb}
     .ags-subtab__n{margin-left:.35rem;font-size:.68rem;padding:.02rem .4rem;border-radius:999px;background:rgba(128,128,128,.2)}
@@ -49,10 +49,21 @@
     .ags-pos--off .ags-pos__t{color:#6b7280;font-weight:500}
     .ags-bar{height:.5rem;border-radius:999px;background:rgba(128,128,128,.25);overflow:hidden}
     .ags-bar>i{display:block;height:100%;background:#16a34a}
+    .ags-x{display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;border-radius:999px;border:0;background:transparent;color:inherit;cursor:pointer;opacity:.7}
+    .ags-x:hover,.ags-x:focus-visible{opacity:1;background:rgba(128,128,128,.2);outline:none}
+    .ags-ic{width:1rem;height:1rem;flex:none}
+    .ags-btn{display:inline-flex;align-items:center;gap:.35rem}
+    .ags-btn--line{padding:.3rem .7rem;border-radius:.6rem;border:1px solid rgba(128,128,128,.45);color:inherit;text-decoration:none;font-size:.8rem;transition:background .12s,border-color .12s}
+    .ags-btn--line:hover,.ags-btn--line:focus-visible{background:rgba(37,99,235,.1);border-color:#2563eb;outline:none}
+    .ags-sw{position:relative;width:2rem;height:1.15rem;flex:none;border-radius:999px;border:0;background:rgba(128,128,128,.4);cursor:pointer;padding:0;transition:background .15s}
+    .ags-sw[aria-checked=true]{background:#16a34a}.ags-sw[disabled]{cursor:default;opacity:.7}
+    .ags-sw i{position:absolute;top:.15rem;left:.15rem;width:.85rem;height:.85rem;border-radius:50%;background:#fff;transition:transform .15s}
+    .ags-sw[aria-checked=true] i{transform:translateX(.85rem)}
+    .ags-next{display:flex;flex-wrap:wrap;gap:.4rem}
     @media (max-width:760px){.ags-win{flex-direction:column}.ags-side{width:auto;flex-direction:row;overflow-x:auto;padding:.4rem}.ags-grp{display:none}.ags-nav{white-space:nowrap}}
 </style>
 <div class="ags" data-testid="agent-studio" wire:key="studio-{{ $s['key'] }}" wire:keydown.escape.window="closeStudio">
-    <div class="ags-win" role="dialog" aria-label="Agent Studio: {{ $p['display_name'] }}">
+    <div class="ags-win" role="dialog" aria-label="Hồ sơ nhân sự: {{ $p['display_name'] }}">
         <nav class="ags-side" aria-label="Điều hướng hồ sơ">
             @foreach ($tabs as $k => [$label, $group])
                 @if ($group)<div class="ags-grp">{{ $group }}</div>@endif
@@ -67,7 +78,7 @@
                 </div>
                 <div style="display:flex;gap:.5rem;align-items:center">
                     @if (! $edit)<x-studio.badge tone="muted">Chỉ xem</x-studio.badge>@endif
-                    <button type="button" style="{{ $btn }}" wire:click="closeStudio" data-testid="studio-close">Đóng</button>
+                    <button type="button" class="ags-x" wire:click="closeStudio" data-testid="studio-close" aria-label="Đóng" title="Đóng"><x-filament::icon icon="heroicon-m-x-mark" class="ags-ic" style="width:1.25rem;height:1.25rem" /></button>
                 </div>
             </div>
             <div class="ags-body" data-testid="studio-pane-{{ $s['tab'] }}">
@@ -76,7 +87,6 @@
                     @php $w = $s['week']; $working = $s['working']; @endphp
                     <div class="ags-ph">
                         <div><h3>Tổng quan</h3><div class="ags-desc">{{ $s['role']['goal'] }}</div></div>
-                        <div class="ags-act"><button type="button" style="{{ $btn }}" wire:click="setStudioTab('tech')" data-testid="studio-open-tech">Chi tiết kỹ thuật</button></div>
                     </div>
                     <div class="ags-card" style="display:flex;justify-content:space-between;gap:.6rem;align-items:center;flex-wrap:wrap" data-testid="studio-status">
                         @if ($working)
@@ -85,182 +95,116 @@
                         @else
                             <span data-status="idle" style="opacity:.75">Đang rảnh</span>
                         @endif
-                        <x-studio.badge :tone="$s['enabled'] ? 'ok' : 'muted'">{{ $s['enabled'] ? 'Đang bật' : 'Đang tắt' }}</x-studio.badge>
+                        @unless ($s['enabled'])<x-studio.badge tone="muted">Đang tắt</x-studio.badge>@endunless
                     </div>
-                    <div class="ags-sec">Đã sẵn sàng chưa</div>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.5rem" data-testid="studio-checks">
-                        @foreach ($s['checks'] as $c)
-                            <button type="button" class="ags-card ags-check" style="text-align:left;cursor:pointer;color:inherit;background:transparent;margin:0" wire:click="setStudioTab('{{ $c['tab'] }}'{{ $c['sec'] ? ", '".$c['sec']."'" : '' }})" data-ok="{{ $c['ok'] ? 1 : 0 }}">
-                                <span style="color:{{ $c['ok'] ? '#16a34a' : 'inherit' }};opacity:{{ $c['ok'] ? 1 : .5 }}">{{ $c['ok'] ? '✓' : '○' }}</span> <strong class="text-sm">{{ $c['label'] }}</strong>
-                                <div class="text-xs" style="opacity:.6">{{ $c['note'] ?? ($c['ok'] ? 'Xong' : 'Chưa có') }}</div>
-                            </button>
-                        @endforeach
+                    <div class="ags-card" style="display:flex;justify-content:space-between;gap:.6rem;align-items:center;flex-wrap:wrap" data-testid="studio-model-line">
+                        <span><span class="text-xs" style="opacity:.65">Model</span> <strong class="text-sm">{{ $s['model'] ?? 'Dùng định tuyến theo loại việc' }}</strong></span>
+                        <button type="button" class="ags-btn ags-btn--line" wire:click="setStudioTab('tech')" style="background:transparent">{{ $s['model'] ? 'Đổi' : 'Chọn model' }}</button>
                     </div>
-                    <div class="ags-sec">7 ngày gần nhất</div>
                     @if ($w['steps'] > 0)
+                        <div class="ags-sec">7 ngày gần nhất</div>
                         <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem" data-testid="studio-week">
                             <div class="ags-card"><div class="text-xs" style="opacity:.7">Phiên</div><strong>{{ number_format($w['runs']) }}</strong></div>
-                            <div class="ags-card"><div class="text-xs" style="opacity:.7">Tỉ lệ ok</div><strong>{{ $w['ok_rate'] }}%</strong></div>
+                            <div class="ags-card"><div class="text-xs" style="opacity:.7">Tỉ lệ thành công</div><strong>{{ $w['ok_rate'] }}%</strong></div>
                             <div class="ags-card"><div class="text-xs" style="opacity:.7">Chi phí</div><strong>{{ number_format($w['cost'], 0, ',', '.') }} ₫</strong></div>
                         </div>
-                    @else
-                        <div class="text-sm" style="opacity:.65" data-testid="studio-week-empty">Chưa có phiên nào trong 7 ngày qua.</div>
                     @endif
-                    <div class="text-xs" style="margin-top:1rem;display:flex;align-items:center;gap:.5rem">
-                        <span style="opacity:.75">Đào tạo <strong data-testid="studio-percent">{{ $p['training_percent'] }}%</strong></span>
-                        <div class="ags-bar" style="width:8rem"><i style="width:{{ $p['training_percent'] }}%"></i></div>
-                        <x-help title="Đào tạo">
-                            <p>{{ $p['training_percent'] >= 100 ? 'Đã đủ persona, quy tắc, bài học, kỹ năng.' : 'Còn thiếu: persona, quy tắc, bài học, kỹ năng hoặc tài liệu riêng.' }}</p>
-                            <p>Hồ sơ: {{ $p['is_customized'] ? 'đã tùy chỉnh, phiên bản '.$p['version'] : 'mặc định từ tệp vai trò (chưa ai tùy chỉnh, hệ thống chạy như cũ)' }}. Chỉ dẫn từ hồ sơ áp dụng vào prompt từ lần chạy kế tiếp.</p>
-                        </x-help>
-                    </div>
-                    @break
-
-                @case('persona')
-                    <div class="ags-ph">
-                        <div><h3>Vai trò & chỉ dẫn <x-help title="Chỉ dẫn">
-                            <p>Mỗi lần lưu tạo một phiên bản và áp dụng từ lần chạy kế tiếp.</p>
-                            <p>Persona và quy tắc đi vào prompt như dữ liệu của quản trị; không ghi đè quy tắc an toàn, bộ luật chất lượng hay định dạng đầu ra. Để trống một ô để quay về mặc định.</p>
-                        </x-help></h3><div class="ags-desc">Tên, giọng và quy tắc làm việc của nhân sự này.</div></div>
-                        <div class="ags-act">
-                            <button type="button" style="{{ $btn }}" wire:click="toggleHistory" data-testid="studio-history-btn">Lịch sử</button>
-                            @if ($edit)
-                                <button type="button" style="{{ $btn }}" wire:click="undoProfile" @disabled(! $s['canUndo']) data-testid="studio-undo">Hoàn tác</button>
-                                <button type="button" style="{{ $btnPrimary }}" wire:click="saveProfile" data-testid="studio-save">Lưu</button>
-                            @endif
-                        </div>
-                    </div>
-                    @if ($showHistory)
-                        <div class="ags-card" data-testid="studio-history">
-                            @forelse ($s['history'] as $h)
-                                <div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.8rem;padding:.2rem 0">
-                                    <span>v{{ $h['version'] }} · {{ $h['summary'] }} <span style="opacity:.6">· {{ $h['by'] ?? 'hệ thống' }} · {{ $h['at'] ? \Illuminate\Support\Carbon::parse($h['at'])->format('d/m/Y H:i') : '' }}</span></span>
-                                    @if ($edit)<button type="button" style="{{ $btn }}" wire:click="restoreVersion({{ $h['version'] }})">Khôi phục</button>@endif
-                                </div>
-                            @empty<span class="text-xs" style="opacity:.7">Chưa có phiên bản nào: hồ sơ đang là mặc định.</span>@endforelse
-                        </div>
-                    @endif
-                    <fieldset @disabled(! $edit) style="border:0;padding:0;margin:0">
-                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.6rem">
-                            <div><label>Tên hiển thị</label><input style="{{ $input }}" wire:model="fName" maxlength="80" data-testid="studio-f-name"></div>
-                            <div><label>Chức vụ</label><input style="{{ $input }}" wire:model="fTitle" maxlength="120" data-testid="studio-f-title"></div>
-                        </div>
-                        <label>Tính cách (tối đa {{ \App\Services\Agent\Roles\AgentProfiles::TRAITS_MAX }})</label>
-                        <div style="display:flex;gap:.3rem;flex-wrap:wrap;align-items:center" data-testid="studio-traits">
-                            @foreach ($fTraits as $i => $t)<span class="ags-chip ags-chip--on">{{ $t }} @if ($edit)<button type="button" wire:click="removeTrait({{ $i }})" aria-label="Bỏ {{ $t }}" style="background:none;border:0;cursor:pointer;color:inherit">×</button>@endif</span>@endforeach
-                            @if ($edit)
-                                @foreach (array_diff($s['suggested'], $fTraits) as $t)<button type="button" class="ags-chip" wire:click="addTrait('{{ $t }}')">+ {{ $t }}</button>@endforeach
-                                <input style="{{ $input }};width:9rem" wire:model="newTrait" wire:keydown.enter.prevent="addTrait" placeholder="Tự thêm" maxlength="40" aria-label="Tự thêm tính cách">
-                            @endif
-                        </div>
-                        <label>Persona (vai trò, giọng, cách làm việc) · {{ mb_strlen($fPersona) }}/{{ \App\Services\Agent\Roles\AgentProfiles::PERSONA_MAX }}</label>
-                        <textarea style="{{ $input }}" rows="5" wire:model="fPersona" data-testid="studio-f-persona"></textarea>
-                        <label>Quy tắc (markdown ngắn) · {{ mb_strlen($fInstructions) }}/{{ \App\Services\Agent\Roles\AgentProfiles::INSTRUCTIONS_MAX }}</label>
-                        <textarea style="{{ $input }}" rows="8" wire:model="fInstructions" data-testid="studio-f-instructions"></textarea>
-                    </fieldset>
-                    @break
-
-                @case('model')
-                    @php
-                        $mTier = ['cheap' => 'ags-tier--cheap', 'standard' => 'ags-tier--std', 'reasoning' => 'ags-tier--rsn'];
-                        $isPick = fn ($slot, $gid, $mid) => ($s[$slot] ?? null) && $s[$slot]['provider'] === $gid && $s[$slot]['model'] === $mid;
-                        $labelOf = function ($slot) use ($s) {
-                            $x = $s[$slot] ?? null; if (! $x) return null;
-                            $g = collect($s['groups'])->firstWhere('id', $x['provider']);
-                            return ['name' => $g['name'] ?? 'Tài khoản đã xóa', 'logo' => $g['logo'] ?? 'custom', 'model' => $x['model'], 'ok' => (bool) $g];
-                        };
-                    @endphp
-                    <div class="ags-ph">
-                        <div><h3>Mô hình <x-help title="Chọn model cho nhân sự">
-                            <p>Danh sách gồm model đã bật ở các tài khoản trong Cấu hình AI → Tích hợp AI. Tài khoản tắt hoặc chưa có khóa không hiện.</p>
-                            <p>Bậc đề xuất cho vai trò này: {{ $s['role']['tier_label'] }}. Model dự phòng chỉ dùng khi model chính lỗi tạm thời liên tục. Chưa chọn thì dùng định tuyến theo loại việc.</p>
-                            <p>Ngân sách là một con số cho cả phiên chạy, không đặt riêng theo nhân sự.</p>
-                        </x-help></h3><div class="ags-desc">Model AI nhân sự này gọi khi làm việc.</div></div>
-                    </div>
-                    @if (! $s['modelWired'])
-                        <div class="ags-card" data-testid="studio-model">Chưa nối vào luồng gọi AI: vai trò này chưa gọi AI trong phiên chạy nên chưa chọn model.</div>
-                    @else
-                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:.5rem" data-testid="studio-model">
-                            @foreach (['primary' => 'Model chính', 'fallback' => 'Dự phòng'] as $slot => $slotLabel)
-                                @php $cur = $labelOf($slot); @endphp
-                                <div class="ags-card" data-slot="{{ $slot }}">
-                                    <div class="text-xs" style="opacity:.65">{{ $slotLabel }}</div>
-                                    @if ($cur)
-                                        <div style="display:flex;align-items:center;gap:.5rem;margin-top:.25rem"><x-ai.logo :brand="$cur['logo']" :size="1.7" /><span style="min-width:0"><strong class="text-sm">{{ $cur['model'] }}</strong><span class="text-xs" style="display:block;opacity:.7">{{ $cur['name'] }}{{ $cur['ok'] ? '' : ' · không dùng được' }}</span></span>
-                                            @if ($edit)<button type="button" style="{{ $btn }};margin-left:auto" wire:click="clearModel('{{ $slot }}')">Bỏ</button>@endif</div>
-                                    @else
-                                        <div class="text-sm" style="opacity:.6;margin-top:.25rem">{{ $slot === 'primary' ? 'Chưa chọn, dùng định tuyến theo loại việc' : 'Không có dự phòng' }}</div>
-                                    @endif
-                                </div>
+                    @if ($s['next'])
+                        <div class="ags-sec">Việc cần làm tiếp</div>
+                        <div class="ags-next" data-testid="studio-next">
+                            @foreach ($s['next'] as $n)
+                                <button type="button" class="ags-btn ags-btn--line" style="background:transparent" wire:click="setStudioTab('{{ $n['tab'] }}'{{ $n['sec'] ? ", '".$n['sec']."'" : '' }})">{{ $n['label'] }} <x-filament::icon icon="heroicon-m-arrow-right" class="ags-ic" /></button>
                             @endforeach
                         </div>
-                        <div class="ags-sec">Model khả dụng</div>
-                        @forelse ($s['groups'] as $g)
-                            <div class="ags-card" data-testid="studio-model-group" data-provider="{{ $g['id'] }}">
-                                <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem"><x-ai.logo :brand="$g['logo']" :size="1.8" /><strong class="text-sm">{{ $g['name'] }}</strong></div>
-                                @forelse ($g['models'] as $m)
-                                    <div class="ags-mrow" data-model="{{ $m['id'] }}">
-                                        <span style="min-width:0;flex:1"><span class="text-sm">{{ $m['name'] }}</span>
-                                            @if ($m['tier'])<span class="ags-tier {{ $mTier[$m['tier']] ?? '' }}">{{ $s['tierLabels'][$m['tier']] ?? $m['tier'] }}</span>@else<span class="ags-tier">tùy chỉnh</span>@endif
-                                            @if ($m['context'])<span class="text-xs" style="opacity:.55"> · {{ \App\Services\Agent\Ai\AiModelCatalog::contextLabel($m['context']) }} ngữ cảnh</span>@endif
-                                            <code class="text-xs" style="opacity:.5;display:block">{{ $m['id'] }}</code></span>
-                                        @if ($edit)
-                                            <button type="button" class="ags-pickbtn {{ $isPick('primary', $g['id'], $m['id']) ? 'is-on' : '' }}" wire:click="pickModel('primary', {{ $g['id'] }}, {{ \Illuminate\Support\Js::from($m['id']) }})">{{ $isPick('primary', $g['id'], $m['id']) ? '✓ Chính' : 'Chọn chính' }}</button>
-                                            <button type="button" class="ags-pickbtn {{ $isPick('fallback', $g['id'], $m['id']) ? 'is-on' : '' }}" wire:click="pickModel('fallback', {{ $g['id'] }}, {{ \Illuminate\Support\Js::from($m['id']) }})">{{ $isPick('fallback', $g['id'], $m['id']) ? '✓ Dự phòng' : 'Dự phòng' }}</button>
-                                        @elseif ($isPick('primary', $g['id'], $m['id']))<x-studio.badge tone="ok">Chính</x-studio.badge>
-                                        @elseif ($isPick('fallback', $g['id'], $m['id']))<x-studio.badge tone="muted">Dự phòng</x-studio.badge>@endif
-                                    </div>
-                                @empty<div class="text-xs" style="opacity:.6">Tài khoản chưa bật model nào.</div>@endforelse
-                            </div>
-                        @empty
-                            <div class="ags-card text-sm" data-testid="studio-model-empty">Chưa có tài khoản AI nào đang bật. <a href="{{ $s['configUrl'] }}" style="text-decoration:underline">Mở Cấu hình AI</a></div>
-                        @endforelse
                     @endif
                     @break
 
                 @case('training')
-                    @php $tsec = $s['sec']; $activeLessons = count(array_filter($s['lessons'], fn ($l) => $l->active)); @endphp
+                    @php $tsec = $s['sec']; $activeLessons = count(array_filter($s['lessons'], fn ($l) => $l->active)); $customOn = fn ($d) => $d->enabled !== false; @endphp
                     <div class="ags-ph">
-                        <div><h3>Huấn luyện <x-help title="Huấn luyện nhân sự">
-                            <p>Bài học, tài liệu và kỹ năng riêng được đưa vào prompt ở mỗi lần chạy khi đang bật (tối đa {{ number_format($s['max']) }} ký tự cho bài học và tài liệu). Áp dụng từ lần chạy kế tiếp.</p>
-                            <p>Dùng khối "Lần chạy cần dạy lại" để biến lỗi thành bài học. Công cụ, rubric và dữ liệu đọc/ghi nằm ở Chi tiết kỹ thuật.</p>
-                        </x-help></h3><div class="ags-desc">Những gì nhân sự này học và được phép đọc.</div></div>
+                        <div><h3>Huấn luyện <x-help title="Huấn luyện và Mô hình & kỹ thuật"><p>Huấn luyện: nhân sự học và làm gì. Mô hình & kỹ thuật: nhân sự chạy thế nào.</p><p>Chỉ dẫn, bài học, tài liệu và kỹ năng đi vào prompt ở mỗi lần chạy khi đang bật (tối đa {{ number_format($s['max']) }} ký tự cho bài học và tài liệu). Áp dụng từ lần chạy kế tiếp.</p></x-help></h3></div>
+                        <div class="text-xs" style="display:flex;align-items:center;gap:.5rem"><span style="opacity:.75">Đào tạo <strong data-testid="studio-percent">{{ $p['training_percent'] }}%</strong></span><div class="ags-bar" style="width:6rem"><i style="width:{{ $p['training_percent'] }}%"></i></div></div>
                     </div>
                     <div class="ags-subtabs" role="tablist" aria-label="Phần huấn luyện" data-testid="studio-train-tabs">
                         @foreach ($s['sections'] as $k => $label)
-                            @php $cnt = match ($k) { 'lessons' => $activeLessons, 'docs' => count($s['docs']), 'skills' => count($s['skills']) + count($s['custom']), 'brain' => count(array_filter($grants)) }; @endphp
+                            @php $cnt = match ($k) { 'instructions' => 0, 'lessons' => $activeLessons, 'docs' => count($s['docs']), 'skills' => count(array_filter($s['skills'], fn ($x) => $x['exists'] && $x['enabled'])) + count(array_filter($s['custom'], $customOn)), 'brain' => count(array_filter($grants)) }; @endphp
                             <button type="button" role="tab" aria-selected="{{ $tsec === $k ? 'true' : 'false' }}" class="ags-subtab" wire:click="setTrainSec('{{ $k }}')" data-sec="{{ $k }}">{{ $label }}@if ($cnt > 0)<span class="ags-subtab__n">{{ $cnt }}</span>@endif</button>
                         @endforeach
                     </div>
 
-                    @if ($tsec === 'lessons')
-                        <div class="ags-sec" style="margin-top:0">Bài học · {{ $activeLessons }} đang bật <x-help text="Quy tắc ngắn nhân sự luôn nhớ. Phần lớn đến từ lần chạy có vấn đề." /></div>
-                        @forelse ($s['lessons'] as $l)
+                    @if ($tsec === 'instructions')
+                        <div class="ags-ph" style="margin-bottom:.5rem">
+                            <div class="ags-sec" style="margin:0">Chỉ dẫn <x-help title="Chỉ dẫn">
+                                <p>Mỗi lần lưu tạo một phiên bản và áp dụng từ lần chạy kế tiếp.</p>
+                                <p>Persona và quy tắc đi vào prompt như dữ liệu của quản trị; không ghi đè quy tắc an toàn, bộ luật chất lượng hay định dạng đầu ra. Để trống một ô để quay về mặc định.</p>
+                            </x-help></div>
+                            <div class="ags-act">
+                                <button type="button" style="{{ $btn }}" wire:click="toggleHistory" data-testid="studio-history-btn">Lịch sử</button>
+                                @if ($edit)
+                                    <button type="button" style="{{ $btn }}" wire:click="undoProfile" @disabled(! $s['canUndo']) data-testid="studio-undo">Hoàn tác</button>
+                                    <button type="button" style="{{ $btnPrimary }}" wire:click="saveProfile" data-testid="studio-save">Lưu</button>
+                                @endif
+                            </div>
+                        </div>
+                        @if ($showHistory)
+                            <div class="ags-card" data-testid="studio-history">
+                                @forelse ($s['history'] as $h)
+                                    <div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.8rem;padding:.2rem 0">
+                                        <span>v{{ $h['version'] }} · {{ $h['summary'] }} <span style="opacity:.6">· {{ $h['by'] ?? 'hệ thống' }} · {{ $h['at'] ? \Illuminate\Support\Carbon::parse($h['at'])->format('d/m/Y H:i') : '' }}</span></span>
+                                        @if ($edit)<button type="button" style="{{ $btn }}" wire:click="restoreVersion({{ $h['version'] }})">Khôi phục</button>@endif
+                                    </div>
+                                @empty<span class="text-xs" style="opacity:.7">Đang dùng mặc định từ tệp vai trò.</span>@endforelse
+                            </div>
+                        @endif
+                        <fieldset @disabled(! $edit) style="border:0;padding:0;margin:0">
+                            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.6rem">
+                                <div><label>Tên hiển thị</label><input style="{{ $input }}" wire:model="fName" maxlength="80" data-testid="studio-f-name"></div>
+                                <div><label>Chức vụ</label><input style="{{ $input }}" wire:model="fTitle" maxlength="120" data-testid="studio-f-title"></div>
+                            </div>
+                            <label>Tính cách (tối đa {{ \App\Services\Agent\Roles\AgentProfiles::TRAITS_MAX }})</label>
+                            <div style="display:flex;gap:.3rem;flex-wrap:wrap;align-items:center" data-testid="studio-traits">
+                                @foreach ($fTraits as $i => $t)<span class="ags-chip ags-chip--on">{{ $t }} @if ($edit)<button type="button" wire:click="removeTrait({{ $i }})" aria-label="Bỏ {{ $t }}" title="Bỏ {{ $t }}" style="background:none;border:0;cursor:pointer;color:inherit;display:inline-flex"><x-filament::icon icon="heroicon-m-x-mark" style="width:.8rem;height:.8rem" /></button>@endif</span>@endforeach
+                                @if ($edit)
+                                    @foreach (array_diff($s['suggested'], $fTraits) as $t)<button type="button" class="ags-chip" wire:click="addTrait('{{ $t }}')"><x-filament::icon icon="heroicon-m-plus" style="width:.75rem;height:.75rem" /> {{ $t }}</button>@endforeach
+                                    <input style="{{ $input }};width:9rem" wire:model="newTrait" wire:keydown.enter.prevent="addTrait" placeholder="Tự thêm" maxlength="40" aria-label="Tự thêm tính cách">
+                                @endif
+                            </div>
+                            <label>Persona (vai trò, giọng, cách làm việc) · {{ mb_strlen($fPersona) }}/{{ \App\Services\Agent\Roles\AgentProfiles::PERSONA_MAX }}</label>
+                            <textarea style="{{ $input }}" rows="5" wire:model="fPersona" data-testid="studio-f-persona"></textarea>
+                            <label>Quy tắc (markdown ngắn) · {{ mb_strlen($fInstructions) }}/{{ \App\Services\Agent\Roles\AgentProfiles::INSTRUCTIONS_MAX }}</label>
+                            <textarea style="{{ $input }}" rows="8" wire:model="fInstructions" data-testid="studio-f-instructions"></textarea>
+                        </fieldset>
+
+                    @elseif ($tsec === 'lessons')
+                        <div class="ags-sec" style="margin-top:0">Bài học <x-help text="Quy tắc ngắn nhân sự luôn nhớ. Phần lớn đến từ lần chạy có vấn đề." /></div>
+                        @foreach ($s['lessons'] as $l)
                             <div class="ags-card" style="display:flex;justify-content:space-between;gap:.5rem;align-items:flex-start" data-testid="studio-lesson">
                                 <span style="{{ $l->active ? '' : 'opacity:.5' }}">{{ $l->text }}
                                     <span class="text-xs" style="opacity:.6;display:block">{{ $l->source === 'run' ? 'từ lần chạy'.($l->run_id ? ' #'.$l->run_id : '') : 'nhập tay' }}</span></span>
                                 @if ($edit)<span style="display:flex;gap:.3rem;flex:none"><button type="button" style="{{ $btn }}" wire:click="toggleLesson({{ $l->id }}, {{ $l->active ? 'false' : 'true' }})">{{ $l->active ? 'Tắt' : 'Bật' }}</button><button type="button" style="{{ $btn }}" wire:click="deleteLesson({{ $l->id }})" wire:confirm="Xóa bài học?">Xóa</button></span>@endif
                             </div>
-                        @empty<div class="text-xs" style="opacity:.6">Chưa có bài học.</div>@endforelse
+                        @endforeach
                         @if ($edit)
                             <div style="display:flex;gap:.4rem;margin-top:.4rem"><input style="{{ $input }}" wire:model="lessonText" wire:keydown.enter.prevent="addLesson" maxlength="500" placeholder="Ví dụ: Không dùng số liệu khi chưa có nguồn" data-testid="studio-lesson-text"><button type="button" style="{{ $btnPrimary }}" wire:click="addLesson" data-testid="studio-lesson-add">Thêm</button></div>
                         @endif
-                        <div class="ags-sec">Lần chạy cần dạy lại · {{ count($s['issues']) }} <x-help title="Phòng huấn luyện"><p>Các lần chạy gần đây có vấn đề với vai trò này. "Dạy lại" biến lỗi thành bài học: sửa câu cho đúng ý rồi lưu.</p></x-help></div>
-                        @forelse ($s['issues'] as $i)
-                            <div class="ags-card" data-testid="studio-issue">
-                                <div style="display:flex;justify-content:space-between;gap:.5rem"><strong class="text-sm">{{ $i['label'] }}</strong>
-                                    @if ($i['run_id'])<a href="{{ ($s['runUrl'])($i['run_id']) }}" class="text-xs" style="text-decoration:underline">Phiên #{{ $i['run_id'] }}</a>@endif</div>
-                                @if ($i['detail'])<div class="text-xs" style="opacity:.75;margin:.2rem 0">{{ $i['detail'] }}</div>@endif
-                                @if ($edit)
-                                    @if (isset($teach[$i['key']]))
-                                        <textarea style="{{ $input }}" rows="2" wire:model="teach.{{ $i['key'] }}" maxlength="500"></textarea>
-                                        <button type="button" style="{{ $btnPrimary }};margin-top:.3rem" wire:click="teachRow('{{ $i['key'] }}', {{ $i['run_id'] ?? 'null' }})">Lưu bài học</button>
-                                    @else
-                                        <button type="button" style="{{ $btn }}" wire:click="$set('teach.{{ $i['key'] }}', {{ \Illuminate\Support\Js::from($i['draft']) }})" data-testid="studio-teach">Dạy lại</button>
+                        @if ($s['issues'])
+                            <div class="ags-sec">Lần chạy cần dạy lại · {{ count($s['issues']) }} <x-help title="Phòng huấn luyện"><p>Các lần chạy gần đây có vấn đề với vai trò này. "Dạy lại" biến lỗi thành bài học: sửa câu cho đúng ý rồi lưu.</p></x-help></div>
+                            @foreach ($s['issues'] as $i)
+                                <div class="ags-card" data-testid="studio-issue">
+                                    <div style="display:flex;justify-content:space-between;gap:.5rem"><strong class="text-sm">{{ $i['label'] }}</strong>
+                                        @if ($i['run_id'])<a href="{{ ($s['runUrl'])($i['run_id']) }}" class="text-xs" style="text-decoration:underline">Phiên #{{ $i['run_id'] }}</a>@endif</div>
+                                    @if ($i['detail'])<div class="text-xs" style="opacity:.75;margin:.2rem 0">{{ $i['detail'] }}</div>@endif
+                                    @if ($edit)
+                                        @if (isset($teach[$i['key']]))
+                                            <textarea style="{{ $input }}" rows="2" wire:model="teach.{{ $i['key'] }}" maxlength="500"></textarea>
+                                            <button type="button" style="{{ $btnPrimary }};margin-top:.3rem" wire:click="teachRow('{{ $i['key'] }}', {{ $i['run_id'] ?? 'null' }})">Lưu bài học</button>
+                                        @else
+                                            <button type="button" style="{{ $btn }}" wire:click="$set('teach.{{ $i['key'] }}', {{ \Illuminate\Support\Js::from($i['draft']) }})" data-testid="studio-teach">Dạy lại</button>
+                                        @endif
                                     @endif
-                                @endif
-                            </div>
-                        @empty<div class="text-sm" style="opacity:.65">Chưa có lần chạy nào có vấn đề.</div>@endforelse
+                                </div>
+                            @endforeach
+                        @endif
 
                     @elseif ($tsec === 'docs')
                         <div class="ags-sec" style="margin-top:0">Tài liệu kiến thức · {{ number_format($s['chars']) }}/{{ number_format($s['max']) }} ký tự <x-help text="Văn bản tham chiếu riêng của nhân sự này (dán hoặc tải .md/.txt dưới 100 KB)." /></div>
@@ -271,63 +215,114 @@
                         @if ($edit)
                             <div class="ags-card">
                                 <input style="{{ $input }}" wire:model="docTitle" placeholder="Tên tài liệu" maxlength="160" data-testid="studio-doc-title">
-                                <textarea style="{{ $input }};margin-top:.4rem" rows="3" wire:model="docBody" placeholder="Dán văn bản (hoặc tải tệp .md/.txt dưới 100 KB)" data-testid="studio-doc-body"></textarea>
-                                <div style="display:flex;gap:.5rem;align-items:center;margin-top:.4rem"><input type="file" wire:model="docFile" accept=".md,.txt"><button type="button" style="{{ $btnPrimary }}" wire:click="addDocument" data-testid="studio-doc-add">Thêm tài liệu</button></div>
+                                <textarea style="{{ $input }};margin-top:.4rem" rows="3" wire:model="docBody" placeholder="Dán văn bản" data-testid="studio-doc-body"></textarea>
+                                <div style="margin-top:.4rem"><x-upload-zone name="studio-doc-file" model="docFile" accept=".md,.txt" hint="MD, TXT · dưới 100 KB"><button type="button" style="{{ $btnPrimary }};align-self:flex-start" wire:click="addDocument" data-testid="studio-doc-add">Thêm tài liệu</button></x-upload-zone></div>
                             </div>
-                        @elseif (count($s['docs']) === 0)
-                            <div class="text-xs" style="opacity:.6">Chưa có tài liệu riêng.</div>
                         @endif
 
                     @elseif ($tsec === 'skills')
-                        <div style="display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap;align-items:center">
-                            <div class="ags-sec" style="margin:0">Kỹ năng đã gán <x-help title="Kỹ năng"><p>Kỹ năng gán sẵn là playbook học từ claude-seo; kỹ năng tùy chỉnh là văn bản riêng của vai trò, đi vào prompt từ lần chạy kế tiếp. Tắt kỹ năng thì bước đó dùng chỉ dẫn mặc định.</p></x-help></div>
+                        <div style="display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem">
+                            <div class="ags-sec" style="margin:0">Kỹ năng <x-help title="Kỹ năng"><p>Kỹ năng mặc định là playbook học từ claude-seo: tắt được, không xóa được. Kỹ năng tự tạo là văn bản riêng của vai trò, xóa được. Cả hai đi vào prompt từ lần chạy kế tiếp; tắt thì bước đó dùng chỉ dẫn mặc định.</p></x-help></div>
                             <div class="ags-act">
-                                @if ($edit)<button type="button" style="{{ $btn }}" wire:click="mountAction('assign', {{ \Illuminate\Support\Js::from(['role' => $s['key']]) }})">Bật/tắt, ghim phiên bản</button>@endif
-                                @if ($s['skillsUrl'])<a href="{{ $s['skillsUrl'] }}" style="{{ $btn }};text-decoration:none">Mở trang Kỹ năng</a>@endif
+                                @if ($edit)
+                                    <button type="button" class="ags-btn" style="{{ $btnPrimary }}" wire:click="mountAction('createSkill', {{ \Illuminate\Support\Js::from(['role' => $s['key']]) }})" data-testid="studio-skill-add"><x-filament::icon icon="heroicon-m-plus" class="ags-ic" /> Thêm kỹ năng</button>
+                                    @if ($s['skills'])<button type="button" class="ags-btn ags-btn--line" style="background:transparent" wire:click="mountAction('assign', {{ \Illuminate\Support\Js::from(['role' => $s['key']]) }})">Ghim phiên bản</button>@endif
+                                @endif
+                                @if ($s['skillsUrl'])<a href="{{ $s['skillsUrl'] }}" class="ags-btn ags-btn--line">Trang Kỹ năng</a>@endif
                             </div>
                         </div>
-                        @forelse ($s['skills'] as $k)
-                            <div class="ags-card" style="display:flex;justify-content:space-between;gap:.5rem;align-items:center;flex-wrap:wrap">
-                                <span><code>{{ $k['ref'] }}</code> @if ($k['exists'])<x-studio.badge :tone="$k['status'] === 'active' ? 'ok' : 'muted'">v{{ $k['version'] }} · {{ $k['status'] === 'active' ? 'đang dùng' : 'bản nháp' }}</x-studio.badge> @else <x-studio.badge tone="muted">Chưa có</x-studio.badge>@endif
-                                    <x-studio.badge :tone="$k['enabled'] ? 'ok' : 'muted'">{{ $k['enabled'] ? 'bật' : 'tắt' }}</x-studio.badge>
+                        @foreach ($s['skills'] as $k)
+                            <div class="ags-card" style="display:flex;justify-content:space-between;gap:.5rem;align-items:center;flex-wrap:wrap" data-testid="studio-default-skill" data-ref="{{ $k['ref'] }}">
+                                <span style="{{ $k['enabled'] ? '' : 'opacity:.5' }}"><code>{{ $k['ref'] }}</code> @if ($k['exists'])<x-studio.badge :tone="$k['status'] === 'active' ? 'ok' : 'muted'">v{{ $k['version'] }} · {{ $k['status'] === 'active' ? 'đang dùng' : 'bản nháp' }}</x-studio.badge>@else <x-studio.badge tone="muted">Chưa có</x-studio.badge>@endif
                                     @if ($k['lineage'])<span class="text-xs" style="opacity:.6;display:block">Kế thừa {{ $k['lineage']['source'] }} ({{ $k['lineage']['license'] }})</span>@endif</span>
-                                @if ($edit && $k['exists'])<button type="button" style="{{ $btn }}" wire:click="cloneSkill('{{ $k['ref'] }}')">Nhân bản để sửa</button>@endif
+                                <span style="display:flex;gap:.5rem;align-items:center">
+                                    @if ($edit && $k['exists'])<button type="button" style="{{ $btn }}" wire:click="cloneSkill('{{ $k['ref'] }}')">Nhân bản để sửa</button>@endif
+                                    <button type="button" class="ags-sw" role="switch" aria-checked="{{ $k['enabled'] ? 'true' : 'false' }}" aria-label="Bật/tắt {{ $k['ref'] }}" title="{{ $k['enabled'] ? 'Đang bật' : 'Đang tắt' }}" @disabled(! $edit) wire:click="toggleSkill('{{ $k['ref'] }}', {{ $k['enabled'] ? 'false' : 'true' }}, '{{ $s['key'] }}')"><i></i></button>
+                                </span>
                             </div>
-                        @empty<div class="text-xs" style="opacity:.6">Chưa khai báo kỹ năng.</div>@endforelse
-                        <div class="ags-sec">Kỹ năng tùy chỉnh</div>
-                        @foreach ($s['custom'] as $d)
-                            <div class="ags-card" style="display:flex;justify-content:space-between;gap:.5rem" data-testid="studio-custom-skill"><span><strong>{{ $d->title }}</strong> <span class="text-xs" style="opacity:.6">· {{ number_format(mb_strlen($d->body)) }} ký tự</span></span>@if ($edit)<button type="button" style="{{ $btn }}" wire:click="deleteDocument({{ $d->id }})" wire:confirm="Xóa kỹ năng?">Xóa</button>@endif</div>
                         @endforeach
-                        @if ($edit)
-                            <div class="ags-card">
-                                <input style="{{ $input }}" wire:model="skillTitle" placeholder="Tên kỹ năng" maxlength="160" data-testid="studio-skill-title">
-                                <textarea style="{{ $input }};margin-top:.4rem" rows="5" wire:model="skillBody" placeholder="Nội dung kỹ năng (văn bản/markdown)" data-testid="studio-skill-body"></textarea>
-                                <button type="button" style="{{ $btnPrimary }};margin-top:.4rem" wire:click="addSkillDoc" data-testid="studio-skill-add">Thêm kỹ năng</button>
+                        @foreach ($s['custom'] as $d)
+                            <div class="ags-card" style="display:flex;justify-content:space-between;gap:.5rem;align-items:center;flex-wrap:wrap" data-testid="studio-custom-skill">
+                                <span style="min-width:0;{{ $customOn($d) ? '' : 'opacity:.5' }}"><strong>{{ $d->title }}</strong> <x-studio.badge tone="info">Tự tạo</x-studio.badge>
+                                    @if ($d->description)<span class="text-xs" style="opacity:.7;display:block">{{ $d->description }}</span>@endif</span>
+                                <span style="display:flex;gap:.4rem;align-items:center">
+                                    @if ($edit)
+                                        <button type="button" style="{{ $btn }}" wire:click="mountAction('editSkill', {{ \Illuminate\Support\Js::from(['id' => $d->id]) }})" data-testid="studio-skill-edit">Sửa</button>
+                                        <button type="button" style="{{ $btn }}" wire:click="mountAction('deleteSkill', {{ \Illuminate\Support\Js::from(['ref' => 'doc:'.$d->id]) }})" data-testid="studio-skill-delete">Xóa</button>
+                                    @endif
+                                    <button type="button" class="ags-sw" role="switch" aria-checked="{{ $customOn($d) ? 'true' : 'false' }}" aria-label="Bật/tắt {{ $d->title }}" @disabled(! $edit) wire:click="toggleSkill('doc:{{ $d->id }}', {{ $customOn($d) ? 'false' : 'true' }})"><i></i></button>
+                                </span>
                             </div>
-                        @elseif (count($s['custom']) === 0)
-                            <div class="text-xs" style="opacity:.6">Chưa có kỹ năng tùy chỉnh.</div>
-                        @endif
+                        @endforeach
 
                     @else
-                        <div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center">
-                            <div class="ags-sec" style="margin:0">Trí tuệ được đọc <x-help title="Quyền đọc Trí tuệ"><p>Chọn Trí tuệ mà vai trò này được đọc kiến thức. Quyền "Đọc và ghi" chưa có: vai trò chỉ đọc.</p><p>Với Người viết: nếu chọn ít nhất một Trí tuệ, kiến thức khi viết chỉ lấy từ lựa chọn này và các Trí tuệ đã gắn website. Không chọn gì = như cũ.</p></x-help>
-                                <span class="text-xs" style="opacity:.7;text-transform:none;letter-spacing:0;font-weight:400">{{ $s['applied'] ? 'Đang áp dụng khi chạy.' : 'Mới lưu, chưa áp dụng khi chạy.' }}</span></div>
+                        <div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center;margin-bottom:.5rem">
+                            <div class="ags-sec" style="margin:0">Trí tuệ được đọc <x-help title="Quyền đọc Trí tuệ"><p>Chọn Trí tuệ mà vai trò này được đọc kiến thức. Quyền "Đọc và ghi" chưa có: vai trò chỉ đọc.</p><p>Với Người viết: nếu chọn ít nhất một Trí tuệ, kiến thức khi viết chỉ lấy từ lựa chọn này và các Trí tuệ đã gắn website. Không chọn gì = như cũ.</p>@unless ($s['applied'])<p>Quyền này mới được lưu, chưa áp dụng khi chạy vai trò này.</p>@endunless</x-help></div>
                             @if ($edit)<button type="button" style="{{ $btnPrimary }}" wire:click="saveGrants" data-testid="studio-grants-save">Lưu quyền</button>@endif
                         </div>
-                        @forelse ($s['brains'] as $b)
+                        @foreach ($s['brains'] as $b)
                             <label class="ags-card" style="display:flex;justify-content:space-between;align-items:center;margin:0 0 .4rem;opacity:1;font-size:.85rem">
                                 <span>{{ $b['name'] }}</span>
                                 <select wire:model="grants.{{ $b['id'] }}" @disabled(! $edit) style="{{ $input }};width:7rem"><option value="">Không</option><option value="1">Đọc</option></select>
                             </label>
-                        @empty<div class="text-xs" style="opacity:.6">Chưa có Trí tuệ đang hoạt động.</div>@endforelse
+                        @endforeach
                     @endif
                     @break
 
                 @case('tech')
+                    @php
+                        $mTier = ['cheap' => 'ags-tier--cheap', 'standard' => 'ags-tier--std', 'reasoning' => 'ags-tier--rsn'];
+                        $isPick = fn ($slot, $gid, $mid) => ($s[$slot] ?? null) && $s[$slot]['provider'] === $gid && $s[$slot]['model'] === $mid;
+                        $labelOf = function ($slot) use ($s) {
+                            $x = $s[$slot] ?? null; if (! $x) return null;
+                            $g = collect($s['groups'])->firstWhere('id', $x['provider']);
+                            return ['name' => $g['name'] ?? 'Tài khoản đã xóa', 'logo' => $g['logo'] ?? 'custom', 'model' => $x['model'], 'ok' => (bool) $g];
+                        };
+                    @endphp
                     <div class="ags-ph">
-                        <div><h3>Chi tiết kỹ thuật <x-help title="Dành cho quản trị"><p>Công cụ được phép/cấm, rubric, rào chắn, tự động hóa và xuất xứ của vai trò, đọc từ tệp vai trò và mã kiểm tra.</p><p>Muốn sửa tên, giọng, quy tắc: mục Vai trò & chỉ dẫn. Muốn thêm kiến thức, bài học, kỹ năng: mục Huấn luyện.</p></x-help></h3><div class="ags-desc">Phạm vi thật của nhân sự này.</div></div>
+                        <div><h3>Mô hình & kỹ thuật <x-help title="Mô hình & kỹ thuật">
+                            <p>Mô hình & kỹ thuật: nhân sự chạy thế nào. Huấn luyện: nhân sự học và làm gì (chỉ dẫn, bài học, tài liệu, kỹ năng).</p>
+                            <p>Danh sách model gồm model đã bật ở Cấu hình AI → Tích hợp AI. Bậc đề xuất cho vai trò này: {{ $s['role']['tier_label'] }}. Model dự phòng chỉ dùng khi model chính lỗi tạm thời liên tục. Chưa chọn thì dùng định tuyến theo loại việc. Ngân sách là một con số cho cả phiên chạy.</p>
+                            @unless ($s['modelWired'])<p>Model này sẽ dùng khi luồng gọi AI cho vai trò này.</p>@endunless
+                        </x-help></h3></div>
                     </div>
-                    @include('filament.clusters.agent-team.role-detail', ['role' => $s['role'], 'skills' => $s['skills'], 'rubric' => $s['rubric'], 'skillsUrl' => $s['skillsUrl']])
+                    <div class="ags-sec" style="margin-top:0">Mô hình</div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:.5rem" data-testid="studio-model">
+                        @foreach (['primary' => 'Model chính', 'fallback' => 'Dự phòng'] as $slot => $slotLabel)
+                            @php $cur = $labelOf($slot); @endphp
+                            <div class="ags-card" data-slot="{{ $slot }}">
+                                <div class="text-xs" style="opacity:.65">{{ $slotLabel }}</div>
+                                @if ($cur)
+                                    <div style="display:flex;align-items:center;gap:.5rem;margin-top:.25rem"><x-ai.logo :brand="$cur['logo']" :size="1.7" /><span style="min-width:0"><strong class="text-sm">{{ $cur['model'] }}</strong><span class="text-xs" style="display:block;opacity:.7">{{ $cur['name'] }}{{ $cur['ok'] ? '' : ' · không dùng được' }}</span></span>
+                                        @if ($edit)<button type="button" style="{{ $btn }};margin-left:auto" wire:click="clearModel('{{ $slot }}')">Bỏ</button>@endif</div>
+                                @else
+                                    <div class="text-sm" style="opacity:.6;margin-top:.25rem">{{ $slot === 'primary' ? 'Chưa chọn, dùng định tuyến theo loại việc' : 'Không có dự phòng' }}</div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="ags-sec">Model khả dụng</div>
+                    @forelse ($s['groups'] as $g)
+                        <div class="ags-card" data-testid="studio-model-group" data-provider="{{ $g['id'] }}">
+                            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem"><x-ai.logo :brand="$g['logo']" :size="1.8" /><strong class="text-sm">{{ $g['name'] }}</strong></div>
+                            @forelse ($g['models'] as $m)
+                                <div class="ags-mrow" data-model="{{ $m['id'] }}">
+                                    <span style="min-width:0;flex:1"><span class="text-sm">{{ $m['name'] }}</span>
+                                        @if ($m['tier'])<span class="ags-tier {{ $mTier[$m['tier']] ?? '' }}">{{ $s['tierLabels'][$m['tier']] ?? $m['tier'] }}</span>@else<span class="ags-tier">tùy chỉnh</span>@endif
+                                        @if ($m['context'])<span class="text-xs" style="opacity:.55"> · {{ \App\Services\Agent\Ai\AiModelCatalog::contextLabel($m['context']) }} ngữ cảnh</span>@endif
+                                        <code class="text-xs" style="opacity:.5;display:block">{{ $m['id'] }}</code></span>
+                                    @if ($edit)
+                                        <button type="button" class="ags-pickbtn ags-btn {{ $isPick('primary', $g['id'], $m['id']) ? 'is-on' : '' }}" wire:click="pickModel('primary', {{ $g['id'] }}, {{ \Illuminate\Support\Js::from($m['id']) }})">@if ($isPick('primary', $g['id'], $m['id']))<x-filament::icon icon="heroicon-m-check" class="ags-ic" style="width:.85rem;height:.85rem" /> Chính @else Chọn chính @endif</button>
+                                        <button type="button" class="ags-pickbtn ags-btn {{ $isPick('fallback', $g['id'], $m['id']) ? 'is-on' : '' }}" wire:click="pickModel('fallback', {{ $g['id'] }}, {{ \Illuminate\Support\Js::from($m['id']) }})">@if ($isPick('fallback', $g['id'], $m['id']))<x-filament::icon icon="heroicon-m-check" class="ags-ic" style="width:.85rem;height:.85rem" /> Dự phòng @else Dự phòng @endif</button>
+                                    @elseif ($isPick('primary', $g['id'], $m['id']))<x-studio.badge tone="ok">Chính</x-studio.badge>
+                                    @elseif ($isPick('fallback', $g['id'], $m['id']))<x-studio.badge tone="muted">Dự phòng</x-studio.badge>@endif
+                                </div>
+                            @empty<div class="text-xs" style="opacity:.6">Tài khoản chưa bật model nào.</div>@endforelse
+                        </div>
+                    @empty
+                        <div class="ags-card text-sm" data-testid="studio-model-empty">Chưa có tài khoản AI nào đang bật. <a href="{{ $s['configUrl'] }}" style="text-decoration:underline">Mở Cấu hình AI</a></div>
+                    @endforelse
+                    @include('filament.clusters.agent-team.role-detail', ['role' => $s['role'], 'rubric' => $s['rubric']])
                     @break
 
                 @case('position')
@@ -336,14 +331,14 @@
                         <div><h3>Vị trí trong luồng <x-help title="Cách đọc">
                             <p>Mỗi loại việc một hàng. Luồng nhân sự này tham gia được tô nổi và xếp lên đầu; luồng không liên quan bị làm mờ cả tiêu đề. Trong luồng, bước tô xanh là bước vai trò này phụ trách, bước mờ là của vai trò khác hoặc hệ thống. Nét đứt = bước chưa chạy.</p>
                         </x-help></h3><div class="ags-desc">Tham gia {{ $joined }}/{{ count($s['positions']) }} luồng.</div></div>
-                        <div class="ags-act"><a href="{{ $s['pipelineUrl'] }}" style="{{ $btn }};text-decoration:none" data-testid="studio-open-pipeline">Mở Pipeline ↗</a></div>
+                        <div class="ags-act"><a href="{{ $s['pipelineUrl'] }}" class="ags-btn ags-btn--line" data-testid="studio-open-pipeline"><x-filament::icon icon="heroicon-o-arrow-top-right-on-square" class="ags-ic" /> Mở Pipeline</a></div>
                     </div>
                     @foreach ($s['positions'] as $j)
                         <div class="ags-card ags-pos {{ $j['mine'] ? 'ags-pos--on' : 'ags-pos--off' }}" data-testid="studio-pos-{{ $j['id'] }}" data-joined="{{ $j['mine'] ? 1 : 0 }}">
                             <div style="display:flex;justify-content:space-between;gap:.5rem;margin-bottom:.4rem"><strong class="text-sm ags-pos__t">{{ $j['title'] }}</strong><span class="text-xs" style="opacity:.75">{{ $j['mine'] ? $j['mine'].' bước' : 'không tham gia' }}{{ $j['status'] === 'planned' ? ' · chưa chạy' : '' }}</span></div>
                             <div class="ags-flow">
                                 @foreach ($j['steps'] as $st)
-                                    @if (! $loop->first)<span aria-hidden="true" style="opacity:.4">›</span>@endif
+                                    @if (! $loop->first)<x-filament::icon icon="heroicon-m-chevron-right" class="ags-ic" style="opacity:.4;width:.8rem;height:.8rem" aria-hidden="true" />@endif
                                     <span class="ags-step {{ $st['mine'] ? 'ags-step--mine' : '' }} {{ $st['planned'] ? 'ags-step--planned' : '' }}" data-mine="{{ $st['mine'] ? 1 : 0 }}">{{ $st['label'] }}</span>
                                 @endforeach
                             </div>
@@ -360,13 +355,13 @@
                     @if ($a['steps'] > 0)
                         <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;margin-bottom:.8rem" data-testid="studio-activity">
                             <div class="ags-card"><div class="text-xs" style="opacity:.7">Số bước</div><strong>{{ number_format($a['steps']) }}</strong></div>
-                            <div class="ags-card"><div class="text-xs" style="opacity:.7">Tỉ lệ ok</div><strong>{{ $a['ok_rate'] === null ? '—' : $a['ok_rate'].'%' }}</strong></div>
+                            <div class="ags-card"><div class="text-xs" style="opacity:.7">Tỉ lệ thành công</div><strong>{{ $a['ok_rate'] === null ? '—' : $a['ok_rate'].'%' }}</strong></div>
                             <div class="ags-card"><div class="text-xs" style="opacity:.7">Chi phí</div><strong>{{ number_format($a['cost_vnd']) }} ₫</strong></div>
                         </div>
                     @endif
                     @forelse ($a['runs'] as $r)
                         <div class="ags-card" style="display:flex;justify-content:space-between;gap:.5rem"><span>{{ $r['title'] }} <x-studio.badge :tone="$statusTone[$r['status']] ?? 'muted'">{{ $r['status'] }}</x-studio.badge></span><a href="{{ ($s['runUrl'])($r['id']) }}" class="text-xs" style="text-decoration:underline">Xem diễn biến</a></div>
-                    @empty<div class="text-sm" style="opacity:.65" data-testid="studio-activity">Chưa có hoạt động.</div>@endforelse
+                    @empty<div class="text-sm" style="opacity:.65" data-testid="studio-activity">Chưa có phiên nào.</div>@endforelse
                     @break
             @endswitch
             </div>

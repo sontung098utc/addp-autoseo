@@ -88,10 +88,10 @@ final class DigestQueries
         $team = self::agentStats($from, $to);
 
         return [
-            ['label' => 'Bản bài mới', 'value' => (string) $created, 'sub' => 'hôm qua', 'n' => $created],
-            ['label' => 'Đã duyệt / từ chối', 'value' => $approved.' / '.$rejected, 'sub' => 'hôm qua', 'n' => $approved + $rejected],
+            ['label' => 'Bản bài mới', 'value' => (string) $created, 'sub' => '', 'n' => $created],
+            ['label' => 'Đã duyệt / từ chối', 'value' => $approved.' / '.$rejected, 'sub' => '', 'n' => $approved + $rejected],
             ['label' => 'Đã đăng', 'value' => (string) $published, 'sub' => $upcoming.' lượt sắp đăng trong 24 giờ tới', 'n' => $published],
-            ['label' => 'Chi phí AI', 'value' => Vnd::format($cost), 'sub' => 'cộng từ các bản bài mới hôm qua', 'n' => (int) round($cost)],
+            ['label' => 'Chi phí AI', 'value' => Vnd::format($cost), 'sub' => '', 'n' => (int) round($cost)],
             ...$team,
         ];
     }
@@ -114,11 +114,11 @@ final class DigestQueries
         $cost = (float) (clone $runs)->sum('cost_vnd');
 
         return [
-            ['label' => 'Phiên chạy của đội AI', 'value' => (string) $total, 'sub' => 'hôm qua'.($failed > 0 ? ", {$failed} phiên lỗi" : '').($mock > 0 ? ", {$mock} phiên dùng AI giả lập" : ''), 'n' => $total],
+            ['label' => 'Phiên chạy của đội AI', 'value' => (string) $total, 'sub' => ltrim(($failed > 0 ? ", {$failed} phiên lỗi" : '').($mock > 0 ? ", {$mock} phiên dùng AI giả lập" : ''), ', '), 'n' => $total],
             ['label' => 'Đội AI đưa tới chờ duyệt', 'value' => (string) $ready, 'sub' => 'bản nháp đạt mọi luật bắt buộc', 'n' => $ready],
             ['label' => 'Đội AI giữ nháp', 'value' => (string) $held, 'sub' => 'còn lỗi chặn, chưa vào hàng chờ duyệt', 'n' => $held],
             ['label' => 'Tự thử lại / tự sửa', 'value' => $retries.' / '.$repairs, 'sub' => 'lần thử lại khi AI lỗi tạm thời / vòng sửa', 'n' => $retries + $repairs],
-            ['label' => 'Chi phí đội AI', 'value' => Vnd::format($cost), 'sub' => 'cộng từ các phiên chạy hôm qua', 'n' => (int) round($cost)],
+            ['label' => 'Chi phí đội AI', 'value' => Vnd::format($cost), 'sub' => '', 'n' => (int) round($cost)],
         ];
     }
 
@@ -160,7 +160,7 @@ final class DigestQueries
             $groups[] = self::group('website_issue', 'Website không hoạt động', $badSites, 'Lượt đăng vào website này sẽ báo lỗi khi tới giờ.', WebsiteResource::getUrl('index'), 'warning');
         }
         if ($queue > 0) {
-            $groups[] = self::group('review_queue', 'Bài đang chờ duyệt', $queue, 'Chưa quá hạn.', ArticleResource::getUrl('index', ['activeTab' => 'needs_review']), 'info');
+            $groups[] = self::group('review_queue', 'Bài đang chờ duyệt', $queue, '', ArticleResource::getUrl('index', ['activeTab' => 'needs_review']), 'info');
         }
 
         return $groups;

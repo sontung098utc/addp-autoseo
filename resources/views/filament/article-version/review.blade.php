@@ -59,7 +59,7 @@
                 .ss-qual-count{border:1px solid currentColor;border-radius:999px;padding:.1rem .6rem;font-size:.8rem;font-weight:600}
                 .ss-qual-count--P0{color:#b91c1c}.ss-qual-count--P1{color:#b45309}.ss-qual-count--P2{color:#475569}
                 .ss-qual-list{list-style:none;margin:0;padding:0;display:grid;gap:.6rem}
-                .ss-qual-item{border-left:3px solid currentColor;padding:.1rem 0 .1rem .6rem}
+                .ss-qual-item{border:1px solid currentColor;border-radius:.5rem;padding:.35rem .6rem;background:rgba(128,128,128,.05)}
                 .ss-qual-item--P0{color:#b91c1c}.ss-qual-item--P1{color:#b45309}.ss-qual-item--P2{color:#475569}
                 .ss-qual-item > *{color:var(--ss-text,inherit)}
                 .ss-qual-head{font-weight:600}
@@ -78,9 +78,9 @@
                 <div class="ss-qual-blocked"><strong>Còn {{ $qCounts['P0'] }} lỗi P0 — chặn duyệt.</strong> <x-help tone="warning" title="Cách xử lý"><p>Sửa bài hoặc duyệt ngoại lệ với lý do (được ghi log).</p></x-help></div>
             @endif
             <ul class="ss-qual-counts" aria-label="Số mục chưa đạt">
-                <li class="ss-qual-count ss-qual-count--P0">P0 chưa đạt: {{ $qCounts['P0'] }}</li>
-                <li class="ss-qual-count ss-qual-count--P1">P1 chưa đạt: {{ $qCounts['P1'] }}</li>
-                <li class="ss-qual-count ss-qual-count--P2">P2 chưa đạt: {{ $qCounts['P2'] }}</li>
+                @foreach (['P0', 'P1', 'P2'] as $sv)
+                    @if ($qCounts[$sv] > 0)<li class="ss-qual-count ss-qual-count--{{ $sv }}">{{ $sv }} chưa đạt: {{ $qCounts[$sv] }}</li>@endif
+                @endforeach
             </ul>
             @if ($quality->failed())
                 <ul class="ss-qual-list">
@@ -115,31 +115,37 @@
         @php($bc = \App\Services\Brand\BrandCompliance::forVersion($record))
         <section class="ss-review-card" aria-labelledby="ss-review-brand" data-testid="brand-compliance">
             <h2 class="ss-review-card__title" id="ss-review-brand">Bản sắc thương hiệu và quy tắc lĩnh vực <x-help title="Cách kiểm"><p>Kiểm bằng luật, không phán đoán văn phong: chỉ nói điều đối chiếu được với hồ sơ doanh nghiệp và Trí tuệ.</p></x-help></h2>
-            @foreach ($bc['notes'] as $n)<p style="color:#b45309;margin:.2rem 0">⚠ {{ $n }}</p>@endforeach
+            @foreach ($bc['notes'] as $n)<p style="color:#b45309;margin:.2rem 0"><x-filament::icon icon="heroicon-o-exclamation-triangle" style="width:1rem;height:1rem;display:inline;vertical-align:-.2em" /> {{ $n }}</p>@endforeach
             <dl class="ss-review-dl">
                 <dt>Hồ sơ doanh nghiệp</dt><dd>{{ $bc['brand']['profile_percent'] }}%@if ($bc['brand']['missing'] !== []) (thiếu: {{ implode(', ', $bc['brand']['missing']) }})@endif</dd>
-                <dt>Giọng đã cấu hình</dt><dd>{{ $bc['brand']['voice'] ?: '—' }}</dd>
-                <dt>Đối tượng</dt><dd>{{ $bc['brand']['audience'] ?: '—' }}</dd>
+                @if ($bc['brand']['voice'])<dt>Giọng đã cấu hình</dt><dd>{{ $bc['brand']['voice'] }}</dd>@endif
+                @if ($bc['brand']['audience'])<dt>Đối tượng</dt><dd>{{ $bc['brand']['audience'] }}</dd>@endif
+                @if ($bc['brand']['messages'])
                 <dt>Thông điệp chính</dt>
                 <dd>
-                    @forelse ($bc['brand']['messages'] as $m)
-                        <div>{{ $m['covered'] ? '✔ Có trong bài' : '○ Chưa thấy' }}: {{ $m['text'] }}</div>
-                    @empty — @endforelse
+                    @foreach ($bc['brand']['messages'] as $m)
+                        <div><x-filament::icon :icon="$m['covered'] ? 'heroicon-o-check-circle' : 'heroicon-o-minus-circle'" style="width:1rem;height:1rem;display:inline;vertical-align:-.2em" /> {{ $m['covered'] ? 'Có trong bài' : 'Chưa thấy' }}: {{ $m['text'] }}</div>
+                    @endforeach
                 </dd>
+                @endif
                 <dt>Từ cấm trong bài</dt><dd>{{ $bc['brand']['forbidden_hits'] === [] ? 'Không có' : implode(', ', $bc['brand']['forbidden_hits']) }}</dd>
+                @if ($bc['domain']['brains'])
                 <dt>Trí tuệ áp dụng</dt>
                 <dd>
-                    @forelse ($bc['domain']['brains'] as $b)
+                    @foreach ($bc['domain']['brains'] as $b)
                         <div>{{ $b['name'] }} · nguồn: {{ \App\Models\Brain::RELIANCE[$b['reliance']] ?? $b['reliance'] }} · rủi ro: {{ \App\Models\Brain::RISK[$b['risk']] ?? $b['risk'] }}</div>
-                    @empty Chưa gắn Trí tuệ nào @endforelse
+                    @endforeach
                 </dd>
+                @endif
+                @if ($bc['domain']['rules_applied'])
                 <dt>Quy tắc chuyên gia đã đưa cho AI</dt>
                 <dd>
-                    @forelse ($bc['domain']['rules_applied'] as $r)
+                    @foreach ($bc['domain']['rules_applied'] as $r)
                         <div>{{ $r['type'] === 'forbidden' ? 'Không được nói' : 'Quan niệm sai' }}: {{ $r['title'] }}</div>
-                    @empty Chưa có quy tắc nào @endforelse
+                    @endforeach
                 </dd>
-                <dt>Mục kiến thức đã đưa cho AI</dt><dd>{{ $bc['domain']['knowledge_items'] }}</dd>
+                @endif
+                @if ($bc['domain']['knowledge_items'])<dt>Mục kiến thức đã đưa cho AI</dt><dd>{{ $bc['domain']['knowledge_items'] }}</dd>@endif
             </dl>
         </section>
         <section class="ss-review-card" aria-labelledby="ss-review-seo">
@@ -169,10 +175,9 @@
         <section class="ss-review-card" aria-labelledby="ss-review-hist">
             <h2 class="ss-review-card__title" id="ss-review-hist">Duyệt &amp; lịch sử</h2>
             <dl class="ss-review-dl">
-                <dt>Trạng thái</dt><dd>{{ $statusLabel }}</dd>
-                <dt>Người duyệt</dt><dd>{{ $dash($record->reviewer?->name) }}</dd>
-                <dt>Thời điểm</dt><dd>{{ $record->reviewed_at?->format('d/m/Y H:i') ?? '—' }}</dd>
-                <dt>Ghi chú</dt><dd>{{ $dash($record->review_notes) }}</dd>
+                @if ($record->reviewer)<dt>Người duyệt</dt><dd>{{ $record->reviewer->name }}</dd>@endif
+                @if ($record->reviewed_at)<dt>Thời điểm</dt><dd>{{ $record->reviewed_at->format('d/m/Y H:i') }}</dd>@endif
+                @if (filled($record->review_notes))<dt>Ghi chú</dt><dd>{{ $record->review_notes }}</dd>@endif
             </dl>
             <h3 class="ss-review-sub">Các phiên bản của bài</h3>
             @include('filament.article-version.history')
@@ -186,7 +191,6 @@
                 <span>Từ khóa chính: {{ $dash($article?->primary_keyword) }}</span>
                 <span>Website đích: {{ $dash($article?->website?->name) }}</span>
                 <span>Phiên bản v{{ $record->version }}</span>
-                <span class="ss-review-badge ss-review-badge--{{ $statusColor }}">{{ $statusLabel }}</span>
             </p>
         </header>
 
@@ -200,11 +204,10 @@
             @include('filament.article-version.media')
         </section>
 
+        @if ($prev)
         <section class="ss-review-card" aria-labelledby="ss-review-diff">
             <h2 class="ss-review-card__title" id="ss-review-diff">Thay đổi so với bản đã duyệt gần nhất</h2>
-            @if (! $prev)
-                <p>Chưa có bản đã duyệt để so sánh.</p>
-            @else
+            @if (true)
                 <p class="ss-review-muted">So với v{{ $prev->version }} (đã duyệt).
                     <strong>Thêm {{ $nAdded }}</strong>, <strong>xóa {{ $nRemoved }}</strong>, <strong>sửa {{ $nChanged }}</strong>.</p>
                 @if ($numberChanges)
@@ -227,5 +230,6 @@
                 @endif
             @endif
         </section>
+        @endif
     </div>
 </div>

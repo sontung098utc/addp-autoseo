@@ -64,7 +64,7 @@ class ArticlesMergedScreenTest extends TestCase
         $this->assertSame(['all', 'planned', 'drafting', 'needs_review', 'rejected', 'approved', 'scheduled', 'published'], array_keys($tabs));
         $this->assertSame(4, $tabs['all']->getBadge());
         $this->assertSame(2, $tabs['needs_review']->getBadge());
-        $this->assertSame(0, $tabs['drafting']->getBadge());
+        $this->assertNull($tabs['drafting']->getBadge()); // 0 không hiện số
         $this->assertSame(1, $tabs['published']->getBadge());
 
         $t->set('activeTab', 'needs_review')->assertCanSeeTableRecords([$r1, $r2])->assertCanNotSeeTableRecords([$p, $pub]);

@@ -136,11 +136,12 @@ class RoleAssignmentTest extends TestCase
         $this->assertSame(0, AgentRoleAssignment::count());
     }
 
-    public function test_vai_tro_chua_noi_khong_gan_model_duoc(): void
+    public function test_vai_tro_chua_noi_van_gan_model_duoc(): void
     {
         $a = $this->provider();
-        $this->expectException(\InvalidArgumentException::class);
-        (new RoleAssignments)->saveModel('auditor', $a->id, 'm', null, null, true, $this->user('admin'));
+        $row = (new RoleAssignments)->saveModel('auditor', $a->id, 'm', null, null, true, $this->user('admin'));
+        $this->assertSame('m', $row->model, 'mọi vai trò đều chọn được model');
+        $this->assertNull((new RoleAssignments)->forTask('audit'), 'chưa nối luồng thì luồng chưa dùng');
     }
 
     public function test_router_uu_tien_ban_gan_theo_vai_tro_va_van_chay_khi_khong_co(): void
@@ -264,9 +265,13 @@ class RoleAssignmentTest extends TestCase
         Livewire::test(AgentRoles::class)->mountAction('assign', ['role' => 'writer'])->assertDontSee(self::KEY);
     }
 
-    public function test_vai_tro_chua_noi_hien_ghi_chu_chua_noi_vao_luong(): void
+    public function test_vai_tro_chua_noi_van_chon_model_tu_danh_sach_khong_bi_chan(): void
     {
         $this->actingAs($this->user('admin'));
-        Livewire::test(AgentRoles::class)->call('openStudio', 'auditor', 'model')->assertSee('Chưa nối vào luồng gọi AI');
+        $a = $this->provider();
+        $t = Livewire::test(AgentRoles::class)->call('openStudio', 'auditor', 'model')
+            ->assertDontSee('Chưa nối vào luồng gọi AI')->assertSee('Chọn chính')->assertSee('Model này sẽ dùng khi luồng gọi AI cho vai trò này.');
+        $t->call('pickModel', 'primary', $a->id, 'claude-sonnet-5-5');
+        $this->assertSame('claude-sonnet-5-5', AgentRoleAssignment::where('role_key', 'auditor')->value('model'));
     }
 }

@@ -5,7 +5,7 @@
         return $articleUrl($p);
     };
 @endphp
-    <x-chain-context step="Xuất bản" purpose="Lịch tuần: sắp ngày dự kiến đăng cho bài. Lượt đăng thật theo giờ, trạng thái và đối soát nằm ở tab Danh sách." :inputs="[['label'=>'Bài đã duyệt','url'=>\App\Filament\Resources\ArticleResource::getUrl('index'),'note'=>'Bài viết']]" :outputs="[['label'=>'Lịch xuất bản','url'=>\App\Filament\Resources\PublicationResource::listUrl(),'note'=>'lượt đăng thật'],['label'=>'Search Console','url'=>\App\Filament\Pages\SearchConsolePage::getUrl(),'note'=>'đo sau khi bài lên']]" />
+    <x-chain-context step="Xuất bản" purpose="Lịch tuần: sắp ngày dự kiến đăng cho bài. Lượt đăng thật theo giờ, trạng thái và đối soát nằm ở tab Danh sách." :inputs="[['label'=>'Bài đã duyệt','url'=>\App\Filament\Resources\ArticleResource::getUrl('index'),'note'=>'Bài viết']]" :outputs="[['label'=>'Lịch xuất bản','url'=>\App\Filament\Resources\PublicationResource::listUrl(),'note'=>'lượt đăng thật'],['label'=>'Search Console','url'=>\App\Filament\Pages\SearchConsolePage::getUrl(),'note'=>'đo sau khi bài lên']]" :compact="true" />
     <style>
         .ss-sched-bar{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
         .ss-sched-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.5rem}
@@ -13,7 +13,7 @@
         .ss-sched-day{border:1px solid rgba(128,128,128,.25);border-radius:.75rem;padding:.5rem;min-height:8rem}
         .ss-sched-day.is-today{border-color:rgb(var(--primary-600));box-shadow:0 0 0 2px rgba(var(--primary-600),.25)}
         .ss-sched-dayh{font-weight:600;font-size:.8rem;margin-bottom:.4rem}
-        .ss-sched-card{display:block;border-left:4px solid #9ca3af;border-radius:.4rem;padding:.3rem .45rem;margin-bottom:.35rem;font-size:.75rem;background:rgba(128,128,128,.08);text-decoration:none;color:inherit}
+        .ss-sched-card{display:block;border-left:3px solid #9ca3af;border-radius:.4rem;padding:.3rem .45rem;margin-bottom:.35rem;font-size:.75rem;background:rgba(128,128,128,.08);text-decoration:none;color:inherit}
         .ss-sched-card.ss-sched-c-success{border-color:rgb(var(--success-600))}
         .ss-sched-card.ss-sched-c-danger{border-color:rgb(var(--danger-600))}
         .ss-sched-card.ss-sched-c-warning{border-color:rgb(var(--warning-600))}
@@ -83,16 +83,6 @@
             </div>
         @endforeach
     </div>
-
-    @if ($todayQueue->count() > 0)
-    <div class="ss-sched-box" data-testid="today-queue">
-        <div class="ss-sched-h">Hàng đợi hôm nay ({{ $todayQueue->count() }})</div>
-        @foreach ($todayQueue as $p)
-            <div><a href="{{ $articleUrl($p) }}">{{ VnTime::format($p->scheduled_at_utc ? VnTime::fromRaw($p, 'scheduled_at_utc') : null, 'H:i') }} · {{ $p->articleVersion?->article?->primary_keyword ?? '—' }}</a>
-                <span class="ss-sched-muted">{{ $p->website?->name }} · {{ StatusPresenter::label($p->status, 'publication') }}</span></div>
-        @endforeach
-    </div>
-    @endif
 
     @if ($reconcile->count() > 0)
     <div class="ss-sched-box" style="border-color:rgb(var(--warning-600))" data-testid="reconcile">

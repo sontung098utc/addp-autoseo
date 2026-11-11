@@ -54,7 +54,7 @@ class PipelineChainTabTest extends TestCase
             $this->assertNotFalse($a, $j['id']);
             $sec = substr($html, $a, strpos($html, '</section>', $a) - $a);
             $this->assertStringContainsString($j['title'], $sec);
-            $this->assertStringContainsString('pv-flow__plain', $sec);
+            $this->assertStringNotContainsString('pv-flow__plain', $sec); // mô tả đã có ở thẻ, không lặp trong cửa sổ
             $this->assertStringNotContainsString('agent_runs', $sec);
         }
         $this->assertStringContainsString('open-work-site_audit', $html);

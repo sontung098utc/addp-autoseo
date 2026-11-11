@@ -12,7 +12,7 @@
         .hp-btn:hover,.hp-btn[aria-expanded=true]{opacity:1;background:rgba(128,128,128,.15)}
         .hp-btn:focus-visible{outline:2px solid currentColor;outline-offset:1px}
         .hp-btn--warning{color:#d97706;opacity:.9}
-        .hp-pop{position:absolute;top:1.6rem;z-index:60;width:min(22rem,80vw);padding:.7rem .85rem;border-radius:.6rem;font-size:.8125rem;line-height:1.5;font-weight:400;text-align:left;
+        .hp-pop{display:block;position:absolute;top:1.6rem;z-index:60;width:min(22rem,80vw);padding:.7rem .85rem;border-radius:.6rem;font-size:.8125rem;line-height:1.5;font-weight:400;text-align:left;
             background:#fff;color:#0f172a;border:1px solid rgba(128,128,128,.35);box-shadow:0 8px 24px rgba(0,0,0,.18)}
         .hp-pop--left{left:0}.hp-pop--right{right:0}
         @media (prefers-color-scheme:dark){.hp-pop{background:#1f2937;color:#e5e7eb}}
@@ -25,9 +25,9 @@
     <button type="button" class="hp-btn @if ($tone === 'warning') hp-btn--warning @endif" :aria-expanded="open" aria-haspopup="dialog" aria-label="{{ $label }}" @click.stop="open = ! open">
         <x-filament::icon :icon="$tone === 'warning' ? 'heroicon-o-exclamation-circle' : 'heroicon-o-information-circle'" style="width:1.05rem;height:1.05rem" />
     </button>
-    <div class="hp-pop hp-pop--{{ $align === 'right' ? 'right' : 'left' }}" x-show="open" x-cloak x-transition.opacity.duration.120ms role="dialog" @if ($title) aria-label="{{ $title }}" @endif>
+    <span class="hp-pop hp-pop--{{ $align === 'right' ? 'right' : 'left' }}" x-show="open" x-cloak x-transition.opacity.duration.120ms role="dialog" @if ($title) aria-label="{{ $title }}" @endif>
         @if ($title)<b class="hp-t">{{ $title }}</b>@endif
-        @if ($text !== null)<p>{{ $text }}</p>@endif
+        @if ($text !== null)<span style="display:block;margin:.25rem 0">{{ $text }}</span>@endif
         {{ $slot }}
-    </div>
+    </span>
 </span>

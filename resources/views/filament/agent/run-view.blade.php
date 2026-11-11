@@ -6,7 +6,10 @@
     $stepState = ['ok' => 'done', 'warn' => 'warn', 'blocked' => 'blocked', 'failed' => 'failed', 'skipped' => 'skipped'];
     $roles = ['system' => 'Hệ thống', 'strategist' => 'Chiến lược', 'writer' => 'Người viết', 'editor' => 'Biên tập'];
     $modeLabels = ['cautious' => 'Thận trọng', 'balanced' => 'Cân bằng'];
-    [$sLabel, $sColor] = $statusMap[$run->status] ?? [$run->status, 'gray'];
+    $badgeShort = ['running' => 'Đang chạy', 'ready_for_review' => 'Xong', 'held' => 'Giữ', 'blocked' => 'Bị chặn', 'failed' => 'Lỗi'];
+    [, $sColor] = $statusMap[$run->status] ?? [$run->status, 'gray'];
+    $sLabel = $badgeShort[$run->status] ?? $run->status;
+    if (collect($flow['nodes'])->contains('state', 'waiting')) { [$sLabel, $sColor] = ['Chờ bạn', 'warning']; }
     if ($stale) { [$sLabel, $sColor] = ['Có thể bị treo', 'warning']; }
     $tone = ['success' => 'done', 'warning' => 'warn', 'danger' => 'failed', 'info' => 'running', 'gray' => 'idle'][$sColor] ?? 'idle';
     $nodes = $flow['nodes'];
@@ -29,7 +32,7 @@
     ];
     $report = \App\Filament\Support\Agent\RunReport::for($run);
     $jobTitle = \App\Services\Agent\Pipeline\JobTypeRegistry::find((string) ($run->job_type ?: 'article_write'))['title'] ?? $run->job_type;
-    $verdictIcon = ['done' => 'heroicon-o-check-circle', 'warn' => 'heroicon-o-exclamation-triangle', 'failed' => 'heroicon-o-x-circle', 'running' => 'heroicon-o-arrow-path'][$verdict['tone']] ?? 'heroicon-o-information-circle';
+    $verdictIcon = ($verdict['tone'] ?? '') === 'failed' ? 'heroicon-o-x-circle' : 'heroicon-o-exclamation-triangle';
     $modelList = collect($nodes)->pluck('models')->flatten()->filter()->unique()->values()->all();
     $loopCount = collect($nodes)->firstWhere('code', 'repair')['count'] ?? 0;
 @endphp
@@ -39,15 +42,10 @@
         .rvx{display:flex;flex-direction:column;gap:.9rem}
         .rvx-head{display:flex;flex-wrap:wrap;gap:.5rem 1.2rem;align-items:center;justify-content:space-between}
         .rvx-id,.rvx-actions{display:flex;flex-wrap:wrap;gap:.3rem .6rem;align-items:center;font-size:.8rem}
-        .rvx-verdict{display:flex;flex-wrap:wrap;gap:.7rem 1rem;align-items:center;padding:1rem 1.2rem;border-radius:.95rem;border:1px solid var(--fl-line);border-left:6px solid var(--fl-mute);background:var(--fl-card);box-shadow:var(--fl-shadow)}
-        .rvx-verdict__ic{flex:none;width:2.8rem;height:2.8rem;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--fl-soft)}
-        .rvx-verdict__main{flex:1 1 16rem;min-width:0}
-        .rvx-verdict__main small{font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;opacity:.6}
-        .rvx-verdict p{margin:.1rem 0 0;font-size:1.05rem;font-weight:700;line-height:1.4}
-        .rvx-verdict--done{border-left-color:var(--fl-done);background:linear-gradient(90deg,rgba(5,150,105,.09),transparent 45%),var(--fl-card)}.rvx-verdict--done .rvx-verdict__ic{background:rgba(5,150,105,.16);color:var(--fl-done)}
-        .rvx-verdict--warn{border-left-color:var(--fl-warn);background:linear-gradient(90deg,rgba(217,119,6,.11),transparent 45%),var(--fl-card)}.rvx-verdict--warn .rvx-verdict__ic{background:rgba(217,119,6,.18);color:var(--fl-warn)}
-        .rvx-verdict--failed{border-left-color:var(--fl-fail);background:linear-gradient(90deg,rgba(220,38,38,.10),transparent 45%),var(--fl-card)}.rvx-verdict--failed .rvx-verdict__ic{background:rgba(220,38,38,.16);color:var(--fl-fail)}
-        .rvx-verdict--running{border-left-color:var(--fl-run);background:linear-gradient(90deg,rgba(2,132,199,.10),transparent 45%),var(--fl-card)}.rvx-verdict--running .rvx-verdict__ic{background:rgba(2,132,199,.16);color:var(--fl-run)}
+        .rv-incident{border:1px solid var(--rv-warn);border-radius:.5rem}
+        .rvx-alert{display:flex;flex-wrap:wrap;gap:.5rem .8rem;align-items:center;padding:.55rem .9rem;border-radius:.7rem;border:1px solid var(--fl-warn);background:rgba(217,119,6,.09);font-size:.88rem;font-weight:600}
+        .rvx-alert--failed{border-color:var(--fl-fail);background:rgba(220,38,38,.08)}
+        .rvx-alert span{flex:1 1 14rem}
         .rvx-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.75rem}
         @media (max-width:1100px){.rvx-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
         @media (max-width:640px){.rvx-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -65,7 +63,6 @@
         .rvx-step{border-top:1px solid var(--fl-line);padding:.55rem 0;font-size:.8rem}.rvx-step:first-of-type{border-top:0}
         .rvx-step .t{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
         .rvx-note{font-size:.75rem;opacity:.75}
-        .rvx-wait{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.4rem 0;padding:.5rem .7rem;border-radius:.6rem;background:rgba(124,58,237,.1);border:1px solid var(--fl-wait)}
         .rvx-table{width:100%;font-size:.8rem;border-collapse:collapse}.rvx-table th,.rvx-table td{padding:.35rem .5rem;border-bottom:1px solid var(--fl-line);text-align:left}.rvx-table td.n,.rvx-table th.n{text-align:right;white-space:nowrap}
         .rvx-pre{font-size:.72rem;white-space:pre-wrap;overflow-wrap:anywhere;background:rgba(128,128,128,.08);border-radius:.5rem;padding:.6rem;max-height:22rem;overflow:auto}
         .rvx details>summary{cursor:pointer;font-weight:600;font-size:.85rem}
@@ -83,36 +80,34 @@
             </div>
         @endif
 
-        {{-- Đầu trang gọn: chip trạng thái, định danh, nút chính. Kết luận và chỉ số nằm ở tab Diễn biến, phía trên lưu đồ. --}}
+        {{-- Đầu trang: huy hiệu trạng thái ngắn, #id · giờ, nút hành động. Không câu kết luận nào. --}}
         <div class="rvx-head" data-testid="run-status-bar">
             <div class="rvx-id" data-testid="run-meta">
-                <span class="rv-outcome"><x-filament::badge :color="$sColor" size="lg">{{ $sLabel }}</x-filament::badge></span>
-                <span class="rv-sub">#{{ $run->id }} · {{ $jobTitle }} · {{ $startedAt ? VnTime::format($startedAt, 'd/m/Y H:i') : '—' }}</span>
-                @if ($run->website)<span class="rv-chip">{{ $run->website->name }}</span>@endif
-                @if ($campaign)<a class="rv-chip rv-chip--link" href="{{ \App\Filament\Resources\CampaignResource::getUrl('edit', ['record' => $campaign]) }}">Chiến dịch: {{ $campaign->name }}</a>@endif
+                <span class="rv-outcome" data-testid="run-badge"><x-filament::badge :color="$sColor">{{ $sLabel }}</x-filament::badge></span>
+                <span class="rv-sub">#{{ $run->id }} · {{ $startedAt ? VnTime::format($startedAt, 'd/m/Y H:i') : '—' }}</span>
+                @if ($campaign)<a class="rv-chip rv-chip--link" href="{{ \App\Filament\Resources\CampaignResource::getUrl('view', ['record' => $campaign]) }}">{{ $campaign->name }}</a>@endif
                 <x-help title="Về phiên này">
                     <p>{{ $aiNote }}</p>
+                    @if ($run->website)<p>Website: {{ $run->website->name }}.</p>@endif
                     @if ($run->risk_level)<p>Hạng rủi ro: {{ ['low'=>'thấp','medium'=>'vừa','high'=>'cao'][$run->risk_level] ?? $run->risk_level }}.</p>@endif
                     @if ($campaign)<p>Chế độ chiến dịch: {{ $modeLabels[$campaign->mode] ?? $campaign->mode }}.</p>@endif
                     @if ($run->article?->primary_keyword)<p>Từ khóa: {{ $run->article->primary_keyword }}.</p>@endif
                 </x-help>
             </div>
-            <div class="rvx-actions">
-                @if ($verdict['action'])<x-filament::button tag="a" size="sm" color="gray" :href="$verdict['action']['url']" data-testid="run-head-action">{{ $verdict['action']['label'] }}</x-filament::button>@endif
-                <span class="rv-disabled" data-testid="rerun-unwired" role="note">Chạy lại <x-studio.hint tone="warning" text="Chưa nối: hiện chưa có luồng chạy lại một phiên cũ an toàn. Muốn viết lại, giao lại bài cho đội AI từ trang bài viết." /> <em>Chưa nối</em></span>
-            </div>
         </div>
+
+        @if ($verdict)
+            <div class="rvx-alert rvx-alert--{{ $verdict['tone'] }}" data-testid="run-alert" role="alert">
+                <x-filament::icon :icon="$verdictIcon" style="width:1.2rem;height:1.2rem;flex:none" />
+                <span>{{ $verdict['text'] }}</span>
+                @if ($verdict['action'])<x-filament::button tag="a" size="sm" :href="$verdict['action']['url']" data-testid="run-alert-action">{{ $verdict['action']['label'] }}</x-filament::button>@endif
+            </div>
+        @endif
 
         <x-studio.tabs :default="$tab" :tabs="$tabs" label="Các phần của phiên chạy">
             {{-- ===== Diễn biến ===== --}}
             <x-studio.panel key="dien-bien">
                 <div class="rvx" x-data="{ sel: @js($focus) }">
-                    <div class="rvx-verdict rvx-verdict--{{ $verdict['tone'] }}" data-testid="run-verdict">
-                        <span class="rvx-verdict__ic"><x-filament::icon :icon="$verdictIcon" style="width:1.6rem;height:1.6rem" /></span>
-                        <div class="rvx-verdict__main"><small>Kết luận</small><p>{{ $verdict['text'] }}</p></div>
-                        @if ($verdict['action'])<x-filament::button tag="a" :href="$verdict['action']['url']" data-testid="run-verdict-action">{{ $verdict['action']['label'] }}</x-filament::button>@endif
-                    </div>
-
                     <div class="rvx-kpis" data-testid="run-stats">
                         <div class="rvx-kpi rvx-kpi--{{ $tone }}" data-kpi="duration"><span class="rvx-kpi__ic"><x-filament::icon icon="heroicon-o-clock" style="width:1.3rem;height:1.3rem" /></span><b>{{ \App\Filament\Support\Agent\RunActivity::formatElapsed($flow['seconds']) }}</b><small>Thời lượng</small></div>
                         <div class="rvx-kpi rvx-kpi--{{ $flow['budgetPct'] >= 90 ? 'warn' : 'idle' }}" data-kpi="cost"><span class="rvx-kpi__ic"><x-filament::icon icon="heroicon-o-banknotes" style="width:1.3rem;height:1.3rem" /></span><b>{{ number_format($flow['cost'], 0, ',', '.') }} ₫</b><small>Chi phí · ngân sách {{ number_format($flow['budget'], 0, ',', '.') }} ₫</small></div>
@@ -156,9 +151,6 @@
                                 <span class="rvx-note">{{ $stLabel }}@if ($n['count'] > 1) ×{{ $n['count'] }}@endif · {{ $n['who']['title'] }}@if ($n['skill']) · {{ $n['skill'] }}@endif</span>
                                 @if (isset($blueprint[$n['code']]))<x-help :title="$n['title']"><p>{{ $blueprint[$n['code']]['what'] }}</p></x-help>@endif
                             </h3>
-                            @if ($n['waiting'])
-                                <div class="rvx-wait"><x-filament::icon icon="heroicon-m-user" style="width:1.1rem;height:1.1rem" /> <strong>Chờ bạn.</strong> Phiên dừng ở chặng này cho đến khi có người xác nhận.@if ($verdict['action'])<x-filament::button tag="a" size="xs" :href="$verdict['action']['url']">{{ $verdict['action']['label'] }}</x-filament::button>@endif</div>
-                            @endif
                             @foreach ($n['incidents'] as $i)
                                 <div class="rv-incident" data-testid="flow-incident">
                                     <x-filament::icon :icon="$i['kind'] === 'failover' ? 'heroicon-m-arrows-right-left' : 'heroicon-m-arrow-path'" style="width:.9rem;height:.9rem" />
@@ -250,10 +242,6 @@
                             @if ($run->outcome_reason)<div class="rv-result__reason"><span class="rv-k">Lý do kết thúc</span> {{ $run->outcome_reason }}</div>@endif
                             @if ($run->finalVersion)
                                 <div>Bản nháp v{{ $run->finalVersion->version }}: <a class="underline" href="{{ \App\Filament\Resources\ArticleVersionResource::getUrl('view', ['record' => $run->finalVersion]) }}">xem bài</a></div>
-                            @elseif ($run->job_type !== 'article_write')
-                                <div class="rv-small">Loại việc này không tạo bài.</div>
-                            @else
-                                <div class="rv-small">Phiên này không tạo bản nháp.</div>
                             @endif
                             @include('filament.agent.cms-draft-line', ['version' => $run->finalVersion])
                             @if ($run->ai_mode !== 'real')

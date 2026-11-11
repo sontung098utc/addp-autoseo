@@ -75,7 +75,7 @@ class HintSweepTest extends TestCase
         $this->login();
         $p = $this->get('/admin/doi-ai/pipeline')->assertOk()->getContent();
         $this->assertStringContainsString('data-testid="help"', $p);
-        $this->assertStringContainsString('Chạy lại / Tạm dừng pipeline: chưa nối', $p);
+        $this->assertStringNotContainsString('Chạy lại / Tạm dừng pipeline: chưa nối', $p);
         $k = $this->get('/admin/doi-ai/ky-nang')->assertOk()->getContent();
         $this->assertStringContainsString('data-testid="help"', $k);
     }

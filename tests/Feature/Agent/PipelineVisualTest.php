@@ -129,7 +129,7 @@ class PipelineVisualTest extends TestCase
         $this->makeRun('site_audit', 'ready_for_review');
         $html = $this->get('/admin/doi-ai/pipeline')->assertOk()->getContent();
         $this->assertDoesNotMatchRegularExpression('/data-testid="pipeline"[^>]*wire:poll/', $html);
-        $this->assertStringContainsString('Không có phiên nào đang chạy', $html);
+        $this->assertStringNotContainsString('Không có phiên nào đang chạy', $html);
     }
 
     public function test_pipeline_khong_con_tab_van_phong_ai_va_nhan_su_dang_lam_nam_o_the_vai_tro(): void
@@ -166,7 +166,7 @@ class PipelineVisualTest extends TestCase
     {
         $this->actingAs($this->user('approver'));
         Livewire::test(PipelineMap::class)->call('mountAction', 'step', ['job' => 'site_audit', 'step' => 'crawl'])
-            ->assertSee('Chưa có lần chạy nào')->assertSee('Chuyên viên Audit');
+            ->assertDontSee('Chưa có lần chạy nào')->assertDontSee('Số liệu 30 ngày')->assertSee('Chuyên viên Audit');
         $run = $this->makeRun('site_audit');
         $run->steps()->update(['stage' => 'crawl', 'role' => 'auditor']);
         Livewire::test(PipelineMap::class)->call('mountAction', 'step', ['job' => 'site_audit', 'step' => 'crawl'])
@@ -194,5 +194,16 @@ class PipelineVisualTest extends TestCase
 
         $this->assertCount(1, $rows, 'chỉ còn lượt xây kho do người bấm');
         $this->assertSame(1, PipelineVisual::autoPrepareCount());
+    }
+
+    public function test_trang_pipeline_khong_con_chu_vo_gia_tri(): void
+    {
+        $this->actingAs($this->user('approver'));
+        $this->makeRun('site_audit', 'ready_for_review');
+        $html = $this->get('/admin/doi-ai/pipeline')->assertOk()->getContent();
+        foreach (['Các phiên đang chạy và vừa chạy', 'Các phiên 24 giờ qua', 'lượt chuẩn bị kiến thức tự động', 'Chạy được', 'Bấm một bước ở trên để xem', 'Chưa chạy trong mã hiện tại'] as $gone) {
+            $this->assertStringNotContainsString($gone, $html, $gone);
+        }
+        $this->assertStringContainsString('aria-label="Đóng"', $html);
     }
 }

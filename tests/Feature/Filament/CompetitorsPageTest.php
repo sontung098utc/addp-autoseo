@@ -7,7 +7,10 @@ use App\Filament\Support\Competitors\CompetitorService;
 use App\Filament\Support\Competitors\CostPolicy;
 use App\Filament\Support\Competitors\KeywordGapSource;
 use App\Filament\Support\Competitors\SourceUnavailableException;
+use App\Filament\Support\Demo\CompetitorsDemoData;
+use App\Filament\Support\Demo\DemoStore;
 use App\Models\Article;
+use App\Models\Competitor;
 use App\Models\User;
 use App\Models\Website;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -103,7 +106,7 @@ class CompetitorsPageTest extends TestCase
         $this->assertSame(1000, CostPolicy::used());
         $p->assertSee('data-co-section="gaps"', false);
         $this->assertNotNull(CompetitorService::snapshot($this->site));
-        $this->assertCount(1, \App\Filament\Support\Demo\DemoStore::get('competitors.log'));
+        $this->assertCount(1, DemoStore::get('competitors.log'));
     }
 
     public function test_over_quota_blocks_refresh(): void
@@ -125,9 +128,15 @@ class CompetitorsPageTest extends TestCase
 
         app()->instance(KeywordGapSource::class, new class implements KeywordGapSource
         {
-            public function estimateRows(int $n): int { return $n * 1000; }
+            public function estimateRows(int $n): int
+            {
+                return $n * 1000;
+            }
 
-            public function fetch(array $domains): array { throw new SourceUnavailableException('429 hết hạn mức'); }
+            public function fetch(array $domains): array
+            {
+                throw new SourceUnavailableException('429 hết hạn mức');
+            }
         });
         $p->call('doRefresh')->assertSee('Không lấy được dữ liệu')->assertSee('Dữ liệu cũ')->assertDontSee('data-co-section="gaps"', false);
         $this->assertSame($before, CompetitorService::snapshot($this->site));
@@ -179,7 +188,7 @@ class CompetitorsPageTest extends TestCase
     public function test_existing_article_marked_not_suggested(): void
     {
         $this->actingAs($this->user('approver'));
-        $kw = \App\Filament\Support\Demo\CompetitorsDemoData::keywordPool()[0]['keyword'];
+        $kw = CompetitorsDemoData::keywordPool()[0]['keyword'];
         $art = Article::create(['website_id' => $this->site->id, 'created_by' => $this->user('writer')->id, 'primary_keyword' => '  '.mb_strtoupper($kw).' ', 'workflow_status' => 'published']);
         $p = $this->loaded();
         $row = collect($p->instance()->gaps())->first(fn ($g) => $g['norm'] === $kw);
@@ -214,7 +223,7 @@ class CompetitorsPageTest extends TestCase
             ->assertDontSee('tuyensinhhub.example')->assertDontSee('Dữ liệu minh họa —')
             ->set('newDomain', 'a.vn')->call('addCompetitor');
         $this->assertSame([], CompetitorService::domains($this->site));
-        $this->assertSame(['a.vn'], \App\Models\Competitor::pluck('domain')->all());
+        $this->assertSame(['a.vn'], Competitor::pluck('domain')->all());
     }
 
     /** Chưa có đối thủ: chỉ một trạng thái trống với MỘT nút hành động (Thêm), không nhãn đỏ, không thẻ KPI rỗng. */
@@ -239,7 +248,7 @@ class CompetitorsPageTest extends TestCase
         $p = $this->loaded();
         $html = $p->html();
         $this->assertStringContainsString('ss-kpi__l">Khoảng trống còn mở', $html);
-        $this->assertStringContainsString('ss-kpi__l">Đối thủ theo dõi', $html);
+        $this->assertStringNotContainsString('ss-kpi__l">Đối thủ theo dõi', $html); // trùng số ở nhãn tab
         $this->assertStringNotContainsString('Thêm vào kế hoạch (0)', $html);
         $open = collect($p->instance()->gaps())->first(fn ($g) => $g['existing'] === null);
         $this->assertStringContainsString('Thêm vào kế hoạch (1)', $p->set('selected', [$open['norm']])->html());
@@ -258,7 +267,7 @@ class CompetitorsPageTest extends TestCase
     {
         $this->actingAs($this->user('approver'));
         $this->app['env'] = 'production';
-        \App\Models\Competitor::create(['website_id' => $this->site->id, 'domain' => 'a.vn']);
+        Competitor::create(['website_id' => $this->site->id, 'domain' => 'a.vn']);
         $html = Livewire::test(CompetitorsPage::class)->html();
         $this->assertStringContainsString("studioTabs('competitors'", $html);
         $this->assertStringNotContainsString('data-key="gaps"', $html, 'Tab Khoảng trống ẩn khi chưa có dữ liệu');

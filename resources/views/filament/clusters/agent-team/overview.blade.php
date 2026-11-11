@@ -14,26 +14,24 @@
                 @elseif (! $ai['connected'])
                     <span style="font-weight:600;color:#d97706">Chưa kết nối AI</span>
                 @else
-                    <span style="font-weight:600">Đang nghỉ</span> <x-help text="Nhịp kế tiếp trong vòng 15 phút. Mỗi nhịp, chiến dịch đang chạy chọn bài kế tiếp và tạo một phiên chạy cho bài đó." />
+                    <span style="font-weight:600">Đang nghỉ</span>
                 @endif
             </div>
             <div class="text-sm" data-testid="today" style="display:flex;gap:1.25rem;flex-wrap:wrap">
-                <span><strong>{{ $today['runs'] }}</strong> bài đã giao hôm nay <x-help text="Chiến dịch giao bài, mỗi bài là một phiên chạy. Chiến dịch không phải chuỗi phiên." /></span>
-                <span><strong>{{ $today['toReview'] }}</strong> đã tới chờ duyệt</span>
-                <span>Chi phí <strong>{{ $fmt($today['cost']) }} ₫</strong>@if ($today['cap'] > 0) <span style="opacity:.6">/ {{ $fmt($today['cap']) }} ₫</span>@endif</span>
+                @if ($today['runs'] > 0)<span><strong>{{ $today['runs'] }}</strong> bài đã giao hôm nay</span>@endif
+                @if ($today['toReview'] > 0)<span><strong>{{ $today['toReview'] }}</strong> chờ duyệt</span>@endif
+                @if ($today['cost'] > 0)<span>Chi phí <strong>{{ $fmt($today['cost']) }} ₫</strong>@if ($today['cap'] > 0) <span style="opacity:.6">/ {{ $fmt($today['cap']) }} ₫</span>@endif</span>@endif
             </div>
         </div>
 
         {{-- 2. Cần bạn: chỉ hiện khi có việc, xếp theo mức nghiêm trọng --}}
         <div data-testid="attention">
-            @forelse ($attention as $a)
-                <a href="{{ $a['url'] }}" style="display:flex;justify-content:space-between;align-items:center;gap:1rem;text-decoration:none;color:inherit;border-left:4px solid {{ $tone[$a['tone']][0] }};background:{{ $tone[$a['tone']][1] }};border-radius:.4rem;padding:.6rem .9rem;margin-bottom:.4rem">
+            @foreach ($attention as $a)
+                <a href="{{ $a['url'] }}" style="display:flex;justify-content:space-between;align-items:center;gap:1rem;text-decoration:none;color:inherit;border:1px solid {{ $tone[$a['tone']][0] }};background:{{ $tone[$a['tone']][1] }};border-radius:.6rem;padding:.6rem .9rem;margin-bottom:.4rem">
                     <span style="font-weight:600;font-size:.9rem">{{ $a['text'] }}</span>
-                    <span style="color:{{ $tone[$a['tone']][0] }};font-weight:600;font-size:.82rem;white-space:nowrap">{{ $a['action'] }} →</span>
+                    <span style="color:{{ $tone[$a['tone']][0] }};font-weight:600;font-size:.82rem;white-space:nowrap">{{ $a['action'] }} <x-filament::icon icon="heroicon-m-arrow-right" style="width:.95rem;height:.95rem;display:inline;vertical-align:-.15em" /></span>
                 </a>
-            @empty
-                <div class="text-sm" style="opacity:.65;padding:.2rem .2rem">Không có việc nào cần bạn lúc này.</div>
-            @endforelse
+            @endforeach
         </div>
 
         {{-- 3. Đang chạy: mỗi phiên một dòng (chi tiết luồng xem trong từng phiên) --}}
@@ -57,13 +55,12 @@
         {{-- 4. Cài đặt: gập sẵn; chỉ là gợi ý, không chiếm chỗ --}}
         @if ($stepsLeft > 0)
             <x-filament::section :heading="'Hoàn tất cài đặt: còn '.$stepsLeft.' bước'" collapsible collapsed compact>
-                <x-slot name="headerEnd"><x-help text="Bước chưa có dữ liệu thật được ghi là chưa làm, không tính là xong." /></x-slot>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(10.5rem,1fr));gap:.6rem">
                     @foreach ($steps as $s)
                         <{{ $s['url'] ? 'a' : 'div' }} @if ($s['url']) href="{{ $s['url'] }}" @endif data-step="{{ $s['n'] }}" data-state="{{ $s['state'] }}" style="border:1px solid rgba(128,128,128,.35);border-radius:.6rem;padding:.6rem;text-decoration:none;color:inherit;{{ $s['state'] === 'todo' ? 'border-color:#d97706;' : '' }}">
                             <div style="font-size:.7rem;opacity:.6">Bước {{ $s['n'] }}</div>
                             <div style="font-weight:600;font-size:.88rem">{{ $s['title'] }}
-                                @if ($s['state'] === 'done')<span style="color:#16a34a">✓</span>@elseif ($s['state'] === 'todo')<span style="color:#d97706">●</span>@endif
+                                @if ($s['state'] === 'done')<x-filament::icon icon="heroicon-m-check" style="width:1rem;height:1rem;color:#16a34a;display:inline;vertical-align:-.15em" aria-label="Xong" />@elseif ($s['state'] === 'todo')<span style="color:#d97706" aria-label="Chưa làm">●</span>@endif
                             </div>
                             <div style="font-size:.72rem;opacity:.8;margin-top:.2rem">{{ $s['note'] }}</div>
                         </{{ $s['url'] ? 'a' : 'div' }}>

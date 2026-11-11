@@ -79,7 +79,7 @@ class AgentStudioPageTest extends TestCase
         $this->assertCount(1, $issues);
         $this->assertStringContainsString('Thiếu nguồn', $issues[0]['draft']);
 
-        Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'training')->assertSee('Dạy lại')
+        Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'training')->call('setTrainSec', 'lessons')->assertSee('Dạy lại')
             ->set('teach', [$issues[0]['key'] => 'Luôn kèm nguồn cho số liệu.'])
             ->call('teachRow', $issues[0]['key'], $run->id);
         $l = AgentProfiles::lessons('writer');
@@ -93,10 +93,11 @@ class AgentStudioPageTest extends TestCase
         $this->login('admin');
         Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'training')->call('setTrainSec', 'skills')
             ->call('cloneSkill', 'writer/article-draft')
-            ->assertNotSet('skillBody', '')
-            ->set('skillTitle', 'Bản riêng')
-            ->call('addSkillDoc');
+            ->assertActionMounted('createSkill')
+            ->callMountedAction()
+            ->assertHasNoActionErrors();
         $this->assertCount(1, AgentProfiles::documents('writer', 'skill'));
+        $this->assertStringStartsWith('Bản riêng:', AgentProfiles::documents('writer', 'skill')[0]->title);
         $this->assertNotNull(AgentProfiles::promptBlock('writer'));
     }
 

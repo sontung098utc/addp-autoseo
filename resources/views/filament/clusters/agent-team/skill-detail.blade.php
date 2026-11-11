@@ -11,17 +11,13 @@
         <div class="text-xs">
             @if ($pb->status === 'draft')<x-studio.badge tone="warn">Nháp, chưa qua bộ mẫu</x-studio.badge>
             @else<x-studio.badge :tone="$pb->status === 'active' ? 'ok' : 'muted'">{{ $pb->status === 'active' ? 'Đang dùng' : 'Đã nghỉ' }}</x-studio.badge>@endif
-            Chỉ xem. Sửa kỹ năng = sửa file <code>{{ str_replace(base_path().'/', '', $pb->path) }}</code> và mở PR. Chạy thử: chưa nối, cần bộ mẫu AG-K09 với model thật.
+            Kỹ năng mặc định không sửa trực tiếp ở đây; muốn đổi, hãy tạo kỹ năng riêng.
         </div>
 
-        {!! $sec('Đã được phiên nào dùng chưa') !!}
-        <div class="text-xs" data-testid="skill-usage">
-            @if ($usage)Đã dùng trong {{ $usage['count'] }} bước của các phiên chạy; lần gần nhất {{ $usage['last']?->format('d/m/Y H:i') ?? 'không rõ' }}.
-            @else Chưa được phiên nào dùng. @endif
+        <div class="text-xs" data-testid="skill-usage" style="margin-top:.6rem">
+            {{ $usage ? 'Đã dùng trong '.$usage['count'].' bước; lần gần nhất '.($usage['last']?->format('d/m/Y H:i') ?? 'không rõ').'.' : 'Chưa được phiên nào dùng.' }}
+            @if ($s['roles'])Vai trò: {{ implode(', ', array_column($s['roles'], 'name')) }}.@endif
         </div>
-
-        {!! $sec('Vai trò dùng kỹ năng') !!}
-        <div class="text-xs">{{ $s['roles'] ? implode(', ', array_column($s['roles'], 'name')) : 'Chưa vai trò nào khai báo dùng kỹ năng này.' }}</div>
 
         {!! $sec('Xuất xứ') !!}
         <table class="text-xs" style="width:100%"><tbody data-testid="skill-lineage">
@@ -35,7 +31,7 @@
 
         {!! $sec('Luật chất lượng liên quan (rubric_refs)') !!}
         @if ($rubric === [])
-            <div class="text-xs" style="opacity:.7">Kỹ năng này không gắn luật nào.</div>
+            <div class="text-xs" style="opacity:.7">Không gắn luật nào.</div>
         @else
             <table class="text-xs" style="width:100%;border-collapse:collapse" data-testid="skill-rubric"><tbody>
             @foreach ($rubric as $r)

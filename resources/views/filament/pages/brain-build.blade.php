@@ -13,8 +13,7 @@
     </style>
     <div class="ss-page">
         <div class="bb-row" style="margin-bottom:.6rem" data-testid="bb-intro">
-            <a href="{{ \App\Filament\Pages\BrainLibraryPage::getUrl() }}" wire:navigate class="ss-text-sm">← Về thư viện Trí tuệ</a>
-            <span class="ss-muted ss-text-sm">Trí tuệ doanh nghiệp: chọn website → Khởi tạo nhanh → đọc trang → khám phá nguồn → hồ sơ doanh nghiệp → xem mục tự nhận (hoàn tác được) → duyệt.</span>
+            <a href="{{ \App\Filament\Pages\BrainLibraryPage::getUrl() }}" wire:navigate class="ss-text-sm"><x-filament::icon icon="heroicon-o-arrow-left" style="width:.9rem;height:.9rem;display:inline;vertical-align:-.15em" /> Về thư viện Trí tuệ</a>
             <x-help title="Luồng tạo Trí tuệ doanh nghiệp"><p>Làm lần lượt từ trên xuống trên cùng một trang, không cần chuyển tab. Khởi tạo nhanh chạy cả chuỗi bằng một nút; hoặc làm từng bước. Xong, kiến thức tự nhận và hồ sơ doanh nghiệp nằm trong Trí tuệ Thương hiệu của website, mục chờ duyệt hiện ở hộp duyệt của Trí tuệ đó.</p></x-help>
         </div>
         <div class="bb-row" style="margin-bottom:0">
@@ -137,7 +136,7 @@
         <div class="ss-card" style="margin-top:1rem" x-data="{ open: {{ ($pendingCount + count($suggestions) + $autoItems->count()) > 0 ? 'true' : 'false' }} }" id="can-xem" data-testid="bb-todo"><div class="ss-card__b">
             <button type="button" class="kh-h" @click="open = ! open" :aria-expanded="open">Việc cần bạn xem<x-filament::icon icon="heroicon-o-chevron-down" class="kh-chev" style="width:1.1rem;height:1.1rem" /></button>
             <div x-show="open" x-cloak>
-            <p data-testid="bb-pending"><a href="{{ $reviewUrl }}" wire:navigate>{{ $pendingCount }} mục chờ duyệt</a> trong Kho trí tuệ.</p>
+            @if ($pendingCount > 0)<p data-testid="bb-pending"><a href="{{ $reviewUrl }}" wire:navigate>{{ $pendingCount }} mục chờ duyệt</a> trong Kho trí tuệ.</p>@endif
         @if ($suggestions !== [])
         <div class="kh-sub" data-testid="bb-suggest">
             <div class="kh-sub__h">Gợi ý cho kho từ các bài gần đây

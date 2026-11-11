@@ -3,44 +3,20 @@
     $sec = fn (string $t) => '<div class="text-sm" style="font-weight:600;margin:.9rem 0 .3rem">'.e($t).'</div>';
 @endphp
 <div data-testid="role-detail" class="space-y-2 text-sm">
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:1rem">
         <x-studio.chip domain="readiness" :value="$role['readiness']" />
         <span class="text-xs" style="opacity:.75">{{ $role['readiness_note'] }}</span>
     </div>
-
-    {!! $sec('Mục tiêu') !!}
-    <div>{{ $role['goal'] }}</div>
 
     {!! $sec('Công cụ') !!}
     <div class="text-xs"><strong>Được phép:</strong> {{ implode(' · ', $role['tools_allowed']) }}</div>
     <div class="text-xs"><strong>Không được:</strong> {{ implode(' · ', $role['tools_denied']) }}</div>
 
-    {!! $sec('Bậc model & cổng người') !!}
-    <div class="text-xs">Bậc model mục tiêu: <strong>{{ $role['tier_label'] }}</strong> (khai báo thiết kế; model thật chọn ở mục Mô hình, tài khoản ở Cấu hình AI → Tích hợp AI) · Cổng người: {{ $role['human_gate'] }}</div>
-
-    {!! $sec('Kỹ năng (playbook)') !!}
-    <div data-testid="role-skills" class="space-y-1">
-        @foreach ($skills as $s)
-            <div class="text-xs" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-                <code>{{ $s['ref'] }}</code>
-                @if ($s['exists'])
-                    <x-studio.badge :tone="$s['status'] === 'active' ? 'ok' : 'muted'">v{{ $s['version'] }} · {{ $s['status'] === 'active' ? 'đang dùng' : ($s['status'] === 'draft' ? 'bản nháp' : $s['status']) }}</x-studio.badge>
-                    <span style="opacity:.7">{{ $s['title'] }}</span>
-                @elseif ($s['error'])
-                    <x-studio.badge tone="danger">Lỗi</x-studio.badge> <span>{{ $s['error'] }}</span>
-                @else
-                    <x-studio.badge tone="muted">Chưa có</x-studio.badge>
-                @endif
-            </div>
-        @endforeach
-        <div class="text-xs" style="opacity:.7">
-            @if ($skillsUrl)<a href="{{ $skillsUrl }}" style="text-decoration:underline">Mở tab Kỹ năng</a>@else Tab Kỹ năng chưa có (đang phát triển). @endif
-        </div>
-    </div>
+    <div class="text-xs" style="margin-top:.6rem">Bậc model đề xuất: <strong>{{ $role['tier_label'] }}</strong> · Cổng người: {{ $role['human_gate'] }}</div>
 
     {!! $sec('Rubric: các luật và ngưỡng') !!}
     @if ($rubric === [])
-        <div class="text-xs" style="opacity:.7">Vai trò này chưa gắn luật chất lượng nào.</div>
+        <div class="text-xs" style="opacity:.7">Chưa gắn luật chất lượng nào.</div>
     @else
         <div style="overflow-x:auto"><table class="text-xs" style="width:100%;border-collapse:collapse" data-testid="role-rubric">
             <thead><tr style="text-align:left;opacity:.7"><th>Luật</th><th>Mức</th><th>Ngưỡng</th><th>Nguồn / lý do</th><th>Xác minh</th></tr></thead>
@@ -56,7 +32,7 @@
             @endforeach
             </tbody>
         </table></div>
-        <div class="text-xs" style="opacity:.65">Rà soát lần cuối {{ $rubric[0]['reviewed_at'] }}. Ngưỡng đọc trực tiếp từ mã của bộ kiểm tra; "Mức" là các mức lỗi mà luật có thể trả.</div>
+        <div class="text-xs" style="opacity:.65">Rà soát lần cuối {{ $rubric[0]['reviewed_at'] }}.</div>
     @endif
 
     {!! $sec('Rào chắn (không bao giờ làm)') !!}
@@ -71,7 +47,5 @@
     </tbody></table>
 
     {!! $sec('Xuất xứ') !!}
-    <div class="text-xs">Học từ <strong>{{ implode(', ', $role['origin']) }}</strong> (giấy phép MIT).
-        @foreach ($skills as $s)@if ($s['lineage'])<div style="margin-top:.25rem"><code>{{ $s['ref'] }}</code>: {{ $s['lineage']['source'] }} v{{ $s['lineage']['source_version'] }} · {{ $s['lineage']['license'] }}. Đã chỉnh: {{ $s['lineage']['adaptations'] }}</div>@endif @endforeach
-    </div>
+    <div class="text-xs">Học từ <strong>{{ implode(', ', $role['origin']) }}</strong> (giấy phép MIT).</div>
 </div>

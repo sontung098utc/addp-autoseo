@@ -60,7 +60,7 @@ class AgentRolesTest extends TestCase
         $this->assertSame('claude-seo/seo-content', $editor['editor/qa-review']['lineage']['source']);
 
         $this->actingAs($this->user('admin'));
-        Livewire::test(AgentRoles::class)->call('openStudio', 'manager', 'tech')->assertSee('manager/seo-orchestrator');
+        Livewire::test(AgentRoles::class)->call('openStudio', 'manager', 'training')->call('setTrainSec', 'skills')->assertSee('manager/seo-orchestrator');
     }
 
     public function test_rubric_refs_deu_la_ma_luat_that(): void
@@ -126,8 +126,9 @@ class AgentRolesTest extends TestCase
         $this->actingAs($this->user('approver'));
         $this->get('/admin/doi-ai/vai-tro')->assertOk()->assertSee('Chuyên viên Audit')->assertSee('Biên tập / QA nội dung')->assertDontSee('Đang hoạt động');
         Livewire::test(AgentRoles::class)->call('openStudio', 'editor', 'tech')
-            ->assertSee('Đang phát triển')->assertSee('Mục tiêu')->assertSee('Rubric')->assertSee('LEN01')->assertSee('Rào chắn')->assertSee('Điều kiện đạt')->assertSee('Xuất xứ')
-            ->assertSee('editor/eeat-check');
+            ->assertSee('Đang phát triển')->assertSee('Rubric')->assertSee('LEN01')->assertSee('Rào chắn')->assertSee('Điều kiện đạt')->assertSee('Xuất xứ')
+            ->assertSeeHtml('data-testid="studio-model"')
+            ->call('setStudioTab', 'training', 'skills')->assertSee('editor/eeat-check');
     }
 
     public function test_bien_tap_vien_bi_chan(): void
@@ -182,15 +183,16 @@ class AgentRolesTest extends TestCase
         $this->assertStringNotContainsString('data-status="working"', $e[0]);
     }
 
-    public function test_tong_quan_nhan_su_co_checklist_va_so_that(): void
+    public function test_tong_quan_nhan_su_gon_va_so_that(): void
     {
         $this->actingAs($this->user('admin'));
         $t = Livewire::test(AgentRoles::class)->call('openStudio', 'writer');
-        $t->assertSee('Đã sẵn sàng chưa')->assertSee('Có model')->assertSee('Có quy tắc')->assertSee('Có kỹ năng')->assertSee('Có bài học')
-            ->assertSee('Chưa có phiên nào trong 7 ngày qua.')->assertSeeHtml('data-testid="help"');
+        $t->assertSee('Đang rảnh')->assertSeeHtml('data-testid="studio-model-line"')->assertSee('Chọn model')
+            ->assertDontSee('Đã sẵn sàng chưa')->assertDontSee('Có bài học')->assertDontSee('Chưa có phiên nào trong 7 ngày qua.')->assertDontSee('Chi tiết kỹ thuật')
+            ->assertDontSeeHtml('data-testid="studio-week"');
         $w = Website::create(['name' => 'Site A', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
         $run = AgentRun::create(['website_id' => $w->id, 'job_type' => 'article_write', 'status' => 'ready_for_review', 'trigger' => 'manual', 'ai_mode' => 'real', 'started_at' => now()]);
         AgentRunStep::create(['agent_run_id' => $run->id, 'seq' => 1, 'stage' => 'write', 'role' => 'writer', 'status' => 'ok', 'title' => 'Viết', 'cost_vnd' => 1234]);
-        Livewire::test(AgentRoles::class)->call('openStudio', 'writer')->assertSeeHtml('data-testid="studio-week"')->assertSee('1.234 ₫')->assertSee('100%');
+        Livewire::test(AgentRoles::class)->call('openStudio', 'writer')->assertSeeHtml('data-testid="studio-week"')->assertSee('1.234 ₫')->assertSee('100%')->assertSee('Tỉ lệ thành công');
     }
 }

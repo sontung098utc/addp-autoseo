@@ -40,7 +40,7 @@ class ListArticles extends ListRecords
         $tabs = ['all' => Tab::make('Tất cả')->badge((int) $counts->sum())];
         foreach (ArticleResource::TAB_STATUSES as $status) {
             $tabs[$status] = Tab::make(ArticleResource::TAB_LABELS[$status])
-                ->badge((int) ($counts[$status] ?? 0))
+                ->badge(((int) ($counts[$status] ?? 0)) ?: null)
                 ->badgeColor($status === 'needs_review' ? 'warning' : 'gray')
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('articles.workflow_status', $status));
         }

@@ -18,12 +18,11 @@
     .ss-tabs-wrap .ss-tab:focus-visible { outline: 2px solid var(--ss-focus); outline-offset: -2px; }
     .ss-tabs-wrap .ss-tab__icon { width: 1.1rem; height: 1.1rem; flex: none; }
     .ss-tabs-wrap .ss-tabs-scroller::before, .ss-tabs-wrap .ss-tabs-scroller::after { border-radius: 0; }
-    .ss-tabs-wrap [class*=ss-tabs__arrow] { bottom: 0; padding: 0; }
+    .ss-tabs-wrap .ss-tabs-scroller .ss-tabs { overflow-y: hidden; }
 </style>
 @endonce
 <div class="ss-tabs-wrap" x-data="studioTabs(@js($default), @js($persist))" data-tabs="{{ $uid }}">
     <div class="ss-tabs-scroller" x-bind:class="{ 'has-start': canStart, 'has-end': canEnd }">
-    <button type="button" class="ss-tabs__arrow ss-tabs__arrow--start" tabindex="-1" aria-hidden="true" x-on:click="nudge(-1)" x-cloak>‹</button>
     <div class="ss-tabs" role="tablist" aria-label="{{ $label }}" x-ref="strip" x-on:keydown="onKey($event)" x-on:scroll.passive="measure()">
         @foreach ($tabs as $t)
             @php $k = (string) $t['key']; @endphp
@@ -41,7 +40,6 @@
             </button>
         @endforeach
     </div>
-    <button type="button" class="ss-tabs__arrow ss-tabs__arrow--end" tabindex="-1" aria-hidden="true" x-on:click="nudge(1)" x-cloak>›</button>
     </div>
     <div class="ss-tabpanels" data-uid="{{ $uid }}">{{ $slot }}</div>
 </div>

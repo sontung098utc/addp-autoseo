@@ -36,7 +36,7 @@ return [
     ],
     'orchestrator_steps' => [],
     'readiness' => 'idea',
-    'readiness_note' => 'Hiện chưa có bộ điều phối: thứ tự các bước do mã cố định (AgentRunOrchestrator) quyết định, không phải vai trò này.',
+    'readiness_note' => 'Hiện chưa có bộ điều phối: thứ tự các bước do hệ thống cố định, không phải vai trò này quyết định.',
     'origin' => [
         'claude-seo/seo',
     ],

@@ -27,6 +27,7 @@
             <x-help title="Cấu hình AI">
                 <p><strong>Tác vụ nào chưa có khóa tài khoản sẽ không chạy.</strong> Hệ thống không tự dùng Mock thay thế.</p>
                 <p>Mọi bài do AI viết đều dừng ở bản nháp chờ duyệt. Khóa API lưu mã hóa, chỉ ghi, không hiện lại (chỉ thấy vài ký tự cuối).</p>
+                <p>"Tháng này" chỉ tính các phiên chạy qua định tuyến có ghi tài khoản; phiên cũ không quy được cho tài khoản nào.</p>
                 <p>Trang này chỉ cấu hình kết nối và model dùng được. Việc chọn model cho từng nhân sự nằm ở Đội AI → Vai trò → hồ sơ → Mô hình.</p>
                 @unless ($isAdmin)<p>Chỉ quản trị viên được thêm, sửa hoặc đổi khóa.</p>@endunless
             </x-help>
@@ -56,7 +57,7 @@
 
     @if ($providers->isEmpty())
         <x-filament::section>
-            <p class="text-sm" style="opacity:.75" data-testid="no-accounts">Chưa có tài khoản AI nào. @if ($isAdmin) Bấm "Thêm tài khoản" và chọn nhà cung cấp để bắt đầu. @endif</p>
+            <p class="text-sm" style="opacity:.75" data-testid="no-accounts">Chưa có tài khoản AI nào.</p>
         </x-filament::section>
     @else
         <div class="cfg-grid">
@@ -74,7 +75,7 @@
                         </div>
                     </div>
                     @if ($p->last_test_ok === false && $p->last_test_message)<div class="cfg-sub" style="color:#dc2626">{{ \Illuminate\Support\Str::limit($p->last_test_message, 140) }}</div>@endif
-                    <div class="cfg-row"><span class="cfg-sub">Khóa API</span><span class="cfg-key" data-testid="key-mask">@if ($p->hasKey())•••• đã lưu{{ $p->keyTail() ? ' …'.$p->keyTail() : '' }}@else <span style="opacity:.7">Chưa có khóa</span>@endif</span></div>
+                    @if ($p->hasKey())<div class="cfg-row"><span class="cfg-sub">Khóa API</span><span class="cfg-key" data-testid="key-mask">@if ($p->hasKey())•••• đã lưu{{ $p->keyTail() ? ' …'.$p->keyTail() : '' }}@else <span style="opacity:.7">Chưa có khóa</span>@endif</span></div>@endif
                     <div>
                         <div class="cfg-sub" style="margin-bottom:.25rem">Model đã bật ({{ count($p->enabled_models) }})</div>
                         <div class="cfg-models" data-testid="account-models">
@@ -84,7 +85,7 @@
                         </div>
                     </div>
                     <div class="cfg-row">
-                        <span class="cfg-sub">Tháng này: {{ $money($p->used_month) }}{{ $p->monthly_budget_vnd ? ' / '.$money($p->monthly_budget_vnd) : '' }}@if ($p->monthly_budget_vnd && $p->used_month >= $p->monthly_budget_vnd) <x-filament::badge color="danger">Vượt ngân sách</x-filament::badge>@endif</span>
+                        @if ($p->used_month > 0 || $p->monthly_budget_vnd)<span class="cfg-sub">Tháng này: {{ $money($p->used_month) }}{{ $p->monthly_budget_vnd ? ' / '.$money($p->monthly_budget_vnd) : '' }}@if ($p->monthly_budget_vnd && $p->used_month >= $p->monthly_budget_vnd) <x-filament::badge color="danger">Vượt ngân sách</x-filament::badge>@endif</span>@endif
                         @if ($p->staff_count > 0)<span class="cfg-sub">{{ $p->staff_count }} nhân sự đang dùng</span>@endif
                     </div>
                     @if ($isAdmin)
@@ -95,6 +96,5 @@
                 </article>
             @endforeach
         </div>
-        <p class="text-xs" style="opacity:.65">"Tháng này" chỉ tính các phiên chạy qua định tuyến có ghi tài khoản; phiên cũ không quy được cho tài khoản nào.</p>
     @endif
 </div>

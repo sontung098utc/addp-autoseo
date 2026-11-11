@@ -245,8 +245,9 @@ class AgentTeamHubTest extends TestCase
         AgentSetting::create(['provider' => 'gemini', 'api_key' => 'AIza-test-1234', 'model' => 'm']);
         $this->actingAs($this->user('approver'));
 
-        $html = $this->get('/admin/doi-ai/tong-quan')->assertOk()->assertSee('Không có việc nào cần bạn lúc này')->assertSee('Đang nghỉ')->getContent();
+        $html = $this->get('/admin/doi-ai/tong-quan')->assertOk()->assertDontSee('Không có việc nào cần bạn lúc này')->assertDontSee('chờ duyệt')->assertDontSee('bài đã giao hôm nay')->assertSee('Đang nghỉ')->getContent();
         $this->assertStringNotContainsString('data-live-run', $html);
+        $this->assertStringNotContainsString('Nhịp kế tiếp trong vòng 15 phút', $html);
         $this->assertStringNotContainsString('Đường đi của một bài', $html, 'đường đi của bài chỉ ở cửa sổ phụ');
         $this->assertStringNotContainsString('data-stage=', $html, 'không còn lưới chặng gộp mọi phiên');
     }

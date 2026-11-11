@@ -10,9 +10,10 @@
         .dark .kb-menu__p{background:rgb(var(--gray-800))}
         .kb-menu__p button{text-align:left;padding:.3rem .5rem;border-radius:.3rem}
         .kb-menu__p button:hover{background:rgba(128,128,128,.2)}
-        .kb-ai{border-left:3px solid rgb(var(--info-500,59 130 246))}
+        .kb-ai{border:1px solid rgb(var(--info-500,59 130 246));border-radius:.5rem;background:rgba(59,130,246,.06)}
         .kb-act{display:flex;gap:.3rem;align-items:center;justify-content:flex-end}
     </style>
+    <script>if (location.hash === '#tab-add') { location.hash = '#tab-sources'; }</script>
     @php
         $statusTone = ['proposed' => 'warn', 'approved' => 'ok', 'outdated' => 'muted', 'rejected' => 'danger'];
         $scope = fn ($i) => $i->website?->name ?? ($i->website_id ? 'Website #'.$i->website_id : 'Chung');
@@ -20,10 +21,9 @@
         $tabs = $manage ? [
             ['key' => 'inbox', 'label' => 'Hộp duyệt', 'count' => $inbox->count() ?: null, 'tone' => $inbox->count() ? 'warn' : null],
             ['key' => 'all', 'label' => 'Tất cả'],
-            ['key' => 'sources', 'label' => 'Nguồn', 'count' => $sources->count() ?: null],
+            ['key' => 'sources', 'label' => 'Tài liệu', 'count' => $sources->count() ?: null],
             ['key' => 'warn', 'label' => 'Cảnh báo', 'count' => $warnCount ?: null, 'tone' => $warnCount ? 'danger' : null],
             ['key' => 'gaps', 'label' => 'Khoảng trống', 'count' => $gaps->where('status', 'open')->count() ?: null, 'tone' => $gaps->where('status', 'open')->count() ? 'warn' : null],
-            ['key' => 'add', 'label' => 'Thêm kiến thức'],
         ] : [['key' => 'all', 'label' => 'Kiến thức đã duyệt']];
         if ($brain) { // AG-B1: trang một Trí tuệ — thêm tab Hồ sơ lĩnh vực (đầu) và Cài đặt (cuối); 'Tất cả' đổi tên thành 'Hiểu biết'
             $tabs = array_map(fn ($t) => $t['key'] === 'all' ? ['key' => 'all', 'label' => 'Hiểu biết'] : $t, $tabs);
@@ -52,7 +52,7 @@
                     @if ($manage && ! $editing)
                         <x-filament::button size="sm" wire:click="startEdit">Sửa</x-filament::button>
                     @endif
-                    <x-filament::button size="sm" color="gray" wire:click="closeItem">Đóng</x-filament::button>
+                    <x-close-x wire:click="closeItem" />
                 </div>
                 @if ($editing)
                     <div class="kb-grid">
@@ -139,7 +139,7 @@
             @if ($manage)
             <x-studio.panel key="inbox">
                 @if ($inbox->isEmpty())
-                    <div class="ss-alert ss-alert--info" role="status">Hộp duyệt trống. Dán tài liệu hoặc thêm kiến thức ở tab "Thêm kiến thức".</div>
+                    <div class="ss-alert ss-alert--info" role="status">Không có mục nào chờ duyệt.</div>
                 @else
                     <div class="kb-bar">
                         <span class="ss-muted ss-text-sm">{{ $inbox->count() }} mục chờ duyệt</span>
@@ -232,8 +232,54 @@
 
             @if ($manage)
             <x-studio.panel key="sources">
+              <div x-data="{ adding: false }" x-on:kb-add.window="adding = true">
+                <div class="kb-bar" style="margin-bottom:.6rem">
+                    <x-filament::button size="sm" icon="heroicon-o-plus" x-on:click="adding = ! adding" x-bind:aria-expanded="adding">Thêm kiến thức</x-filament::button>
+                    <x-studio.hint text="Thêm tài liệu hoặc mục → Tài liệu → Tách thành mục → Hộp duyệt → mục đã duyệt vào Hiểu biết, nơi AI lấy kiến thức." />
+                </div>
+                <div x-show="adding" x-cloak style="margin-bottom:1rem">
+                    <div style="display:flex;justify-content:flex-end"><x-close-x x-on:click="adding = false" /></div>
+                <div class="ss-split">
+                    <div class="ss-card"><div class="ss-card__b">
+                        <div class="ss-card__h">Dán tài liệu <x-studio.hint text="Hệ thống lưu nguồn rồi tách theo đoạn trống và dòng tiêu đề thành các mục 'Đề xuất' (quy tắc cố định, không dùng AI). Bạn duyệt từng mục sau." /></div>
+                        <div class="kb-bar">
+                            <input class="kb-in" wire:model="paste.title" placeholder="Tên tài liệu" aria-label="Tên tài liệu" maxlength="200">
+                            <select class="kb-in" wire:model="paste.website_id" aria-label="Website áp dụng"><option value="">Chung (mọi website)</option>@foreach ($sites as $s)<option value="{{ $s->id }}">{{ $s->name }}</option>@endforeach</select>
+                        </div>
+                        <textarea class="kb-in" style="width:100%" rows="9" wire:model="paste.text" placeholder="Dán văn bản: bảng giá, chính sách, quy trình, FAQ…" aria-label="Nội dung tài liệu"></textarea>
+                        <div class="kb-bar" style="margin-top:.5rem">
+                            <label><input type="checkbox" wire:model="paste.split"> Tách thành mục ngay</label>
+                            <x-filament::button wire:click="pasteDoc">Lưu nguồn</x-filament::button>
+                        </div>
+                    </div></div>
+                    <div class="ss-card"><div class="ss-card__b">
+                        <div class="ss-card__h">Thêm 1 mục kiến thức</div>
+                        <div class="kb-grid">
+                            <label>Tiêu đề<input class="kb-in" style="width:100%" wire:model="new.title" maxlength="200"></label>
+                            <label>Loại <x-studio.hint text="Quan niệm sai: tiêu đề là điều hay bị hiểu sai, nội dung là bản đúng (kèm nguồn). Không được nói: điều AI tuyệt đối không được viết; nhập cụm từ cần chặn ở ô Giá trị nếu muốn hệ thống chặn tự động. Hai loại này áp cho mọi bài của Trí tuệ, không dùng như sự thật để trích."/><select class="kb-in" style="width:100%" wire:model="new.type">@foreach ($types as $k => $l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></label>
+                            <label>Website<select class="kb-in" style="width:100%" wire:model="new.website_id"><option value="">Chung</option>@foreach ($sites as $s)<option value="{{ $s->id }}">{{ $s->name }}</option>@endforeach</select></label>
+                            <label>Chủ đề<select class="kb-in" style="width:100%" wire:model="new.topic_id"><option value="">—</option>@foreach ($topics as $t)<option value="{{ $t->id }}">{{ $t->fullName() }}</option>@endforeach</select></label>
+                            <label>Thực thể <x-studio.hint text="Tùy chọn. Ví dụ 'Gói Cơ bản' + trường 'giá' + giá trị '8000000' giúp máy phát hiện mâu thuẫn." /><input class="kb-in" style="width:100%" wire:model="new.entity"></label>
+                            <label>Trường<input class="kb-in" style="width:100%" wire:model="new.field"></label>
+                            <label>Giá trị <x-studio.hint text="Với loại Không được nói: các cụm từ cần chặn, cách nhau bằng dấu | (mỗi cụm tối thiểu 3 ký tự). Bài chứa cụm này sẽ bị chặn."/><input class="kb-in" style="width:100%" wire:model="new.value"></label>
+                            <label>Đơn vị<input class="kb-in" style="width:100%" wire:model="new.value_unit"></label>
+                            <label>Thẻ<input class="kb-in" style="width:100%" wire:model="new.tags" placeholder="giá, học phí"></label>
+                            <label>Hiệu lực đến<input type="date" class="kb-in" style="width:100%" wire:model="new.valid_until"></label>
+                        </div>
+                        <label style="display:block;margin-top:.5rem">Nội dung<textarea class="kb-in" style="width:100%" rows="4" wire:model="new.body"></textarea></label>
+                        <div class="kb-bar" style="margin-top:.5rem"><x-filament::button wire:click="addItem">Thêm vào Hộp duyệt</x-filament::button></div>
+                        <hr style="margin:.75rem 0;opacity:.3">
+                        <div class="kb-bar">
+                            <input class="kb-in" wire:model="topicName" placeholder="Chủ đề mới" aria-label="Tên chủ đề mới" maxlength="120">
+                            <select class="kb-in" wire:model="topicParent" aria-label="Chủ đề cha"><option value="">Cấp 1</option>@foreach ($topics->whereNull('parent_id') as $t)<option value="{{ $t->id }}">Con của: {{ $t->name }}</option>@endforeach</select>
+                            <x-filament::button size="sm" color="gray" wire:click="addTopic">Thêm chủ đề</x-filament::button>
+                            <x-studio.hint text="Chủ đề có tối đa 2 cấp." />
+                        </div>
+                    </div></div>
+                </div>
+                </div>
                 @if ($sources->isEmpty())
-                    <div class="ss-alert ss-alert--info" role="status">Chưa có nguồn. Dán tài liệu ở tab "Thêm kiến thức".</div>
+                    <p class="ss-muted ss-text-sm" role="status">Chưa có tài liệu.</p>
                 @else
                     <div class="ss-dt__scroll"><table class="ss-dt__table">
                         <thead><tr><th>Nguồn</th><th style="width:1%;white-space:nowrap">Phạm vi</th><th style="width:1%;white-space:nowrap">Số mục</th><th style="width:1%;white-space:nowrap">Thao tác</th></tr></thead>
@@ -275,6 +321,7 @@
                         </tbody>
                     </table></div>
                 @endif
+              </div>
             </x-studio.panel>
 
             <x-studio.panel key="warn">
@@ -315,7 +362,7 @@
 
             <x-studio.panel key="gaps">
                 @if ($gaps->isEmpty())
-                    <div class="ss-alert ss-alert--ok" role="status">Chưa có khoảng trống: Người viết tìm thấy kiến thức đã duyệt cho các bài đã chạy.</div>
+                    <div class="ss-alert ss-alert--ok" role="status">Chưa có khoảng trống.</div>
                 @else
                     <div class="kb-bar">
                         <span class="ss-muted ss-text-sm">{{ $gaps->where('status', 'open')->count() }} chỗ còn thiếu</span>
@@ -340,7 +387,7 @@
                                 </td>
                                 <td style="width:1%;white-space:nowrap"><div class="kb-act">
                                     @if ($g->status !== 'filled')
-                                        <x-filament::button size="xs" wire:click="prefillFromGap({{ $g->id }})" x-on:click="set('add')">Thêm kiến thức</x-filament::button>
+                                        <x-filament::button size="xs" wire:click="prefillFromGap({{ $g->id }})" x-on:click="set('sources'); $dispatch('kb-add')">Thêm kiến thức</x-filament::button>
                                     @endif
                                 </div></td>
                             </tr>
@@ -350,46 +397,6 @@
                 @endif
             </x-studio.panel>
 
-            <x-studio.panel key="add">
-                <div class="ss-split">
-                    <div class="ss-card"><div class="ss-card__b">
-                        <div class="ss-card__h">Dán tài liệu <x-studio.hint text="Hệ thống lưu nguồn rồi tách theo đoạn trống và dòng tiêu đề thành các mục 'Đề xuất' (quy tắc cố định, không dùng AI). Bạn duyệt từng mục sau." /></div>
-                        <div class="kb-bar">
-                            <input class="kb-in" wire:model="paste.title" placeholder="Tên tài liệu" aria-label="Tên tài liệu" maxlength="200">
-                            <select class="kb-in" wire:model="paste.website_id" aria-label="Website áp dụng"><option value="">Chung (mọi website)</option>@foreach ($sites as $s)<option value="{{ $s->id }}">{{ $s->name }}</option>@endforeach</select>
-                        </div>
-                        <textarea class="kb-in" style="width:100%" rows="9" wire:model="paste.text" placeholder="Dán văn bản: bảng giá, chính sách, quy trình, FAQ…" aria-label="Nội dung tài liệu"></textarea>
-                        <div class="kb-bar" style="margin-top:.5rem">
-                            <label><input type="checkbox" wire:model="paste.split"> Tách thành mục ngay</label>
-                            <x-filament::button wire:click="pasteDoc">Lưu nguồn</x-filament::button>
-                        </div>
-                    </div></div>
-                    <div class="ss-card"><div class="ss-card__b">
-                        <div class="ss-card__h">Thêm 1 mục kiến thức</div>
-                        <div class="kb-grid">
-                            <label>Tiêu đề<input class="kb-in" style="width:100%" wire:model="new.title" maxlength="200"></label>
-                            <label>Loại <x-studio.hint text="Quan niệm sai: tiêu đề là điều hay bị hiểu sai, nội dung là bản đúng (kèm nguồn). Không được nói: điều AI tuyệt đối không được viết; nhập cụm từ cần chặn ở ô Giá trị nếu muốn hệ thống chặn tự động. Hai loại này áp cho mọi bài của Trí tuệ, không dùng như sự thật để trích."/><select class="kb-in" style="width:100%" wire:model="new.type">@foreach ($types as $k => $l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></label>
-                            <label>Website<select class="kb-in" style="width:100%" wire:model="new.website_id"><option value="">Chung</option>@foreach ($sites as $s)<option value="{{ $s->id }}">{{ $s->name }}</option>@endforeach</select></label>
-                            <label>Chủ đề<select class="kb-in" style="width:100%" wire:model="new.topic_id"><option value="">—</option>@foreach ($topics as $t)<option value="{{ $t->id }}">{{ $t->fullName() }}</option>@endforeach</select></label>
-                            <label>Thực thể <x-studio.hint text="Tùy chọn. Ví dụ 'Gói Cơ bản' + trường 'giá' + giá trị '8000000' giúp máy phát hiện mâu thuẫn." /><input class="kb-in" style="width:100%" wire:model="new.entity"></label>
-                            <label>Trường<input class="kb-in" style="width:100%" wire:model="new.field"></label>
-                            <label>Giá trị <x-studio.hint text="Với loại Không được nói: các cụm từ cần chặn, cách nhau bằng dấu | (mỗi cụm tối thiểu 3 ký tự). Bài chứa cụm này sẽ bị chặn."/><input class="kb-in" style="width:100%" wire:model="new.value"></label>
-                            <label>Đơn vị<input class="kb-in" style="width:100%" wire:model="new.value_unit"></label>
-                            <label>Thẻ<input class="kb-in" style="width:100%" wire:model="new.tags" placeholder="giá, học phí"></label>
-                            <label>Hiệu lực đến<input type="date" class="kb-in" style="width:100%" wire:model="new.valid_until"></label>
-                        </div>
-                        <label style="display:block;margin-top:.5rem">Nội dung<textarea class="kb-in" style="width:100%" rows="4" wire:model="new.body"></textarea></label>
-                        <div class="kb-bar" style="margin-top:.5rem"><x-filament::button wire:click="addItem">Thêm vào Hộp duyệt</x-filament::button></div>
-                        <hr style="margin:.75rem 0;opacity:.3">
-                        <div class="kb-bar">
-                            <input class="kb-in" wire:model="topicName" placeholder="Chủ đề mới" aria-label="Tên chủ đề mới" maxlength="120">
-                            <select class="kb-in" wire:model="topicParent" aria-label="Chủ đề cha"><option value="">Cấp 1</option>@foreach ($topics->whereNull('parent_id') as $t)<option value="{{ $t->id }}">Con của: {{ $t->name }}</option>@endforeach</select>
-                            <x-filament::button size="sm" color="gray" wire:click="addTopic">Thêm chủ đề</x-filament::button>
-                            <x-studio.hint text="Chủ đề có tối đa 2 cấp." />
-                        </div>
-                    </div></div>
-                </div>
-            </x-studio.panel>
             @endif
         </x-studio.tabs>
     </div>

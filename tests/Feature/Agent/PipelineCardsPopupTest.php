@@ -92,7 +92,8 @@ class PipelineCardsPopupTest extends TestCase
         $this->assertStringContainsString('data-week="3"', $card);
         $this->assertStringContainsString('pc__pulse', $card);
         $this->assertStringNotContainsString('pc__pulse', $this->card($html, 'measure'));
-        $this->assertStringContainsString('Chưa có dữ liệu xong/lỗi', $this->card($html, 'measure'));
+        $this->assertStringNotContainsString('Chưa có dữ liệu xong/lỗi', $this->card($html, 'measure'));
+        $this->assertStringNotContainsString('0</b> đang chạy', $this->card($html, 'measure'));
     }
 
     public function test_the_co_chip_can_thiep_khi_luong_co_diem_dung_cua_nguoi(): void
@@ -115,7 +116,7 @@ class PipelineCardsPopupTest extends TestCase
             }
             $this->assertStringContainsString('Đầu vào của cả luồng', $p);
             $this->assertStringContainsString('Kết quả của cả luồng', $p);
-            $this->assertStringContainsString('Phiên gần đây của luồng này', $p);
+            $this->assertStringNotContainsString('Chưa có phiên nào của luồng này', $p);
             $this->assertStringContainsString('data-testid="runs-of-'.$j['id'].'"', $p);
             $this->assertStringContainsString('role="dialog"', $html);
         }

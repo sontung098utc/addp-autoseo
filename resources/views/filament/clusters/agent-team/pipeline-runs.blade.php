@@ -1,6 +1,4 @@
 <div data-testid="pipeline-runs">
-    <div class="text-xs" style="opacity:.75;margin-bottom:.5rem">Các phiên đang chạy và vừa chạy <x-help title="Điều khiển pipeline"><p>Chạy lại / Tạm dừng pipeline: chưa nối. Cần job nền và API pipeline (AG-B10), nên chưa có nút.</p></x-help></div>
-    @if (! $live && $runs !== [])<div class="text-xs" style="opacity:.7;margin-bottom:.5rem">Không có phiên nào đang chạy. Các phiên 24 giờ qua:</div>@endif
     @forelse ($runs as $r)
         <div class="pv-run" data-run="{{ $r['run']->id }}" data-live="{{ $r['live'] ? 1 : 0 }}">
             <div style="flex:1 1 14rem">
@@ -18,8 +16,6 @@
             </div>
         </div>
     @empty
-        <div class="text-sm" style="opacity:.65" data-testid="pipeline-runs-empty">Chưa có phiên nào trong 24 giờ qua.</div>
+        <div class="text-sm" data-testid="pipeline-runs-empty"><a class="underline" href="{{ \App\Filament\Resources\AgentRunResource::getUrl('index') }}">Xem tất cả phiên chạy</a></div>
     @endforelse
-    @php($auto = \App\Services\Agent\Pipeline\PipelineVisual::autoPrepareCount())
-    @if ($auto > 0)<div class="text-xs" style="opacity:.7;margin-top:.5rem" data-testid="pipeline-auto-prepare">Đã ẩn {{ $auto }} lượt chuẩn bị kiến thức tự động <x-help text="Đội AI tự đọc website trước khi viết bài. Xem ở tab Phiên chạy." /></div>@endif
 </div>

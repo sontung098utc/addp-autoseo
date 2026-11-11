@@ -117,9 +117,9 @@ class AiConfigTabTest extends TestCase
         $this->login();
         $this->assertFalse(method_exists(AgentRoles::class, 'detailAction'));
         $t = Livewire::test(AgentRoles::class)->call('openStudio', 'editor', 'overview');
-        $t->assertSee('Chi tiết kỹ thuật')->assertDontSee("mountAction('detail'", false);
+        $t->assertDontSee('Chi tiết kỹ thuật')->assertDontSeeHtml('studio-open-tech')->assertDontSee("mountAction('detail'", false);
         $t->call('setStudioTab', 'tech')->assertSee('data-testid="role-detail"', false)->assertSee('Rubric')->assertSee('LEN01');
-        $this->assertSame(['overview', 'persona', 'model', 'training', 'position', 'activity', 'tech'], array_keys(AgentRoles::STUDIO_TABS));
+        $this->assertSame(['overview', 'training', 'tech', 'position', 'activity'], array_keys(AgentRoles::STUDIO_TABS));
     }
 
     public function test_icon_co_dinh_khong_con_chon_avatar(): void
@@ -149,8 +149,8 @@ class AiConfigTabTest extends TestCase
     {
         $this->login();
         $t = Livewire::test(AgentRoles::class)->call('openStudio', 'strategist', 'training');
-        $t->assertSee('studio-train-tabs', false)->assertSee('Bài học')->assertSee('Tài liệu')->assertSee('Kỹ năng')->assertSee('Trí tuệ')->assertSee('Lần chạy cần dạy lại');
-        foreach (['knowledge', 'brain', 'skills', 'lab', 'connect'] as $old) {
+        $t->assertSee('studio-train-tabs', false)->assertSee('Bài học')->assertSee('Tài liệu')->assertSee('Kỹ năng')->assertSee('Trí tuệ')->assertSee('Chỉ dẫn')->assertDontSee('Lần chạy cần dạy lại');
+        foreach (['knowledge', 'brain', 'skills', 'lab', 'connect', 'persona', 'model'] as $old) {
             $this->assertArrayNotHasKey($old, AgentRoles::STUDIO_TABS);
         }
         $html = $t->call('setStudioTab', 'position')->html();

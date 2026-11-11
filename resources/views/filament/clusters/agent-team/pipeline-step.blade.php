@@ -7,12 +7,8 @@
     </div>
     <div><strong>Ai làm:</strong> {{ $s['profile']['name'] }}, {{ $s['profile']['title'] }}</div>
     <div><strong>Khi nào bỏ qua / điều kiện:</strong> {{ $s['when'] ?: 'Luôn chạy.' }}</div>
-    <div><strong>Số liệu 30 ngày:</strong>
-        @if ($stats)
-            {{ $stats['runs'] }} lần chạy · {{ $stats['ok'] }} đạt, {{ $stats['warn'] }} cảnh báo, {{ $stats['failed'] }} lỗi · chi phí trung bình {{ number_format($stats['avg_cost'], 0, ',', '.') }} ₫
-        @else
-            Chưa có lần chạy nào.
-        @endif
-    </div>
+    @if ($stats)
+        <div><strong>Số liệu 30 ngày:</strong> {{ $stats['runs'] }} lần chạy · {{ $stats['ok'] }} đạt, {{ $stats['warn'] }} cảnh báo, {{ $stats['failed'] }} lỗi · chi phí trung bình {{ number_format($stats['avg_cost'], 0, ',', '.') }} ₫</div>
+    @endif
 </div>
 @endif

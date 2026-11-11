@@ -36,10 +36,9 @@ class StudioUiKitTest extends TestCase
 
         $this->assertStringContainsString('ss-tabs-scroller', $html);
         $this->assertStringContainsString('x-ref="strip"', $html);
-        // Mũi tên chỉ là phụ trợ chuột/chạm: ẩn khỏi trình đọc màn hình, không vào thứ tự Tab (bàn phím dùng ←/→/Home/End).
-        $this->assertSame(2, substr_count($html, 'ss-tabs__arrow '));
-        $this->assertSame(2, substr_count($html, 'aria-hidden="true" x-on:click="nudge('));
-        $this->assertSame(2, substr_count($html, 'tabindex="-1" aria-hidden'));
+        // Chủ dự án yêu cầu bỏ mũi tên ở đuôi hàng tab: tab tràn thì vuốt/cuộn ngang, bàn phím dùng ←/→/Home/End.
+        $this->assertStringNotContainsString('ss-tabs__arrow', $html);
+        $this->assertStringNotContainsString('nudge(', $html);
 
         $js = (string) file_get_contents(public_path('js/studio-ui.js'));
         foreach (['reveal(', 'measure()', 'prefers-reduced-motion'] as $needle) {

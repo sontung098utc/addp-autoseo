@@ -32,9 +32,7 @@ class Dashboard extends BaseDashboard
 
     public function getSubheading(): ?string
     {
-        $user = auth()->user();
-
-        return $user ? 'Tổng quan · '.$user->name : null;
+        return null;
     }
 
     public function getColumns(): int|string|array

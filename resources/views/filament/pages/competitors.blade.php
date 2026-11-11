@@ -7,7 +7,7 @@
     $showGaps = $ready && $state === 'ket-noi' && ! $refreshError && count($domains) > 0 && $fetchedLabel;
 @endphp
 <x-filament-panels::page>
-    <x-chain-context step="Khám phá" purpose="Tìm khoảng trống nội dung so với đối thủ." :inputs="[['label'=>'Từ khóa đối thủ','url'=>null,'note'=>'nhập CSV']]" :outputs="[['label'=>'Kho từ khóa (trang Từ khóa)','url'=>\App\Filament\Pages\KeywordsPage::getUrl(),'note'=>'từ khóa đối thủ có mà mình chưa có'],['label'=>'Kế hoạch nội dung','url'=>\App\Filament\Pages\ContentPlanPage::getUrl()]]" />
+    <x-chain-context step="Khám phá" purpose="Tìm khoảng trống nội dung so với đối thủ." :inputs="[['label'=>'Từ khóa đối thủ','url'=>null,'note'=>'nhập CSV']]" :outputs="[['label'=>'Kho từ khóa (trang Từ khóa)','url'=>\App\Filament\Pages\KeywordsPage::getUrl(),'note'=>'từ khóa đối thủ có mà mình chưa có'],['label'=>'Kế hoạch nội dung','url'=>\App\Filament\Pages\ContentPlanPage::getUrl()]]" :compact="true" />
     @php
         $multiSite = count($websites) > 1;
         $hasDomains = count($domains) > 0;
@@ -62,9 +62,7 @@
 
             @if ($showGaps)
                 <div class="ss-kpis">
-                    <div class="ss-kpi"><div class="ss-kpi__l">Đối thủ theo dõi</div><div class="ss-kpi__v">{{ count($domains) }}</div></div>
                     <div class="ss-kpi"><div class="ss-kpi__l">Khoảng trống còn mở</div><div class="ss-kpi__v">{{ $openCount }}</div><div class="ss-kpi__d ss-muted">{{ $totalGaps - $openCount }} đã có trong kế hoạch</div></div>
-                    <div class="ss-kpi"><div class="ss-kpi__l">Chi phí làm mới ước tính</div><div class="ss-kpi__v">~{{ $nf($estimate['cost_vnd']) }} ₫</div></div>
                 </div>
             @endif
 
@@ -99,7 +97,6 @@
                 @if ($showGaps)
                 <x-studio.panel key="gaps">
                     <div data-co-section="gaps">
-                        <div class="ss-text-xs ss-muted" style="margin-bottom:.5rem">Dữ liệu lúc {{ $fetchedLabel }}@if($staleDays) ({{ $staleDays }} ngày trước)@endif</div>
                         <x-studio.data-table id="co-gaps" :columns="$gapColumns" :rows="$gapRows" :selectable="$canWrite" select-model="selected" :selected="$selected" :page-size="25" search="Tìm từ khóa" empty="Chưa có khoảng trống" />
                     </div>
                 </x-studio.panel>
@@ -137,7 +134,6 @@
                             <div>Lần làm mới gần nhất: <strong>{{ $fetchedLabel ?? 'Chưa làm mới lần nào' }}</strong>@if($staleDays) ({{ $staleDays }} ngày trước)@endif</div>
                             <div>Chi phí ước tính lần này: <strong>~{{ $nf($estimate['cost_vnd']) }} ₫</strong></div>
                             <div>Hạn mức tháng: <strong>{{ $nf($used) }} / {{ $nf($monthlyLimit) }}</strong> dòng, còn {{ $nf($estimate['remaining']) }}</div>
-                            @if ($blockedReason)<div><x-studio.badge tone="warn">{{ $blockedReason }}</x-studio.badge></div>@endif
                         </div></div>
                         <div>
                             <x-studio.data-table id="co-log" :columns="[
@@ -153,7 +149,7 @@
 
                 @if ($showGaps)
                 <x-studio.panel key="clusters">
-                    <div class="ss-text-xs ss-muted" style="margin-bottom:.5rem"><x-studio.badge tone="accent">AI đề xuất</x-studio.badge> Gom theo từ chung, chỉ đề xuất.</div>
+                    <div class="ss-text-xs ss-muted" style="margin-bottom:.5rem"><x-studio.badge tone="accent">AI đề xuất</x-studio.badge></div>
                     <x-studio.data-table id="co-clusters" :columns="array_values(array_filter([
                         ['key' => 'name', 'label' => 'Cụm', 'type' => 'text', 'sortable' => true],
                         ['key' => 'count', 'label' => 'Số từ khóa', 'type' => 'number', 'sortable' => true],

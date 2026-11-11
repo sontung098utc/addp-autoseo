@@ -183,7 +183,7 @@ class TrustPolicyTest extends TestCase
 
         $this->actingAs($this->user('approver'));
         $this->get('/admin/doi-ai/pipeline')->assertOk()
-            ->assertSee('Chạy lại / Tạm dừng pipeline: chưa nối', false)
+            ->assertDontSee('Chạy lại / Tạm dừng pipeline: chưa nối', false)
             ->assertDontSee('Chạy toàn bộ')->assertDontSee('Bản đồ 9 giai đoạn');
         $this->assertFalse(PipelineBlueprint::controlsWired());
     }

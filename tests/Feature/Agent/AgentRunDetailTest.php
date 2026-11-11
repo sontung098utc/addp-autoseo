@@ -56,7 +56,7 @@ class AgentRunDetailTest extends TestCase
         $html = $this->page($r);
         $this->assertStringContainsString('từ khóa chính abc', $html);
         $this->assertStringNotContainsString('Diễn biến phiên chạy', $html);
-        $this->assertStringContainsString('#'.$r->id.' · Viết bài', $html);
+        $this->assertStringContainsString('#'.$r->id.' · ', $html);
 
         $v = ArticleVersion::create(['article_id' => $r->article_id, 'version' => 1, 'title' => 'Tiêu đề bản bài thật', 'slug' => 'tieu-de', 'html_content' => '<p>x</p>', 'review_status' => 'needs_review']);
         $r->update(['final_version_id' => $v->id]);
@@ -157,7 +157,7 @@ class AgentRunDetailTest extends TestCase
         $this->assertStringContainsString('—', $score);
         $this->assertStringNotContainsString('data-testid="score-timeline"', $html);
         $this->assertStringContainsString('AI giả lập', $html);
-        $this->assertStringContainsString('Chưa nối', $html);
+        $this->assertStringNotContainsString('Chưa nối', $html);
         $this->assertStringNotContainsString('ngưỡng tham khảo', $html);
     }
 
@@ -189,13 +189,13 @@ class AgentRunDetailTest extends TestCase
             $html = $this->page($this->run_($st, [['guard', 'ok']], $st === 'failed' ? ['outcome_reason' => 'Hết tiền'] : []));
             $this->assertMatchesRegularExpression('/studioTabs\\([\'"]dien-bien/', $html, $st);
         }
-        foreach (['stage-rail', 'run-verdict', 'run-report', 'run-cost', 'run-data'] as $id) {
+        foreach (['stage-rail', 'run-stats', 'run-report', 'run-cost', 'run-data'] as $id) {
             $this->assertStringContainsString('data-testid="'.$id.'"', $done, $id);
         }
         $this->assertStringContainsString('Chi phí và model', $done);
     }
 
-    public function test_tab_dien_bien_hien_du_chang_dung_trang_thai_va_ket_luan_mot_dong(): void
+    public function test_tab_dien_bien_hien_du_chang_dung_trang_thai_va_canh_bao_mot_dong(): void
     {
         $r = $this->run_('failed', [['guard', 'ok'], ['risk', 'ok'], ['brief', 'failed']], ['outcome_reason' => 'Nhà cung cấp lỗi', 'cost_vnd' => 1500]);
         $html = $this->page($r);
@@ -204,11 +204,11 @@ class AgentRunDetailTest extends TestCase
         $this->assertSame('done', $this->state($html, 'guard'));
         $this->assertSame('failed', $this->state($html, 'brief'));
         $this->assertSame('idle', $this->state($html, 'write'));
-        $verdict = substr(strstr($html, 'data-testid="run-verdict"'), 0, 2200);
-        $this->assertStringContainsString('Lỗi ở «Dàn ý»', $verdict);
-        $this->assertStringContainsString('Nhà cung cấp lỗi', $verdict);
-        $this->assertStringContainsString('1.500 ₫', $verdict);
-        $this->assertStringContainsString('data-testid="run-verdict-action"', $html);
+        $alert = substr(strstr($html, 'data-testid="run-alert"'), 0, 900);
+        $this->assertStringContainsString('Lỗi ở «Dàn ý»', $alert);
+        $this->assertStringContainsString('Nhà cung cấp lỗi', $alert);
+        $this->assertStringContainsString('data-testid="run-alert-action"', $html);
+        $this->assertStringNotContainsString('data-testid="run-verdict"', $html);
         // một khung chi tiết cho mỗi chặng, chỉ chặng lỗi mở sẵn
         $this->assertMatchesRegularExpression('/sel: [\'"]brief/', $html);
     }
@@ -229,7 +229,8 @@ class AgentRunDetailTest extends TestCase
         $this->assertSame('waiting', $this->state($html, 'checkpoint'));
         $this->assertStringContainsString('data-testid="flow-waiting"', $html);
         $this->assertStringContainsString('Chờ bạn', $html);
-        $this->assertStringContainsString('Dừng ở «', substr(strstr($html, 'data-testid="run-verdict"'), 0, 2200));
+        $this->assertStringContainsString('Chờ bạn xác nhận ở «', substr(strstr($html, 'data-testid="run-alert"'), 0, 900));
+        $this->assertStringContainsString('data-testid="run-alert-action"', $html);
         $order = RunFlow::build($r, $r->steps, false, false, null)['nodes'];
         $codes = array_column($order, 'code');
         $this->assertContains('checkpoint', $codes);
@@ -255,25 +256,37 @@ class AgentRunDetailTest extends TestCase
         $this->assertStringContainsString('xyz', substr(strstr($html, 'data-testid="run-input-ref"'), 0, 300));
     }
 
-    public function test_dau_trang_khong_con_ket_luan_va_chi_so_ma_tab_dien_bien_co_ca_hai_phia_tren_luu_do(): void
+    public function test_dau_trang_chi_co_huy_hieu_ngan_va_tab_dien_bien_bat_dau_bang_chi_so_roi_luu_do(): void
     {
         $r = $this->run_('ready_for_review', [['guard', 'ok'], ['write', 'ok', []], ['grade', 'ok', ['score' => 90, 'round' => 0, 'threshold' => 80]], ['handoff', 'ok']], ['cost_vnd' => 2500, 'repair_rounds' => 0]);
         $html = $this->page($r);
         $head = substr($html, strpos($html, 'data-testid="run-status-bar"'), strpos($html, 'data-tabs=') - strpos($html, 'data-testid="run-status-bar"'));
-        $this->assertStringNotContainsString('data-testid="run-verdict"', $head);
-        $this->assertStringNotContainsString('data-testid="run-score"', $head);
-        $this->assertStringNotContainsString('Xong: có bản nháp', $head);
-        $this->assertStringContainsString('#'.$r->id.' · Viết bài', $head);
+        $this->assertStringContainsString('#'.$r->id.' · ', $head);
+        $this->assertMatchesRegularExpression('/data-testid="run-badge".*?Xong/s', $head);
+        // không còn thẻ Kết luận, không còn chip dài, không câu kết luận dưới bất kỳ dạng nào
+        foreach (['data-testid="run-verdict"', 'data-testid="run-alert"', 'Đã có bản nháp chờ duyệt', 'Xong: có bản nháp', 'KẾT LUẬN', '>Kết luận<', 'rerun-unwired', 'Chưa nối'] as $gone) {
+            $this->assertStringNotContainsString($gone, $html, $gone);
+        }
+        $this->assertStringNotContainsString('Viết bài', $head);
 
-        $v = strpos($html, 'data-testid="run-verdict"');
         $k = strpos($html, 'data-testid="run-stats"');
         $f = strpos($html, 'data-testid="stage-rail"');
-        $this->assertTrue($v !== false && $k !== false && $f !== false);
-        $this->assertTrue($v < $k && $k < $f, 'kết luận, rồi chỉ số, rồi lưu đồ');
+        $this->assertTrue($k !== false && $f !== false && $k < $f, 'chỉ số rồi lưu đồ');
         foreach (['duration', 'cost', 'score', 'repairs', 'tokens'] as $kpi) {
             $this->assertStringContainsString('data-kpi="'.$kpi.'"', substr($html, $k, $f - $k));
         }
         $this->assertStringContainsString('2.500 ₫', substr($html, $k, $f - $k));
+    }
+
+    public function test_phien_cho_ban_co_huy_hieu_ngan_va_mot_dong_canh_bao_kem_nut(): void
+    {
+        $w = $this->run_('held', [['guard', 'ok'], ['risk', 'ok'], ['checkpoint', 'warn', ['waiting' => true]]]);
+        $html = $this->page($w);
+        $this->assertSame(1, substr_count($html, 'data-testid="run-alert"'));
+        $this->assertStringContainsString('data-testid="run-alert-action"', $html);
+        $this->assertStringContainsString('data-testid="run-badge"', $html);
+        $this->assertStringNotContainsString('Giữ nháp, cần người xem', $html);
+        $this->assertStringNotContainsString('Phiên dừng ở chặng này cho đến khi có người xác nhận', $html);
     }
 
     public function test_vong_sua_ve_thanh_cung_lap_co_so_lan_va_checkpoint_noi_bat(): void

@@ -285,15 +285,14 @@ final class RunFlow
     }
 
     /**
-     * Một dòng kết luận cho người quản lý: chuyện gì xảy ra, dừng ở đâu, tốn bao nhiêu, làm gì tiếp.
+     * Cảnh báo MỘT dòng, chỉ khi phiên cần người làm gì đó (chờ bạn, treo, lỗi, bị chặn, bị giữ). Phiên bình thường: null, không có câu kết luận nào.
      *
      * @param  array<string, mixed>  $flow  kết quả của build()
-     * @return array{tone:string, text:string, action:?array{label:string,url:string}}
+     * @return array{tone:string, text:string, action:?array{label:string,url:string}}|null
      */
-    public static function verdict(AgentRun $run, array $flow, bool $live, bool $stale): array
+    public static function verdict(AgentRun $run, array $flow, bool $live, bool $stale): ?array
     {
         $nodes = collect($flow['nodes']);
-        $cost = number_format((float) $flow['cost'], 0, ',', '.').' ₫';
         $article = $run->article_id ? PipelineVisual::urlOf('App\\Filament\\Resources\\ArticleResource', ['record' => $run->article_id], 'view') : null;
         $draft = $run->final_version_id ? PipelineVisual::urlOf('App\\Filament\\Resources\\ArticleVersionResource', ['record' => $run->final_version_id], 'view') : null;
         $open = $article ? ['label' => 'Mở bài viết', 'url' => $article] : null;
@@ -302,26 +301,21 @@ final class RunFlow
         $at = fn (?array $n) => $n ? '«'.$n['title'].'»' : 'một chặng';
 
         if ($w = $nodes->firstWhere('state', 'waiting')) {
-            return ['tone' => 'warn', 'text' => 'Dừng ở '.$at($w).': đang chờ bạn. Đã tốn '.$cost.'.', 'action' => $open];
+            return ['tone' => 'warn', 'text' => 'Chờ bạn xác nhận ở '.$at($w).'.', 'action' => $open];
         }
         if ($live) {
-            $n = $nodes->firstWhere('state', 'running');
-
-            return ['tone' => 'running', 'text' => 'Đang chạy'.($n ? ' chặng '.$at($n) : '').', đã tốn '.$cost.'.', 'action' => null];
+            return null;
         }
         if ($stale) {
-            $n = $nodes->firstWhere('state', 'stale');
-
-            return ['tone' => 'warn', 'text' => 'Có thể bị treo ở '.$at($n).': lâu không có bước mới. Đã tốn '.$cost.'.', 'action' => $open];
+            return ['tone' => 'warn', 'text' => 'Có thể bị treo ở '.$at($nodes->firstWhere('state', 'stale')).': lâu không có bước mới.', 'action' => $open];
         }
         $bad = $nodes->first(fn ($n) => in_array($n['state'], ['failed', 'blocked'], true)) ?? ($run->status === 'held' ? $nodes->last(fn ($n) => $n['state'] === 'warn') : null);
 
         return match ($run->status) {
-            'failed' => ['tone' => 'failed', 'text' => 'Lỗi ở '.$at($bad).($reason !== '' ? ': '.Str::limit($reason, 140) : '.').' Đã tốn '.$cost.'.', 'action' => $open],
-            'blocked' => ['tone' => 'warn', 'text' => 'Bị chặn '.($bad ? 'ở '.$at($bad) : 'trước khi chạy').($reason !== '' ? ': '.Str::limit($reason, 140) : '.').' Chưa tốn gì đáng kể ('.$cost.').', 'action' => $open],
-            'held' => ['tone' => 'warn', 'text' => 'Giữ nháp, cần người xem'.($reason !== '' ? ': '.Str::limit($reason, 140) : '.').' Đã tốn '.$cost.'.', 'action' => $view],
-            'ready_for_review' => ['tone' => 'done', 'text' => 'Xong: có bản nháp chờ bạn duyệt'.($flow['finalScore'] !== null ? ' (điểm '.$flow['finalScore'].'/100)' : '').', tốn '.$cost.'.', 'action' => $view],
-            default => ['tone' => 'idle', 'text' => 'Phiên đã kết thúc, tốn '.$cost.'.', 'action' => $view],
+            'failed' => ['tone' => 'failed', 'text' => 'Lỗi ở '.$at($bad).($reason !== '' ? ': '.Str::limit($reason, 140) : '.'), 'action' => $open],
+            'blocked' => ['tone' => 'warn', 'text' => 'Bị chặn '.($bad ? 'ở '.$at($bad) : 'trước khi chạy').($reason !== '' ? ': '.Str::limit($reason, 140) : '.'), 'action' => $open],
+            'held' => ['tone' => 'warn', 'text' => 'Bị giữ, cần người xem'.($reason !== '' ? ': '.Str::limit($reason, 140) : '.'), 'action' => $view],
+            default => null,
         };
     }
 

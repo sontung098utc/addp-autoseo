@@ -101,7 +101,7 @@ class KhoTriTueClusterTest extends TestCase
     {
         $this->actingAs($this->user('writer'));
         Brain::create(['name' => 'Y khoa', 'slug' => 'y-khoa', 'status' => 'active', 'settings' => []]);
-        Livewire::test(BrainLibraryPage::class)->assertSeeHtml('bl-summary')->assertSee('1 Trí tuệ')->assertSee('0 mục kiến thức');
+        Livewire::test(BrainLibraryPage::class)->assertSeeHtml('bl-summary')->assertSee('1 chưa gắn website')->assertDontSee('0 mục kiến thức'); // chỉ nêu việc cần làm, không đếm lại tổng
     }
 
     public function test_cum_khong_con_tab_nap_kien_thuc(): void

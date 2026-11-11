@@ -1,5 +1,5 @@
 <x-filament-panels::page>
-    <x-chain-context step="Khám phá" purpose="Kiểm sức khỏe kỹ thuật và nội dung của website, rồi biến lỗi thành việc làm mới bài." :inputs="[['label'=>'Website kết nối','url'=>\App\Filament\Resources\WebsiteResource::getUrl('index'),'note'=>'trang đã quét của website']]" :outputs="[['label'=>'Kế hoạch nội dung','url'=>\App\Filament\Pages\ContentPlanPage::getUrl(),'note'=>'đề xuất làm mới tạo bài loại làm mới (chỉ từ quét thật)'],['label'=>'Danh sách lỗi cho dev','url'=>null,'note'=>'ngay trên trang này'],['label'=>'Search Console','url'=>\App\Filament\Pages\SearchConsolePage::getUrl(),'note'=>'đối chiếu hiệu quả']]" />
+    <x-chain-context step="Khám phá" purpose="Kiểm sức khỏe kỹ thuật và nội dung của website, rồi biến lỗi thành việc làm mới bài." :inputs="[['label'=>'Website kết nối','url'=>\App\Filament\Resources\WebsiteResource::getUrl('index'),'note'=>'trang đã quét của website']]" :outputs="[['label'=>'Kế hoạch nội dung','url'=>\App\Filament\Pages\ContentPlanPage::getUrl(),'note'=>'đề xuất làm mới tạo bài loại làm mới (chỉ từ quét thật)'],['label'=>'Danh sách lỗi cho dev','url'=>null,'note'=>'ngay trên trang này'],['label'=>'Search Console','url'=>\App\Filament\Pages\SearchConsolePage::getUrl(),'note'=>'đối chiếu hiệu quả']]" :compact="true" />
     <style>
         .au-mono{font-family:ui-monospace,monospace}
         .au-code{margin:0;padding:.4rem .6rem;background:var(--ss-surface);border:1px solid var(--ss-border);border-radius:.3rem;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -52,7 +52,7 @@
                 @if ($scanning)
                     <span class="ss-text-sm ss-muted">Đang quét, chờ xong mới quét lại được.</span>
                 @elseif (! $guard['ok'])
-                    <span class="ss-text-sm ss-muted" title="{{ $guard['reason'] }}">🔒 {{ $guard['reason'] }} {{ $nextAtLabel }}</span>
+                    <span class="ss-text-sm ss-muted" title="{{ $guard['reason'] }}"><x-filament::icon icon="heroicon-o-lock-closed" style="width:1rem;height:1rem;display:inline;vertical-align:-.2em" /> {{ $guard['reason'] }} {{ $nextAtLabel }}</span>
                 @endif
                 @if ($run)
                     <span class="ss-text-sm ss-muted">{{ $realRun ? 'Quét thật lúc '.$vn($run['at']) : 'Dữ liệu mẫu, không phải kết quả quét website thật' }}@if ($stale) <x-studio.badge tone="warn">Kết quả cũ</x-studio.badge>@endif</span>
@@ -99,7 +99,7 @@
                 <div class="ss-kpi"><div class="ss-kpi__l">URL đã quét</div><div class="ss-kpi__v">{{ $run['urls_crawled'] }}<span class="ss-muted ss-text-sm"> / {{ $run['urls_total'] }}</span></div><div class="ss-kpi__d ss-muted">{{ $s['urls_with_issue'] }} URL có lỗi</div></div>
                 @foreach (['P0' => 'Lỗi P0', 'P1' => 'Lỗi P1', 'P2' => 'Lỗi P2'] as $sv => $lab)
                     <div class="ss-kpi"><div class="ss-kpi__l">{{ $lab }} <x-studio.badge :tone="$ctone[$sv]">{{ $sv }}</x-studio.badge></div><div class="ss-kpi__v">{{ $sevStats[$sv]['n'] }}</div>
-                        <div class="ss-kpi__d"><x-studio.delta :value="$sevStats[$sv]['delta']" good="down" :decimals="0" /> <span class="ss-muted">so với lần trước</span></div></div>
+                        <div class="ss-kpi__d"><x-studio.delta :value="$sevStats[$sv]['delta']" good="down" :decimals="0" /></div></div>
                 @endforeach
             </div>
         @endif
@@ -125,12 +125,11 @@
                                     ['key' => 'evidence', 'label' => 'Bằng chứng', 'type' => 'mono', 'visible' => false],
                                 ]" />
                                 @php $related = collect($suggestions)->filter(fn ($x) => in_array($group['type'], $x['types'], true)); @endphp
+                                @if ($realRun)
                                 <div class="au-ai" style="border-style:solid">
                                     <strong>Việc sửa liên quan</strong>
                                     <x-help text="Đề xuất làm mới bài từ lỗi này. Đề xuất chỉ thành việc khi approver chấp nhận; hệ thống không tự sửa bài đã đăng." />
-                                    @if (! $realRun)
-                                        <div class="ss-text-sm ss-muted">Dữ liệu mẫu: không tạo việc.</div>
-                                    @else
+                                    @if (true)
                                         @forelse ($related as $x)
                                             <div class="ss-text-sm"><span class="au-mono">{{ $x['url'] }}</span> · {{ $x['status_label'] }}@if ($x['task']) · bài làm mới {{ $x['task'] }}@endif</div>
                                         @empty
@@ -138,10 +137,10 @@
                                         @endforelse
                                     @endif
                                 </div>
+                                @endif
                                 <div class="au-ai">
                                     <x-studio.badge tone="accent">AI đề xuất</x-studio.badge> <strong>Cách sửa gợi ý</strong>
                                     <ol class="ss-text-sm">@foreach ($fixSteps as $step)<li>{{ $step }}</li>@endforeach</ol>
-                                    <div class="ss-text-xs ss-muted">Nguồn: {{ $group['urls'] }} URL trong lần quét {{ $vn($run['at']) }}</div>
                                 </div>
                             </div>
                         </div>
@@ -161,9 +160,7 @@
                                 <x-filament::button color="gray" wire:click="acceptAllSuggestions" wire:confirm="Chấp nhận tất cả đề xuất đang chờ có bài khớp? Mỗi đề xuất sẽ tạo một bài làm mới trong Kế hoạch." :disabled="! $canAct" title="{{ $canAct ? 'Chấp nhận hàng loạt (có xác nhận)' : 'Chỉ approver trở lên.' }}">Chấp nhận tất cả đang chờ</x-filament::button>
                             @endif
                         </div>
-                        @if (! $realRun)
-                            <div class="ss-text-sm ss-muted" role="status">Dữ liệu mẫu: không tạo việc. Đề xuất chỉ sinh từ kết quả quét thật.</div>
-                        @elseif ($suggestBlocker)
+                        @if ($realRun && $suggestBlocker)
                             <div class="ss-alert ss-alert--warn" role="status">{{ $suggestBlocker }}</div>
                         @endif
                         @if ($realRun)
@@ -208,7 +205,7 @@
             <div class="au-drawer">
                 <div class="ss-toolbar">
                     <h2 class="ss-card__h" id="au-brief-t" style="border:0;padding:0;flex:1">{{ $brief['title'] }}</h2>
-                    <x-filament::button color="gray" size="sm" wire:click="closeBrief">Đóng</x-filament::button>
+                    <x-close-x wire:click="closeBrief" />
                 </div>
                 <textarea x-ref="t" readonly aria-label="Nội dung brief">{{ $brief['body'] }}</textarea>
                 <div>

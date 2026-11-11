@@ -3,8 +3,11 @@
 namespace App\Filament\Clusters\AgentTeam\Pages;
 
 use App\Filament\Clusters\AgentTeam;
+use App\Filament\Clusters\AgentTeam\Concerns\ManagesCustomSkills;
 use App\Models\AgentRunStep;
 use App\Models\User;
+use App\Services\Agent\Roles\AgentProfiles;
+use App\Services\Agent\Roles\RoleAssignments;
 use App\Services\Agent\Roles\RoleRegistry;
 use App\Services\Ai\Playbook\InvalidPlaybook;
 use App\Services\Ai\Playbook\Playbook;
@@ -13,15 +16,18 @@ use App\Services\Content\Quality\QualityRubric;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Filament\Pages\SubNavigationPosition;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
 /**
  * Tab "Kỹ năng" của Đội AI (AG-S13): kỹ năng nghiệp vụ = playbook học từ claude-seo, đọc THẬT từ resources/playbooks.
- * CHỈ XEM: sửa kỹ năng = sửa file + PR. Playbook hỏng chỉ hiện một dòng lỗi, không làm vỡ trang.
+ * Playbook mặc định chỉ tắt/bật theo vai trò (sửa nội dung = sửa file + PR, không xóa được). Kỹ năng tự tạo (agent_documents) thêm/sửa/xóa được bởi quản trị. Playbook hỏng chỉ hiện một dòng lỗi, không làm vỡ trang.
  */
 class AgentSkills extends Page
 {
+    use ManagesCustomSkills;
+
     protected static ?string $cluster = AgentTeam::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-academic-cap';
@@ -68,7 +74,7 @@ class AgentSkills extends Page
                     'usage' => $this->usage()[$skill['ref']] ?? null,
                 ]);
             })
-            ->modalSubmitAction(false)->modalCancelActionLabel('Đóng');
+            ->modalSubmitAction(false)->modalCancelAction(false)->modalCloseButton()->closeModalByEscaping();
     }
 
     public function noticeAction(): Action
@@ -82,7 +88,7 @@ class AgentSkills extends Page
                     'html' => $raw === false ? '' : Str::markdown($raw, ['html_input' => 'escape', 'allow_unsafe_links' => false]),
                 ]);
             })
-            ->modalSubmitAction(false)->modalCancelActionLabel('Đóng');
+            ->modalSubmitAction(false)->modalCancelAction(false)->modalCloseButton()->closeModalByEscaping();
     }
 
     /**
@@ -137,7 +143,7 @@ class AgentSkills extends Page
     /**
      * Số lần phiên chạy đã dùng từng playbook, đọc từ agent_run_steps.data.playbook.ref.
      *
-     * @return array<string, array{count: int, last: ?\Illuminate\Support\Carbon}>
+     * @return array<string, array{count: int, last: ?Carbon}>
      */
     private function usage(): array
     {
@@ -179,7 +185,29 @@ class AgentSkills extends Page
             $groups[$s['roles'][0]['name'] ?? 'Chưa gắn vai trò nào'][] = $s;
         }
 
+        $reg = new RoleRegistry(null, app(PlaybookLoader::class));
+        $assign = new RoleAssignments($reg);
+        foreach ($groups as &$list) {
+            foreach ($list as &$row) {
+                $base = $row['playbook'] ? explode('/', $row['ref'], 2)[0].'/'.$row['playbook']->key : $row['ref'];
+                $row['base'] = $base;
+                $row['enabled'] = $row['roles'] === [] ? null : $assign->skillState($base)['enabled'];
+            }
+            unset($row);
+        }
+        unset($list);
+        $names = [];
+        foreach ($reg->all() as $r) {
+            $names[$r['key']] = AgentProfiles::displayName($r['key']) ?? $r['name'];
+        }
+        $custom = array_values(array_filter(AgentProfiles::allSkills(), function ($d) use ($search) {
+            return ($this->roleFilter === '' || $d->role_key === $this->roleFilter)
+                && ($this->statusFilter === '' || ($this->statusFilter === 'custom'))
+                && ($search === '' || str_contains(Str::lower($d->title), $search));
+        }));
+
         return [
+            'canEdit' => $this->skillAdmin() !== null, 'custom' => $custom, 'roleNames' => $names,
             'groups' => $groups,
             'total' => count($all),
             'drafts' => count(array_filter($all, fn ($s) => $s['status'] === 'draft')),

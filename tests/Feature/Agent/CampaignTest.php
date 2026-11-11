@@ -216,7 +216,7 @@ class CampaignTest extends TestCase
             }
         })->data())->render();
         $this->assertStringContainsString('0 phiên chạy thật', $html);
-        $this->assertStringContainsString('chưa có số liệu', $html);
+        $this->assertStringNotContainsString('chưa có số liệu', $html);
     }
 
     // ---- AG-S02 ----

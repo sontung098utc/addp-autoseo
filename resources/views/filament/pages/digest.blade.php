@@ -26,7 +26,7 @@
                 <x-filament::section>
                     <div class="text-xs" style="opacity:.7">{{ $s['label'] }}</div>
                     <div style="font-size:1.6rem;font-weight:600;line-height:1.2">{{ $s['value'] }}</div>
-                    <div class="text-xs" style="opacity:.65">{{ $s['sub'] }}</div>
+                    @if ($s['sub'] !== '')<div class="text-xs" style="opacity:.65">{{ $s['sub'] }}</div>@endif
                 </x-filament::section>
             @endforeach
         </div>
@@ -51,7 +51,7 @@
                         <div style="font-weight:600;font-size:.9rem">{{ $g['title'] }}
                             <x-filament::badge :color="$sev[$g['severity']] ?? 'gray'">{{ $g['count'] }}</x-filament::badge>
                         </div>
-                        <div class="text-xs" style="opacity:.7">{{ $g['detail'] }}</div>
+                        @if ($g['detail'] !== '')<div class="text-xs" style="opacity:.7">{{ $g['detail'] }}</div>@endif
                     </div>
                     <a href="{{ $g['url'] }}" class="text-sm underline">Xem</a>
                 </div>

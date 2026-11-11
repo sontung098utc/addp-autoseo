@@ -317,18 +317,18 @@ class KeywordMetricsTest extends TestCase
         return User::create(['name' => 'w', 'email' => 'w@x.vn', 'password' => 'secret123', 'role' => 'writer', 'is_active' => true]);
     }
 
-    public function test_trang_hien_day_du_chain_context_the_nguon_va_nhan_nguon(): void
+    public function test_trang_hien_day_du_dai_buoc_the_nguon_va_nhan_nguon(): void
     {
         $this->actingAs($this->writer());
         $this->kw('có csv', ['volume' => 100, 'volume_source' => 'csv']);
         $this->kw('có dfs', ['volume' => 900, 'volume_source' => 'dataforseo', 'metrics_at' => now()]);
         $this->kw('chưa có');
         $t = Livewire::test(KeywordsPage::class);
-        $t->assertSee('Kho từ khóa của website')->assertSee('Nguồn số liệu lượt tìm')->assertSee('2/3 từ khóa có số liệu, 1 từ nguồn DataForSEO')
+        $t->assertSee('Nguồn số liệu lượt tìm')->assertSee('2/3 từ khóa có số liệu, 1 từ nguồn DataForSEO')
             ->assertSee('Lấy lượt tìm thật');
         $src = collect($t->viewData('kwRows'))->pluck('volumeSource', 'keyword')->all();
         $this->assertSame(['có csv' => 'CSV', 'có dfs' => 'DataForSEO', 'chưa có' => 'Chưa có số liệu'], $src);
-        $this->get('/admin/tu-khoa')->assertOk()->assertSee('data-testid="chain-context"', false)->assertSee('Đối thủ')->assertSee('Kế hoạch nội dung');
+        $this->get('/admin/tu-khoa')->assertOk()->assertDontSee('data-testid="chain-context"', false)->assertSee('Mở Kế hoạch');
     }
 
     public function test_nut_lay_luot_tim_bat_tat_dung(): void

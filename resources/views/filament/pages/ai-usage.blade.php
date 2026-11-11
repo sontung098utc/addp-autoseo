@@ -144,7 +144,7 @@
 
             <x-studio.panel key="thresholds">
                 <div>
-                    <div class="ss-card" data-ai="thresholds"><div class="ss-card__h">Ngưỡng đang áp dụng <x-help title="Về ngưỡng"><p>Khi vượt chỉ cảnh báo, không dừng sinh bài. Ngưỡng đang lưu tạm.</p></x-help></div><div class="ss-card__b ss-text-sm" style="display:grid;gap:.375rem">
+                    <div class="ss-card" data-ai="thresholds"><div class="ss-card__h">Ngưỡng đang áp dụng <x-help title="Về ngưỡng"><p>Khi vượt chỉ cảnh báo, không dừng sinh bài.</p></x-help></div><div class="ss-card__b ss-text-sm" style="display:grid;gap:.375rem">
                         <div>Theo bài: <strong>{{ Vnd::format($th['article']) }}</strong></div>
                         <div>Theo tháng: <strong>{{ $th['month'] === null ? 'Chưa đặt' : Vnd::format($th['month']) }}</strong>@if ($th['month'] !== null) <span class="ss-muted" data-ai="month-meter">đã dùng {{ Vnd::format($monthCost ?? 0) }} ({{ Vnd::percent(($monthCost ?? 0) / $th['month']) }}) {{ $monthLabel }}</span>@endif</div>
                         <div><button type="button" class="ss-dt__btn" wire:click="mountAction('setThreshold')">Sửa ngưỡng</button></div>
@@ -155,7 +155,7 @@
             <x-studio.panel key="rules">
                 <div class="ss-grid ss-text-sm">
                     <div class="ss-card"><div class="ss-card__h">Cách tính</div><div class="ss-card__b"><ul style="list-style:disc;padding-left:1.25rem;display:grid;gap:.25rem">
-                        <li><strong>Ngưỡng theo bài:</strong> tổng cost_vnd của mọi phiên bản của một bài LỚN HƠN ngưỡng (đúng bằng thì không vượt; so sánh trên số đã làm tròn đồng) thì bài hiện "▲ Vượt ngưỡng". Chỉ cảnh báo, không chặn sinh bài. Mặc định 3.000 ₫ theo báo cáo PoC.</li>
+                        <li><strong>Ngưỡng theo bài:</strong> tổng cost_vnd của mọi phiên bản của một bài LỚN HƠN ngưỡng (đúng bằng thì không vượt; so sánh trên số đã làm tròn đồng) thì bài hiện "▲ Vượt ngưỡng". Chỉ cảnh báo, không chặn sinh bài.</li>
                         <li><strong>Ngưỡng theo tháng:</strong> tổng cost_vnd các phiên bản sinh trong tháng dương lịch (giờ Việt Nam), toàn hệ thống. Để trống = không cảnh báo; nếu đặt phải lớn hơn hoặc bằng ngưỡng theo bài.</li>
                         <li><strong>Trung bình mỗi bài:</strong> tổng cost_vnd của MỌI phiên bản thuộc các bài có phiên bản sinh trong kỳ, chia cho số bài đó (sinh lại tính vào bài). Có thể lệch so với chi phí trong kỳ nếu bài có phiên bản ở kỳ khác.</li>
                         <li><strong>Chi phí tính tại thời điểm sinh:</strong> không tính lại khi đổi bảng giá hoặc tỉ giá. Tiền tệ VND, cộng trên giá trị lưu rồi mới làm tròn đồng nên tổng các dòng có thể lệch vài đồng.</li>
@@ -164,8 +164,7 @@
                     <div class="ss-card"><div class="ss-card__h">Quyền và dữ liệu thiếu</div><div class="ss-card__b"><ul style="list-style:disc;padding-left:1.25rem;display:grid;gap:.25rem">
                         <li><strong>Ai được xem và đặt:</strong> Quản trị và Người duyệt. Biên tập viên bị chặn (403).</li>
                         <li><strong>Thiếu dữ liệu:</strong> không có phiên bản trong kỳ thì hiện "Chưa có dữ liệu", không hiện số 0 giả. Phiên bản chưa ghi chi phí (cost_vnd trống, hoặc 0 ₫ với 0 token) được đếm riêng.</li>
-                        <li><strong>Model lạ:</strong> khi model chưa có trong bảng giá, bộ tính rơi về giá gemini-1.5-flash nên chi phí có thể bị ghi thấp (cần Dev1 xác nhận).</li>
-                        <li><strong>Cần Dev1 thêm:</strong> bảng cấu hình ngưỡng; nhật ký mỗi lượt gọi AI (token vào/ra, cache, ảnh, lỗi/thử lại, chiến dịch); nhật ký cảnh báo đã bắn (task 6.3).</li>
+                        <li><strong>Model lạ:</strong> khi model chưa có trong bảng giá, bộ tính rơi về giá gemini-1.5-flash nên chi phí có thể bị ghi thấp.</li>
                     </ul></div></div>
                 </div>
             </x-studio.panel>

@@ -33,7 +33,7 @@ class KnowledgePageTest extends TestCase
     {
         $this->actingAs($this->user('admin'));
         $this->assertTrue(KnowledgePage::canAccess());
-        Livewire::test(KnowledgePage::class)->assertOk()->assertSee('Hộp duyệt')->assertSee('Cảnh báo')->assertSee('Nguồn');
+        Livewire::test(KnowledgePage::class)->assertOk()->assertSee('Hộp duyệt')->assertSee('Cảnh báo')->assertSee('Tài liệu');
         $this->get('/admin/tri-thuc-tat-ca')->assertOk(); // AG-B1: URL cũ /admin/kho-kien-thuc chuyển hướng sang Kho trí tuệ
         $this->get('/admin/kho-kien-thuc')->assertRedirect('/admin/kho-tri-tue/tri-tue');
 

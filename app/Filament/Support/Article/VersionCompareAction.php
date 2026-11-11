@@ -18,7 +18,7 @@ class VersionCompareAction
     {
         return Action::make('compare')->label('So với bản trước')->icon('heroicon-o-arrows-right-left')->color('gray')
             ->slideOver()->modalWidth('5xl')->modalHeading('So với bản trước')
-            ->modalSubmitAction(false)->modalCancelActionLabel('Đóng')
+            ->modalSubmitAction(false)->modalCancelAction(false)->modalCloseButton()
             ->modalContent(function (Action $action) use ($resolve) {
                 $new = $resolve($action->getArguments());
                 $old = $new ? self::previous($new) : null;

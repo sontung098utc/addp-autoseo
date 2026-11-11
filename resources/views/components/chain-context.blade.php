@@ -1,8 +1,22 @@
-@props(['step' => null, 'purpose' => '', 'inputs' => [], 'outputs' => []])
+@props(['step' => null, 'purpose' => '', 'inputs' => [], 'outputs' => [], 'compact' => false])
 {{--
     Vai trò của trang trong chuỗi làm nội dung, GỌN MỘT DÒNG: "Lấy từ … → Kết quả đi tới …" và dấu (i) bấm để đọc trang này để làm gì.
     inputs/outputs: list<array{label:string, url?:?string, note?:?string}>. Mục không có url hiển thị chữ thường.
+    compact=true: không hiện dải chữ; chỉ một dấu (i), bấm mới hiện "Lấy từ / Kết quả" (đặt cạnh các (i) khác ở đầu trang).
 --}}
+@if ($compact)
+    <span data-testid="chain-context">
+        <x-help title="{{ $step ? $step.': ' : '' }}Trang này nối với đâu">
+            @if ($purpose !== '')<p>{{ $purpose }}</p>@endif
+            <p><strong>Lấy từ:</strong>
+                @forelse ($inputs as $i)@if (! empty($i['url']))<a href="{{ $i['url'] }}" style="text-decoration:underline">{{ $i['label'] }}</a>@else{{ $i['label'] }}@endif@if (! empty($i['note'])) ({{ $i['note'] }})@endif{{ $loop->last ? '' : ' · ' }}@empty bạn nhập trực tiếp @endforelse
+            </p>
+            <p><strong>Kết quả:</strong>
+                @forelse ($outputs as $o)@if (! empty($o['url']))<a href="{{ $o['url'] }}" style="text-decoration:underline">{{ $o['label'] }}</a>@else{{ $o['label'] }}@endif@if (! empty($o['note'])) ({{ $o['note'] }})@endif{{ $loop->last ? '' : ' · ' }}@empty chỉ để xem @endforelse
+            </p>
+        </x-help>
+    </span>
+@else
 <div class="cc-line" data-testid="chain-context">
     <style>
         .cc-line{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem .6rem;margin:0 0 .75rem;font-size:.8125rem;opacity:.9}
@@ -34,3 +48,4 @@
         </x-help>
     @endif
 </div>
+@endif

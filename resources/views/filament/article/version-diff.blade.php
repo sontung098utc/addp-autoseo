@@ -14,7 +14,7 @@
             <li>Chưa đạt: P0 {{ $qo['P0'] ?? 0 }} → {{ $qn['P0'] ?? 0 }} · P1 {{ $qo['P1'] ?? 0 }} → {{ $qn['P1'] ?? 0 }} · P2 {{ $qo['P2'] ?? 0 }} → {{ $qn['P2'] ?? 0 }}</li>
         </ul>
         @if (($qn['P0'] ?? 0) > ($qo['P0'] ?? 0))
-            <p data-testid="aw-compare-warn" style="border-left:3px solid #dc2626;padding:.4rem .7rem">Bản mới có nhiều lỗi chặn hơn bản trước.</p>
+            <p data-testid="aw-compare-warn" style="border:1px solid rgba(220,38,38,.4);background:rgba(220,38,38,.07);border-radius:.5rem;padding:.4rem .7rem">Bản mới có nhiều lỗi chặn hơn bản trước.</p>
         @endif
         <section>
             <h3 style="font-weight:600">Thẻ meta đổi</h3>

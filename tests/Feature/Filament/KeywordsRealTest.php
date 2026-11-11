@@ -5,9 +5,9 @@ namespace Tests\Feature\Filament;
 use App\Filament\Pages\ContentPlanPage;
 use App\Filament\Pages\KeywordsPage;
 use App\Filament\Support\ContentPlan\PlanActions;
-use App\Filament\Support\Keywords\EloquentKeywordRepository;
 use App\Filament\Support\Keywords\CsvKeywordParser;
 use App\Filament\Support\Keywords\DemoKeywordRepository;
+use App\Filament\Support\Keywords\EloquentKeywordRepository;
 use App\Filament\Support\Keywords\KeywordArticleLinks;
 use App\Filament\Support\Keywords\KeywordService;
 use App\Models\Article;
@@ -113,7 +113,12 @@ class KeywordsRealTest extends TestCase
         $this->assertSame('Đã đăng', $l['k pub']['label']);
         $this->assertNotNull($l['k plan']['article_id']);
         $rows = (new KeywordsPage)->keywordRows($svc->repo()->all(), $this->site);
-        $this->assertSame('Chưa có', $rows[0]['article']['text']);
+        $st = collect($rows)->mapWithKeys(fn ($r) => [$r['keyword'] => $r['status']['text']])->all();
+        $this->assertSame('Chưa dùng', $st['k none']);
+        $this->assertSame('Trong kế hoạch', $st['k plan']);
+        $this->assertSame('Đã có bài', $st['k draft']);
+        $this->assertSame('Đã có bài', $st['k pub']);
+        $this->assertSame(ContentPlanPage::getUrl(), $rows[0]['status']['href']);
         $this->assertNull($rows[0]['volume']);
     }
 

@@ -12,7 +12,7 @@
     ];
 @endphp
 <x-filament-panels::page>
-    <x-chain-context step="Khám phá" purpose="Tìm khoảng trống nội dung so với đối thủ." :inputs="[['label' => 'Từ khóa đối thủ', 'note' => 'nhập CSV']]" :outputs="[['label' => 'Kho từ khóa (trang Từ khóa)', 'url' => \App\Filament\Pages\KeywordsPage::getUrl()], ['label' => 'Kế hoạch nội dung', 'url' => \App\Filament\Pages\ContentPlanPage::getUrl()]]" />
+    <x-chain-context step="Khám phá" purpose="Tìm khoảng trống nội dung so với đối thủ." :inputs="[['label' => 'Từ khóa đối thủ', 'note' => 'nhập CSV']]" :outputs="[['label' => 'Kho từ khóa (trang Từ khóa)', 'url' => \App\Filament\Pages\KeywordsPage::getUrl()], ['label' => 'Kế hoạch nội dung', 'url' => \App\Filament\Pages\ContentPlanPage::getUrl()]]" :compact="true" />
     @php $multiSite = count($websites) > 1; @endphp
     <div class="ss-page" data-co-state="real">
         @if (! $site)
@@ -60,13 +60,6 @@
                 </x-help>
             </div>
 
-            @if (count($gapRows) > 0)
-                <div class="ss-kpis">
-                    <div class="ss-kpi"><div class="ss-kpi__l">Đối thủ theo dõi</div><div class="ss-kpi__v">{{ $compCount }}</div></div>
-                    <div class="ss-kpi"><div class="ss-kpi__l">Khoảng trống còn mới</div><div class="ss-kpi__v">{{ $openCount }}</div><div class="ss-kpi__d ss-muted">{{ $addedCount }} đã thêm vào Từ khóa</div></div>
-                </div>
-            @endif
-
             @php
                 $tabs = [];
                 if (count($gapRows) > 0) { $tabs[] = ['key' => 'gaps', 'label' => 'Khoảng trống', 'count' => count($gapRows)]; }
@@ -106,7 +99,7 @@
                 <x-studio.panel key="import">
                     <div class="ss-card" role="region" aria-label="Nhập CSV khoảng trống"><div class="ss-card__b" style="display:grid;gap:.5rem">
                         <div class="ss-text-sm">Nhập tệp CSV khoảng trống <x-help title="Định dạng CSV"><p>Cột bắt buộc <code>keyword</code>; tùy chọn <code>competitor_domain</code>, <code>competitor_rank</code>, <code>our_rank</code>, <code>volume</code>. Tối đa {{ number_format($maxRows, 0, ',', '.') }} dòng và 1 MB, UTF-8.</p><p>Không có volume thì để trống cột; hệ thống không tự điền số và không chấm điểm ưu tiên cho dòng thiếu lượng tìm. Tên miền đối thủ phải đã được thêm ở tab Đối thủ.</p></x-help></div>
-                        <input type="file" wire:model="csvFile" accept=".csv,text/csv,text/plain" aria-label="Chọn tệp CSV">
+                        <x-upload-zone model="csvFile" name="csv" accept=".csv,text/csv,text/plain" :max-mb="1" hint="CSV · tối đa 1 MB" label="Kéo thả tệp CSV vào đây hoặc bấm để chọn" />
                         <textarea style="width:100%" rows="4" wire:model="csvText" placeholder="Hoặc dán nội dung CSV vào đây" aria-label="Nội dung CSV"></textarea>
                         <div><x-filament::button color="gray" wire:click="previewCsv">Xem trước</x-filament::button></div>
                         @if ($csvPreview)

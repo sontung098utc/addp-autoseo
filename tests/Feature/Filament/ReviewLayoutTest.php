@@ -27,7 +27,7 @@ class ReviewLayoutTest extends TestCase
 
     private function user(string $role): User
     {
-        return User::create(['name' => $role, 'email' => uniqid() . '@x.vn', 'password' => 'secret123', 'role' => $role, 'is_active' => true]);
+        return User::create(['name' => $role, 'email' => uniqid().'@x.vn', 'password' => 'secret123', 'role' => $role, 'is_active' => true]);
     }
 
     private function article(string $ws = 'needs_review'): Article
@@ -37,7 +37,7 @@ class ReviewLayoutTest extends TestCase
 
     private function version(Article $a, int $v, string $status, string $html = '<p>x</p>', array $extra = []): ArticleVersion
     {
-        return ArticleVersion::create(array_merge(['article_id' => $a->id, 'version' => $v, 'title' => 't' . $v, 'slug' => 's', 'html_content' => $html, 'review_status' => $status], $extra));
+        return ArticleVersion::create(array_merge(['article_id' => $a->id, 'version' => $v, 'title' => 't'.$v, 'slug' => 's', 'html_content' => $html, 'review_status' => $status], $extra));
     }
 
     public function test_renders_full_data(): void
@@ -62,7 +62,7 @@ class ReviewLayoutTest extends TestCase
         $this->actingAs($this->user('approver'));
         $v = $this->version($this->article(), 1, 'needs_review');
         Livewire::test(ViewArticleVersion::class, ['record' => $v->id])
-            ->assertOk()->assertSee('Chưa có bản đã duyệt để so sánh')->assertSee('META01')->assertSee('Chưa có meta description')
+            ->assertOk()->assertDontSee('Chưa có bản đã duyệt để so sánh')->assertSee('META01')->assertSee('Chưa có meta description')
             ->assertSee('Bài chưa có ảnh nào để kiểm tra alt');
     }
 

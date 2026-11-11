@@ -49,12 +49,12 @@ class KnowledgeGapsTest extends TestCase
     {
         $w = $this->site();
         $art = Article::create(['website_id' => $w->id, 'primary_keyword' => 'chính sách bảo hành', 'workflow_status' => 'planned']);
-        $ctx = new KnowledgeContext();
+        $ctx = new KnowledgeContext;
         $ctx->load($art->fresh(), ['Tổng quan']);
         $gap = KnowledgeGap::first();
         $this->assertSame('open', $gap->status);
         $gap->update(['status' => 'filled', 'filled_at' => now(), 'filled_item_id' => 1]);
-        (new KnowledgeContext())->load($art->fresh(), ['Tổng quan']);
+        (new KnowledgeContext)->load($art->fresh(), ['Tổng quan']);
         $gap->refresh();
         $this->assertSame('open', $gap->status, 'tìm vẫn không ra → mở lại');
         $this->assertSame(2, $gap->count);
@@ -67,7 +67,7 @@ class KnowledgeGapsTest extends TestCase
         $gap = $this->gap($w);
         $gapOther = $this->gap($other, 'học bổng toàn phần');
         $gapUnrelated = $this->gap($w, 'chính sách bảo hành sản phẩm');
-        $review = new KnowledgeReview();
+        $review = new KnowledgeReview;
         $by = $this->user();
 
         $review->approve($this->proposed(['website_id' => $w->id, 'title' => 'Giá vé', 'body' => 'Giá vé vào cổng là năm mươi nghìn đồng.']), $by);
@@ -86,7 +86,7 @@ class KnowledgeGapsTest extends TestCase
     {
         $w = $this->site();
         $gap = $this->gap($w);
-        (new KnowledgeReview())->approve($this->proposed(['website_id' => null]), $this->user());
+        (new KnowledgeReview)->approve($this->proposed(['website_id' => null]), $this->user());
         $this->assertSame('filled', $gap->fresh()->status);
     }
 
@@ -107,5 +107,24 @@ class KnowledgeGapsTest extends TestCase
         $gap = $this->gap($this->site());
         $this->actingAs($this->user('writer'));
         Livewire::test(KnowledgePage::class)->assertOk()->assertDontSee('Khoảng trống')->call('prefillFromGap', $gap->id)->assertForbidden();
+    }
+
+    public function test_nguon_va_them_kien_thuc_gop_thanh_mot_tab_tai_lieu(): void
+    {
+        $w = $this->site();
+        $g = $this->gap($w);
+        $this->actingAs($this->user());
+
+        $html = Livewire::test(KnowledgePage::class)->assertOk()->html();
+        preg_match_all('/role="tab"[^>]*data-key="([^"]+)"/', $html, $m);
+        $this->assertContains('sources', $m[1]);
+        $this->assertNotContains('add', $m[1]);
+        $this->assertStringContainsString('<span>Tài liệu</span>', $html);
+        $this->assertStringNotContainsString('<span>Nguồn</span>', $html);
+        $this->assertStringNotContainsString('<span>Thêm kiến thức</span>', $html);
+
+        // Nút ở tab Khoảng trống điền sẵn tiêu đề vào form nằm trong tab Tài liệu.
+        Livewire::test(KnowledgePage::class)->call('prefillFromGap', $g->id)->assertSet('new.title', 'học bổng toàn phần')
+            ->assertSeeHtml('x-on:kb-add.window');
     }
 }

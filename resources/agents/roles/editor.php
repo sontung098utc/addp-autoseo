@@ -51,7 +51,7 @@ return [
         'risk' => 'editor',
         'grade' => 'editor',
     ],
-    'readiness_note' => 'Được AgentRunOrchestrator gọi trong phiên chạy; mới kiểm bằng AI giả lập trong test, chưa thử với model thật, chưa qua staging, chưa có người thật nghiệm thu.',
+    'readiness_note' => 'Đã chạy được trong phiên chạy. Mới kiểm bằng AI giả lập, chưa thử với model thật và chưa có người nghiệm thu.',
     'origin' => [
         'claude-seo/seo-content',
         'claude-seo/quality-gates',

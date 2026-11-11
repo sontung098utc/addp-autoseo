@@ -23,6 +23,5 @@
     </div>
     <div><strong>Tính năng liên quan:</strong> {{ implode(', ', $j['features']) ?: 'chưa có' }}</div>
     </div></details>
-    <div class="text-xs" style="opacity:.7">Chạy loại việc: chưa nối ở tab này.</div>
 </div>
 @endif

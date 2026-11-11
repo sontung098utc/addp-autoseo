@@ -65,7 +65,7 @@ class RunReportAndTodayTest extends TestCase
         $this->site();
         $this->actingAs($this->user());
 
-        $this->get('/admin')->assertOk()->assertSee('Hôm nay chưa có việc nào cần bạn xử lý.')->assertDontSee('class="at-card', false)->assertDontSee('gợi ý bổ sung kho');
+        $this->get('/admin')->assertOk()->assertDontSee('Hôm nay chưa có việc nào cần bạn xử lý.')->assertDontSee('class="at-card', false)->assertDontSee('gợi ý bổ sung kho');
     }
 
     public function test_tong_quan_hien_khoi_doi_ai_hom_nay(): void

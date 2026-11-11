@@ -5,7 +5,6 @@
     $tones = ['success' => 'ok', 'warning' => 'warn', 'danger' => 'danger', 'info' => 'info', 'gray' => 'muted'];
 @endphp
 <x-filament-panels::page>
-    <x-chain-context step="Kế hoạch của chiến dịch" purpose="Quyết định viết gì, theo thứ tự ưu tiên. Mỗi bài thuộc một chiến dịch hoặc là bài lẻ." :inputs="[['label'=>'Từ khóa và cụm chủ đề','url'=>\App\Filament\Pages\KeywordsPage::getUrl()],['label'=>'Đề xuất làm mới từ Audit','url'=>\App\Filament\Pages\AuditPage::getUrl()]]" :outputs="[['label'=>'Bài «Đã lên kế hoạch» để đội AI viết','url'=>\App\Filament\Resources\ArticleResource::getUrl('index'),'note'=>'Bài viết']]" />
     <style>
         .cp-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.5rem}
         @media (max-width:1024px){.cp-week{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -35,7 +34,7 @@
                     <option value="solo">Bài lẻ (không chiến dịch)</option>
                     @foreach ($campaigns as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach
                 </select>
-                <span class="ss-muted ss-text-sm">{{ $total }} bài · tối đa {{ $limit }} bài/ngày · giờ VN</span>
+                
                 <x-help title="Quy tắc của kế hoạch">
 <ul>
                         <li>Biên tập viên trở lên (đang hoạt động) mới xem/tạo bài; máy chủ kiểm lại ở mọi thao tác.</li>
@@ -55,7 +54,6 @@
             @endif
         </div>
 
-        @include('filament.partials.plan-proposals', ['proposals' => $proposals, 'pendingAudit' => $pendingAudit, 'showTarget' => $showTarget, 'targetCampaigns' => $campaigns])
 
         @if ($lastResults)
             <div class="ss-card" style="margin-bottom:.75rem" role="status"><div class="ss-card__b">
@@ -68,14 +66,15 @@
 
         @php
             $tabs = [
-                ['key' => 'week', 'label' => 'Lịch tuần', 'count' => $weekCount],
-                ['key' => 'clusters', 'label' => 'Cụm chủ đề', 'count' => count($rows)],
+                ['key' => 'lich-tuan', 'label' => 'Lịch tuần', 'count' => $weekCount],
+                ['key' => 'de-xuat', 'label' => 'Đề xuất kế hoạch', 'count' => count($proposals) > 0 ? count($proposals) : null],
+                ['key' => 'cum', 'label' => 'Cụm chủ đề', 'count' => count($rows)],
             ];
-            if (count($undated) > 0) { $tabs[] = ['key' => 'undated', 'label' => 'Chưa có ngày', 'count' => count($undated)]; }
-            if (count($allConflicts) > 0) { $tabs[] = ['key' => 'warn', 'label' => 'Cảnh báo', 'count' => count($allConflicts), 'tone' => 'danger']; }
+            if (count($undated) > 0) { $tabs[] = ['key' => 'chua-cum', 'label' => 'Chưa có ngày', 'count' => count($undated)]; }
+            if (count($allConflicts) > 0) { $tabs[] = ['key' => 'canh-bao', 'label' => 'Cảnh báo', 'count' => count($allConflicts), 'tone' => 'danger']; }
         @endphp
         <x-studio.tabs persist="ke-hoach-noi-dung" :tabs="$tabs">
-            <x-studio.panel key="week">
+            <x-studio.panel key="lich-tuan">
                 <div class="cp-bar">
                     <x-filament::button color="gray" size="sm" wire:click="previousWeek">Tuần trước</x-filament::button>
                     <x-filament::button color="gray" size="sm" wire:click="currentWeek">Tuần này</x-filament::button>
@@ -103,7 +102,12 @@
                 </div>
             </x-studio.panel>
 
-            <x-studio.panel key="clusters">
+            <x-studio.panel key="de-xuat">
+                <x-chain-context step="Kế hoạch của chiến dịch" purpose="Quyết định viết gì, theo thứ tự ưu tiên. Mỗi bài thuộc một chiến dịch hoặc là bài lẻ." :inputs="[['label'=>'Từ khóa và cụm chủ đề','url'=>\App\Filament\Pages\KeywordsPage::getUrl()],['label'=>'Đề xuất làm mới từ Audit','url'=>\App\Filament\Pages\AuditPage::getUrl()]]" :outputs="[['label'=>'Bài «Đã lên kế hoạch» để đội AI viết','url'=>\App\Filament\Resources\ArticleResource::getUrl('index'),'note'=>'Bài viết']]" />
+                @include('filament.partials.plan-proposals', ['proposals' => $proposals, 'pendingAudit' => $pendingAudit, 'showTarget' => $showTarget, 'targetCampaigns' => $campaigns])
+            </x-studio.panel>
+
+            <x-studio.panel key="cum">
                 @if (count($rows) === 0)
                     <div class="ss-text-sm ss-muted" role="status">Chưa có cụm chủ đề. Tạo cụm ở trang <a href="{{ \App\Filament\Pages\KeywordsPage::getUrl() }}" style="text-decoration:underline">Từ khóa</a>.</div>
                 @else
@@ -163,7 +167,7 @@
             </x-studio.panel>
 
             @if (count($undated) > 0)
-            <x-studio.panel key="undated">
+            <x-studio.panel key="chua-cum">
                 @if (true)
                     <x-studio.data-table id="plan-undated" :columns="$undatedColumns" :rows="$undatedRows" :page-size="25" search="Tìm bài" />
                 @endif
@@ -171,7 +175,7 @@
             @endif
 
             @if (count($allConflicts) > 0)
-            <x-studio.panel key="warn">
+            <x-studio.panel key="canh-bao">
                 @foreach ($allConflicts as $kwNorm => $ids)
                     <div class="ss-alert ss-alert--danger" role="status" style="margin-bottom:.5rem">
                         <strong>⚠ Ăn thịt từ khóa "{{ $kwNorm }}": {{ count($ids) }} bài</strong>

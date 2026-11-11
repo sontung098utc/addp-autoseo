@@ -55,8 +55,8 @@ class PreflightPanelTest extends TestCase
             ->assertSee('AI sẽ tự chuẩn bị')
             ->assertSee('Cao')
             ->assertSee('Kho có 0 mục kiến thức đã duyệt')
-            ->assertSee('Ước tính: chưa có')
-            ->assertSee('Hồ sơ: 0%')
+            ->assertDontSee('Ước tính: chưa có')
+            ->assertDontSee('Hồ sơ: 0%')
             ->assertDontSee('DỪNG')
             ->assertDontSee('Gắn cho website')
             ->assertDontSee('Sẵn sàng trước khi giao');

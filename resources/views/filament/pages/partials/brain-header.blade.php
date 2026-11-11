@@ -1,6 +1,6 @@
 {{-- AG-B1: đầu trang một Trí tuệ. Mọi chuỗi qua {{ }} (escape). --}}
 <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:.8rem">
-    <a href="{{ \App\Filament\Pages\BrainLibraryPage::getUrl() }}" class="ss-muted ss-text-xs" style="text-decoration:underline">← Kho trí tuệ</a>
+    <a href="{{ \App\Filament\Pages\BrainLibraryPage::getUrl() }}" class="ss-muted ss-text-xs" style="text-decoration:underline"><x-filament::icon icon="heroicon-o-arrow-left" style="width:.85rem;height:.85rem;display:inline;vertical-align:-.15em" /> Kho trí tuệ</a>
     <strong style="font-size:1.1rem">{{ $brain->name }}</strong>
     @if (! $brain->isActive())<x-studio.badge tone="muted">Đã lưu trữ</x-studio.badge>@endif
     <x-studio.badge tone="info">{{ $reliances[$brain->reliance()] ?? $brain->reliance() }}</x-studio.badge>

@@ -36,8 +36,6 @@
                         'nosrc' => $cards->where('needs_source', true)->count(), 'nosite' => $cards->filter(fn ($c) => $c['sites'] === [])->count()];
             @endphp
             <div class="bl-row" style="margin-bottom:.8rem" data-testid="bl-summary">
-                <x-studio.badge tone="info">{{ $cards->count() }} Trí tuệ</x-studio.badge>
-                <x-studio.badge tone="ok">{{ $tot['items'] }} mục kiến thức</x-studio.badge>
                 @if ($tot['proposed'])<x-studio.badge tone="warn">{{ $tot['proposed'] }} chờ duyệt</x-studio.badge>@endif
                 @if ($tot['warn'])<x-studio.badge tone="danger">{{ $tot['warn'] }} cảnh báo (mâu thuẫn, cũ, khoảng trống)</x-studio.badge>@endif
                 @if ($tot['nosrc'])<x-studio.badge tone="warn">{{ $tot['nosrc'] }} chưa có nguồn xác nhận</x-studio.badge>@endif
@@ -49,7 +47,7 @@
         @endif
 
         @if ($cards->isEmpty())
-            <div class="ss-card"><div class="ss-card__b">{{ $archived ? 'Chưa có Trí tuệ nào được lưu trữ.' : 'Chưa có Trí tuệ nào.' }}@if ($manage && ! $archived) Bấm "Tạo trí tuệ" rồi chọn loại để bắt đầu.@endif</div></div>
+            <div class="ss-card"><div class="ss-card__b">{{ $archived ? 'Chưa có Trí tuệ nào được lưu trữ.' : 'Chưa có Trí tuệ nào.' }}</div></div>
         @else
             <div class="bl-grid">
                 @foreach ($cards as $c)
@@ -68,19 +66,19 @@
                             <span>{{ $c['sources'] }} tài liệu</span><span>·</span><span>{{ $c['items'] }} mục</span>
                             @if ($c['proposed'])<x-studio.badge tone="warn">{{ $c['proposed'] }} chờ duyệt</x-studio.badge>@endif
                         </div>
+                        @if ($c['conflicts'] + $c['expired'] + $c['gaps'] > 0 || $c['needs_source'])
                         <div class="bl-row ss-text-xs">
                             <span>Độ khỏe</span>
                             <x-studio.hint text="Mâu thuẫn: cùng thực thể và trường nhưng khác giá trị. Cũ: mục đã duyệt nhưng quá hiệu lực. Khoảng trống: truy vấn Người viết không tìm thấy kiến thức đã duyệt." />
-                            @if ($c['conflicts'] + $c['expired'] + $c['gaps'] === 0 && ! $c['needs_source'])
-                                <x-studio.badge tone="ok">Không cảnh báo</x-studio.badge>
-                            @else
+                            @if ($c['conflicts'] + $c['expired'] + $c['gaps'] > 0 || $c['needs_source'])
                                 @if ($c['needs_source'])<x-studio.badge tone="warn">Chưa có nguồn xác nhận</x-studio.badge>@endif
                                 @if ($c['conflicts'])<x-studio.badge tone="danger">{{ $c['conflicts'] }} mâu thuẫn</x-studio.badge>@endif
                                 @if ($c['expired'])<x-studio.badge tone="warn">{{ $c['expired'] }} cũ</x-studio.badge>@endif
                                 @if ($c['gaps'])<x-studio.badge tone="warn">{{ $c['gaps'] }} khoảng trống</x-studio.badge>@endif
                             @endif
                         </div>
-                        <div class="ss-muted ss-text-xs">Website: {{ $c['sites'] ? implode(', ', array_slice($c['sites'], 0, 3)).(count($c['sites']) > 3 ? ' +'.(count($c['sites']) - 3) : '') : 'chưa gắn website nào' }}</div>
+                        @endif
+                        @if ($c['sites'])<div class="ss-muted ss-text-xs">Website: {{ implode(', ', array_slice($c['sites'], 0, 3)).(count($c['sites']) > 3 ? ' +'.(count($c['sites']) - 3) : '') }}</div>@endif
                         <div style="margin-top:auto"><x-filament::button size="sm" color="gray" tag="a" :href="\App\Filament\Pages\BrainPage::getUrl(['brain' => $b->id])">Mở</x-filament::button></div>
                     </div></div>
                 @endforeach
@@ -92,6 +90,7 @@
                 <div class="bl-modal__b">
                     <div class="ss-card__h" style="display:flex;gap:.4rem;align-items:center">Cài các trí tuệ mẫu
                         <x-studio.hint tone="warning" text="Mẫu chỉ mang khung cấu trúc, quy tắc an toàn, tên thuật ngữ (chưa có định nghĩa) và gợi ý nguồn chưa xác nhận. Chưa có kiến thức nào được duyệt; cần chuyên gia điền và duyệt trước khi dùng. Mẫu đã cài thì bỏ qua, không ghi đè bản bạn đã sửa. Không tự gắn website." />
+                        <span style="flex:1"></span><x-close-x wire:click="closeInstall" />
                     </div>
                     <form wire:submit="installSelected" style="display:flex;flex-direction:column;gap:.5rem">
                         <div class="bl-row"><x-filament::button type="button" size="xs" color="gray" wire:click="selectNotInstalled">Chọn các mục chưa cài</x-filament::button>
@@ -114,6 +113,7 @@
                 <div class="bl-modal__b" style="{{ $createKind === '' ? 'max-width:40rem' : '' }}">
                     <div class="ss-card__h" style="display:flex;gap:.4rem;align-items:center">Tạo trí tuệ
                         @if ($createKind !== '')<span class="ss-muted ss-text-xs">· {{ $kinds[$createKind]['name'] ?? '' }}</span>@endif
+                        <span style="flex:1"></span><x-close-x wire:click="closeCreate" />
                     </div>
                     @if ($createKind === '')
                         <p class="ss-muted ss-text-sm" style="margin:0 0 .6rem">Bạn muốn tạo loại Trí tuệ nào?</p>

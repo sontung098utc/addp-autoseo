@@ -143,7 +143,7 @@ final class AgentProfiles
             $reg = self::registry();
             $role = $reg->find($roleKey);
             $pts += $role && array_filter($reg->skills($role), fn ($s) => $s['exists'] && $s['enabled']) ? 1 : 0;
-            $pts += self::documents($roleKey, 'knowledge') !== [] || self::documents($roleKey, 'skill') !== [] ? 1 : 0;
+            $pts += self::documents($roleKey, 'knowledge') !== [] || array_filter(self::documents($roleKey, 'skill'), fn ($d) => $d->enabled !== false) !== [] ? 1 : 0;
 
             return $pts * 20;
         } catch (Throwable) {
@@ -436,7 +436,7 @@ final class AgentProfiles
         return array_sum(array_map(fn ($d) => mb_strlen($d->body), self::documents($roleKey, 'knowledge')));
     }
 
-    public static function addDocument(string $roleKey, string $kind, string $title, string $body, User $by): AgentDocument
+    public static function addDocument(string $roleKey, string $kind, string $title, string $body, User $by, ?string $description = null, bool $enabled = true): AgentDocument
     {
         self::guard($by, $roleKey);
         if (! in_array($kind, ['knowledge', 'skill'], true)) {
@@ -456,10 +456,62 @@ final class AgentProfiles
                 ? 'Vượt giới hạn '.self::PROMPT_MAX.' ký tự tài liệu kiến thức của vai trò (còn '.max(0, $limit).').'
                 : 'Kỹ năng tùy chỉnh tối đa '.self::INSTRUCTIONS_MAX.' ký tự.');
         }
-        $d = AgentDocument::query()->create(['role_key' => $roleKey, 'kind' => $kind, 'title' => $title, 'body' => $body, 'bytes' => strlen($body), 'created_by' => $by->id]);
+        $d = AgentDocument::query()->create(['role_key' => $roleKey, 'kind' => $kind, 'title' => $title, 'description' => self::oneLine($description), 'body' => $body, 'bytes' => strlen($body), 'enabled' => $enabled, 'created_by' => $by->id, 'updated_by' => $by->id]);
         self::log($by, $roleKey, 'document_add', ['id' => $d->id, 'kind' => $kind]);
 
         return $d;
+    }
+
+    private static function oneLine(?string $s): ?string
+    {
+        $s = trim(preg_replace('/\s+/u', ' ', self::clean((string) $s)) ?? '');
+        if (mb_strlen($s) > 200) {
+            throw new InvalidArgumentException('Mô tả tối đa 200 ký tự.');
+        }
+
+        return $s === '' ? null : $s;
+    }
+
+    /** Sửa kỹ năng tự tạo (tên, mô tả, nội dung, vai trò áp dụng, bật/tắt). Đổi vai trò = chuyển kỹ năng sang vai trò khác. */
+    public static function updateSkill(int $id, string $title, ?string $description, string $body, bool $enabled, ?string $roleKey, User $by): AgentDocument
+    {
+        $d = AgentDocument::query()->where('kind', 'skill')->findOrFail($id);
+        self::guard($by, $d->role_key);
+        $roleKey = $roleKey ?: $d->role_key;
+        self::guard($by, $roleKey);
+        $title = trim(preg_replace('/\s+/u', ' ', self::clean($title)) ?? '');
+        $body = trim(self::clean($body));
+        if ($title === '' || mb_strlen($title) > 160) {
+            throw new InvalidArgumentException('Tên kỹ năng cần 1 đến 160 ký tự.');
+        }
+        if ($body === '') {
+            throw new InvalidArgumentException('Nội dung trống.');
+        }
+        if (mb_strlen($body) > self::INSTRUCTIONS_MAX) {
+            throw new InvalidArgumentException('Kỹ năng tùy chỉnh tối đa '.self::INSTRUCTIONS_MAX.' ký tự.');
+        }
+        $d->fill(['role_key' => $roleKey, 'title' => $title, 'description' => self::oneLine($description), 'body' => $body, 'bytes' => strlen($body), 'enabled' => $enabled, 'updated_by' => $by->id])->save();
+        self::log($by, $roleKey, 'skill_update', ['id' => $id, 'enabled' => $enabled]);
+
+        return $d;
+    }
+
+    public static function toggleSkill(int $id, bool $enabled, User $by): void
+    {
+        $d = AgentDocument::query()->where('kind', 'skill')->findOrFail($id);
+        self::guard($by, $d->role_key);
+        $d->update(['enabled' => $enabled, 'updated_by' => $by->id]);
+        self::log($by, $d->role_key, 'skill_toggle', ['id' => $id, 'enabled' => $enabled]);
+    }
+
+    /** @return list<AgentDocument> mọi kỹ năng tự tạo (mọi vai trò) */
+    public static function allSkills(): array
+    {
+        try {
+            return Schema::hasTable('agent_documents') ? AgentDocument::query()->where('kind', 'skill')->orderBy('role_key')->orderBy('id')->get()->all() : [];
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     public static function deleteDocument(int $id, User $by): void
@@ -483,7 +535,7 @@ final class AgentProfiles
     {
         $c = self::custom($roleKey);
         $lessons = array_map(fn ($l) => $l->text, self::lessons($roleKey, true));
-        $skills = self::documents($roleKey, 'skill');
+        $skills = array_values(array_filter(self::documents($roleKey, 'skill'), fn ($s) => $s->enabled !== false));
         $docs = self::documents($roleKey, 'knowledge');
         if (array_diff_key($c, ['display_name' => 1, 'avatar' => 1, 'brain_grants' => 1]) === [] && $lessons === [] && $skills === [] && $docs === []) {
             return null;

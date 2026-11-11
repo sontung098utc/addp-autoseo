@@ -32,7 +32,7 @@
     ];
 @endphp
 <x-filament-panels::page>
-    <x-chain-context step="Khám phá" purpose="Đo hiệu quả bài đã đăng và phát hiện bài tụt hạng để làm mới." :inputs="[['label'=>'Bài đã đăng','url'=>\App\Filament\Resources\PublicationResource::listUrl(),'note'=>'Lịch xuất bản']]" :outputs="[['label'=>'Đề xuất làm mới','url'=>\App\Filament\Pages\AuditPage::getUrl(),'note'=>'bài tụt hạng'],['label'=>'Từ khóa mới','url'=>\App\Filament\Pages\KeywordsPage::getUrl()]]" />
+    <x-chain-context step="Khám phá" purpose="Đo hiệu quả bài đã đăng và phát hiện bài tụt hạng để làm mới." :inputs="[['label'=>'Bài đã đăng','url'=>\App\Filament\Resources\PublicationResource::listUrl(),'note'=>'Lịch xuất bản']]" :outputs="[['label'=>'Đề xuất làm mới','url'=>\App\Filament\Pages\AuditPage::getUrl(),'note'=>'bài tụt hạng'],['label'=>'Từ khóa mới','url'=>\App\Filament\Pages\KeywordsPage::getUrl()]]" :compact="true" />
     <style>
         .gs-chart{width:100%;height:auto}
         .gs-list{margin:0;padding:0;list-style:none;display:grid;gap:.5rem}
@@ -49,10 +49,6 @@
                     <x-filament::button size="sm" :color="$days === $d ? 'info' : 'gray'" :outlined="$days !== $d" wire:click="setDays({{ $d }})" aria-pressed="{{ $days === $d ? 'true' : 'false' }}">{{ $d }} ngày</x-filament::button>
                 @endforeach
             </span>
-            @if (in_array($state, ['ket-noi', 'het-han'], true))
-                <x-studio.badge :tone="$state === 'het-han' ? 'warn' : 'ok'">{{ $state === 'het-han' ? 'Hết hạn' : 'Đã kết nối' }}</x-studio.badge>
-                @if ($report && ! $report['empty'])<span class="ss-text-sm ss-muted">Dữ liệu đến {{ $report['periods']['current']['to']->format('d/m/Y') }}</span>@endif
-            @endif
             <x-help title="Nguồn dữ liệu và quy tắc" text="Hệ thống chỉ đọc Search Console, không ghi ngược. Chưa kết nối Google thì trang không có số liệu.">
 <ul>
                         <li>Nguồn: Google Search Console API, OAuth chỉ đọc; hệ thống không ghi ngược vào Search Console.</li>
@@ -94,7 +90,7 @@
         @endif
         @if ($state === 'het-han')
             <div class="ss-alert ss-alert--warn" role="alert" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
-                <span><x-studio.badge tone="warn">Số liệu có thể đã cũ</x-studio.badge> Kết nối hết hạn.</span>
+                <span>Kết nối hết hạn, số liệu có thể đã cũ.</span>
                 <x-filament::button size="sm" color="gray" wire:click="connect">Kết nối lại</x-filament::button>
             </div>
         @endif
@@ -134,23 +130,23 @@
                                     <polyline points="{{ $pts($report['daily_cur']) }}" fill="none" stroke="var(--ss-accent-fg)" stroke-width="2.5"/>
                                 </svg>
                                 <div class="ss-text-sm" style="display:flex;gap:1rem;flex-wrap:wrap">
-                                    <span><strong style="color:var(--ss-accent-fg)">━</strong> Kỳ này: {{ $n($sumC) }} clicks</span>
-                                    <span><strong style="color:var(--ss-muted-fg)">╌</strong> Kỳ trước: {{ $n($sumP) }} clicks</span>
+                                    <span><strong style="color:var(--ss-accent-fg)">━</strong> Kỳ này</span>
+                                    <span><strong style="color:var(--ss-muted-fg)">╌</strong> Kỳ trước</span>
                                 </div>
                             </div>
                         </div>
+                        @if ($oppRows !== [] && count($oppRows) > 0)
                         <div class="ss-card">
                             <div class="ss-card__h">Top cơ hội</div>
                             <div class="ss-card__b">
                                 <ul class="gs-list">
-                                    @forelse (array_slice($oppRows, 0, 5) as $o)
+                                    @foreach (array_slice($oppRows, 0, 5) as $o)
                                         <li class="ss-text-sm"><x-studio.badge :tone="$o['type']['tone']">{{ $o['type']['text'] }}</x-studio.badge> <strong>{{ $o['key'] }}</strong><div class="ss-text-xs ss-muted">{{ $o['reason'] }}</div></li>
-                                    @empty
-                                        <li class="ss-text-sm ss-muted">Không có cơ hội nào trong kỳ này.</li>
-                                    @endforelse
+                                    @endforeach
                                 </ul>
                             </div>
                         </div>
+                        @endif
                     </div>
                 </x-studio.panel>
 
