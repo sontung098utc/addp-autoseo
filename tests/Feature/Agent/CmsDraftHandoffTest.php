@@ -60,11 +60,11 @@ class CmsDraftHandoffTest extends TestCase
             public ?\Throwable $failDelete = null;
 
             public function testConnection(Website $website): bool { return true; }
-            public function uploadMedia(Website $website, string $filePath, string $altText): array { return []; }
+            public function uploadMedia(Website $website, string $filePath, string $altText = ''): array { return []; }
             public function publish(Publication $publication): array { return []; }
             public function getByPublicationKey(Website $website, string $publicationKey): ?array { return null; }
 
-            public function createDraft(Website $website, ArticleVersion $version): array
+            public function createDraft(Website $website, ArticleVersion $version, ?string $publicationKey = null): array
             {
                 $this->drafts++;
                 if ($this->fail) {

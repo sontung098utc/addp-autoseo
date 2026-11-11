@@ -45,7 +45,10 @@ return new class extends Migration
             $table->foreignId('keyword_id')->nullable()->constrained('keywords')->nullOnDelete();
             $table->unsignedBigInteger('cluster_id')->nullable();
             $table->unsignedTinyInteger('priority')->nullable();
-            $table->unsignedBigInteger('campaign_id')->nullable();
+            // articles.campaign_id (FK) do lô migration A (2026_11_10_000002) tạo trước; chỉ bổ sung nếu môi trường chưa có.
+            if (! Schema::hasColumn('articles', 'campaign_id')) {
+                $table->unsignedBigInteger('campaign_id')->nullable();
+            }
         });
     }
 
@@ -53,7 +56,7 @@ return new class extends Migration
     {
         Schema::table('articles', function (Blueprint $table) {
             $table->dropConstrainedForeignId('keyword_id');
-            $table->dropColumn(['kind', 'origin', 'origin_ref', 'cluster_id', 'priority', 'campaign_id']);
+            $table->dropColumn(['kind', 'origin', 'origin_ref', 'cluster_id', 'priority']);
         });
         Schema::dropIfExists('keywords');
         Schema::dropIfExists('keyword_clusters');

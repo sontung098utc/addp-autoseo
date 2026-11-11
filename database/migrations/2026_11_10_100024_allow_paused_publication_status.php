@@ -25,7 +25,7 @@ return new class extends Migration
         DB::table('publications')->whereIn('status', ['paused', 'awaiting_confirm'])
             ->update(['status' => 'failed', 'last_error' => 'Đang dừng/chờ xác nhận khi gỡ tính năng điểm dừng; cần xếp lịch lại.']);
         Schema::table('publications', function (Blueprint $table) {
-            $table->enum('status', ['scheduled', 'publishing', 'published', 'failed', 'needs_reconcile'])->default('scheduled')->change();
+            $table->enum('status', ['scheduled', 'publishing', 'published', 'failed', 'needs_reconcile', 'held'])->default('scheduled')->change();
         });
     }
 };

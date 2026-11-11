@@ -306,7 +306,9 @@ class WebsiteResource extends Resource
                     $record->forceFill(['last_synced_at' => now(), 'status' => 'active'])->save();
                     Notification::make()->title('Kết nối thành công. Trạng thái đã chuyển sang Hoạt động.')->success()->send();
                 } else {
-                    $record->forceFill(['status' => 'error'])->save();
+                    if ($record->status !== 'active') {
+                        $record->forceFill(['status' => 'error'])->save();
+                    }
                     Notification::make()->title('Kết nối không thành công. Vui lòng kiểm tra lại địa chỉ và credential.')->danger()->send();
                 }
             });

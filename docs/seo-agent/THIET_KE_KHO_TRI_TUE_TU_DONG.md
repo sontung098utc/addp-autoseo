@@ -24,7 +24,7 @@ Quy ước: đường dẫn tính từ gốc kho mã; số dòng đúng lúc đ�
 | Giọng thương hiệu, thông điệp, từ cấm | `brand_profiles` | `AgentRunOrchestrator::brandOptions` `:379` |
 | Danh sách nguồn được phép trích, **chỉ khi** Trí tuệ đặt `must_cite` | `brain_sources` đã xác nhận | `AgentRunOrchestrator.php:295-297`; `BrainSourceRegistry::citable` `:44` |
 
-Chuỗi chạy hiện có các bước `guard | risk | brief | write | grade | repair | handoff` (`2026_11_07_000001_create_agent_runs_tables.php:43`). **Không có bước nghiên cứu riêng**: kho được nạp ngay trong bước viết (`AgentRunOrchestrator::write` `:282`).
+Chuỗi chạy hiện có các bước `guard | risk | brief | write | grade | repair | handoff` (`2026_11_10_100001_create_agent_runs_tables.php:43`). **Không có bước nghiên cứu riêng**: kho được nạp ngay trong bước viết (`AgentRunOrchestrator::write` `:282`).
 
 Tab "Nghiên cứu và nguồn" của bài (`workspace.blade.php:76`, khối `:266-346`; dữ liệu ở `ViewArticle.php:162-186`) hiện bốn thẻ: Từ Kho trí tuệ, Từ hồ sơ doanh nghiệp, Nguồn AI nêu trong bài, Dàn ý AI lập. Kèm cảnh báo "Kho thiếu kiến thức" và dòng "Hệ thống hiện chưa tự tìm nguồn trên web hay từ tổ chức chuyên ngành" (`:344`).
 

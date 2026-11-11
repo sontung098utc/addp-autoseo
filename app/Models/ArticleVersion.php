@@ -5,10 +5,19 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ArticleVersion extends Model
 {
+    protected static function booted(): void
+    {
+        // Có bản mới (làm mới, chạy lại theo chỉ dẫn...) thì bản đã duyệt trước đó không còn là bản mới nhất: xóa articles.approved_version_id.
+        static::created(function (self $v): void {
+            Article::query()->whereKey($v->article_id)->whereNotNull('approved_version_id')->update(['approved_version_id' => null]);
+        });
+    }
+
     use HasFactory;
 
     protected $fillable = [
@@ -66,7 +75,7 @@ class ArticleVersion extends Model
         return $this->hasMany(Publication::class);
     }
 
-    public function mediaAssets(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function mediaAssets(): BelongsToMany
     {
         return $this->belongsToMany(MediaAsset::class, 'article_version_media')
             ->withPivot(['is_featured', 'position', 'custom_alt'])

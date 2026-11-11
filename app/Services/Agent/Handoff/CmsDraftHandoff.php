@@ -2,6 +2,7 @@
 
 namespace App\Services\Agent\Handoff;
 
+use App\Contracts\CmsErrorInterface;
 use App\Filament\Support\Schedule\ErrorMasker;
 use App\Models\AgentRun;
 use App\Models\ArticleVersion;
@@ -23,9 +24,7 @@ use Throwable;
  */
 class CmsDraftHandoff
 {
-    public function __construct(private PublisherManager $publishers, private EmergencyStopService $stop)
-    {
-    }
+    public function __construct(private PublisherManager $publishers, private EmergencyStopService $stop) {}
 
     public function push(AgentRun $run, ArticleVersion $version, ?Website $site, bool $passedP0, string $riskLevel): CmsDraftResult
     {
@@ -61,6 +60,8 @@ class CmsDraftHandoff
         }
 
         try {
+            // KHÔNG truyền publication_key vào createDraft: connector WordPress dùng khóa đó làm dấu nhận dạng, khi đăng chính thức bước 1 sẽ thấy bản nháp
+            // và chỉ đổi trạng thái (bỏ qua SEO meta/taxonomy, không ghi promoted_draft_id). Nháp của hệ thống tự nhận biết bằng cms_draft_id.
             $res = $publisher->createDraft($site, $version);
             $id = (string) ($res['remote_id'] ?? '');
             if ($id === '') {
@@ -73,14 +74,31 @@ class CmsDraftHandoff
             ])->save();
 
             return new CmsDraftResult('pushed', null, $label, $url !== '' ? $url : null, $id);
-        } catch (Throwable $e) {
-            // KHÔNG thử lại: nếu lỗi sau khi gửi thì nháp có thể đã tồn tại trên CMS (không có khóa nhận dạng để tra).
-            $msg = ErrorMasker::short($e->getMessage(), 160);
-            Log::warning("[CmsDraftHandoff] Đẩy nháp version #{$version->id} lên {$label} lỗi (không thử lại): {$msg}");
-            $version->forceFill(['cms_draft_status' => 'failed'])->save();
+        } catch (CmsErrorInterface $e) {
+            if (! $e->isAmbiguous()) {
+                // Lỗi chuẩn hóa KHÔNG mơ hồ (vd 401/403/422, thiếu quyền): CMS chắc chắn chưa tạo nháp, nên cho phép thử lại.
+                $msg = ErrorMasker::short($e->getMessage(), 160);
+                Log::warning("[CmsDraftHandoff] Đẩy nháp version #{$version->id} lên {$label} thất bại chắc chắn [{$e->errorCode()}]: {$msg}");
+                $version->forceFill(['cms_draft_status' => 'failed'])->save();
 
-            return new CmsDraftResult('failed', "Không đẩy được nháp lên {$label} ({$msg}). Không tự thử lại để tránh tạo trùng; nháp có thể đã tồn tại trên CMS, hãy kiểm tra thủ công. Bài vẫn chờ người duyệt.", $label);
+                return new CmsDraftResult('failed', "Không đẩy được nháp lên {$label} ({$msg}). Lỗi rõ ràng, CMS chưa tạo nháp nào; sau khi xử lý lỗi có thể đẩy lại. Bài vẫn chờ người duyệt.", $label);
+            }
+
+            return $this->draftFailedMaybeCreated($version, $label, $e);
+        } catch (Throwable $e) {
+            return $this->draftFailedMaybeCreated($version, $label, $e);
         }
+    }
+
+    /** Lỗi mơ hồ hoặc không rõ: nháp có thể đã tồn tại trên CMS, nên KHÔNG thử lại. */
+    private function draftFailedMaybeCreated(ArticleVersion $version, string $label, Throwable $e): CmsDraftResult
+    {
+        // KHÔNG thử lại: nếu lỗi sau khi gửi thì nháp có thể đã tồn tại trên CMS (không có khóa nhận dạng để tra).
+        $msg = ErrorMasker::short($e->getMessage(), 160);
+        Log::warning("[CmsDraftHandoff] Đẩy nháp version #{$version->id} lên {$label} lỗi (không thử lại): {$msg}");
+        $version->forceFill(['cms_draft_status' => 'failed'])->save();
+
+        return new CmsDraftResult('failed', "Không đẩy được nháp lên {$label} ({$msg}). Không tự thử lại để tránh tạo trùng; nháp có thể đã tồn tại trên CMS, hãy kiểm tra thủ công. Bài vẫn chờ người duyệt.", $label);
     }
 
     /**
@@ -92,7 +110,7 @@ class CmsDraftHandoff
             throw new \RuntimeException('Bản này không có nháp đang hiệu lực trên CMS.');
         }
         // Đã có lượt đăng chính thức (kể cả đang chạy/cần đối soát): nháp có thể đã thành bài công khai, không được xóa.
-        if (Publication::query()->where('article_version_id', $version->id)->whereIn('status', ['publishing', 'published', 'needs_reconcile'])->exists()) {
+        if (Publication::query()->where('article_version_id', $version->id)->whereIn('status', ['publishing', 'published', 'needs_reconcile', 'held', 'paused', 'awaiting_confirm'])->exists()) {
             throw new \RuntimeException('Bản này đã có lượt đăng chính thức nên không hủy nháp được.');
         }
         $site = $version->article?->website;

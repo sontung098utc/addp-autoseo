@@ -2,14 +2,15 @@
 
 namespace App\Integrations\WordPress\Exceptions;
 
+use App\Contracts\CmsErrorInterface;
 use Illuminate\Http\Client\ConnectionException;
 use Throwable;
 
 /**
- * Lỗi MƠ HỒ sau khi đã gửi yêu cầu ghi. Cố ý kế thừa ConnectionException vì PublishArticleJob
- * (không được sửa) chỉ chuyển sang needs_reconcile khi bắt được loại ngoại lệ này.
+ * Lỗi MƠ HỒ sau khi đã gửi yêu cầu ghi. Kế thừa ConnectionException để tương thích ngược,
+ * đồng thời triển khai CmsErrorInterface (PR-D) để PublishArticleJob xử lý đồng nhất.
  */
-class WordPressAmbiguousException extends ConnectionException
+class WordPressAmbiguousException extends ConnectionException implements CmsErrorInterface
 {
     use HasWordPressErrorCode;
 

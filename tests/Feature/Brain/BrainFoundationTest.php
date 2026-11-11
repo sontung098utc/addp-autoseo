@@ -42,7 +42,7 @@ class BrainFoundationTest extends TestCase
 
     private function runDataMigration(): void
     {
-        $m = require database_path('migrations/2026_11_18_000001_create_brains_tables.php');
+        $m = require database_path('migrations/2026_11_10_100015_create_brains_tables.php');
         $m->up();
     }
 

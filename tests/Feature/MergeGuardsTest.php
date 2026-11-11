@@ -116,4 +116,20 @@ class MergeGuardsTest extends TestCase
         $this->assertSame(160, mb_strlen($fit->invoke(null, str_repeat('ê', 500), 160)));
         $this->assertNull($fit->invoke(null, null, 70));
     }
+
+    public function test_ban_moi_xoa_approved_version_id_va_danh_sach_trang_thai_co_du_ba_kieu_giu(): void
+    {
+        foreach (['held', 'paused', 'awaiting_confirm'] as $st) {
+            $this->assertContains($st, Publication::ALL_STATUSES);
+        }
+        $w = $this->site();
+        $a = Article::create(['website_id' => $w->id, 'primary_keyword' => 'k', 'workflow_status' => 'approved']);
+        $v1 = ArticleVersion::create(['article_id' => $a->id, 'version' => 1, 'title' => 't', 'slug' => 's', 'html_content' => '<p>x</p>', 'review_status' => 'approved', 'tokens_used' => 1, 'cost_vnd' => 1]);
+        $a->update(['approved_version_id' => $v1->id]);
+        $this->assertSame($v1->id, $a->fresh()->approved_version_id);
+
+        ArticleVersion::create(['article_id' => $a->id, 'version' => 2, 'title' => 't2', 'slug' => 's', 'html_content' => '<p>y</p>', 'review_status' => 'needs_review', 'tokens_used' => 1, 'cost_vnd' => 1]);
+
+        $this->assertNull($a->fresh()->approved_version_id);
+    }
 }

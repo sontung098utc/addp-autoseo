@@ -289,7 +289,7 @@ class KeywordMetricsTest extends TestCase
     public function test_migration_len_xuong_sqlite(): void
     {
         $this->assertTrue(Schema::hasColumns('keywords', ['volume_source', 'metrics_at', 'competition', 'cpc_vnd']));
-        $m = require base_path('database/migrations/2026_11_23_000001_add_volume_source_to_keywords.php');
+        $m = require base_path('database/migrations/2026_11_10_100020_add_volume_source_to_keywords.php');
         $m->down();
         $this->assertFalse(Schema::hasColumn('keywords', 'volume_source'));
         $this->assertFalse(Schema::hasColumn('keywords', 'cpc_vnd'));

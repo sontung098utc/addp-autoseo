@@ -153,7 +153,7 @@ class AgentProfilesTest extends TestCase
 
     public function test_migration_up_down(): void
     {
-        $m = require database_path('migrations/2026_11_22_000001_create_agent_profiles_tables.php');
+        $m = require database_path('migrations/2026_11_10_100019_create_agent_profiles_tables.php');
         $m->down();
         foreach (['agent_profiles', 'agent_profile_versions', 'agent_lessons', 'agent_documents'] as $t) {
             $this->assertFalse(Schema::hasTable($t), $t);

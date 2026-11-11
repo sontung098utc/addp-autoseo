@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Contracts\CmsErrorInterface;
 use App\Models\Publication;
 use App\Services\Publishing\EmergencyStopService;
 use App\Services\Publishing\PublisherManager;
@@ -132,6 +133,29 @@ class PublishArticleJob implements ShouldQueue
             }
 
             Log::info("[PublishArticleJob] Xuất bản thành công Publication #{$publication->id} lên {$website->cms_type} (Remote ID: ".($result['remote_id'] ?? 'N/A').').');
+        } catch (CmsErrorInterface $e) {
+            // Lỗi chuẩn hóa từ CMS connector (WordPress & Magento) theo hợp đồng PR-D / E13
+            if ($e->isAmbiguous()) {
+                Log::error("[PublishArticleJob] Lỗi mơ hồ [{$e->errorCode()}] khi gửi bài #{$publication->id}: {$e->getMessage()}. Chuyển sang needs_reconcile.");
+                $publication->update([
+                    'status' => Publication::STATUS_NEEDS_RECONCILE,
+                    'last_error' => $e->getMessage(),
+                ]);
+            } elseif ($e->isRetryable() && $this->job && $this->attempts() < $this->tries) {
+                $delay = $this->backoff[$this->attempts() - 1] ?? 60;
+                Log::warning("[PublishArticleJob] Lỗi tạm thời [{$e->errorCode()}] cho bài #{$publication->id}: {$e->getMessage()}. Thử lại sau {$delay}s.");
+                $publication->update([
+                    'status' => Publication::STATUS_SCHEDULED,
+                    'last_error' => $e->getMessage(),
+                ]);
+                $this->release($delay);
+            } else {
+                Log::error("[PublishArticleJob] Lỗi CMS [{$e->errorCode()}] cho bài #{$publication->id}: {$e->getMessage()}");
+                $publication->update([
+                    'status' => Publication::STATUS_FAILED,
+                    'last_error' => $e->getMessage(),
+                ]);
+            }
         } catch (ConnectionException $e) {
             // Lỗi mạng hoặc timeout từ CMS sau khi gửi bài -> Căn cứ Quy tắc 4 AGENTS.md:
             // Phải chuyển sang needs_reconcile để đối soát theo publication_key, TUYỆT ĐỐI không tự động retry tạo bài mới

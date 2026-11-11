@@ -90,7 +90,8 @@ class ReviewWorkflow
                 'reviewed_at' => now(),
                 'review_notes' => $note,
             ]);
-            $article->update(['workflow_status' => 'approved']);
+            // approved_version_id (lô A của Dev1): bản đang được duyệt; ArticleVersion::created xóa giá trị này khi có bản mới.
+            $article->update(['workflow_status' => 'approved', 'approved_version_id' => $version->id]);
             // Nếu tự duyệt mà thiếu ghi chú, AuditRecorder ném lỗi và transaction rollback.
             $this->audit->record(AuditAction::Approve, $actor, $article, $version, $note);
             if ($blocking) {

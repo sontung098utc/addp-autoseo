@@ -333,7 +333,7 @@ class PilotService
 
             $html = self::generateGoodHtml($def['kw'], $seed, 880);
             $seoTitle = mb_substr("Tìm hiểu {$def['kw']} an toàn", 0, 55);
-            $metaDesc = "Cẩm nang tổng quan về {$def['kw']}: Hướng dẫn chi tiết, nguyên tắc áp dụng an toàn và lời khuyên hữu ích từ bác sĩ chuyên khoa uy tín.";
+            $metaDesc = mb_substr("Cẩm nang tổng quan về {$def['kw']}: Hướng dẫn chi tiết, nguyên tắc áp dụng an toàn và lời khuyên từ bác sĩ.", 0, 155);
 
             $version = ArticleVersion::updateOrCreate([
                 'article_id' => $article->id,
