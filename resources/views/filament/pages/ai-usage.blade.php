@@ -155,15 +155,15 @@
             <x-studio.panel key="rules">
                 <div class="ss-grid ss-text-sm">
                     <details class="ss-card"><summary class="ss-card__h" style="cursor:pointer">Cách tính</summary><div class="ss-card__b"><ul style="list-style:disc;padding-left:1.25rem;display:grid;gap:.25rem">
-                        <li><strong>Ngưỡng theo bài:</strong> tổng cost_vnd của mọi phiên bản của một bài LỚN HƠN ngưỡng (đúng bằng thì không vượt; so sánh trên số đã làm tròn đồng) thì bài hiện "▲ Vượt ngưỡng". Chỉ cảnh báo, không chặn sinh bài.</li>
-                        <li><strong>Ngưỡng theo tháng:</strong> tổng cost_vnd các phiên bản sinh trong tháng dương lịch (giờ Việt Nam), toàn hệ thống. Để trống = không cảnh báo; nếu đặt phải lớn hơn hoặc bằng ngưỡng theo bài.</li>
-                        <li><strong>Trung bình mỗi bài:</strong> tổng cost_vnd của MỌI phiên bản thuộc các bài có phiên bản sinh trong kỳ, chia cho số bài đó (sinh lại tính vào bài). Có thể lệch so với chi phí trong kỳ nếu bài có phiên bản ở kỳ khác.</li>
+                        <li><strong>Ngưỡng theo bài:</strong> tổng chi phí của mọi phiên bản của một bài LỚN HƠN ngưỡng (đúng bằng thì không vượt; so sánh trên số đã làm tròn đồng) thì bài hiện "▲ Vượt ngưỡng". Chỉ cảnh báo, không chặn sinh bài.</li>
+                        <li><strong>Ngưỡng theo tháng:</strong> tổng chi phí các phiên bản sinh trong tháng dương lịch (giờ Việt Nam), toàn hệ thống. Để trống = không cảnh báo; nếu đặt phải lớn hơn hoặc bằng ngưỡng theo bài.</li>
+                        <li><strong>Trung bình mỗi bài:</strong> tổng chi phí của MỌI phiên bản thuộc các bài có phiên bản sinh trong kỳ, chia cho số bài đó (sinh lại tính vào bài). Có thể lệch so với chi phí trong kỳ nếu bài có phiên bản ở kỳ khác.</li>
                         <li><strong>Chi phí tính tại thời điểm sinh:</strong> không tính lại khi đổi bảng giá hoặc tỉ giá. Tiền tệ VND, cộng trên giá trị lưu rồi mới làm tròn đồng nên tổng các dòng có thể lệch vài đồng.</li>
                         <li><strong>So với kỳ trước:</strong> kỳ liền trước cùng độ dài; chi phí và trung bình tính theo %, số bài và phiên bản theo số tuyệt đối. Giảm là tốt (màu xanh).</li>
                     </ul></div></details>
                     <details class="ss-card"><summary class="ss-card__h" style="cursor:pointer">Quyền và dữ liệu thiếu</summary><div class="ss-card__b"><ul style="list-style:disc;padding-left:1.25rem;display:grid;gap:.25rem">
                         <li><strong>Ai được xem và đặt:</strong> Quản trị và Người duyệt. Biên tập viên bị chặn (403).</li>
-                        <li><strong>Thiếu dữ liệu:</strong> không có phiên bản trong kỳ thì hiện "Chưa có dữ liệu", không hiện số 0 giả. Phiên bản chưa ghi chi phí (cost_vnd trống, hoặc 0 ₫ với 0 token) được đếm riêng.</li>
+                        <li><strong>Thiếu dữ liệu:</strong> không có phiên bản trong kỳ thì hiện "Chưa có dữ liệu", không hiện số 0 giả. Phiên bản chưa ghi chi phí (chưa ghi chi phí, hoặc 0 ₫ với 0 token) được đếm riêng.</li>
                         <li><strong>Model lạ:</strong> khi model chưa có trong bảng giá, bộ tính rơi về giá gemini-1.5-flash nên chi phí có thể bị ghi thấp.</li>
                     </ul></div></details>
                 </div>

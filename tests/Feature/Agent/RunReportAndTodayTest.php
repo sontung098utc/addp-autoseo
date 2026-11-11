@@ -26,6 +26,17 @@ class RunReportAndTodayTest extends TestCase
         return User::create(['name' => 'a', 'email' => uniqid().'@x.vn', 'password' => 'secret123', 'role' => 'approver', 'is_active' => true]);
     }
 
+    public function test_bao_cao_khong_lo_ma_trang_thai_ky_thuat(): void
+    {
+        $w = $this->site();
+        $a = Article::create(['website_id' => $w->id, 'primary_keyword' => 'abc', 'workflow_status' => 'needs_review']);
+        $run = AgentRun::create(['website_id' => $w->id, 'article_id' => $a->id, 'status' => 'ready_for_review', 'cost_vnd' => 10]);
+
+        $text = implode(' ', RunReport::for($run)['lines']);
+        $this->assertStringNotContainsString('ready_for_review', $text);
+        $this->assertStringContainsString('đã có bản nháp chờ duyệt', $text);
+    }
+
     public function test_bao_cao_khao_sat_noi_that_ve_luot_tim_va_co_lien_ket(): void
     {
         $w = $this->site();

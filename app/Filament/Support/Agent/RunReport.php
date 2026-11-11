@@ -4,6 +4,7 @@ namespace App\Filament\Support\Agent;
 
 use App\Filament\Pages\BrainBuildPage;
 use App\Filament\Pages\KeywordsPage;
+use App\Filament\Resources\AgentRunResource;
 use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\ArticleVersionResource;
 use App\Models\AgentRun;
@@ -64,7 +65,7 @@ final class RunReport
                 $links[] = ['label' => 'Xem phiên bản đã tạo', 'url' => ArticleVersionResource::getUrl('view', ['record' => $run->final_version_id])];
             }
         }
-        $lines[] = 'Chi phí AI: '.$cost.($dur ? ", thời gian {$dur}" : '').'; '.($run->status === 'failed' ? 'phiên lỗi' : 'trạng thái: '.($run->status)).'.';
+        $lines[] = 'Chi phí AI: '.$cost.($dur ? ", thời gian {$dur}" : '').'; '.($run->status === 'failed' ? 'phiên lỗi' : 'trạng thái: '.mb_strtolower(AgentRunResource::STATUS[$run->status][0] ?? (string) $run->status)).'.';
         if ($run->outcome_reason) {
             $lines[] = 'Lý do kết thúc: '.$run->outcome_reason;
         }

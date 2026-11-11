@@ -21,7 +21,7 @@ return [
         ['id' => 'scope', 'role' => 'strategist', 'label' => 'Phân loại phạm vi sửa', 'kind' => 'rule', 'when' => '(a) tiêu đề và meta, (b) một số mục, (c) viết lại'],
         ['id' => 'meta', 'role' => 'writer', 'label' => 'Sinh lại siêu dữ liệu', 'kind' => 'llm', 'task' => 'meta_regen', 'when' => 'Nhánh 4a; bậc rẻ'],
         ['id' => 'section', 'role' => 'writer', 'label' => 'Sửa các mục có lỗi', 'kind' => 'llm', 'task' => 'section_repair', 'when' => 'Nhánh 4b; bậc chuẩn; chỉ gửi mục cần sửa'],
-        ['id' => 'rewrite', 'role' => 'writer', 'label' => 'Viết lại', 'kind' => 'llm', 'task' => 'write', 'when' => 'Nhánh 4c: chạy như article_write (cũng là đường lùi khi AI không hỗ trợ sửa một phần)'],
+        ['id' => 'rewrite', 'role' => 'writer', 'label' => 'Viết lại', 'kind' => 'llm', 'task' => 'write', 'when' => 'Nhánh 4c: chạy như luồng Viết bài (cũng là đường lùi khi AI không hỗ trợ sửa một phần)'],
         ['id' => 'grade', 'role' => 'editor', 'label' => 'Chấm lại', 'kind' => 'rule'],
         ['id' => 'handoff', 'human' => true, 'role' => 'system', 'label' => 'Bàn giao phiên bản mới', 'kind' => 'rule'],
     ],

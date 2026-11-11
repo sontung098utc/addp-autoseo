@@ -1,7 +1,7 @@
-@props(['type' => 'article_write'])
+@props(['type' => 'article_write', 'title' => null])
 {{-- Hình minh họa phẳng cho từng loại việc (SVG nội tuyến, tự vẽ). Màu nhấn lấy từ --tone của thẻ chứa. --}}
 @php($known = ['market_research', 'site_audit', 'content_plan', 'article_write', 'article_refresh', 'brain_build', 'measure'])
-<div {{ $attributes->class(['fl-illu']) }} data-illustration="{{ $type }}" role="img" aria-label="Hình minh họa {{ $type }}">
+<div {{ $attributes->class(['fl-illu']) }} data-illustration="{{ $type }}" role="img" aria-label="Hình minh họa{{ $title ? ': '.$title : '' }}">
 <svg viewBox="0 0 320 150" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true">
     <circle cx="268" cy="30" r="46" fill="var(--tone)" opacity=".10"/>
     <circle cx="44" cy="128" r="34" fill="var(--tone)" opacity=".08"/>

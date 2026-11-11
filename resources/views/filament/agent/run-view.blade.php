@@ -283,7 +283,7 @@
             <x-studio.panel key="du-lieu">
                 <div class="rvx" data-testid="run-data">
                     <div class="rvx-pane">
-                        <h3>Đầu vào và đầu ra <x-help text="Dữ liệu thô của phiên (input_refs, output_ref). Chỉ quản trị xem được." /></h3>
+                        <h3>Đầu vào và đầu ra <x-help text="Dữ liệu thô của phiên: thứ phiên đã nhận vào và thứ nó ghi ra. Chỉ quản trị xem được." /></h3>
                         @if ($isAdmin)
                             <div class="rv-k">Đầu vào</div><pre class="rvx-pre" data-testid="run-input-ref">{{ json_encode($run->input_refs ?: new stdClass, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) }}</pre>
                             <div class="rv-k" style="margin-top:.5rem">Đầu ra</div><pre class="rvx-pre" data-testid="run-output-ref">{{ json_encode($run->output_ref ?: new stdClass, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) }}</pre>

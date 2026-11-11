@@ -18,7 +18,7 @@ $c = $cards[$f['id']] ?? ['running' => 0, 'week' => 0, 'done' => 0, 'failed' => 
 @endphp
             <button type="button" class="pc" data-card="{{ $f['id'] }}" data-running="{{ $c['running'] }}" data-week="{{ $c['week'] }}" data-steps="{{ count($f['steps']) }}"
                 style="--tone: {{ \App\Services\Agent\Pipeline\PipelineVisual::tone($f['id']) }}" x-on:click="show('{{ $f['id'] }}')" aria-haspopup="dialog">
-                <x-flow.illustration :type="$f['id']" class="pc__illu" />
+                <x-flow.illustration :type="$f['id']" :title="$f['title'] ?? null" class="pc__illu" />
                 <span class="pc__body">
                     <span class="pc__title"><span class="pc__name">{{ $f['title'] }}</span>@if ($f['status'] !== 'active')<span class="pv-tag pv-tag--off">{{ $statusText[$f['status']] ?? $f['status'] }}</span>@endif</span>
                     <span class="pc__plain">{{ $f['plain'] }}</span>
