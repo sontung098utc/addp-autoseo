@@ -83,7 +83,7 @@
   display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: start; }
 .dark .ss-review { --ss-review-ins-bg: #14352B; --ss-review-ins-fg: #BFEBDA; --ss-review-del-bg: #3D1D1A; --ss-review-del-fg: #F6C9C3; --ss-review-num-bg: #3F3210; --ss-review-num-fg: #F4DDA0; }
 .ss-review__side, .ss-review__main { display: grid; gap: 1rem; min-width: 0; align-content: start; }
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .ss-review { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
   .ss-review__main { grid-column: 1; grid-row: 1; }
   .ss-review__side { grid-column: 2; grid-row: 1; position: sticky; top: 5rem; max-height: calc(100vh - 6rem); overflow-y: auto; }
