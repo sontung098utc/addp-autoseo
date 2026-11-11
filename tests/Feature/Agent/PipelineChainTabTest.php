@@ -43,13 +43,14 @@ class PipelineChainTabTest extends TestCase
         $this->assertSame(['flows', 'runs'], $m[1]);
     }
 
-    public function test_moi_luong_la_mot_khung_co_chip_loc_tieu_de_mo_ta_va_nut_mo_trang(): void
+    public function test_moi_luong_la_mot_the_lon_va_mot_popup_co_tieu_de_mo_ta_va_nut_mo_trang(): void
     {
         $this->actingAs($this->user('approver'));
         $html = $this->get('/admin/doi-ai/pipeline')->assertOk()->getContent();
         foreach (JobTypeRegistry::all() as $j) {
-            $this->assertStringContainsString('data-flow-chip="'.$j['id'].'"', $html);
-            $a = strpos($html, '<section class="pv-flow" data-flow="'.$j['id'].'"');
+            $this->assertStringContainsString('data-card="'.$j['id'].'"', $html);
+            $this->assertStringNotContainsString('data-flow-chip', $html);
+            $a = strpos($html, '<section class="pv-flow pm__box" data-flow="'.$j['id'].'"');
             $this->assertNotFalse($a, $j['id']);
             $sec = substr($html, $a, strpos($html, '</section>', $a) - $a);
             $this->assertStringContainsString($j['title'], $sec);

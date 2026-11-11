@@ -6,11 +6,12 @@ use App\Filament\Pages\BrainPage;
 use App\Models\Brain;
 use App\Models\BrainSource;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
 
-/** AG-B3: giao diện Sổ nguồn uy tín trên trang Trí tuệ (quyền, thao tác, cách ly giữa các Trí tuệ). */
+/** AG-B3: giao diện Căn cứ chuẩn mực trên trang Trí tuệ (quyền, thao tác, cách ly giữa các Trí tuệ). */
 class BrainSourceRegistryUiTest extends TestCase
 {
     use RefreshDatabase;
@@ -30,7 +31,7 @@ class BrainSourceRegistryUiTest extends TestCase
         $b = $this->brain();
         $this->actingAs($this->user('approver'));
         Livewire::test(BrainPage::class, ['brain' => $b->id])->assertOk()
-            ->assertSee('Sổ nguồn')->assertSee('Sổ nguồn đang trống')->assertSee('Bắt buộc nguồn');
+            ->assertSee('Căn cứ chuẩn mực')->assertSee('Căn cứ chuẩn mực đang trống')->assertDontSee('Sổ nguồn')->assertSee('Nguồn quốc tế, pháp lý, khoa học đã được công nhận')->assertSee('Bắt buộc nguồn');
     }
 
     public function test_them_nguon_xep_bac_roi_rut_xac_nhan_va_xoa(): void
@@ -58,12 +59,12 @@ class BrainSourceRegistryUiTest extends TestCase
         $this->actingAs($u);
         $s = BrainSource::create(['brain_id' => $b->id, 'name' => 'WHO', 'domain' => 'who.int', 'status' => 'suggested']);
         $t = Livewire::test(BrainPage::class, ['brain' => $b->id]);
-        $t->call('setSourceTier', $s->id, '1')->assertNotified('Đã xác nhận "WHO" ở bậc 1: chính thức');
+        $t->call('setSourceTier', $s->id, '1')->assertNotified('Đã xác nhận "WHO" ở bậc 1: pháp lý, tiêu chuẩn, cơ quan chính thức');
         $t->assertSeeHtml('data-testid="confirmed-by"')->assertSee('Xác nhận bởi approver, '.now()->format('d/m/Y'));
         $t->call('setSourceTier', $s->id, 'blocked')->assertNotified('Đã chặn "WHO"');
         $t->call('unconfirmSource', $s->id)->assertNotified('Đã rút xác nhận "WHO"');
         $t->assertDontSee('Xác nhận bởi');
-        $t->call('removeSource', $s->id)->assertNotified('Đã xóa "WHO" khỏi Sổ nguồn');
+        $t->call('removeSource', $s->id)->assertNotified('Đã xóa "WHO" khỏi Căn cứ chuẩn mực');
     }
 
     public function test_tien_mien_sai_bi_tu_choi_khong_luu(): void
@@ -80,7 +81,7 @@ class BrainSourceRegistryUiTest extends TestCase
         $other = $this->brain();
         $foreign = BrainSource::create(['brain_id' => $other->id, 'name' => 'Khác', 'domain' => 'khac.org', 'status' => 'suggested']);
         $this->actingAs($this->user('approver'));
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $this->expectException(ModelNotFoundException::class);
         try {
             Livewire::test(BrainPage::class, ['brain' => $a->id])->call('setSourceTier', $foreign->id, '1');
         } finally {

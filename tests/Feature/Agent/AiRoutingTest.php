@@ -3,7 +3,6 @@
 namespace Tests\Feature\Agent;
 
 use App\Filament\Pages\AiUsagePage;
-use App\Models\AgentRun;
 use App\Models\AgentSetting;
 use App\Models\AiModelRoute;
 use App\Models\AiProvider;
@@ -19,13 +18,16 @@ use App\Services\Agent\Settings\AgentAi;
 use App\Services\Ai\AiProviderError;
 use App\Services\Ai\AiSchemaError;
 use App\Services\Ai\AnthropicAiProvider;
+use App\Services\Ai\DemoScriptedAiProvider;
 use App\Services\Ai\GeminiAiProvider;
 use App\Services\Ai\OpenAiCompatibleProvider;
 use App\Services\Publishing\EmergencyStopService;
 use App\Services\Security\UrlSafetyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
+use PHPUnit\Framework\ExpectationFailedException;
 use Tests\TestCase;
 use Tests\Unit\QualityFixtures;
 
@@ -43,7 +45,8 @@ class AiRoutingTest extends TestCase
         parent::setUp();
         app(EmergencyStopService::class)->resetForTesting();
         // Không phân giải DNS thật trong test: tên miền giả → một IP công cộng; IP literal vẫn đi qua bộ chặn nội bộ thật.
-        $this->app->instance(UrlSafetyService::class, new class extends UrlSafetyService {
+        $this->app->instance(UrlSafetyService::class, new class extends UrlSafetyService
+        {
             protected function resolveIps(string $host): array
             {
                 return filter_var($host, FILTER_VALIDATE_IP) ? [$host] : ['93.184.216.34'];
@@ -143,7 +146,7 @@ class AiRoutingTest extends TestCase
                 $this->assertTrue(TransientAiError::is($e));
             }
         }
-        Http::fake(['api.anthropic.com/*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('cURL error 28 for https://api.anthropic.com/?key='.self::KEY)]);
+        Http::fake(['api.anthropic.com/*' => fn () => throw new ConnectionException('cURL error 28 for https://api.anthropic.com/?key='.self::KEY)]);
         try {
             (new AnthropicAiProvider(self::KEY, 'm'))->generateOutline($this->article());
             $this->fail('phải ném lỗi');
@@ -251,7 +254,7 @@ class AiRoutingTest extends TestCase
         $o = $this->provider('openai_compat');
         $this->route('outline', $a, 'claude-haiku-5-5');
         $this->route('write', $o, 'gpt-x', ['fallback_provider_id' => $a->id, 'fallback_model' => 'claude-sonnet-5-5', 'cost_cap_vnd_per_call' => 2000]);
-        $r = new AiModelRouter();
+        $r = new AiModelRouter;
 
         $this->assertTrue(AiModelRouter::isConfigured());
         $this->assertSame('claude-haiku-5-5', $r->target('outline')->model);
@@ -270,7 +273,7 @@ class AiRoutingTest extends TestCase
         $off = $this->provider('gemini', ['enabled' => false]);
         $this->route('outline', $noKey);
         $this->route('write', $off);
-        $r = new AiModelRouter();
+        $r = new AiModelRouter;
 
         $this->assertNull($r->target('outline'));
         $this->assertStringContainsString('chưa có khóa', (string) $r->why('outline'));
@@ -288,7 +291,7 @@ class AiRoutingTest extends TestCase
         $a = $this->provider('anthropic');
         $this->route('write', $a, 'm', ['fallback_provider_id' => $a->id, 'fallback_model' => 'm']);
 
-        $this->assertNull((new AiModelRouter())->fallback('write'));
+        $this->assertNull((new AiModelRouter)->fallback('write'));
     }
 
     public function test_agentai_dung_router_khi_da_co_route_va_giu_duong_cu_khi_chua_co(): void
@@ -313,7 +316,9 @@ class AiRoutingTest extends TestCase
     private function runWith(?array $policy = null): array
     {
         $slept = [];
-        $run = (new AgentRunOrchestrator(new RoutedAiProvider(), policy: new RunPolicy(...($policy ?? [])), sleep: function (int $s) use (&$slept) { $slept[] = $s; }))->run($this->article(), null);
+        $run = (new AgentRunOrchestrator(new RoutedAiProvider, policy: new RunPolicy(...($policy ?? [])), sleep: function (int $s) use (&$slept) {
+            $slept[] = $s;
+        }))->run($this->article(), null);
 
         return [$run->load('steps'), $slept];
     }
@@ -450,7 +455,7 @@ class AiRoutingTest extends TestCase
 
     public function test_khong_co_router_van_chay_nhu_cu(): void
     {
-        $ai = new \App\Services\Ai\DemoScriptedAiProvider();
+        $ai = new DemoScriptedAiProvider;
         $run = (new AgentRunOrchestrator($ai))->run($this->article(), null);
 
         $this->assertSame('mock', $run->ai_mode);
@@ -469,7 +474,7 @@ class AiRoutingTest extends TestCase
         $this->assertStringNotContainsString('SECRETKEY', (string) \DB::table('ai_providers')->value('api_key'));
         $this->assertSame('claude-opus-5-5', AiModelRoute::where('task', 'write')->value('primary_model'));
         $this->assertSame('claude-haiku-5-5', AiModelRoute::where('task', 'outline')->value('primary_model'));
-        $html = $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk()->assertSee('Claude')->assertSee('•••• đã lưu')->assertDontSee('Định tuyến theo loại việc')->assertSee('Hệ thống không tự dùng Mock thay thế')->getContent();
+        $html = $this->get('/admin/cau-hinh-ai')->assertOk()->assertSee('Claude')->assertSee('•••• đã lưu')->assertDontSee('Định tuyến theo loại việc')->assertSee('Hệ thống không tự dùng Mock thay thế')->getContent();
         $this->assertStringNotContainsString('SECRETKEY', $html);
         $this->assertStringNotContainsString(self::KEY, $html);
     }
@@ -486,7 +491,7 @@ class AiRoutingTest extends TestCase
         $p->refresh();
         $this->assertFalse($p->last_test_ok);
         $this->assertStringNotContainsString('SECRETKEY', (string) $p->last_test_message);
-        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk()->assertDontSee('SECRETKEY');
+        $this->get('/admin/cau-hinh-ai')->assertOk()->assertDontSee('SECRETKEY');
     }
 
     public function test_trang_cau_hinh_ai_khong_con_bang_dinh_tuyen_hay_gan_vai_tro(): void
@@ -494,7 +499,7 @@ class AiRoutingTest extends TestCase
         $p = $this->provider('anthropic');
         $this->route('write', $p);
         $this->actingAs($this->user('admin'));
-        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk()->assertDontSee('Định tuyến theo loại việc')->assertDontSee('Model chính')->assertDontSee('Trần chi phí');
+        $this->get('/admin/cau-hinh-ai')->assertOk()->assertDontSee('Định tuyến theo loại việc')->assertDontSee('Model chính')->assertDontSee('Trần chi phí');
     }
 
     public function test_base_url_noi_bo_bi_tu_choi_khi_them_provider(): void
@@ -510,7 +515,7 @@ class AiRoutingTest extends TestCase
     public function test_bien_tap_vien_bi_chan_khoi_trang_tich_hop_ai(): void
     {
         $this->actingAs($this->user('writer'));
-        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertForbidden();
+        $this->get('/admin/cau-hinh-ai')->assertForbidden();
         Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)->assertForbidden();
     }
 
@@ -520,14 +525,14 @@ class AiRoutingTest extends TestCase
         $this->route('write', $p);
 
         $this->actingAs($this->user('approver'));
-        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk()->assertSee('P-anthropic')->assertDontSee('Sửa khóa');
+        $this->get('/admin/cau-hinh-ai')->assertOk()->assertSee('P-anthropic')->assertDontSee('Sửa khóa');
         Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)
             ->assertActionHidden('addProvider')->assertActionHidden('testProvider', ['id' => $p->id])
             ->call('mountAction', 'addProvider')->assertSet('mountedActions', []);
         try {
             Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)->callAction('addProvider', ['name' => 'X', 'preset' => 'gemini', 'api_key' => 'k']);
             $this->fail('hành động ẩn phải bị từ chối');
-        } catch (\PHPUnit\Framework\ExpectationFailedException) {
+        } catch (ExpectationFailedException) {
             // đúng: người duyệt không thực hiện được
         }
         $this->assertSame(1, AiProvider::count());

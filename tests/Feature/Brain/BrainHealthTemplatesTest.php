@@ -5,6 +5,7 @@ namespace Tests\Feature\Brain;
 use App\Filament\Pages\BrainLibraryPage;
 use App\Filament\Pages\BrainPage;
 use App\Models\Brain;
+use App\Models\BrainProfile;
 use App\Models\KnowledgeItem;
 use App\Models\KnowledgeSource;
 use App\Models\User;
@@ -177,7 +178,7 @@ class BrainHealthTemplatesTest extends TestCase
     public function test_install_idempotent_khong_ghi_de_ban_da_sua_va_khong_tu_gan_website(): void
     {
         $site = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://x.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
-        $svc = new BrainService();
+        $svc = new BrainService;
         $r = $svc->installTemplates(null, null, $this->user('admin'));
         $this->assertCount(14, $r['created']);
         $this->assertSame([], $r['skipped']);
@@ -203,7 +204,7 @@ class BrainHealthTemplatesTest extends TestCase
         $this->assertSame(14, Brain::count());
         $this->assertSame('Ấm áp', $b->fresh()->profile->voice['tone']);
         $this->assertSame('numbers', $b->fresh()->reliance());
-        $this->assertSame(14, \App\Models\BrainProfile::count());
+        $this->assertSame(14, BrainProfile::count());
 
         // Chỉ chọn một vài mẫu; khóa lạ được báo; gắn website khi truyền $site.
         Brain::where('template_key', 'nhi_khoa')->delete();
@@ -215,7 +216,7 @@ class BrainHealthTemplatesTest extends TestCase
 
     public function test_install_chi_admin_con_lenh_va_seeder(): void
     {
-        $svc = new BrainService();
+        $svc = new BrainService;
         foreach (['approver', 'writer'] as $role) {
             try {
                 $svc->installTemplates(null, null, $this->user($role));
@@ -230,7 +231,7 @@ class BrainHealthTemplatesTest extends TestCase
         $this->assertSame(14, Brain::count());
         $this->artisan('brains:install-health')->assertSuccessful();
         $this->artisan('brains:install-health', ['--only' => ['khong_co']])->assertFailed();
-        (new HealthBrainsSeeder())->run();
+        (new HealthBrainsSeeder)->run();
         $this->assertSame(14, Brain::count(), 'chạy lại không tạo trùng');
         $this->assertSame(0, \DB::table('brain_website')->count());
     }
@@ -253,7 +254,7 @@ class BrainHealthTemplatesTest extends TestCase
 
     public function test_thu_vien_loc_theo_nhom_va_tim_theo_ten(): void
     {
-        $svc = new BrainService();
+        $svc = new BrainService;
         $admin = $this->user('admin');
         $svc->installTemplates(['dai_thao_duong', 'nhi_khoa', 'da_lieu'], null, $admin);
         $svc->createFromTemplate('Thương hiệu A', 'thuong_hieu', [], $admin);
@@ -278,12 +279,12 @@ class BrainHealthTemplatesTest extends TestCase
 
     public function test_trang_tri_tue_hien_nguon_goi_y_chi_doc_kem_canh_bao_va_nhan_mau(): void
     {
-        (new BrainService())->installTemplates(['duoc_thuoc'], null, $this->user('admin'));
+        (new BrainService)->installTemplates(['duoc_thuoc'], null, $this->user('admin'));
         $b = Brain::firstOrFail();
         $this->actingAs($this->user('approver'));
         $t = Livewire::test(BrainPage::class, ['brain' => $b->id])->assertOk()
-            ->assertSee('Sổ nguồn uy tín')->assertSee('dav.gov.vn')
-            ->assertSee('Chưa xác nhận, chưa được tính')->assertSee('Mẫu: chưa có kiến thức nào được duyệt'); // P2: gợi ý nằm trong Sổ nguồn, chưa có bậc nên chưa được tính
+            ->assertSee('Căn cứ chuẩn mực')->assertSee('dav.gov.vn')
+            ->assertSee('Chưa xác nhận, chưa được tính')->assertSee('Mẫu: chưa có kiến thức nào được duyệt'); // P2: gợi ý nằm trong Căn cứ chuẩn mực, chưa có bậc nên chưa được tính
         $t->assertDontSee('brandData');
         $lib = Livewire::test(BrainLibraryPage::class)->assertSee('Mẫu: chưa có kiến thức nào được duyệt');
         $this->assertTrue($lib->viewData('cards')->first()['sample']);

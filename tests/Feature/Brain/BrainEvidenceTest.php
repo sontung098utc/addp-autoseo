@@ -4,9 +4,7 @@ namespace Tests\Feature\Brain;
 
 use App\Contracts\AiProviderInterface;
 use App\Models\Article;
-use App\Models\ArticleVersion;
 use App\Models\Brain;
-use App\Models\BrainSource;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Agent\Run\AgentRunOrchestrator;
@@ -14,12 +12,13 @@ use App\Services\Agent\Run\RunPolicy;
 use App\Services\Ai\OpenAiCompatibleProvider;
 use App\Services\Brain\BrainSourceRegistry;
 use App\Services\Content\Quality\ContentQualityChecker;
+use App\Services\Content\Quality\QualityReport;
 use App\Services\Publishing\EmergencyStopService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 use Tests\Unit\QualityFixtures;
 
-/** AG-B3 (P2): luật EVID01 + nối Sổ nguồn vào người viết. Chỉ mức test giả lập; KHÔNG AI thật, KHÔNG tìm web. */
+/** AG-B3 (P2): luật EVID01 + nối Căn cứ chuẩn mực vào người viết. Chỉ mức test giả lập; KHÔNG AI thật, KHÔNG tìm web. */
 class BrainEvidenceTest extends TestCase
 {
     use RefreshDatabase;
@@ -58,14 +57,14 @@ class BrainEvidenceTest extends TestCase
 
     private function src(Brain $b, string $name, string $domain, ?string $tier): void
     {
-        (new BrainSourceRegistry())->add($b, $name, $domain, $tier, null, $this->user());
+        (new BrainSourceRegistry)->add($b, $name, $domain, $tier, null, $this->user());
     }
 
-    private function check(Article $a, array $cited, string $extraHtml = self::CLAIM): \App\Services\Content\Quality\QualityReport
+    private function check(Article $a, array $cited, string $extraHtml = self::CLAIM): QualityReport
     {
         $v = QualityFixtures::version($a, ++$this->ver, 'needs_review', ['html_content' => QualityFixtures::goodHtml().$extraHtml, 'sources_cited' => $cited]);
 
-        return (new ContentQualityChecker())->check($v, $a);
+        return (new ContentQualityChecker)->check($v, $a);
     }
 
     private function evid($report): array
@@ -92,7 +91,7 @@ class BrainEvidenceTest extends TestCase
     {
         [, , $a] = $this->world();
         $r = $this->check($a, []);
-        $e = collect($this->evid($r))->firstWhere('label', 'Bằng chứng theo Sổ nguồn');
+        $e = collect($this->evid($r))->firstWhere('label', 'Bằng chứng theo Căn cứ chuẩn mực');
         $this->assertFalse($e->passed);
         $this->assertSame('P1', $e->severity);
         $this->assertNotContains('EVID01', $r->blockingCodes(), 'thiếu nguồn không chặn: cờ để người có chuyên môn xử lý');
@@ -107,7 +106,7 @@ class BrainEvidenceTest extends TestCase
         $this->src($b, 'Báo B', 'baob.vn', '3');
         $this->src($b, 'Báo C', 'baoc.vn', '3');
         $this->src($b, 'Blog D', 'blogd.vn', '4');
-        $passes = fn (array $cited) => collect($this->evid($this->check($a, $cited)))->firstWhere('label', 'Bằng chứng theo Sổ nguồn')->passed;
+        $passes = fn (array $cited) => collect($this->evid($this->check($a, $cited)))->firstWhere('label', 'Bằng chứng theo Căn cứ chuẩn mực')->passed;
 
         $this->assertTrue($passes(['https://moh.gov.vn/vb/1']), '1 nguồn bậc 1');
         $this->assertTrue($passes(['a-journal.org']), '1 nguồn bậc 2');
@@ -122,9 +121,9 @@ class BrainEvidenceTest extends TestCase
     {
         [, $b, $a] = $this->world();
         $this->src($b, 'Bộ Y tế', 'moh.gov.vn', null); // mới là gợi ý
-        $e = collect($this->evid($this->check($a, ['https://moh.gov.vn/vb/1', 'Wikipedia'])))->firstWhere('label', 'Bằng chứng theo Sổ nguồn');
+        $e = collect($this->evid($this->check($a, ['https://moh.gov.vn/vb/1', 'Wikipedia'])))->firstWhere('label', 'Bằng chứng theo Căn cứ chuẩn mực');
         $this->assertFalse($e->passed);
-        $this->assertStringContainsString('Nguồn chưa nằm trong Sổ nguồn (không được tính)', $e->message);
+        $this->assertStringContainsString('Nguồn chưa nằm trong Căn cứ chuẩn mực (không được tính)', $e->message);
         $this->assertStringContainsString('Wikipedia', $e->message);
     }
 
@@ -143,7 +142,7 @@ class BrainEvidenceTest extends TestCase
     {
         [, , $a] = $this->world();
         $v = QualityFixtures::version($a, 1, 'needs_review', ['html_content' => '<h2>Giới thiệu</h2><p>Học bổng giúp sinh viên yên tâm học tập và phát triển bản thân.</p>', 'sources_cited' => []]);
-        $e = collect($this->evid((new ContentQualityChecker())->check($v, $a)))->firstWhere('label', 'Bằng chứng theo Sổ nguồn');
+        $e = collect($this->evid((new ContentQualityChecker)->check($v, $a)))->firstWhere('label', 'Bằng chứng theo Căn cứ chuẩn mực');
         $this->assertTrue($e->passed);
         $this->assertStringContainsString('Không phát hiện câu khẳng định', $e->message);
     }
@@ -153,8 +152,8 @@ class BrainEvidenceTest extends TestCase
         [, , $a] = $this->world('free');
         $must = Brain::create(['name' => 'Bắt buộc', 'slug' => 'bb-'.uniqid(), 'status' => 'active', 'settings' => ['ai_reliance' => 'must_cite']]);
         $v = QualityFixtures::version($a, 1, 'needs_review', ['html_content' => QualityFixtures::goodHtml().self::CLAIM, 'sources_cited' => []]);
-        $this->assertSame([], $this->evid((new ContentQualityChecker())->check($v, $a)));
-        $this->assertNotSame([], $this->evid((new ContentQualityChecker())->check($v, $a, [$must->id])));
+        $this->assertSame([], $this->evid((new ContentQualityChecker)->check($v, $a)));
+        $this->assertNotSame([], $this->evid((new ContentQualityChecker)->check($v, $a, [$must->id])));
     }
 
     public function test_nguoi_viet_chi_nhan_nguon_da_xac_nhan_khong_bi_chan_va_chi_khi_bat_buoc_nguon(): void
@@ -164,7 +163,8 @@ class BrainEvidenceTest extends TestCase
         $this->src($b, 'Gợi ý chưa xác nhận', 'goiy.org', null);
         $this->src($b, 'Chặn', 'spam.vn', 'blocked');
 
-        $ai = new class implements AiProviderInterface {
+        $ai = new class implements AiProviderInterface
+        {
             public array $options = [];
 
             public function generateOutline(Article $article, array $options = []): array
@@ -184,7 +184,7 @@ class BrainEvidenceTest extends TestCase
                 return 0.0;
             }
         };
-        $run = (new AgentRunOrchestrator($ai, policy: new RunPolicy()))->run($a, null, 'manual', null, null, true);
+        $run = (new AgentRunOrchestrator($ai, policy: new RunPolicy))->run($a, null, 'manual', null, null, true);
         $this->assertSame([['name' => 'Bộ Y tế', 'domain' => 'moh.gov.vn', 'tier' => '1']], $ai->options[0]['citable_sources'], 'chỉ nguồn đã xác nhận và không bị chặn');
         $write = $run->steps->firstWhere('stage', 'write');
         $this->assertStringContainsString('EVID01', $write->detail);
@@ -193,13 +193,14 @@ class BrainEvidenceTest extends TestCase
         [, , $a2] = $this->world('numbers');
         $ai2 = clone $ai;
         $ai2->options = [];
-        (new AgentRunOrchestrator($ai2, policy: new RunPolicy()))->run($a2, null, "manual", null, null, true);
+        (new AgentRunOrchestrator($ai2, policy: new RunPolicy))->run($a2, null, 'manual', null, null, true);
         $this->assertArrayNotHasKey('citable_sources', $ai2->options[0], 'không bắt buộc nguồn thì không đưa danh sách');
     }
 
     public function test_khoi_nguon_trong_prompt_duoc_lam_sach_va_chi_xuat_hien_khi_co_nguon(): void
     {
-        $p = new class('k', 'm') extends OpenAiCompatibleProvider {
+        $p = new class('k', 'm') extends OpenAiCompatibleProvider
+        {
             public function block(array $o): string
             {
                 return $this->citableSourcesBlock($o);

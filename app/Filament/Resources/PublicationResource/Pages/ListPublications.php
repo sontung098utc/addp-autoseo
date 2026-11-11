@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PublicationResource\Pages;
 
 use App\Filament\Resources\PublicationResource;
+use App\Filament\Support\Schedule\HasWeeklyBoard;
 use App\Filament\Support\Schedule\VnTime;
 use App\Models\Publication;
 use App\Services\Publishing\EmergencyStopService;
@@ -15,21 +16,23 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ListPublications extends ListRecords
 {
+    use HasWeeklyBoard;
+
     protected static string $resource = PublicationResource::class;
 
     protected static ?string $title = 'Lịch xuất bản';
 
-    public function getSubheading(): ?string
-    {
-        $emergencyService = app(EmergencyStopService::class);
-        if ($emergencyService->isStopped()) {
-            $info = $emergencyService->getStopInfo();
-            $reason = $info['reason'] ?? 'Tạm dừng toàn hệ thống';
+    protected static string $view = 'filament.publication.list';
 
-            return "⛔ CẢNH BÁO: Lịch xuất bản tự động đang DỪNG KHẨN CẤP ({$reason}). Toàn bộ lượt đăng đang tạm hoãn.";
+    /** Cảnh báo dừng khẩn cấp: hiện đầu trang chung, trên cả hai tab. @return array{reason: string}|null */
+    public function stopWarning(): ?array
+    {
+        $svc = app(EmergencyStopService::class);
+        if (! $svc->isStopped()) {
+            return null;
         }
 
-        return null;
+        return ['reason' => $svc->getStopInfo()['reason'] ?? 'Tạm dừng toàn hệ thống'];
     }
 
     protected function getHeaderActions(): array

@@ -32,7 +32,8 @@
             </x-help>
         </div>
         @if ($isAdmin)
-            <button type="button" class="cfg-add" wire:click="togglePicker" data-testid="add-account"><x-filament::icon icon="heroicon-o-plus" style="width:1rem;height:1rem" /> Thêm tài khoản</button>
+            <span style="display:inline-flex;gap:.4rem;flex-wrap:wrap"><button type="button" class="cfg-add" style="background:transparent;color:inherit;border-color:rgba(128,128,128,.5)" wire:click="mountAction('editLimits')" data-testid="edit-limits"><x-filament::icon icon="heroicon-o-adjustments-horizontal" style="width:1rem;height:1rem" /> Giới hạn mỗi phiên</button>
+            <button type="button" class="cfg-add" wire:click="togglePicker" data-testid="add-account"><x-filament::icon icon="heroicon-o-plus" style="width:1rem;height:1rem" /> Thêm tài khoản</button></span>
         @endif
     </div>
 

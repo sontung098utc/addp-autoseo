@@ -22,38 +22,27 @@ use InvalidArgumentException;
 use Livewire\Attributes\Url;
 use Throwable;
 
-/** Chi phí AI: hai tab ngang. "Chi phí" (số liệu) và "Cấu hình AI" (tài khoản/khóa/model, trước là trang Tích hợp AI; URL cũ chuyển về ?tab=cau-hinh). */
+/** Cấu hình AI (trước là Chi phí AI): MỘT hàng tab ngang. Các tab chi phí, ngưỡng, quy tắc, rồi "Tích hợp AI" (tài khoản/khóa/model). URL cũ chuyển về #tab-tich-hop-ai. */
 class AiUsagePage extends Page
 {
     use ManagesAiAccounts;
 
-    public const TABS = ['chi-phi' => 'Chi phí', 'cau-hinh' => 'Cấu hình AI'];
-
-    #[Url(as: 'tab')]
-    public string $tab = 'chi-phi';
-
     public static function configUrl(): string
     {
-        return static::getUrl(['tab' => 'cau-hinh']);
-    }
-
-    public function setTab(string $tab): void
-    {
-        $this->tab = array_key_exists($tab, self::TABS) ? $tab : 'chi-phi';
-        $this->showPicker = false;
+        return static::getUrl().'#tab-tich-hop-ai';
     }
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static ?string $navigationLabel = 'Chi phí AI';
+    protected static ?string $navigationLabel = 'Cấu hình AI';
 
     protected static ?string $navigationGroup = 'Cài đặt';
 
     protected static ?int $navigationSort = 1;
 
-    protected static ?string $title = 'Chi phí AI';
+    protected static ?string $title = 'Cấu hình AI';
 
-    protected static ?string $slug = 'chi-phi-ai';
+    protected static ?string $slug = 'cau-hinh-ai';
 
     protected static string $view = 'filament.pages.ai-usage';
 
@@ -129,13 +118,13 @@ class AiUsagePage extends Page
 
     protected function getHeaderActions(): array
     {
-        if ($this->tab === 'cau-hinh') {
-            // addProvider được mở từ bộ chọn nhà cung cấp trong trang (nút ẩn chỉ để Filament nhận diện action).
-            return [$this->editLimitsAction(), $this->addProviderAction()->extraAttributes(['style' => 'display:none', 'aria-hidden' => 'true', 'tabindex' => '-1'])];
-        }
+        // Các action chỉ để Filament nhận diện; nút thật nằm trong từng tab (Ngưỡng, Tích hợp AI).
+        $hide = ['style' => 'display:none', 'aria-hidden' => 'true', 'tabindex' => '-1'];
 
         return [
-            Action::make('setThreshold')
+            $this->editLimitsAction()->extraAttributes($hide),
+            $this->addProviderAction()->extraAttributes($hide),
+            Action::make('setThreshold')->extraAttributes($hide)
                 ->label('Đặt ngưỡng cảnh báo')
                 ->color('primary')
                 ->slideOver()
@@ -171,10 +160,6 @@ class AiUsagePage extends Page
 
     public function getViewData(): array
     {
-        if ($this->tab === 'cau-hinh') {
-            return ['tab' => 'cau-hinh'] + $this->configViewData();
-        }
-
         [$from, $to, $label, $rangeError] = $this->range();
         $rows = UsageReader::rows($this->siteId());
         $agg = new UsageAggregator($rows);
@@ -201,8 +186,7 @@ class AiUsagePage extends Page
         $now = VnTime::now();
         $pace = $th['month'] !== null ? $th['month'] / $now->daysInMonth : null;
 
-        return [
-            'tab' => 'chi-phi',
+        return $this->configViewData() + [
             'websites' => Website::orderBy('name')->get(['id', 'name']),
             'label' => $label,
             'rangeError' => $rangeError,

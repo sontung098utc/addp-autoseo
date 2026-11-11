@@ -5,8 +5,7 @@
         return $articleUrl($p);
     };
 @endphp
-<x-filament-panels::page>
-    <x-chain-context step="Xuất bản" purpose="Lịch tuần: sắp ngày dự kiến đăng cho bài. Lượt đăng thật theo giờ, trạng thái và đối soát nằm ở Lịch xuất bản." :inputs="[['label'=>'Bài đã duyệt','url'=>\App\Filament\Resources\ArticleResource::getUrl('index'),'note'=>'Bài viết']]" :outputs="[['label'=>'Lịch xuất bản','url'=>\App\Filament\Resources\PublicationResource::getUrl('index'),'note'=>'lượt đăng thật'],['label'=>'Search Console','url'=>\App\Filament\Pages\SearchConsolePage::getUrl(),'note'=>'đo sau khi bài lên']]" />
+    <x-chain-context step="Xuất bản" purpose="Lịch tuần: sắp ngày dự kiến đăng cho bài. Lượt đăng thật theo giờ, trạng thái và đối soát nằm ở tab Danh sách." :inputs="[['label'=>'Bài đã duyệt','url'=>\App\Filament\Resources\ArticleResource::getUrl('index'),'note'=>'Bài viết']]" :outputs="[['label'=>'Lịch xuất bản','url'=>\App\Filament\Resources\PublicationResource::listUrl(),'note'=>'lượt đăng thật'],['label'=>'Search Console','url'=>\App\Filament\Pages\SearchConsolePage::getUrl(),'note'=>'đo sau khi bài lên']]" />
     <style>
         .ss-sched-bar{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
         .ss-sched-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.5rem}
@@ -84,7 +83,6 @@
             </div>
         @endforeach
     </div>
-    <x-filament-actions::modals />
 
     @if ($todayQueue->count() > 0)
     <div class="ss-sched-box" data-testid="today-queue">
@@ -106,4 +104,4 @@
         @endforeach
     </div>
     @endif
-</x-filament-panels::page>
+

@@ -151,7 +151,7 @@ final class DigestQueries
 
         $groups = [];
         if ($problems > 0) {
-            $groups[] = self::group('publication_problems', 'Lượt đăng lỗi hoặc chờ đối soát', $problems, 'Cần kiểm tra trước khi đăng lại; hệ thống không tự đăng lại.', PublicationResource::getUrl('index'), 'danger');
+            $groups[] = self::group('publication_problems', 'Lượt đăng lỗi hoặc chờ đối soát', $problems, 'Cần kiểm tra trước khi đăng lại; hệ thống không tự đăng lại.', PublicationResource::listUrl(), 'danger');
         }
         if ($overdue > 0) {
             $groups[] = self::group('overdue_review', 'Bài chờ duyệt quá '.DashboardQueries::OVERDUE_AFTER_HOURS.' giờ', $overdue, 'Đang giữ cả chuỗi phía sau.', ArticleResource::getUrl('index', ['activeTab' => 'needs_review']), 'warning');

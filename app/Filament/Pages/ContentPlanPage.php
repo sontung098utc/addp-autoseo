@@ -25,6 +25,7 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Pages\SubNavigationPosition;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 
@@ -40,6 +41,9 @@ class ContentPlanPage extends Page
     protected static ?string $cluster = AgentTeam::class;
 
     protected static ?int $navigationSort = 2;
+
+    /** Filament đọc vị trí từ CHÍNH trang (không kế thừa từ cụm): thiếu dòng này thì mặc định là menu dọc bên trái. */
+    protected static SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
     protected static ?string $title = 'Kế hoạch nội dung';
 

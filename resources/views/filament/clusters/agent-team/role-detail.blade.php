@@ -16,7 +16,7 @@
     <div class="text-xs"><strong>Không được:</strong> {{ implode(' · ', $role['tools_denied']) }}</div>
 
     {!! $sec('Bậc model & cổng người') !!}
-    <div class="text-xs">Bậc model mục tiêu: <strong>{{ $role['tier_label'] }}</strong> (khai báo thiết kế; model thật chọn ở mục Mô hình, tài khoản ở Chi phí AI → Cấu hình AI) · Cổng người: {{ $role['human_gate'] }}</div>
+    <div class="text-xs">Bậc model mục tiêu: <strong>{{ $role['tier_label'] }}</strong> (khai báo thiết kế; model thật chọn ở mục Mô hình, tài khoản ở Cấu hình AI → Tích hợp AI) · Cổng người: {{ $role['human_gate'] }}</div>
 
     {!! $sec('Kỹ năng (playbook)') !!}
     <div data-testid="role-skills" class="space-y-1">

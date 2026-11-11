@@ -2,14 +2,26 @@
 
 namespace Tests\Feature\Agent;
 
+use App\Filament\Clusters\AgentTeam;
+use App\Filament\Clusters\AgentTeam\Pages\AgentOverview;
+use App\Filament\Clusters\AgentTeam\Pages\AgentRoles;
+use App\Filament\Clusters\AgentTeam\Pages\AgentSkills;
+use App\Filament\Clusters\AgentTeam\Pages\PipelineMap;
 use App\Filament\Pages\AiUsagePage;
+use App\Filament\Pages\ContentPlanPage;
+use App\Filament\Resources\AgentRunResource;
+use App\Filament\Resources\CampaignResource;
+use App\Models\AgentRun;
 use App\Models\AgentSetting;
+use App\Models\AiProvider;
+use App\Models\Article;
 use App\Models\Campaign;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Agent\Settings\AgentAi;
-use App\Services\Ai\GeminiAiProvider;
 use App\Services\Ai\DemoScriptedAiProvider;
+use App\Services\Ai\GeminiAiProvider;
+use Filament\Pages\SubNavigationPosition;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -37,6 +49,27 @@ class AgentTeamHubTest extends TestCase
         foreach (['tong-quan', 'chien-dich', 'phien-chay', 'vai-tro'] as $tab) {
             $this->get("/admin/doi-ai/{$tab}")->assertOk()->assertSee('Tổng quan')->assertSee('Chiến dịch')->assertSee('Phiên chạy')->assertSee('Vai trò');
         }
+    }
+
+    public function test_moi_trang_trong_cum_doi_ai_dung_sub_navigation_ngang(): void
+    {
+        $pages = [
+            AgentTeam::class,
+            ContentPlanPage::class,
+            AgentOverview::class,
+            AgentRoles::class,
+            AgentSkills::class,
+            PipelineMap::class,
+            CampaignResource::class,
+            AgentRunResource::class,
+        ];
+        foreach ($pages as $class) {
+            $this->assertSame(SubNavigationPosition::Top, (new \ReflectionClass($class))->getProperty('subNavigationPosition')->getValue(), $class.' phải dùng hàng tab ngang');
+        }
+        $this->actingAs($this->user('writer'));
+        $html = $this->get('/admin/doi-ai/ke-hoach')->assertOk()->getContent();
+        $this->assertStringContainsString('fi-page-sub-navigation-tabs', $html);
+        $this->assertStringNotContainsString('fi-page-sub-navigation-sidebar', $html);
     }
 
     public function test_bien_tap_vien_khong_vao_duoc_cum(): void
@@ -80,7 +113,7 @@ class AgentTeamHubTest extends TestCase
 
     private function steps(): array
     {
-        $c = \Livewire\Livewire::test(\App\Filament\Clusters\AgentTeam\Pages\AgentOverview::class)->instance();
+        $c = Livewire::test(AgentOverview::class)->instance();
         $m = new \ReflectionMethod($c, 'getViewData');
         $m->setAccessible(true);
 
@@ -104,8 +137,8 @@ class AgentTeamHubTest extends TestCase
         $this->assertSame('done', $this->steps()['steps'][3]['state']);
         $this->assertSame(3, $this->steps()['stepsLeft']);
 
-        $art = \App\Models\Article::create(['website_id' => $w->id, 'primary_keyword' => 'a']);
-        \App\Models\AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'campaign_id' => $c->id, 'status' => 'held', 'ai_mode' => 'mock']);
+        $art = Article::create(['website_id' => $w->id, 'primary_keyword' => 'a']);
+        AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'campaign_id' => $c->id, 'status' => 'held', 'ai_mode' => 'mock']);
         $d = $this->steps();
         $this->assertSame('done', $d['steps'][4]['state']);
         $this->assertSame(2, $d['stepsLeft']);
@@ -132,8 +165,8 @@ class AgentTeamHubTest extends TestCase
 
         $raw = \DB::table('ai_providers')->value('api_key');
         $this->assertStringNotContainsString('SECRETKEY', (string) $raw, 'khóa phải được mã hóa trong CSDL');
-        $this->assertSame('AIzaSECRETKEY9999', \App\Models\AiProvider::first()->api_key);
-        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk()->assertDontSee('SECRETKEY')->assertDontSee('AIzaSECRETKEY9999')->assertSee('•••• đã lưu')->assertSee('…9999');
+        $this->assertSame('AIzaSECRETKEY9999', AiProvider::first()->api_key);
+        $this->get('/admin/cau-hinh-ai')->assertOk()->assertDontSee('SECRETKEY')->assertDontSee('AIzaSECRETKEY9999')->assertSee('•••• đã lưu')->assertSee('…9999');
 
         Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)->callAction('editLimits', ['run_budget_vnd' => 70000, 'max_repair_rounds' => 2])->assertHasNoActionErrors();
         $this->assertSame(70000.0, AgentAi::policy()->budgetVnd);
@@ -142,7 +175,7 @@ class AgentTeamHubTest extends TestCase
 
     public function test_cap_nhat_khoa_thay_khoa_cu(): void
     {
-        $p = \App\Models\AiProvider::create(['name' => 'G', 'kind' => 'gemini', 'api_key' => 'AIza-OLD-1111']);
+        $p = AiProvider::create(['name' => 'G', 'kind' => 'gemini', 'api_key' => 'AIza-OLD-1111']);
         $this->actingAs($this->user('admin'));
 
         Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)->callAction('updateKey', ['api_key' => 'AIza-NEW-2222'], ['id' => $p->id])->assertHasNoActionErrors();
@@ -152,10 +185,10 @@ class AgentTeamHubTest extends TestCase
 
     public function test_nguoi_duyet_xem_duoc_nhung_khong_sua_duoc(): void
     {
-        $p = \App\Models\AiProvider::create(['name' => 'G', 'kind' => 'gemini', 'api_key' => 'AIza-OLD-1111']);
+        $p = AiProvider::create(['name' => 'G', 'kind' => 'gemini', 'api_key' => 'AIza-OLD-1111']);
         $this->actingAs($this->user('approver'));
 
-        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk()->assertSee('Chỉ quản trị viên được thêm')->assertSee('Tác vụ nào chưa có khóa tài khoản sẽ không chạy')->assertDontSee('Sửa khóa');
+        $this->get('/admin/cau-hinh-ai')->assertOk()->assertSee('Chỉ quản trị viên được thêm')->assertSee('Tác vụ nào chưa có khóa tài khoản sẽ không chạy')->assertDontSee('Sửa khóa');
         Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)->assertActionHidden('addProvider')->assertActionHidden('updateKey', ['id' => $p->id])->assertActionHidden('deleteProvider', ['id' => $p->id]);
         $this->assertSame('AIza-OLD-1111', $p->fresh()->api_key);
     }
@@ -184,7 +217,8 @@ class AgentTeamHubTest extends TestCase
 
     public function test_ping_khong_lo_khoa_trong_thong_bao_loi(): void
     {
-        $p = new class('AIza-LEAK-0000', 'm') extends GeminiAiProvider {
+        $p = new class('AIza-LEAK-0000', 'm') extends GeminiAiProvider
+        {
             protected function callGeminiApi(string $systemInstruction, string $userContent): array
             {
                 throw new \RuntimeException('Client error: `POST https://x/models/m:generateContent?key=AIza-LEAK-0000` resulted in 403');
@@ -194,7 +228,8 @@ class AgentTeamHubTest extends TestCase
 
         $this->assertFalse($r['ok']);
         $this->assertStringNotContainsString('LEAK', $r['message']);
-        $this->assertTrue((new class('k', 'm') extends GeminiAiProvider {
+        $this->assertTrue((new class('k', 'm') extends GeminiAiProvider
+        {
             protected function callGeminiApi(string $systemInstruction, string $userContent): array
             {
                 return ['text' => '{"ok":true}'];
@@ -220,9 +255,9 @@ class AgentTeamHubTest extends TestCase
     {
         AgentSetting::create(['provider' => 'gemini', 'api_key' => 'AIza-test-1234', 'model' => 'm']);
         $w = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
-        $art = \App\Models\Article::create(['website_id' => $w->id, 'primary_keyword' => 'a']);
-        \App\Models\AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'status' => 'held', 'ai_mode' => 'mock']);
-        \App\Models\AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'status' => 'failed', 'ai_mode' => 'mock']);
+        $art = Article::create(['website_id' => $w->id, 'primary_keyword' => 'a']);
+        AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'status' => 'held', 'ai_mode' => 'mock']);
+        AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'status' => 'failed', 'ai_mode' => 'mock']);
         $this->actingAs($this->user('approver'));
 
         $html = $this->get('/admin/doi-ai/tong-quan')->assertOk()->assertDontSee('Không có việc nào cần bạn')->getContent();
@@ -234,8 +269,8 @@ class AgentTeamHubTest extends TestCase
     {
         AgentSetting::create(['provider' => 'gemini', 'api_key' => 'AIza-test-1234', 'model' => 'm']);
         $w = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
-        $art = \App\Models\Article::create(['website_id' => $w->id, 'primary_keyword' => 'a']);
-        \App\Models\AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'status' => 'ready_for_review', 'ai_mode' => 'mock', 'started_at' => now(), 'cost_vnd' => 1234]);
+        $art = Article::create(['website_id' => $w->id, 'primary_keyword' => 'a']);
+        AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'status' => 'ready_for_review', 'ai_mode' => 'mock', 'started_at' => now(), 'cost_vnd' => 1234]);
         $this->actingAs($this->user('approver'));
 
         $this->get('/admin/doi-ai/tong-quan')->assertOk()->assertSee('bài đã giao hôm nay')->assertSee('1.234 ₫');
@@ -245,8 +280,8 @@ class AgentTeamHubTest extends TestCase
     {
         $this->actingAs($this->user('approver'));
         $w = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
-        $art = \App\Models\Article::create(['website_id' => $w->id, 'primary_keyword' => 'a']);
-        \App\Models\AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'status' => 'held', 'ai_mode' => 'mock', 'started_at' => now(), 'outcome_reason' => 'Dừng vì điểm không tăng']);
+        $art = Article::create(['website_id' => $w->id, 'primary_keyword' => 'a']);
+        AgentRun::create(['article_id' => $art->id, 'website_id' => $w->id, 'status' => 'held', 'ai_mode' => 'mock', 'started_at' => now(), 'outcome_reason' => 'Dừng vì điểm không tăng']);
         Campaign::create(['website_id' => $w->id, 'name' => 'CD', 'status' => 'active', 'daily_limit' => 5, 'keywords' => ['a']]);
 
         $runs = $this->get('/admin/doi-ai/phien-chay')->assertOk()->getContent();

@@ -6,15 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * AG-B3: một nguồn trong Sổ nguồn uy tín của một Trí tuệ. Do người/chuyên gia xếp bậc và xác nhận; `suggested` chưa có hiệu lực.
+ * AG-B3: một nguồn trong Căn cứ chuẩn mực của một Trí tuệ. Do người/chuyên gia xếp bậc và xác nhận; `suggested` chưa có hiệu lực.
  */
 class BrainSource extends Model
 {
     public const TIERS = [
-        '1' => 'Bậc 1: Chính thức',
-        '2' => 'Bậc 2: Khoa học',
-        '3' => 'Bậc 3: Báo chí uy tín',
-        '4' => 'Bậc 4: Khác',
+        '1' => 'Bậc 1: Pháp lý, tiêu chuẩn, cơ quan chính thức',
+        '2' => 'Bậc 2: Nghiên cứu khoa học bình duyệt',
+        '3' => 'Bậc 3: Tạp chí chuyên ngành uy tín',
+        '4' => 'Bậc 4: Chỉ để tham khảo',
         'blocked' => 'Chặn',
     ];
 

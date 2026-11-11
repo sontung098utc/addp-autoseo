@@ -28,18 +28,32 @@ use Livewire\Attributes\Url;
 /** G2: xây kho trí tuệ từ chính website. Chạy đồng bộ trong trang (chưa có chạy nền). Chỉ người duyệt trở lên. */
 class BrainBuildPage extends Page
 {
-    /** Z2: thành tab "Nạp kiến thức" của cụm Kho trí tuệ (gồm cả Khởi tạo nhanh, trước là trang Khởi tạo website). URL cũ /admin/xay-kho chuyển hướng ở routes/web.php. */
+    /**
+     * Luồng tạo "Trí tuệ doanh nghiệp" (chọn ở hộp "Tạo trí tuệ" của thư viện), KHÔNG phải tab: trang con của Kho trí tuệ, ẩn khỏi menu.
+     * Gồm Khởi tạo nhanh, đọc website, khám phá nguồn, hồ sơ doanh nghiệp, mục tự nhận (hoàn tác). URL cũ /admin/xay-kho, /admin/khoi-tao-website,
+     * /admin/kho-tri-tue/nap-kien-thuc chuyển hướng về đây ở routes/web.php.
+     */
     protected static ?string $cluster = KhoTriTue::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-down-tray';
 
-    protected static ?string $navigationLabel = 'Nạp kiến thức';
+    protected static ?string $navigationLabel = 'Tạo trí tuệ doanh nghiệp';
 
     protected static ?int $navigationSort = 2;
 
-    protected static ?string $title = 'Nạp kiến thức';
+    protected static ?string $title = 'Tạo trí tuệ doanh nghiệp';
 
-    protected static ?string $slug = 'nap-kien-thuc';
+    protected static ?string $slug = 'tao-tri-tue-doanh-nghiep';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
+    public function getSubNavigation(): array
+    {
+        return [];
+    }
 
     protected static string $view = 'filament.pages.brain-build';
 

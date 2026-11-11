@@ -28,9 +28,9 @@
         if ($brain) { // AG-B1: trang một Trí tuệ — thêm tab Hồ sơ lĩnh vực (đầu) và Cài đặt (cuối); 'Tất cả' đổi tên thành 'Hiểu biết'
             $tabs = array_map(fn ($t) => $t['key'] === 'all' ? ['key' => 'all', 'label' => 'Hiểu biết'] : $t, $tabs);
             array_unshift($tabs, ['key' => 'profile', 'label' => 'Hồ sơ lĩnh vực', 'count' => $completeness[0].'/'.$completeness[1], 'tone' => $completeness[0] < 3 ? 'warn' : null]);
-            // AG-B3: Sổ nguồn uy tín (P2). Cảnh báo khi Trí tuệ bắt buộc nguồn mà chưa có nguồn nào đã xác nhận.
+            // AG-B3: Căn cứ chuẩn mực (P2). Cảnh báo khi Trí tuệ bắt buộc nguồn mà chưa có nguồn nào đã xác nhận.
             $effectiveSources = $authoritySources->filter(fn ($x) => $x->isEffective() && $x->tier !== 'blocked')->count();
-            array_splice($tabs, array_search('sources', array_column($tabs, 'key')) !== false ? array_search('sources', array_column($tabs, 'key')) + 1 : count($tabs), 0, [['key' => 'registry', 'label' => 'Sổ nguồn', 'count' => $effectiveSources ?: null, 'tone' => ($brain->reliance() === 'must_cite' && $effectiveSources === 0) ? 'warn' : null]]);
+            array_splice($tabs, array_search('sources', array_column($tabs, 'key')) !== false ? array_search('sources', array_column($tabs, 'key')) + 1 : count($tabs), 0, [['key' => 'registry', 'label' => 'Căn cứ chuẩn mực', 'count' => $effectiveSources ?: null, 'tone' => ($brain->reliance() === 'must_cite' && $effectiveSources === 0) ? 'warn' : null]]);
             if ($manage) { $tabs[] = ['key' => 'settings', 'label' => 'Cài đặt']; }
             if ($isBrand) { // AG-B2: Hồ sơ doanh nghiệp thuộc Trí tuệ Thương hiệu, đặt ngay sau Hồ sơ lĩnh vực
                 array_splice($tabs, 1, 0, [['key' => 'brand', 'label' => 'Hồ sơ doanh nghiệp', 'count' => $brandCompleteness['filled'].'/'.$brandCompleteness['total'], 'tone' => $brandCompleteness['filled'] < $brandCompleteness['total'] ? 'warn' : null]]);

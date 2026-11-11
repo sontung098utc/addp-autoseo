@@ -8,8 +8,8 @@ use App\Models\AiProvider;
 use App\Models\User;
 use App\Services\Ai\Playbook\InvalidPlaybook;
 use App\Services\Ai\Playbook\PlaybookLoader;
-use InvalidArgumentException;
 use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
 use Throwable;
 
 /**
@@ -22,13 +22,11 @@ final class RoleAssignments
     /** Vai trò → loại việc của AiModelRouter. Vai trò không có ở đây thì chưa nối vào luồng gọi AI. */
     public const ROLE_TASKS = ['strategist' => ['outline'], 'writer' => ['write', 'repair'], 'editor' => ['summary']];
 
-    public function __construct(private readonly ?RoleRegistry $registry = null, private readonly ?PlaybookLoader $playbooks = null)
-    {
-    }
+    public function __construct(private readonly ?RoleRegistry $registry = null, private readonly ?PlaybookLoader $playbooks = null) {}
 
     private function registry(): RoleRegistry
     {
-        return $this->registry ?? new RoleRegistry();
+        return $this->registry ?? new RoleRegistry;
     }
 
     public static function roleForTask(string $task): ?string
@@ -108,7 +106,7 @@ final class RoleAssignments
         }
         foreach ([$providerId, $fallbackProviderId] as $pid) {
             if ($pid !== null && ! AiProvider::query()->whereKey($pid)->exists()) {
-                throw new InvalidArgumentException('Nhà cung cấp đã chọn không tồn tại. Thêm ở Chi phí AI → Cấu hình AI.');
+                throw new InvalidArgumentException('Nhà cung cấp đã chọn không tồn tại. Thêm ở Cấu hình AI → Tích hợp AI.');
             }
         }
         foreach ([$model, $fallbackModel] as $m) {
@@ -127,13 +125,13 @@ final class RoleAssignments
     }
 
     /**
-     * @param  array<string, array{enabled?: bool, pin?: int|string|null}>  $skills ref => trạng thái; ref không khai báo trong vai trò bị từ chối
+     * @param  array<string, array{enabled?: bool, pin?: int|string|null}>  $skills  ref => trạng thái; ref không khai báo trong vai trò bị từ chối
      */
     public function saveSkills(string $role, array $skills, User $actor): AgentRoleAssignment
     {
         $this->guard($actor, $role);
         $declared = $this->registry()->find($role)['skills'];
-        $loader = $this->playbooks ?? new PlaybookLoader();
+        $loader = $this->playbooks ?? new PlaybookLoader;
         $clean = [];
         foreach ($skills as $ref => $s) {
             if (! in_array($ref, $declared, true)) {
@@ -199,6 +197,6 @@ final class RoleAssignments
 
     private function log(User $actor, string $role, string $what, array $detail): void
     {
-        (new LogAuditSink())->write(['action' => 'role_assignment', 'actor_id' => $actor->id, 'actor_role' => $actor->role, 'role' => $role, 'what' => $what, 'detail' => $detail, 'at_utc' => now('UTC')->toIso8601String()]);
+        (new LogAuditSink)->write(['action' => 'role_assignment', 'actor_id' => $actor->id, 'actor_role' => $actor->role, 'role' => $role, 'what' => $what, 'detail' => $detail, 'at_utc' => now('UTC')->toIso8601String()]);
     }
 }

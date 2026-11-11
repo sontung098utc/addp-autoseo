@@ -32,7 +32,7 @@ class RoleMatrixTest extends TestCase
             'Thư viện ảnh (CHƯA có Policy)' => ['class' => R\MediaAssetResource::class, 'admin' => 'YCD', 'approver' => 'YCD', 'writer' => 'YCD'],
             'Tổng quan' => ['class' => P\Dashboard::class, 'admin' => 'Y', 'approver' => 'Y', 'writer' => 'Y'],
             'Audit website' => ['class' => P\AuditPage::class, 'admin' => 'Y', 'approver' => 'Y', 'writer' => 'Y'],
-            'Chi phí AI' => ['class' => P\AiUsagePage::class, 'admin' => 'Y', 'approver' => 'Y', 'writer' => '-'],
+            'Cấu hình AI' => ['class' => P\AiUsagePage::class, 'admin' => 'Y', 'approver' => 'Y', 'writer' => '-'],
             'Từ khóa' => ['class' => P\KeywordsPage::class, 'admin' => 'Y', 'approver' => 'Y', 'writer' => 'Y'],
             'Kế hoạch nội dung' => ['class' => P\ContentPlanPage::class, 'admin' => 'Y', 'approver' => 'Y', 'writer' => 'Y'],
             'Đối thủ' => ['class' => P\CompetitorsPage::class, 'admin' => 'Y', 'approver' => 'Y', 'writer' => '-'],

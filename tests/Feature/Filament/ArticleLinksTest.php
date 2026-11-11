@@ -4,7 +4,6 @@ namespace Tests\Feature\Filament;
 
 use App\Filament\Pages\AiUsagePage;
 use App\Filament\Pages\Dashboard;
-use App\Filament\Pages\WeeklySchedule;
 use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\PublicationResource;
 use App\Filament\Resources\PublicationResource\Pages\ListPublications;
@@ -67,7 +66,7 @@ class ArticleLinksTest extends TestCase
 
     public function test_lich_tuan_tro_ve_bai_viet_va_giu_link_doi_soat(): void
     {
-        $html = Livewire::test(WeeklySchedule::class)->html();
+        $html = Livewire::test(ListPublications::class)->html();
         $this->assertStringContainsString($this->articleUrl().'#tab-publish', $html);
         $this->assertStringNotContainsString($this->oldEdit(), $html);
         $this->assertStringContainsString(PublicationResource::getUrl('view', ['record' => $this->pub]), $html); // nút Đối soát lượt đăng

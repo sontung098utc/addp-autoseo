@@ -83,7 +83,7 @@ class Brain extends Model
         return $this->hasMany(KnowledgeGap::class);
     }
 
-    /** AG-B3: Sổ nguồn uy tín của Trí tuệ này (khác `sources()` là tài liệu nguồn của kho kiến thức). */
+    /** AG-B3: Căn cứ chuẩn mực của Trí tuệ này (khác `sources()` là tài liệu nguồn của kho kiến thức). */
     public function authoritySources(): HasMany
     {
         return $this->hasMany(BrainSource::class);

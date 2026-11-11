@@ -8,9 +8,9 @@ use Filament\Pages\SubNavigationPosition;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Z2: MỘT mục menu "Kho trí tuệ" gom mọi việc của kho: tab "Trí tuệ" (thư viện) và "Nạp kiến thức" (đọc website công ty, tìm nguồn trên web,
- * việc cần xem, khởi tạo nhanh). Trang một Trí tuệ (BrainPage) và hồ sơ doanh nghiệp (tab Thương hiệu) nằm trong Trí tuệ.
- * Quyền giữ nguyên theo từng trang: người viết thấy tab Trí tuệ; người duyệt thấy thêm tab Nạp kiến thức.
+ * MỘT mục menu "Kho trí tuệ" và MỘT trang chính (thư viện Trí tuệ, không có hàng tab). "Tạo trí tuệ" hỏi LOẠI (App\Services\Knowledge\BrainKinds):
+ * loại doanh nghiệp đi vào trang con BrainBuildPage (luồng xây kho từ website, ẩn khỏi menu). Trang một Trí tuệ là BrainPage.
+ * Quyền giữ nguyên theo từng trang: người viết vào thư viện; người duyệt vào thêm luồng tạo Trí tuệ doanh nghiệp.
  */
 class KhoTriTue extends Cluster
 {

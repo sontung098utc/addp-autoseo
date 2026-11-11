@@ -14,22 +14,17 @@
     ]));
 @endphp
 <x-filament-panels::page>
-    <style>
-        .aiu-tabs{display:flex;gap:.25rem;border-bottom:1px solid rgba(128,128,128,.3);margin-bottom:1rem}
-        .aiu-tab{padding:.55rem 1rem;border:0;border-bottom:2px solid transparent;background:transparent;color:inherit;cursor:pointer;font-size:.9rem;opacity:.7;margin-bottom:-1px}
-        .aiu-tab:hover{opacity:1}
-        .aiu-tab[aria-selected=true]{opacity:1;font-weight:600;border-bottom-color:#0f6b5c;color:#0f6b5c}
-        :root[data-theme=dark] .aiu-tab[aria-selected=true],.dark .aiu-tab[aria-selected=true]{color:#5eead4;border-bottom-color:#5eead4}
-    </style>
-    <div class="aiu-tabs" role="tablist" aria-label="Chi phí AI" data-testid="ai-tabs">
-        @foreach (\App\Filament\Pages\AiUsagePage::TABS as $k => $label)
-            <button type="button" role="tab" class="aiu-tab" aria-selected="{{ $tab === $k ? 'true' : 'false' }}" wire:click="setTab('{{ $k }}')" data-tab="{{ $k }}">{{ $label }}</button>
-        @endforeach
-    </div>
-    @if ($tab === 'cau-hinh')
-        @include('filament.pages.ai-config')
-    @else
     <div class="ss-page">
+        <x-studio.tabs persist="cau-hinh-ai" :default="$summary ? 'overview' : 'thresholds'" :tabs="array_values(array_filter([
+            $summary ? ['key' => 'overview', 'label' => 'Tổng quan'] : null,
+            $summary ? ['key' => 'model', 'label' => 'Theo model', 'count' => count($modelRows)] : null,
+            $summary ? ['key' => 'prompt', 'label' => 'Theo prompt', 'count' => count($promptRows)] : null,
+            $summary ? ['key' => 'top', 'label' => 'Bài tốn nhất', 'count' => count($topRows), 'tone' => count($overArticles) ? 'danger' : null] : null,
+            ['key' => 'thresholds', 'label' => 'Ngưỡng', 'tone' => $monthExceeds ? 'danger' : null],
+            ['key' => 'rules', 'label' => 'Quy tắc'],
+            ['key' => 'tich-hop-ai', 'label' => 'Tích hợp AI', 'icon' => 'heroicon-o-key'],
+        ]))" label="Cấu hình AI">
+            <div x-show="active !== 'tich-hop-ai'" data-testid="ai-cost-head">
         <div class="ss-toolbar" role="group" aria-label="Bộ lọc">
             <label for="ai-period" class="ss-text-sm ss-muted">Kỳ</label>
             <select id="ai-period" wire:model.live="period">
@@ -60,7 +55,7 @@
 
         @if (! $summary)
             <div class="ss-card" data-ai="empty"><div class="ss-card__b" style="display:flex;gap:1rem;align-items:center;justify-content:space-between;flex-wrap:wrap">
-                <span>Chưa có dữ liệu chi phí trong kỳ này{{ $websiteId ? ' ở website đã chọn' : '' }}. <x-help title="Chi phí AI hiện khi nào"><p>Chi phí hiện khi có phiên bản bài do AI sinh trong kỳ. Bạn vẫn có thể đặt ngưỡng cảnh báo trước.</p></x-help></span>
+                <span>Chưa có dữ liệu chi phí trong kỳ này{{ $websiteId ? ' ở website đã chọn' : '' }}. <x-help title="Chi phí hiện khi nào"><p>Chi phí hiện khi có phiên bản bài do AI sinh trong kỳ. Bạn vẫn có thể đặt ngưỡng cảnh báo trước.</p></x-help></span>
                 <button type="button" class="ss-dt__btn" wire:click="mountAction('setThreshold')">Đặt ngưỡng cảnh báo</button>
             </div></div>
         @else
@@ -84,14 +79,8 @@
             </div>
         @endif
 
-        <x-studio.tabs persist="chi-phi-ai" :default="$summary ? 'overview' : 'thresholds'" :tabs="array_values(array_filter([
-            $summary ? ['key' => 'overview', 'label' => 'Tổng quan'] : null,
-            $summary ? ['key' => 'model', 'label' => 'Theo model', 'count' => count($modelRows)] : null,
-            $summary ? ['key' => 'prompt', 'label' => 'Theo prompt', 'count' => count($promptRows)] : null,
-            $summary ? ['key' => 'top', 'label' => 'Bài tốn nhất', 'count' => count($topRows), 'tone' => count($overArticles) ? 'danger' : null] : null,
-            ['key' => 'thresholds', 'label' => 'Ngưỡng', 'tone' => $monthExceeds ? 'danger' : null],
-            ['key' => 'rules', 'label' => 'Quy tắc'],
-        ]))">
+</div>
+
             <x-studio.panel key="overview">
                 @if ($summary)
                     @php
@@ -180,7 +169,9 @@
                     </ul></div></div>
                 </div>
             </x-studio.panel>
+            <x-studio.panel key="tich-hop-ai">
+                @include('filament.pages.ai-config')
+            </x-studio.panel>
         </x-studio.tabs>
     </div>
-    @endif
 </x-filament-panels::page>

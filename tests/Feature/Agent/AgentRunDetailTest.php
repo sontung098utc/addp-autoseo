@@ -204,7 +204,7 @@ class AgentRunDetailTest extends TestCase
         $this->assertSame('done', $this->state($html, 'guard'));
         $this->assertSame('failed', $this->state($html, 'brief'));
         $this->assertSame('idle', $this->state($html, 'write'));
-        $verdict = substr(strstr($html, 'data-testid="run-verdict"'), 0, 600);
+        $verdict = substr(strstr($html, 'data-testid="run-verdict"'), 0, 2200);
         $this->assertStringContainsString('Lỗi ở «Dàn ý»', $verdict);
         $this->assertStringContainsString('Nhà cung cấp lỗi', $verdict);
         $this->assertStringContainsString('1.500 ₫', $verdict);
@@ -229,7 +229,7 @@ class AgentRunDetailTest extends TestCase
         $this->assertSame('waiting', $this->state($html, 'checkpoint'));
         $this->assertStringContainsString('data-testid="flow-waiting"', $html);
         $this->assertStringContainsString('Chờ bạn', $html);
-        $this->assertStringContainsString('Dừng ở «', substr(strstr($html, 'data-testid="run-verdict"'), 0, 600));
+        $this->assertStringContainsString('Dừng ở «', substr(strstr($html, 'data-testid="run-verdict"'), 0, 2200));
         $order = RunFlow::build($r, $r->steps, false, false, null)['nodes'];
         $codes = array_column($order, 'code');
         $this->assertContains('checkpoint', $codes);
@@ -253,5 +253,42 @@ class AgentRunDetailTest extends TestCase
         $html = $this->page($r);
         $this->assertStringContainsString('data-testid="run-input-ref"', $html);
         $this->assertStringContainsString('xyz', substr(strstr($html, 'data-testid="run-input-ref"'), 0, 300));
+    }
+
+    public function test_dau_trang_khong_con_ket_luan_va_chi_so_ma_tab_dien_bien_co_ca_hai_phia_tren_luu_do(): void
+    {
+        $r = $this->run_('ready_for_review', [['guard', 'ok'], ['write', 'ok', []], ['grade', 'ok', ['score' => 90, 'round' => 0, 'threshold' => 80]], ['handoff', 'ok']], ['cost_vnd' => 2500, 'repair_rounds' => 0]);
+        $html = $this->page($r);
+        $head = substr($html, strpos($html, 'data-testid="run-status-bar"'), strpos($html, 'data-tabs=') - strpos($html, 'data-testid="run-status-bar"'));
+        $this->assertStringNotContainsString('data-testid="run-verdict"', $head);
+        $this->assertStringNotContainsString('data-testid="run-score"', $head);
+        $this->assertStringNotContainsString('Xong: có bản nháp', $head);
+        $this->assertStringContainsString('#'.$r->id.' · Viết bài', $head);
+
+        $v = strpos($html, 'data-testid="run-verdict"');
+        $k = strpos($html, 'data-testid="run-stats"');
+        $f = strpos($html, 'data-testid="stage-rail"');
+        $this->assertTrue($v !== false && $k !== false && $f !== false);
+        $this->assertTrue($v < $k && $k < $f, 'kết luận, rồi chỉ số, rồi lưu đồ');
+        foreach (['duration', 'cost', 'score', 'repairs', 'tokens'] as $kpi) {
+            $this->assertStringContainsString('data-kpi="'.$kpi.'"', substr($html, $k, $f - $k));
+        }
+        $this->assertStringContainsString('2.500 ₫', substr($html, $k, $f - $k));
+    }
+
+    public function test_vong_sua_ve_thanh_cung_lap_co_so_lan_va_checkpoint_noi_bat(): void
+    {
+        $g = fn (int $round, int $score) => ['grade', $score >= 80 ? 'ok' : 'warn', ['score' => $score, 'round' => $round, 'threshold' => 80]];
+        $r = $this->run_('ready_for_review', [['guard', 'ok'], ['write', 'ok'], $g(0, 60), ['repair', 'ok'], $g(1, 70), ['repair', 'ok'], $g(2, 90), ['handoff', 'ok']], ['repair_rounds' => 2]);
+        $html = $this->page($r);
+        $this->assertStringContainsString('data-testid="flow-loop"', $html);
+        $this->assertStringContainsString('<b data-loop>↻ 2 vòng</b>', $html);
+        $this->assertStringContainsString('fl-link--loop', $html);
+
+        $w = $this->run_('held', [['guard', 'ok'], ['risk', 'ok'], ['checkpoint', 'warn', ['waiting' => true]]]);
+        $html = $this->page($w);
+        $this->assertStringContainsString('fl-node--waiting', $html);
+        $this->assertStringContainsString('fl-wait-pill', $html);
+        $this->assertStringContainsString('Chờ bạn', $html);
     }
 }

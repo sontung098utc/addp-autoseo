@@ -12,6 +12,11 @@
         .kh-sub__h{font-weight:600;margin-bottom:.35rem}
     </style>
     <div class="ss-page">
+        <div class="bb-row" style="margin-bottom:.6rem" data-testid="bb-intro">
+            <a href="{{ \App\Filament\Pages\BrainLibraryPage::getUrl() }}" wire:navigate class="ss-text-sm">← Về thư viện Trí tuệ</a>
+            <span class="ss-muted ss-text-sm">Trí tuệ doanh nghiệp: chọn website → Khởi tạo nhanh → đọc trang → khám phá nguồn → hồ sơ doanh nghiệp → xem mục tự nhận (hoàn tác được) → duyệt.</span>
+            <x-help title="Luồng tạo Trí tuệ doanh nghiệp"><p>Làm lần lượt từ trên xuống trên cùng một trang, không cần chuyển tab. Khởi tạo nhanh chạy cả chuỗi bằng một nút; hoặc làm từng bước. Xong, kiến thức tự nhận và hồ sơ doanh nghiệp nằm trong Trí tuệ Thương hiệu của website, mục chờ duyệt hiện ở hộp duyệt của Trí tuệ đó.</p></x-help>
+        </div>
         <div class="bb-row" style="margin-bottom:0">
             <label>Website
                 <select class="bb-in" wire:model.live="websiteId" data-testid="ob-site">

@@ -2,8 +2,12 @@
 
 namespace Tests\Feature\Filament;
 
-use App\Filament\Pages\WeeklySchedule;
+use App\Filament\Resources\ArticleResource\Pages\CreateArticle;
+use App\Filament\Resources\PublicationResource\Pages\ListPublications;
 use App\Filament\Resources\WebsiteResource\Pages as WebsitePages;
+use App\Filament\Support\Audit\AuditAction;
+use App\Filament\Support\Audit\AuditRecorder;
+use App\Filament\Support\Audit\AuditSink;
 use App\Models\Article;
 use App\Models\ArticleVersion;
 use App\Models\Publication;
@@ -11,6 +15,7 @@ use App\Models\User;
 use App\Models\Website;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -21,7 +26,7 @@ class SmallPolishTest extends TestCase
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();
-        \Illuminate\Support\Carbon::setTestNow();
+        Carbon::setTestNow();
         parent::tearDown();
     }
 
@@ -69,7 +74,7 @@ class SmallPolishTest extends TestCase
     {
         $now = CarbonImmutable::parse('2026-11-11 03:00:00', 'UTC'); // thứ Tư 10:00 giờ VN
         CarbonImmutable::setTestNow($now);
-        \Illuminate\Support\Carbon::setTestNow($now);
+        Carbon::setTestNow($now);
 
         $site = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
         $a = Article::create(['website_id' => $site->id, 'primary_keyword' => 'kw', 'workflow_status' => 'scheduled']);
@@ -78,11 +83,11 @@ class SmallPolishTest extends TestCase
 
         $this->actingAs($this->user('approver'));
 
-        $html = Livewire::test(WeeklySchedule::class)->html();
+        $html = Livewire::test(ListPublications::class)->html();
         // Ngày đã qua (thứ Hai 09/11) phải có bộ xử lý thả để thông báo lý do thay vì im lặng.
         $this->assertMatchesRegularExpression('/data-day="2026-11-09"[^>]*x-on:drop\.prevent/s', $html);
 
-        Livewire::test(WeeklySchedule::class)
+        Livewire::test(ListPublications::class)
             ->call('moveToDay', $p->id, '2026-11-09')
             ->assertNotified('Không đổi được lịch');
         $this->assertSame('2026-11-12 02:30:00', $p->fresh()->getRawOriginal('scheduled_at_utc'));
@@ -94,7 +99,7 @@ class SmallPolishTest extends TestCase
         $approver = $this->user('approver');
         $this->actingAs($approver);
 
-        \Livewire\Livewire::test(\App\Filament\Resources\ArticleResource\Pages\CreateArticle::class)
+        Livewire::test(CreateArticle::class)
             ->fillForm(['website_id' => $site->id, 'primary_keyword' => 'kw tự tạo', 'search_intent' => 'informational'])
             ->call('create')
             ->assertHasNoFormErrors();
@@ -107,8 +112,9 @@ class SmallPolishTest extends TestCase
         $v = ArticleVersion::create(['article_id' => $article->id, 'version' => 1, 'title' => 't', 'slug' => 's', 'html_content' => '<p>x</p>', 'review_status' => 'needs_review']);
         $article->update(['workflow_status' => 'needs_review']);
         $this->expectException(\InvalidArgumentException::class);
-        (new \App\Filament\Support\Audit\AuditRecorder(new class implements \App\Filament\Support\Audit\AuditSink {
+        (new AuditRecorder(new class implements AuditSink
+        {
             public function write(array $entry): void {}
-        }))->record(\App\Filament\Support\Audit\AuditAction::Approve, $approver, $article, $v, null);
+        }))->record(AuditAction::Approve, $approver, $article, $v, null);
     }
 }

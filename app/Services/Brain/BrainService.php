@@ -32,7 +32,7 @@ final class BrainService
     }
 
     /**
-     * @param list<int|Website> $websites website liên kết (thứ tự = mức ưu tiên)
+     * @param  list<int|Website>  $websites  website liên kết (thứ tự = mức ưu tiên)
      */
     public function createFromTemplate(string $name, ?string $templateKey, array $websites, ?User $by, bool $skipAuth = false): Brain
     {
@@ -61,7 +61,7 @@ final class BrainService
                     KnowledgeTopic::create(['brain_id' => $brain->id, 'parent_id' => $top->id, 'name' => mb_substr($child, 0, 120)]);
                 }
             }
-            (new BrainSourceRegistry())->importSuggested($brain); // AG-B3: gợi ý nguồn của mẫu vào Sổ nguồn dạng "chưa xác nhận"
+            (new BrainSourceRegistry)->importSuggested($brain); // AG-B3: gợi ý nguồn của mẫu vào Căn cứ chuẩn mực dạng "chưa xác nhận"
             $this->syncWebsites($brain, $websites, $by, false);
             // AG-B2: Trí tuệ Thương hiệu gắn đúng một website thì tự có hồ sơ doanh nghiệp RỖNG của website đó (nếu chưa có). Không đụng hồ sơ đã có.
             if ($key === 'thuong_hieu' && $brain->websites()->count() === 1) {
@@ -78,7 +78,7 @@ final class BrainService
      * AG-B2: cài các Trí tuệ từ mẫu. Idempotent theo (template_key + tên): đã có thì BỎ QUA, không ghi đè bản đã sửa, không tạo trùng.
      * Không tự gắn website (trừ khi truyền $site). Không tạo nguồn/mục kiến thức nào: chỉ khung.
      *
-     * @param list<string>|null $keys null = 14 mẫu sức khỏe
+     * @param  list<string>|null  $keys  null = 14 mẫu sức khỏe
      * @return array{created:list<Brain>,skipped:list<string>,unknown:list<string>}
      */
     public function installTemplates(?array $keys = null, ?Website $site = null, ?User $by = null): array
@@ -159,7 +159,7 @@ final class BrainService
     /**
      * Liên kết website kèm mức ưu tiên riêng (số nhỏ = ưu tiên trước). Trí tuệ không còn website nào vẫn hợp lệ (chỉ dùng được khi chiến dịch chọn).
      *
-     * @param array<int,int|string> $priorityById website_id => ưu tiên
+     * @param  array<int,int|string>  $priorityById  website_id => ưu tiên
      */
     public function linkWebsites(Brain $brain, array $priorityById, ?User $by): void
     {
@@ -197,7 +197,7 @@ final class BrainService
     /**
      * Lưu Hồ sơ lĩnh vực. Bài mẫu tối đa BrainProfile::MAX_EXEMPLARS (vượt thì từ chối, không tự cắt âm thầm).
      *
-     * @param array<string,mixed> $data voice, structure, terminology, reasoning, rubric_notes, exemplars
+     * @param  array<string,mixed>  $data  voice, structure, terminology, reasoning, rubric_notes, exemplars
      */
     public function saveProfile(Brain $brain, array $data, ?User $by): BrainProfile
     {

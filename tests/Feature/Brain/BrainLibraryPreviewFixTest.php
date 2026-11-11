@@ -51,7 +51,7 @@ class BrainLibraryPreviewFixTest extends TestCase
     {
         $a = $this->admin();
         $this->actingAs($a);
-        (new BrainService())->installTemplates(['dai_thao_duong'], null, $a);
+        (new BrainService)->installTemplates(['dai_thao_duong'], null, $a);
         $t = Livewire::test(BrainLibraryPage::class)->call('openInstall');
         $keys = $t->get('installKeys');
         $this->assertNotContains('dai_thao_duong', $keys);
@@ -64,7 +64,7 @@ class BrainLibraryPreviewFixTest extends TestCase
     public function test_hop_tao_mac_dinh_mau_trong_va_ten_trong_bao_loi(): void
     {
         $this->actingAs($this->admin());
-        $t = Livewire::test(BrainLibraryPage::class)->call('openCreate')->assertSet('create.template', 'trong');
+        $t = Livewire::test(BrainLibraryPage::class)->call('openCreate')->call('pickKind', 'domain')->assertSet('create.template', 'trong');
         $t->set('create.name', '')->call('createBrain')->assertNotified('Chưa tạo được');
         $this->assertSame(0, Brain::count());
     }

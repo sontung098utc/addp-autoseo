@@ -65,14 +65,14 @@
 
 @if ($canEdit)
 <x-studio.panel key="registry">
-    {{-- AG-B3 (P2, Tầng 3): Sổ nguồn uy tín. Hệ thống KHÔNG tự cho rằng nguồn nào uy tín: gợi ý của mẫu chưa có bậc và chưa được tính; chỉ nguồn do người xác nhận + xếp bậc mới có hiệu lực. --}}
+    {{-- AG-B3 (P2, Tầng 3): Căn cứ chuẩn mực. Hệ thống KHÔNG tự cho rằng nguồn nào uy tín: gợi ý của mẫu chưa có bậc và chưa được tính; chỉ nguồn do người xác nhận + xếp bậc mới có hiệu lực. --}}
     <div data-testid="source-registry">
         <div class="ss-card" style="margin-bottom:.8rem"><div class="ss-card__b">
-            <div class="ss-card__h" style="display:flex;gap:.4rem;align-items:center">Sổ nguồn uy tín
-                <x-studio.hint text="Chuyên gia xếp bậc từng nguồn: Bậc 1 chính thức · Bậc 2 khoa học · Bậc 3 báo chí uy tín · Bậc 4 khác (chỉ gợi ý hướng tìm, không dùng để khẳng định) · Chặn. Chỉ nguồn đã xác nhận mới được tính khi kiểm bằng chứng. Hệ thống chưa tìm web; việc kiểm hiện ở mức cả bài, chưa nối từng câu với từng nguồn."/>
+            <div class="ss-card__h" style="display:flex;gap:.4rem;align-items:center">Căn cứ chuẩn mực
+                <x-studio.hint text="Nguồn quốc tế, pháp lý, khoa học đã được công nhận mà AI được phép trích dẫn. Chuyên gia xếp bậc từng nguồn: Bậc 1 pháp lý, tiêu chuẩn, cơ quan chính thức · Bậc 2 nghiên cứu khoa học bình duyệt · Bậc 3 tạp chí chuyên ngành uy tín · Bậc 4 chỉ để tham khảo (chỉ gợi ý hướng tìm, không dùng để khẳng định) · Chặn. Chỉ nguồn đã xác nhận mới được tính khi kiểm bằng chứng. Hệ thống chưa tìm web; việc kiểm hiện ở mức cả bài, chưa nối từng câu với từng nguồn."/>
             </div>
             @if ($authoritySources->isEmpty())
-                <div class="ss-alert ss-alert--info" role="status">Sổ nguồn đang trống. @if ($brain->reliance() === 'must_cite') Trí tuệ này đặt mức Bắt buộc nguồn, bài sẽ luôn giữ cho người có chuyên môn duyệt cho tới khi có nguồn đã xác nhận. @endif</div>
+                <div class="ss-alert ss-alert--info" role="status">Căn cứ chuẩn mực đang trống. @if ($brain->reliance() === 'must_cite') Trí tuệ này đặt mức Bắt buộc nguồn, bài sẽ luôn giữ cho người có chuyên môn duyệt cho tới khi có nguồn đã xác nhận. @endif</div>
             @else
                 <div class="ss-dt__scroll"><table class="ss-dt__table">
                     <thead><tr><th>Nguồn</th><th style="width:1%;white-space:nowrap">Bậc</th><th style="width:1%;white-space:nowrap">Trạng thái</th>@if ($canEdit)<th style="width:1%;white-space:nowrap"></th>@endif</tr></thead>

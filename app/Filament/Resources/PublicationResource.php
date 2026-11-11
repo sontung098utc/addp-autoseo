@@ -3,17 +3,26 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\PublicationResource\Pages;
-use App\Models\Publication;
-use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Table;
 use App\Filament\Support\Schedule\ErrorMasker;
+use App\Filament\Support\Schedule\PublicationHoldAction;
 use App\Filament\Support\Schedule\ReconcileAction;
+use App\Filament\Support\Schedule\RescheduleAction;
 use App\Filament\Support\Schedule\ScheduleExplainer;
 use App\Filament\Support\Schedule\VnTime;
 use App\Filament\Support\StatusPresenter;
+use App\Jobs\PublishArticleJob;
+use App\Models\Publication;
+use App\Models\User;
+use Carbon\Carbon;
+use Filament\Forms;
+use Filament\Forms\Form;
+use Filament\Notifications\Notification;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 class PublicationResource extends Resource
 {
@@ -32,16 +41,27 @@ class PublicationResource extends Resource
 
     protected static ?string $navigationGroup = 'Lịch đăng';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $recordTitleAttribute = 'publication_key';
 
-
-    protected static function user(): ?\App\Models\User
+    /** Trang "Lịch xuất bản" mở ở tab Lịch tuần (tab mặc định). */
+    public static function scheduleUrl(): string
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
+        return static::getUrl('index').'#tab-lich-tuan';
+    }
 
-        return $user instanceof \App\Models\User && $user->is_active ? $user : null;
+    /** Trang "Lịch xuất bản" mở ở tab Danh sách. */
+    public static function listUrl(): string
+    {
+        return static::getUrl('index').'#tab-danh-sach';
+    }
+
+    protected static function user(): ?User
+    {
+        $user = Auth::user();
+
+        return $user instanceof User && $user->is_active ? $user : null;
     }
 
     public static function canViewAny(): bool
@@ -49,7 +69,7 @@ class PublicationResource extends Resource
         return static::user()?->isApprover() ?? false;
     }
 
-    public static function canView(\Illuminate\Database\Eloquent\Model $record): bool
+    public static function canView(Model $record): bool
     {
         return static::user()?->isApprover() ?? false;
     }
@@ -60,12 +80,12 @@ class PublicationResource extends Resource
         return false;
     }
 
-    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    public static function canEdit(Model $record): bool
     {
         return false;
     }
 
-    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    public static function canDelete(Model $record): bool
     {
         return false;
     }
@@ -151,7 +171,7 @@ class PublicationResource extends Resource
             ->persistColumnSearchesInSession()
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
-            ->modifyQueryUsing(fn (\Illuminate\Database\Eloquent\Builder $query) => $query->with(['website', 'articleVersion.article']))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['website', 'articleVersion.article']))
             ->defaultSort('scheduled_at_utc', 'asc')
             ->filters([
                 Tables\Filters\SelectFilter::make('status')->label('Trạng thái')
@@ -163,15 +183,19 @@ class PublicationResource extends Resource
                         Forms\Components\DatePicker::make('from')->label('Từ ngày (giờ VN)'),
                         Forms\Components\DatePicker::make('until')->label('Đến ngày (giờ VN)'),
                     ])
-                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
+                    ->query(function (Builder $query, array $data): Builder {
                         return $query
-                            ->when($data['from'] ?? null, fn ($q, $d) => $q->where('scheduled_at_utc', '>=', \Carbon\Carbon::parse($d, 'Asia/Ho_Chi_Minh')->startOfDay()->utc()))
-                            ->when($data['until'] ?? null, fn ($q, $d) => $q->where('scheduled_at_utc', '<', \Carbon\Carbon::parse($d, 'Asia/Ho_Chi_Minh')->addDay()->startOfDay()->utc()));
+                            ->when($data['from'] ?? null, fn ($q, $d) => $q->where('scheduled_at_utc', '>=', Carbon::parse($d, 'Asia/Ho_Chi_Minh')->startOfDay()->utc()))
+                            ->when($data['until'] ?? null, fn ($q, $d) => $q->where('scheduled_at_utc', '<', Carbon::parse($d, 'Asia/Ho_Chi_Minh')->addDay()->startOfDay()->utc()));
                     })
                     ->indicateUsing(function (array $data): array {
                         $out = [];
-                        if ($data['from'] ?? null) { $out[] = 'Từ '.\Carbon\Carbon::parse($data['from'])->format('d/m/Y'); }
-                        if ($data['until'] ?? null) { $out[] = 'Đến '.\Carbon\Carbon::parse($data['until'])->format('d/m/Y'); }
+                        if ($data['from'] ?? null) {
+                            $out[] = 'Từ '.Carbon::parse($data['from'])->format('d/m/Y');
+                        }
+                        if ($data['until'] ?? null) {
+                            $out[] = 'Đến '.Carbon::parse($data['until'])->format('d/m/Y');
+                        }
 
                         return $out;
                     }),
@@ -245,26 +269,26 @@ class PublicationResource extends Resource
                     ->modalHeading('Xuất bản ngay lên CMS')
                     ->modalDescription('Hệ thống sẽ gửi bài viết này trực tiếp lên CMS đích ngay lập tức.')
                     ->action(function (Publication $r) {
-                        \App\Jobs\PublishArticleJob::dispatchSync($r);
+                        PublishArticleJob::dispatchSync($r);
                         $r->refresh();
                         if ($r->status === 'published') {
-                            \Filament\Notifications\Notification::make()
-                                ->title('Đã xuất bản thành công lên ' . ($r->website?->name ?? 'CMS'))
-                                ->body($r->published_url ? 'URL: ' . $r->published_url : null)
+                            Notification::make()
+                                ->title('Đã xuất bản thành công lên '.($r->website?->name ?? 'CMS'))
+                                ->body($r->published_url ? 'URL: '.$r->published_url : null)
                                 ->success()
                                 ->send();
                         } else {
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->title('Xuất bản thất bại')
                                 ->body($r->last_error ?? 'Lỗi không xác định')
                                 ->danger()
                                 ->send();
                         }
                     }),
-                \App\Filament\Support\Schedule\PublicationHoldAction::pauseRow(),
-                \App\Filament\Support\Schedule\PublicationHoldAction::resumeRow(),
+                PublicationHoldAction::pauseRow(),
+                PublicationHoldAction::resumeRow(),
                 ReconcileAction::row(),
-                \App\Filament\Support\Schedule\RescheduleAction::row(),
+                RescheduleAction::row(),
             ]);
     }
 

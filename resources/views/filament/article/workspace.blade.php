@@ -640,7 +640,7 @@
                     <div class="aw-head">
                         <h2 class="ss-review-card__title">Lịch xuất bản của bài <x-help title="Dừng riêng bài này"><p>"Tạm dừng bài này" chỉ giữ lượt đăng của bài này, các bài khác vẫn đăng. Dừng khẩn cấp cho cả hệ thống ở trang Lịch xuất bản.</p></x-help></h2>
                         <span class="aw-muted">
-                            @if (WeeklySchedule::canAccess())<a class="aw-link" href="{{ WeeklySchedule::getUrl() }}">Lịch tuần</a>@endif
+                            @if (WeeklySchedule::canAccess())<a class="aw-link" href="{{ \App\Filament\Resources\PublicationResource::scheduleUrl() }}">Lịch tuần</a>@endif
                             @if (PublicationResource::canViewAny()) · <a class="aw-link" href="{{ PublicationResource::getUrl() }}">Tất cả lịch xuất bản</a>@endif
                         </span>
                     </div>

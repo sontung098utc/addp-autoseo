@@ -9,12 +9,13 @@ use App\Filament\Pages\WebsiteOnboardingPage;
 use App\Models\Brain;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Knowledge\BrainKinds;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
 
-/** Z2: Kho trí tuệ là MỘT mục menu (cụm) có hai tab; Xây kho và Khởi tạo website đã gộp vào tab Nạp kiến thức. */
+/** Z2: Kho trí tuệ là MỘT mục menu, MỘT trang chính; Xây kho và Khởi tạo website là luồng "Trí tuệ doanh nghiệp" trong hộp Tạo trí tuệ, không còn tab Nạp kiến thức. */
 class KhoTriTueClusterTest extends TestCase
 {
     use RefreshDatabase;
@@ -62,7 +63,8 @@ class KhoTriTueClusterTest extends TestCase
         $this->assertTrue(BrainBuildPage::canAccess());
         $this->assertTrue(BrainBuildPage::canOnboard());
         $this->assertSame('Trí tuệ', BrainLibraryPage::getNavigationLabel());
-        $this->assertSame('Nạp kiến thức', BrainBuildPage::getNavigationLabel());
+        $this->assertFalse(BrainBuildPage::shouldRegisterNavigation());
+        $this->assertSame('Tạo trí tuệ doanh nghiệp', BrainBuildPage::getNavigationLabel());
         $this->assertSame(KhoTriTue::class, BrainBuildPage::getCluster());
     }
 
@@ -70,10 +72,12 @@ class KhoTriTueClusterTest extends TestCase
     {
         $this->actingAs($this->user('approver'));
         $this->get('/admin/kho-tri-tue')->assertRedirect('/admin/kho-tri-tue/tri-tue');
-        $this->get('/admin/xay-kho')->assertRedirect('/admin/kho-tri-tue/nap-kien-thuc');
-        $this->get('/admin/xay-kho?topic=abc')->assertRedirect('/admin/kho-tri-tue/nap-kien-thuc?topic=abc');
-        $this->get('/admin/khoi-tao-website')->assertRedirect('/admin/kho-tri-tue/nap-kien-thuc#khoi-tao-nhanh');
-        $this->assertSame('/admin/kho-tri-tue/nap-kien-thuc', parse_url(BrainBuildPage::getUrl(), PHP_URL_PATH));
+        $this->get('/admin/xay-kho')->assertRedirect('/admin/kho-tri-tue/tao-tri-tue-doanh-nghiep');
+        $this->get('/admin/xay-kho?topic=abc')->assertRedirect('/admin/kho-tri-tue/tao-tri-tue-doanh-nghiep?topic=abc');
+        $this->get('/admin/kho-tri-tue/nap-kien-thuc')->assertRedirect('/admin/kho-tri-tue/tao-tri-tue-doanh-nghiep');
+        $this->get('/admin/kho-tri-tue/nap-kien-thuc?topic=abc')->assertRedirect('/admin/kho-tri-tue/tao-tri-tue-doanh-nghiep?topic=abc');
+        $this->get('/admin/khoi-tao-website')->assertRedirect('/admin/kho-tri-tue/tao-tri-tue-doanh-nghiep#khoi-tao-nhanh');
+        $this->assertSame('/admin/kho-tri-tue/tao-tri-tue-doanh-nghiep', parse_url(BrainBuildPage::getUrl(), PHP_URL_PATH));
         $this->assertSame('/admin/kho-tri-tue/tri-tue', parse_url(BrainLibraryPage::getUrl(), PHP_URL_PATH));
     }
 
@@ -98,5 +102,40 @@ class KhoTriTueClusterTest extends TestCase
         $this->actingAs($this->user('writer'));
         Brain::create(['name' => 'Y khoa', 'slug' => 'y-khoa', 'status' => 'active', 'settings' => []]);
         Livewire::test(BrainLibraryPage::class)->assertSeeHtml('bl-summary')->assertSee('1 Trí tuệ')->assertSee('0 mục kiến thức');
+    }
+
+    public function test_cum_khong_con_tab_nap_kien_thuc(): void
+    {
+        $this->actingAs($this->user('approver'));
+        $this->assertSame([], (new BrainLibraryPage)->getSubNavigation());
+        $this->assertSame([], (new BrainBuildPage)->getSubNavigation());
+        $html = $this->get(BrainLibraryPage::getUrl())->assertOk()->getContent();
+        $this->assertStringNotContainsString('Nạp kiến thức', $html);
+    }
+
+    public function test_tao_tri_tue_hoi_loai_voi_hai_the(): void
+    {
+        $this->actingAs($this->user('approver'));
+        $t = Livewire::test(BrainLibraryPage::class)->call('openCreate')->assertSet('createKind', '')
+            ->assertSee('Trí tuệ theo lĩnh vực')->assertSee('Trí tuệ doanh nghiệp')->assertSeeHtml('kind-domain')->assertSeeHtml('kind-enterprise');
+        $this->assertSame(['domain', 'enterprise'], array_keys(BrainKinds::all()));
+        $t->call('pickKind', 'domain')->assertSet('createKind', 'domain')->assertSee('Tên')->call('backToKinds')->assertSet('createKind', '');
+    }
+
+    public function test_chon_doanh_nghiep_vao_luong_xay_kho(): void
+    {
+        $this->actingAs($this->user('approver'));
+        Livewire::test(BrainLibraryPage::class)->call('openCreate')->call('pickKind', 'enterprise')->assertRedirect(BrainBuildPage::getUrl());
+    }
+
+    public function test_quyen_giu_nguyen_va_phai_chon_loai_truoc_khi_tao(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $this->assertNull(BrainKinds::flowUrl('enterprise'));
+        Livewire::test(BrainLibraryPage::class)->call('pickKind', 'enterprise')->assertForbidden();
+        $this->actingAs($this->user('approver'));
+        $this->assertSame(BrainBuildPage::getUrl(), BrainKinds::flowUrl('enterprise'));
+        Livewire::test(BrainLibraryPage::class)->call('openCreate')->set('create.name', 'X')->call('createBrain')->assertStatus(422);
+        $this->assertSame(0, Brain::count());
     }
 }

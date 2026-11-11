@@ -13,7 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
 
-/** Chi phí AI ▸ tab Cấu hình AI (trước là Tích hợp AI) và hồ sơ nhân sự (Agent Studio) sau khi gộp tab. */
+/** Cấu hình AI (trước là Chi phí AI), tab Tích hợp AI và hồ sơ nhân sự (Agent Studio) sau khi gộp tab. */
 class AiConfigTabTest extends TestCase
 {
     use RefreshDatabase;
@@ -31,17 +31,26 @@ class AiConfigTabTest extends TestCase
         return Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class);
     }
 
-    public function test_menu_khong_con_tich_hop_ai_va_url_cu_chuyen_ve_tab_cau_hinh(): void
+    public function test_menu_cau_hinh_ai_mot_hang_tab_va_url_cu_chuyen_dung(): void
     {
         $this->login();
         $html = $this->get('/admin')->assertOk()->getContent();
         $this->assertSame(0, preg_match('/>\s*Tích hợp AI\s*</u', $html));
-        $this->assertSame(1, preg_match('/>\s*Chi phí AI\s*</u', $html));
+        $this->assertSame(0, preg_match('/>\s*Chi phí AI\s*</u', $html));
+        $this->assertSame(1, preg_match('/>\s*Cấu hình AI\s*</u', $html));
         $this->assertFalse(class_exists(AgentConnection::class));
-        $this->get('/admin/tich-hop-ai')->assertStatus(301)->assertRedirect('/admin/chi-phi-ai?tab=cau-hinh');
-        $this->get('/admin/doi-ai/ket-noi-ai')->assertStatus(301)->assertRedirect('/admin/chi-phi-ai?tab=cau-hinh');
-        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk()->assertSee('Cấu hình AI')->assertSee('data-tab="chi-phi"', false);
-        $this->get('/admin/chi-phi-ai')->assertOk()->assertDontSee('data-testid="ai-connection"', false);
+        $this->get('/admin/tich-hop-ai')->assertStatus(301)->assertRedirect('/admin/cau-hinh-ai#tab-tich-hop-ai');
+        $this->get('/admin/doi-ai/ket-noi-ai')->assertStatus(301)->assertRedirect('/admin/cau-hinh-ai#tab-tich-hop-ai');
+        $this->get('/admin/chi-phi-ai')->assertStatus(301)->assertRedirect('/admin/cau-hinh-ai');
+        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertStatus(301)->assertRedirect('/admin/cau-hinh-ai#tab-tich-hop-ai');
+
+        $page = $this->get('/admin/cau-hinh-ai')->assertOk()->assertSee('Cấu hình AI')->assertSee('data-testid="ai-connection"', false)->getContent();
+        // Chỉ MỘT hàng tab (không còn hàng cụm Chi phí | Cấu hình AI), "Tích hợp AI" nằm ngay sau "Quy tắc".
+        $this->assertSame(1, substr_count($page, 'role="tablist"') - substr_count($page, 'role="tablist" aria-label="Đội AI"'));
+        $this->assertStringNotContainsString('data-testid="ai-tabs"', $page);
+        $this->assertStringNotContainsString('data-tab="chi-phi"', $page);
+        $this->assertSame(1, preg_match('/data-key="rules".*?data-key="tich-hop-ai"/s', $page));
+        $this->assertStringContainsString('Tích hợp AI', $page);
     }
 
     public function test_them_hai_tai_khoan_cung_nha_cung_cap_va_hien_logo_model_khoa_an(): void
@@ -63,7 +72,7 @@ class AiConfigTabTest extends TestCase
         $this->assertContains('gemini-exp-x', $m);
         $this->assertStringNotContainsString('COMPANYKEY', (string) \DB::table('ai_providers')->where('name', 'Gemini – công ty')->value('api_key'));
 
-        $html = $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk()->assertSee('Gemini – công ty')->assertSee('Gemini – cá nhân')->assertSee('Gemini 2.5 Flash')->assertSee('gemini-exp-x')->getContent();
+        $html = $this->get('/admin/cau-hinh-ai')->assertOk()->assertSee('Gemini – công ty')->assertSee('Gemini – cá nhân')->assertSee('Gemini 2.5 Flash')->assertSee('gemini-exp-x')->getContent();
         $this->assertStringContainsString('data-logo="google"', $html);
         $this->assertStringContainsString('data-logo="openrouter"', $html);
         $this->assertStringNotContainsString('COMPANYKEY1111', $html);

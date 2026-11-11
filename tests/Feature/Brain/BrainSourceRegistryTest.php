@@ -12,7 +12,7 @@ use App\Services\Knowledge\KnowledgeError;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-/** AG-B3 (Kho trí tuệ P2, Tầng 3): Sổ nguồn uy tín. Hệ thống không tự khẳng định nguồn: chỉ nguồn do người xác nhận + có bậc mới có hiệu lực. */
+/** AG-B3 (Kho trí tuệ P2, Tầng 3): Căn cứ chuẩn mực. Hệ thống không tự khẳng định nguồn: chỉ nguồn do người xác nhận + có bậc mới có hiệu lực. */
 class BrainSourceRegistryTest extends TestCase
 {
     use RefreshDatabase;
@@ -33,7 +33,7 @@ class BrainSourceRegistryTest extends TestCase
         $expected = count(BrainTemplates::get($key)['suggested_sources']);
         $this->assertGreaterThan(0, $expected);
 
-        $brain = (new BrainService())->createFromTemplate('Tim mạch', $key, [], $this->user());
+        $brain = (new BrainService)->createFromTemplate('Tim mạch', $key, [], $this->user());
         $rows = BrainSource::query()->where('brain_id', $brain->id)->get();
         $this->assertCount($expected, $rows);
         $this->assertSame(['suggested'], $rows->pluck('status')->unique()->all());
@@ -46,8 +46,8 @@ class BrainSourceRegistryTest extends TestCase
 
     public function test_nhap_lai_goi_y_khong_nhan_doi_va_khong_dung_hang_da_xac_nhan(): void
     {
-        $brain = (new BrainService())->createFromTemplate('Tim mạch', BrainTemplates::HEALTH_KEYS[0], [], $this->user());
-        $reg = new BrainSourceRegistry();
+        $brain = (new BrainService)->createFromTemplate('Tim mạch', BrainTemplates::HEALTH_KEYS[0], [], $this->user());
+        $reg = new BrainSourceRegistry;
         $first = BrainSource::query()->where('brain_id', $brain->id)->first();
         $reg->confirm($first, '1', $this->user());
 
@@ -60,12 +60,12 @@ class BrainSourceRegistryTest extends TestCase
     {
         $brain = $this->brain();
         $u = $this->user();
-        $s = (new BrainSourceRegistry())->add($brain, 'Bộ Y tế', 'moh.gov.vn', null, null, $u);
+        $s = (new BrainSourceRegistry)->add($brain, 'Bộ Y tế', 'moh.gov.vn', null, null, $u);
         $this->assertSame('suggested', $s->status);
 
         $this->expectException(KnowledgeError::class);
         try {
-            (new BrainSourceRegistry())->confirm($s, '', $u);
+            (new BrainSourceRegistry)->confirm($s, '', $u);
         } finally {
             $this->assertSame('suggested', $s->refresh()->status);
         }
@@ -75,7 +75,7 @@ class BrainSourceRegistryTest extends TestCase
     {
         $brain = $this->brain();
         $u = $this->user();
-        $r = new BrainSourceRegistry();
+        $r = new BrainSourceRegistry;
         $r->add($brain, 'Bộ Y tế', 'https://www.MOH.gov.vn/', '1', 'Cơ quan quản lý', $u);
         $r->add($brain, 'Tạp chí ABC', 'abc-journal.org', '2', null, $u);
         $r->add($brain, 'Blog quảng cáo', 'spam-thuoc.vn', 'blocked', null, $u);
@@ -97,7 +97,7 @@ class BrainSourceRegistryTest extends TestCase
     {
         $brain = $this->brain();
         $u = $this->user();
-        $r = new BrainSourceRegistry();
+        $r = new BrainSourceRegistry;
         foreach (['', 'không phải tên miền', 'a b.com', 'localhost'] as $bad) {
             try {
                 $r->add($brain, 'X', $bad, '1', null, $u);
@@ -121,13 +121,13 @@ class BrainSourceRegistryTest extends TestCase
     {
         $brain = $this->brain();
         $this->expectException(KnowledgeError::class);
-        (new BrainSourceRegistry())->add($brain, 'Bộ Y tế', 'moh.gov.vn', '1', null, $this->user('writer'));
+        (new BrainSourceRegistry)->add($brain, 'Bộ Y tế', 'moh.gov.vn', '1', null, $this->user('writer'));
     }
 
     public function test_xoa_tri_tue_xoa_theo_so_nguon_cua_no(): void
     {
         $brain = $this->brain();
-        (new BrainSourceRegistry())->add($brain, 'Bộ Y tế', 'moh.gov.vn', '1', null, $this->user());
+        (new BrainSourceRegistry)->add($brain, 'Bộ Y tế', 'moh.gov.vn', '1', null, $this->user());
         $this->assertSame(1, BrainSource::count());
         $brain->delete();
         $this->assertSame(0, BrainSource::count());

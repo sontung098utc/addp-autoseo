@@ -541,7 +541,7 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
     }
 
     /**
-     * AG-B3 (P2): Sổ nguồn uy tín đã xác nhận (options['citable_sources']), chỉ khi Trí tuệ bắt buộc nguồn. Người viết CHỈ được trích trong danh sách này
+     * AG-B3 (P2): Căn cứ chuẩn mực đã xác nhận (options['citable_sources']), chỉ khi Trí tuệ bắt buộc nguồn. Người viết CHỈ được trích trong danh sách này
      * (chống bịa nguồn). Dữ liệu, làm phẳng, giới hạn số mục.
      */
     protected function citableSourcesBlock(array $options): string
@@ -556,7 +556,7 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             $lines[] = '- '.$name.(($d = $clean($s['domain'] ?? '', 120)) !== '' ? " ({$d})" : '').' — bậc '.$clean($s['tier'] ?? '', 2);
         }
 
-        return $lines === [] ? '' : "\n\n--- NGUỒN ĐƯỢC PHÉP TRÍCH (Sổ nguồn uy tín đã xác nhận) ---\n".implode("\n", $lines)."\n--- HẾT DANH SÁCH NGUỒN ---\n"
+        return $lines === [] ? '' : "\n\n--- NGUỒN ĐƯỢC PHÉP TRÍCH (Căn cứ chuẩn mực đã xác nhận) ---\n".implode("\n", $lines)."\n--- HẾT DANH SÁCH NGUỒN ---\n"
             .'Trong sources_cited CHỈ ghi nguồn có trong danh sách trên (tên hoặc đường dẫn thuộc tên miền đó); không bịa nguồn, không trích nguồn khác. Khẳng định y khoa/pháp lý/số liệu cần ít nhất một nguồn bậc 1–2 hoặc hai nguồn bậc 2–3 trong danh sách; nếu không đủ nguồn thì bỏ khẳng định đó thay vì tự thêm nguồn.';
     }
 

@@ -13,7 +13,7 @@
 @empty
 <div class="ss-dash-empty">Không có lượt đăng lỗi hoặc chờ đối soát.</div>
 @endforelse
-<div class="ss-dash-sub"><a href="{{ \App\Filament\Resources\PublicationResource::getUrl('index') }}">Xem tất cả lượt đăng</a></div>
+<div class="ss-dash-sub"><a href="{{ \App\Filament\Resources\PublicationResource::listUrl() }}">Xem tất cả lượt đăng</a></div>
 </x-filament::section>
 @endif
 </x-filament-widgets::widget>

@@ -90,8 +90,8 @@ class AgentOverview extends Page
                 ['label' => 'Từ khóa chưa giao', 'n' => $active->sum(fn ($c) => CampaignResource::remaining($c)), 'url' => CampaignResource::getUrl('index'), 'who' => 'Chiến dịch'],
                 ['label' => 'Đội AI giữ nháp', 'n' => $byStatus['held'] ?? 0, 'url' => AgentRunResource::getUrl('index'), 'who' => 'Cần người xem'],
                 ['label' => 'Chờ duyệt', 'n' => ArticleVersion::query()->where('review_status', 'needs_review')->count(), 'url' => ArticleVersionResource::getUrl('index'), 'who' => 'Người duyệt'],
-                ['label' => 'Đã xếp lịch', 'n' => Publication::query()->where('status', 'scheduled')->count(), 'url' => PublicationResource::getUrl('index'), 'who' => 'Hệ thống đăng'],
-                ['label' => 'Đã đăng', 'n' => Publication::query()->where('status', 'published')->count(), 'url' => PublicationResource::getUrl('index'), 'who' => 'CMS'],
+                ['label' => 'Đã xếp lịch', 'n' => Publication::query()->where('status', 'scheduled')->count(), 'url' => PublicationResource::listUrl(), 'who' => 'Hệ thống đăng'],
+                ['label' => 'Đã đăng', 'n' => Publication::query()->where('status', 'published')->count(), 'url' => PublicationResource::listUrl(), 'who' => 'CMS'],
             ],
         ];
     }

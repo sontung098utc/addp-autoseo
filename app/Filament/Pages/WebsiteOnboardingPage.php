@@ -7,7 +7,7 @@ use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Z2: "Khởi tạo website" đã gộp vào khối "Khởi tạo nhanh" ở tab Nạp kiến thức của Kho trí tuệ (BrainBuildPage::startOnboarding).
+ * Z2: "Khởi tạo website" đã gộp vào khối "Khởi tạo nhanh" của luồng Tạo trí tuệ doanh nghiệp (BrainBuildPage::startOnboarding).
  * Trang này chỉ còn giữ URL cũ /admin/khoi-tao-website và chuyển hướng; không hiện trên menu. Quyền (approver trở lên) và logic WebsiteOnboarding không đổi.
  */
 class WebsiteOnboardingPage extends Page

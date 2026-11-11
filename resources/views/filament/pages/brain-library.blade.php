@@ -7,6 +7,10 @@
         .bl-modal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:1rem}
         .bl-modal__b{background:rgb(var(--gray-50));max-width:34rem;width:100%;max-height:90vh;overflow:auto;border-radius:.6rem;padding:1rem}
         .dark .bl-modal__b{background:rgb(var(--gray-900))}
+        .bl-kinds{display:grid;gap:.6rem;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr))}
+        .bl-kind{display:flex;flex-direction:column;gap:.35rem;align-items:flex-start;text-align:left;padding:.8rem;border:1px solid rgba(128,128,128,.5);border-radius:.5rem;background:transparent;cursor:pointer}
+        .bl-kind:hover:not(:disabled),.bl-kind:focus-visible{border-color:rgb(var(--primary-500));outline:2px solid rgb(var(--primary-500))}
+        .bl-kind:disabled{opacity:.55;cursor:not-allowed}
     </style>
     <div class="ss-page">
         <div class="bl-row" style="margin-bottom:.8rem">
@@ -38,14 +42,14 @@
                 @if ($tot['warn'])<x-studio.badge tone="danger">{{ $tot['warn'] }} cảnh báo (mâu thuẫn, cũ, khoảng trống)</x-studio.badge>@endif
                 @if ($tot['nosrc'])<x-studio.badge tone="warn">{{ $tot['nosrc'] }} chưa có nguồn xác nhận</x-studio.badge>@endif
                 @if ($tot['nosite'])<x-studio.badge tone="muted">{{ $tot['nosite'] }} chưa gắn website</x-studio.badge>@endif
-                @if (\App\Filament\Pages\BrainBuildPage::canAccess())
-                    <x-filament::button size="xs" color="gray" tag="a" :href="\App\Filament\Pages\BrainBuildPage::getUrl()" icon="heroicon-o-arrow-down-tray" style="margin-left:auto">Nạp thêm kiến thức</x-filament::button>
+                @if ($buildUrl)
+                    <x-filament::button size="xs" color="gray" tag="a" :href="$buildUrl" icon="heroicon-o-arrow-down-tray" style="margin-left:auto" data-testid="bl-todo">Việc cần xem và nạp thêm kiến thức</x-filament::button>
                 @endif
             </div>
         @endif
 
         @if ($cards->isEmpty())
-            <div class="ss-card"><div class="ss-card__b">{{ $archived ? 'Chưa có Trí tuệ nào được lưu trữ.' : 'Chưa có Trí tuệ nào.' }}@if ($manage && ! $archived) Bấm "Tạo trí tuệ" để bắt đầu từ một mẫu.@endif</div></div>
+            <div class="ss-card"><div class="ss-card__b">{{ $archived ? 'Chưa có Trí tuệ nào được lưu trữ.' : 'Chưa có Trí tuệ nào.' }}@if ($manage && ! $archived) Bấm "Tạo trí tuệ" rồi chọn loại để bắt đầu.@endif</div></div>
         @else
             <div class="bl-grid">
                 @foreach ($cards as $c)
@@ -107,8 +111,23 @@
 
         @if ($showCreate)
             <div class="bl-modal" role="dialog" aria-modal="true" aria-label="Tạo trí tuệ" wire:key="create-modal" x-data x-on:keydown.escape.window="$wire.closeCreate()">
-                <div class="bl-modal__b">
-                    <div class="ss-card__h">Tạo trí tuệ</div>
+                <div class="bl-modal__b" style="{{ $createKind === '' ? 'max-width:40rem' : '' }}">
+                    <div class="ss-card__h" style="display:flex;gap:.4rem;align-items:center">Tạo trí tuệ
+                        @if ($createKind !== '')<span class="ss-muted ss-text-xs">· {{ $kinds[$createKind]['name'] ?? '' }}</span>@endif
+                    </div>
+                    @if ($createKind === '')
+                        <p class="ss-muted ss-text-sm" style="margin:0 0 .6rem">Bạn muốn tạo loại Trí tuệ nào?</p>
+                        <div class="bl-kinds" data-testid="bl-kinds">
+                            @foreach ($kinds as $k)
+                                <button type="button" class="bl-kind" wire:click="pickKind('{{ $k['key'] }}')" data-testid="kind-{{ $k['key'] }}" @disabled(! $kindOk[$k['key']])>
+                                    <x-filament::icon :icon="$k['icon']" style="width:1.6rem;height:1.6rem" />
+                                    <strong>{{ $k['name'] }}</strong>
+                                    <span class="ss-muted ss-text-xs">{{ $k['description'] }}@if (! $kindOk[$k['key']]) Cần quyền người duyệt trở lên.@endif</span>
+                                </button>
+                            @endforeach
+                        </div>
+                        <div class="bl-row" style="justify-content:flex-end;margin-top:.7rem"><x-filament::button type="button" color="gray" wire:click="closeCreate">Hủy</x-filament::button></div>
+                    @else
                     <form wire:submit="createBrain" style="display:flex;flex-direction:column;gap:.7rem">
                         <label>Mẫu <x-studio.hint text="Chọn Trống nếu muốn tự điền từ đầu. Mẫu chỉ mang khung cấu trúc và quy tắc, không mang sự kiện hay số liệu; bạn tự điền thuật ngữ và kiến thức."/>
                             <select class="bl-in" wire:model.live="create.template">@foreach ($templates as $k => $t)<option value="{{ $k }}">{{ $t['name'] }}</option>@endforeach</select></label>
@@ -121,10 +140,11 @@
                             @if ($sites->isEmpty())<span class="ss-muted ss-text-xs">Chưa có website.</span>@endif
                         </fieldset>
                         <div class="bl-row" style="justify-content:flex-end">
-                            <x-filament::button type="button" color="gray" wire:click="closeCreate">Hủy</x-filament::button>
+                            <x-filament::button type="button" color="gray" wire:click="backToKinds">Chọn loại khác</x-filament::button>
                             <x-filament::button type="submit">Tạo</x-filament::button>
                         </div>
                     </form>
+                    @endif
                 </div>
             </div>
         @endif

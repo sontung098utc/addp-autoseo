@@ -8,6 +8,7 @@ use App\Filament\Pages\ContentPlanPage;
 use App\Filament\Pages\KeywordsPage;
 use App\Filament\Pages\KnowledgePage;
 use App\Filament\Pages\SearchConsolePage;
+use App\Filament\Resources\AgentRunResource;
 use App\Filament\Resources\ArticleResource;
 use App\Filament\Support\Agent\RunActivity;
 use App\Models\User;
@@ -18,7 +19,7 @@ use Filament\Pages\Page;
 use Filament\Pages\SubNavigationPosition;
 use Illuminate\Support\Facades\Auth;
 
-/** Tab "Pipeline" của Đội AI: hai tab ngang, "Các luồng" (mỗi loại việc một luồng nút ngang) và "Đang chạy". Chi tiết bước và loại việc mở trong cửa sổ trượt. */
+/** Tab "Pipeline" của Đội AI: hai tab ngang, "Các luồng" (lưới thẻ lớn, bấm mở popup luồng đầy đủ) và "Đang chạy". */
 class PipelineMap extends Page
 {
     protected static ?string $cluster = AgentTeam::class;
@@ -168,8 +169,19 @@ class PipelineMap extends Page
         $flows = array_map(function (array $f) {
             $j = JobTypeRegistry::find($f['id']) ?? [];
 
-            return $f + ['plain' => $j ? self::plainLine($j) : '', 'url' => self::workUrl($f['id']), 'help' => $j ? $this->helpLines($j) : []];
+            return $f + [
+                'plain' => $j ? self::plainLine($j) : '', 'url' => self::workUrl($f['id']), 'help' => $j ? $this->helpLines($j) : [],
+                'runs_url' => PipelineVisual::urlOf(AgentRunResource::class, ['tableFilters' => ['job_type' => ['value' => $f['id']]]]),
+            ];
         }, PipelineVisual::flows());
+        $recent = [];
+        $stepStats = [];
+        foreach ($flows as $f) {
+            $recent[$f['id']] = PipelineVisual::recentRuns($f['id']);
+            foreach ($f['steps'] as $s) {
+                $stepStats[$f['id']][$s['id']] = PipelineVisual::stepStats($f['id'], (string) $s['id']);
+            }
+        }
 
         $runs = PipelineVisual::runs();
         $live = RunActivity::anyRunning();
@@ -182,6 +194,12 @@ class PipelineMap extends Page
 
         return [
             'flows' => $flows,
+            'cards' => PipelineVisual::cardStats(),
+            'recent' => $recent,
+            'stepStats' => $stepStats,
+            'isAdmin' => (bool) Auth::user()?->isAdmin(),
+            'rolesUrl' => PipelineVisual::urlOf(AgentRoles::class),
+            'skillsUrl' => PipelineVisual::urlOf(AgentSkills::class),
             'runs' => $runs,
             'live' => $live,
             'pollSeconds' => RunActivity::POLL_LIVE,

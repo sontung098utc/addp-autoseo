@@ -2,6 +2,7 @@
 
 namespace App\Services\Agent\Pipeline;
 
+use App\Filament\Resources\AgentRunResource;
 use App\Filament\Support\Agent\RunActivity;
 use App\Filament\Support\Schedule\VnTime;
 use App\Models\AgentRun;
@@ -24,6 +25,17 @@ final class PipelineVisual
         'crawled_urls' => 'Các trang đã quét', 'seo_audits' => 'Kết quả audit trước', 'audit_suggestions.issue_codes' => 'Lỗi SEO từ audit', 'publications.published_url' => 'Địa chỉ bài đã đăng',
         'articles đã có' => 'Bài đã có', 'website' => 'Website công ty', 'knowledge_items' => 'Kiến thức đã duyệt', 'Search Console' => 'Số liệu Search Console', 'phiên bản hiện tại' => 'Phiên bản bài hiện tại',
     ];
+
+    /** Màu nhấn theo loại việc (thẻ luồng, hình minh họa). */
+    public const TONES = [
+        'market_research' => '#4f46e5', 'site_audit' => '#d97706', 'content_plan' => '#0d9488', 'article_write' => '#2563eb',
+        'article_refresh' => '#7c3aed', 'brain_build' => '#059669', 'measure' => '#e11d48',
+    ];
+
+    public static function tone(string $jobId): string
+    {
+        return self::TONES[$jobId] ?? '#64748b';
+    }
 
     /** Cấu hình hiển thị của một chức vụ lấy từ AgentProfiles (W3) nếu có, không thì từ RoleRegistry. @return array{key:string,name:string,title:string,avatar:string} */
     public static function profile(string $key): array
@@ -101,15 +113,101 @@ final class PipelineVisual
                     'n' => $i + 1, 'id' => $s['id'], 'label' => $s['label'], 'kind' => $s['kind'], 'tier' => $tier,
                     'human' => ! empty($s['human']), 'planned' => ! empty($s['planned']), 'when' => $s['when'] ?? null,
                     'profile' => self::profile((string) ($s['role'] ?? 'system')),
-                ];
+                ] + ['info' => StepInfo::for($j['id'], (string) $s['id'], (string) $s['label'], (string) $s['kind'])];
             }
+            $total = count($steps);
+            foreach ($steps as $i => &$st) {
+                $st['from'] = $i === 0 ? null : $steps[$i - 1]['label'];
+                $st['to'] = $i === $total - 1 ? null : $steps[$i + 1]['label'];
+            }
+            unset($st);
             $links = self::recordLinks($j);
             $out[] = [
-                'id' => $j['id'], 'title' => $j['title'], 'status' => $j['status'], 'steps' => $steps,
+                'id' => $j['id'], 'title' => $j['title'], 'status' => $j['status'], 'steps' => $steps, 'budget' => $j['budget'],
+                'human' => array_values((array) $j['human']), 'has_human' => collect($steps)->contains('human', true) || ! empty($j['human']),
                 'inputs' => self::plainReads($j['reads']), 'input_links' => array_values(array_filter($links, fn ($l) => $l['type'] === 'input')),
                 'output_links' => array_values(array_filter($links, fn ($l) => $l['type'] !== 'input')),
                 'outputs' => collect($j['shown_at'])->map(fn ($x) => trim((string) preg_replace('/\s*\(.*?\)/u', '', $x)))->all(),
             ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Chỉ số THẬT cho thẻ luồng, đếm từ agent_runs: đang chạy, số phiên 7 ngày, xong và lỗi trong 7 ngày, chi phí trung bình.
+     * Phiên cũ chưa có job_type tính là article_write. Loại việc chưa có phiên nào: toàn 0 và rate = null (không bịa tỷ lệ).
+     *
+     * @return array<string, array{running:int, week:int, done:int, failed:int, rate:?int, avg_cost:?float}>
+     */
+    public static function cardStats(): array
+    {
+        $out = [];
+        foreach (JobTypeRegistry::all() as $j) {
+            $out[$j['id']] = ['running' => 0, 'week' => 0, 'done' => 0, 'failed' => 0, 'rate' => null, 'avg_cost' => null];
+        }
+        $hasType = Schema::hasColumn('agent_runs', 'job_type');
+        $rows = AgentRun::query()->where(fn ($q) => $q->where('status', 'running')->orWhere('created_at', '>=', now()->subDays(7)))
+            ->get(array_filter(['id', 'status', 'cost_vnd', 'created_at', 'updated_at', 'started_at', 'finished_at', $hasType ? 'job_type' : null]));
+        $costs = [];
+        foreach ($rows as $r) {
+            $jt = ($hasType ? $r->job_type : null) ?: 'article_write';
+            if (! isset($out[$jt]) || self::isAutoPrepare($r)) {
+                continue;
+            }
+            if ($r->status === 'running' && RunActivity::isLive($r)) {
+                $out[$jt]['running']++;
+            }
+            if ($r->created_at && $r->created_at->gte(now()->subDays(7))) {
+                $out[$jt]['week']++;
+                if (in_array($r->status, ['failed', 'blocked'], true)) {
+                    $out[$jt]['failed']++;
+                } elseif ($r->status !== 'running') {
+                    $out[$jt]['done']++;
+                }
+                if ((float) $r->cost_vnd > 0) {
+                    $costs[$jt][] = (float) $r->cost_vnd;
+                }
+            }
+        }
+        foreach ($out as $id => &$o) {
+            $fin = $o['done'] + $o['failed'];
+            $o['rate'] = $fin > 0 ? (int) round($o['done'] / $fin * 100) : null;
+            $o['avg_cost'] = ! empty($costs[$id]) ? round(array_sum($costs[$id]) / count($costs[$id]), 0) : null;
+        }
+
+        return $out;
+    }
+
+    /** 5 phiên gần nhất của một loại việc. @return list<array{id:int, subject:string, status:string, when:string, url:?string}> */
+    public static function recentRuns(string $jobId, int $limit = 5): array
+    {
+        $q = AgentRun::query()->with(['article', 'website'])->orderByDesc('id')->limit($limit * 3);
+        if (Schema::hasColumn('agent_runs', 'job_type')) {
+            $q->where(function ($w) use ($jobId) {
+                $w->where('job_type', $jobId);
+                if ($jobId === 'article_write') {
+                    $w->orWhereNull('job_type');
+                }
+            });
+        } elseif ($jobId !== 'article_write') {
+            return [];
+        }
+        $canView = AgentRunResource::canViewAny();
+        $out = [];
+        foreach ($q->get() as $r) {
+            if (self::isAutoPrepare($r)) {
+                continue;
+            }
+            $out[] = [
+                'id' => $r->id, 'status' => $r->status,
+                'subject' => $r->article ? ($r->article->primary_keyword ?: $r->article->title ?: 'Bài #'.$r->article_id) : ($r->website ? $r->website->name : 'Phiên #'.$r->id),
+                'when' => $r->created_at ? VnTime::format(VnTime::fromRaw($r, 'created_at') ?? $r->created_at, 'd/m H:i') : '',
+                'url' => $canView ? AgentRunResource::getUrl('view', ['record' => $r]) : null,
+            ];
+            if (count($out) >= $limit) {
+                break;
+            }
         }
 
         return $out;

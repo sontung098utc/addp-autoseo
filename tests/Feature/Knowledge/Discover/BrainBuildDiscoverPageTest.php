@@ -99,6 +99,6 @@ class BrainBuildDiscoverPageTest extends TestCase
 
     public function test_quyen_writer_khong_vao_trang(): void
     {
-        $this->actingAs($this->user('writer'))->get('/admin/kho-tri-tue/nap-kien-thuc')->assertForbidden();
+        $this->actingAs($this->user('writer'))->get('/admin/kho-tri-tue/tao-tri-tue-doanh-nghiep')->assertForbidden();
     }
 }

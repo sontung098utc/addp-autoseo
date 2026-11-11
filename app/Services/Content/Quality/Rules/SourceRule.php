@@ -16,7 +16,7 @@ use App\Services\Knowledge\KnowledgeRetriever;
  * SRC01 "Nguồn AI nêu có thật" (P1, không bao giờ P0). Chạy cho MỌI bài, không phụ thuộc "Bắt buộc nguồn". Tất định, KHÔNG dùng AI, KHÔNG gọi mạng.
  * Mỗi nguồn trong sources_cited của bản đang chấm phải khớp tập nguồn CÓ THẬT (so khớp không phân biệt hoa/thường, theo tên miền hoặc tên chuẩn hóa):
  *  (a) nguồn kiến thức (tên, tiêu đề, tên miền của url) của các mục kiến thức đã duyệt trong phạm vi website/Trí tuệ;
- *  (b) Sổ nguồn đã xác nhận (không gồm nguồn bị chặn: EVID01 lo, không nhân đôi cờ);
+ *  (b) Căn cứ chuẩn mực đã xác nhận (không gồm nguồn bị chặn: EVID01 lo, không nhân đôi cờ);
  *  (c) tên và tên miền của chính website.
  * Giới hạn: lúc chấm bản chưa lưu nên chưa có knowledge_item_usages; dùng mọi mục đã duyệt còn hiệu lực trong phạm vi (cùng $brainIds của checker), không chỉ mục đã nạp.
  * Chỉ đối chiếu tên/tên miền; không kiểm nội dung nguồn, không kiểm từng câu.
@@ -76,12 +76,12 @@ class SourceRule implements QualityRule
             }
         }
         if ($unmatched === []) {
-            return [new RuleResult('SRC01', RuleResult::P1, true, $label, 'Mọi nguồn AI nêu đều khớp kho kiến thức, Sổ nguồn hoặc website (chỉ đối chiếu tên/tên miền, không kiểm nội dung nguồn).', count($cited).' nguồn')];
+            return [new RuleResult('SRC01', RuleResult::P1, true, $label, 'Mọi nguồn AI nêu đều khớp kho kiến thức, Căn cứ chuẩn mực hoặc website (chỉ đối chiếu tên/tên miền, không kiểm nội dung nguồn).', count($cited).' nguồn')];
         }
         $list = implode('; ', array_map(fn ($u) => '"'.mb_substr($u, 0, 80).'"', array_slice($unmatched, 0, 3)));
 
         return [new RuleResult('SRC01', RuleResult::P1, false, $label,
-            count($unmatched).'/'.count($cited).' nguồn không khớp kho kiến thức, Sổ nguồn hay website: '.$list.'. AI tự nêu, chưa kiểm: hãy xác minh nguồn có thật trước khi duyệt, hoặc thêm vào Sổ nguồn nếu đúng.',
+            count($unmatched).'/'.count($cited).' nguồn không khớp kho kiến thức, Căn cứ chuẩn mực hay website: '.$list.'. AI tự nêu, chưa kiểm: hãy xác minh nguồn có thật trước khi duyệt, hoặc thêm vào Căn cứ chuẩn mực nếu đúng.',
             count($unmatched).' nguồn chưa kiểm', '0 nguồn không khớp')];
     }
 

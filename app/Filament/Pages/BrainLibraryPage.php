@@ -15,6 +15,7 @@ use App\Models\Website;
 use App\Services\Brain\BrainService;
 use App\Services\Brain\BrainTemplates;
 use App\Services\Brand\BrandProfileData;
+use App\Services\Knowledge\BrainKinds;
 use App\Services\Knowledge\KnowledgeConflicts;
 use App\Services\Knowledge\KnowledgeError;
 use App\Services\Knowledge\KnowledgeFreshness;
@@ -28,7 +29,7 @@ use Illuminate\Support\Facades\Auth;
  */
 class BrainLibraryPage extends Page
 {
-    /** Z2: thành tab "Trí tuệ" (đầu tiên) của cụm Kho trí tuệ; URL mới /admin/kho-tri-tue/tri-tue, URL cũ /admin/kho-tri-tue chuyển hướng ở routes/web.php. */
+    /** Trang chính (duy nhất có trên menu) của cụm Kho trí tuệ: /admin/kho-tri-tue/tri-tue; /admin/kho-tri-tue chuyển hướng ở routes/web.php. */
     protected static ?string $cluster = KhoTriTue::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-academic-cap';
@@ -44,6 +45,9 @@ class BrainLibraryPage extends Page
     protected static string $view = 'filament.pages.brain-library';
 
     public bool $showCreate = false;
+
+    /** Bước 1 của "Tạo trí tuệ": loại Trí tuệ (rỗng = đang chọn loại; 'domain' = biểu mẫu theo lĩnh vực). Loại 'enterprise' đi thẳng vào luồng xây kho. */
+    public string $createKind = '';
 
     public bool $showArchived = false;
 
@@ -76,7 +80,34 @@ class BrainLibraryPage extends Page
     {
         abort_unless(static::canAccess() && static::canManage(), 403);
         $this->create = ['name' => '', 'template' => 'trong', 'websites' => []];
+        $this->createKind = '';
         $this->showCreate = true;
+    }
+
+    /** Chọn loại ở bước 1: loại có luồng riêng thì chuyển sang luồng đó (cần quyền của luồng), loại có biểu mẫu thì mở biểu mẫu. */
+    public function pickKind(string $kind): mixed
+    {
+        abort_unless(static::canAccess() && static::canManage(), 403);
+        $k = BrainKinds::get($kind);
+        abort_if($k === null, 404);
+        if ($k['mode'] === 'flow') {
+            $url = BrainKinds::flowUrl($kind);
+            if ($url === null) {
+                Notification::make()->title('Bạn chưa có quyền tạo loại này')->body('Trí tuệ doanh nghiệp cần quyền người duyệt trở lên.')->warning()->send();
+
+                return null;
+            }
+
+            return $this->redirect($url);
+        }
+        $this->createKind = $kind;
+
+        return null;
+    }
+
+    public function backToKinds(): void
+    {
+        $this->createKind = '';
     }
 
     public static function canInstall(): bool
@@ -140,6 +171,7 @@ class BrainLibraryPage extends Page
     public function createBrain(): mixed
     {
         abort_unless(static::canAccess() && static::canManage(), 403);
+        abort_unless($this->createKind === BrainKinds::DOMAIN, 422);
         try {
             $brain = (new BrainService)->createFromTemplate((string) $this->create['name'], (string) $this->create['template'] ?: null, array_map('intval', (array) $this->create['websites']), Auth::user());
         } catch (KnowledgeError|\InvalidArgumentException $e) {
@@ -151,6 +183,12 @@ class BrainLibraryPage extends Page
         Notification::make()->title('Đã tạo Trí tuệ "'.$brain->name.'"')->body('Hồ sơ lĩnh vực mới chỉ có khung gợi ý. Hãy điền giọng, thuật ngữ và quy tắc lập luận.')->success()->send();
 
         return $this->redirect(BrainPage::getUrl(['brain' => $brain->id]));
+    }
+
+    /** Cụm chỉ còn một trang chính: không hiện hàng tab. */
+    public function getSubNavigation(): array
+    {
+        return [];
     }
 
     /** @return array<string,mixed> */
@@ -191,6 +229,8 @@ class BrainLibraryPage extends Page
         });
 
         return [
+            'kinds' => BrainKinds::all(), 'kindOk' => collect(BrainKinds::all())->map(fn ($k) => $k['mode'] !== 'flow' || BrainKinds::flowUrl($k['key']) !== null)->all(),
+            'buildUrl' => BrainBuildPage::canAccess() ? BrainBuildPage::getUrl() : null,
             'cards' => $cards, 'manage' => static::canManage(), 'archived' => $archived,
             'archivedCount' => Brain::query()->where('status', 'archived')->count(),
             'templates' => BrainTemplates::all(), 'sites' => Website::query()->orderBy('name')->get(['id', 'name']),

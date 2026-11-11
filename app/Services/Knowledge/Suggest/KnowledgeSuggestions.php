@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Cache;
 
 /**
  * "Gợi ý cho kho" từ các bài gần đây: vòng kho học lại từ bài. Dẫn xuất khi đọc, 0 token, không bảng mới, không gọi mạng/AI.
- * Ba loại, theo thứ tự hiển thị: khoảng trống kho đang mở (gap) → số liệu chưa có căn cứ trong kho (figure) → nguồn AI nêu mà kho/Sổ nguồn chưa có (source).
+ * Ba loại, theo thứ tự hiển thị: khoảng trống kho đang mở (gap) → số liệu chưa có căn cứ trong kho (figure) → nguồn AI nêu mà kho/Căn cứ chuẩn mực chưa có (source).
  * Chỉ GỢI Ý: không tự thêm gì vào kho. Gợi ý bị "Bỏ qua" được ẩn theo website (cache).
  * Cách so khớp nguồn chép từ luật SRC01 (SourceRule::known là private nên không gọi lại được; luật không bị sửa).
  */
@@ -139,7 +139,7 @@ final class KnowledgeSuggestions
         return $out;
     }
 
-    /** Nguồn AI nêu trong bản mới nhất của mỗi bài mà kho/Sổ nguồn/website không khớp. */
+    /** Nguồn AI nêu trong bản mới nhất của mỗi bài mà kho/Căn cứ chuẩn mực/website không khớp. */
     private function sources(Website $site, $articles, $since): array
     {
         $ids = $articles->pluck('id')->all();
@@ -161,7 +161,7 @@ final class KnowledgeSuggestions
                 }
                 $name = mb_substr($c, 0, 80);
                 $out[] = ['type' => 'source', 'title' => 'Nguồn «'.$name.'» được AI trích trong bài «'.mb_substr((string) ($v->title ?: $article?->primary_keyword), 0, 80).'»',
-                    'detail' => 'Nguồn này chưa có trong kho hay Sổ nguồn. AI tự nêu, chưa kiểm: xác minh nguồn có thật rồi thêm vào kho/Sổ nguồn nếu đúng.',
+                    'detail' => 'Nguồn này chưa có trong kho hay Căn cứ chuẩn mực. AI tự nêu, chưa kiểm: xác minh nguồn có thật rồi thêm vào kho/Căn cứ chuẩn mực nếu đúng.',
                     'article_id' => $v->article_id, 'article_version_id' => $v->id, 'action' => 'open_kb', 'key' => self::key('source', $c), 'query' => null];
             }
         }

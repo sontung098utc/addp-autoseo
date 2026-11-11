@@ -172,7 +172,7 @@
                     @endphp
                     <div class="ags-ph">
                         <div><h3>Mô hình <x-help title="Chọn model cho nhân sự">
-                            <p>Danh sách gồm model đã bật ở các tài khoản trong Chi phí AI → Cấu hình AI. Tài khoản tắt hoặc chưa có khóa không hiện.</p>
+                            <p>Danh sách gồm model đã bật ở các tài khoản trong Cấu hình AI → Tích hợp AI. Tài khoản tắt hoặc chưa có khóa không hiện.</p>
                             <p>Bậc đề xuất cho vai trò này: {{ $s['role']['tier_label'] }}. Model dự phòng chỉ dùng khi model chính lỗi tạm thời liên tục. Chưa chọn thì dùng định tuyến theo loại việc.</p>
                             <p>Ngân sách là một con số cho cả phiên chạy, không đặt riêng theo nhân sự.</p>
                         </x-help></h3><div class="ags-desc">Model AI nhân sự này gọi khi làm việc.</div></div>

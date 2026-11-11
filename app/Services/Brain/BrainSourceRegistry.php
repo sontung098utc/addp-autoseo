@@ -10,7 +10,7 @@ use App\Services\Knowledge\KnowledgeError;
 use Illuminate\Support\Collection;
 
 /**
- * AG-B3 (Kho trí tuệ P2, Tầng 3): Sổ nguồn uy tín. Quản lý (thêm, xếp bậc, xác nhận, chặn, xóa) và PHÂN LOẠI một chuỗi trích dẫn.
+ * AG-B3 (Kho trí tuệ P2, Tầng 3): Căn cứ chuẩn mực. Quản lý (thêm, xếp bậc, xác nhận, chặn, xóa) và PHÂN LOẠI một chuỗi trích dẫn.
  * Nguyên tắc: hệ thống KHÔNG tự cho rằng một tên miền uy tín. Chỉ nguồn do người có quyền xác nhận (có bậc) hoặc chặn mới có hiệu lực;
  * gợi ý từ mẫu chỉ là `suggested` và không bao giờ được tính.
  */
@@ -29,7 +29,7 @@ final class BrainSourceRegistry
     public static function forBrains(array $brainIds): self
     {
         if ($brainIds === []) {
-            return new self();
+            return new self;
         }
 
         return new self(BrainSource::query()->whereIn('brain_id', $brainIds)->where('status', 'confirmed')->whereNotNull('tier')->get());
@@ -93,7 +93,7 @@ final class BrainSourceRegistry
     private function authorize(?User $by): void
     {
         if (! BrainService::canManage($by)) {
-            throw new KnowledgeError('Bạn chưa có quyền sửa Sổ nguồn uy tín.');
+            throw new KnowledgeError('Bạn chưa có quyền sửa Căn cứ chuẩn mực.');
         }
     }
 

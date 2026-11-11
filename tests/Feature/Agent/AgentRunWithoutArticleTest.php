@@ -97,8 +97,8 @@ class AgentRunWithoutArticleTest extends TestCase
         $this->assertSame(0, $s['articles']);
         $this->assertSame([], $agg->topArticles($from, $to));
 
-        $this->get('/admin/chi-phi-ai')->assertOk();
-        $this->get('/admin/chi-phi-ai?site='.$this->site->id)->assertOk();
+        $this->get('/admin/cau-hinh-ai')->assertOk();
+        $this->get('/admin/cau-hinh-ai?site='.$this->site->id)->assertOk();
     }
 
     public function test_xoa_bai_khong_xoa_phien_khong_gan_bai(): void

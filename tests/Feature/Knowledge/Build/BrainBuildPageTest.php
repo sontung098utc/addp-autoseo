@@ -46,17 +46,17 @@ class BrainBuildPageTest extends TestCase
         $this->assertTrue(BrainBuildPage::canAccess());
         auth()->logout();
         $this->assertFalse(BrainBuildPage::canAccess());
-        $this->get('/admin/kho-tri-tue/nap-kien-thuc')->assertRedirect();
+        $this->get('/admin/kho-tri-tue/tao-tri-tue-doanh-nghiep')->assertRedirect();
     }
 
     public function test_writer_bi_chan_con_approver_thay_ghi_chu_co_dinh(): void
     {
-        $this->actingAs($this->user('writer'))->get('/admin/kho-tri-tue/nap-kien-thuc')->assertForbidden();
+        $this->actingAs($this->user('writer'))->get('/admin/kho-tri-tue/tao-tri-tue-doanh-nghiep')->assertForbidden();
     }
 
     public function test_approver_thay_ghi_chu_co_dinh(): void
     {
-        $this->actingAs($this->user('approver'))->get('/admin/kho-tri-tue/nap-kien-thuc')->assertOk()
+        $this->actingAs($this->user('approver'))->get('/admin/kho-tri-tue/tao-tri-tue-doanh-nghiep')->assertOk()
             ->assertSee('Đọc tối đa 30 trang trên chính website của bạn, tốn tối đa 50.000 ₫.', false)
             ->assertSee('Giá, chính sách, sản phẩm sức khỏe và mọi nội dung y khoa luôn chờ người duyệt.', false)
             ->assertSee('Chạy ngay trong trang, có thể mất vài chục giây đến vài phút.', false)

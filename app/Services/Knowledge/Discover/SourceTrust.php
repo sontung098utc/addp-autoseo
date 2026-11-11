@@ -6,9 +6,9 @@ use App\Models\Brain;
 use App\Services\Brain\BrainSourceRegistry;
 
 /**
- * Độ tin cậy NGUỒN tìm được trên web, do LUẬT CỐ ĐỊNH quyết (config/trusted_sources.php + Sổ nguồn của Trí tuệ). AI không được tự phong "uy tín".
- * blocked: mạng xã hội, diễn đàn, chợ, affiliate (danh sách trong config) hoặc nguồn bị chặn trong Sổ nguồn. Chặn thắng mọi thứ.
- * trusted: tên miền thuộc danh sách tin cậy (chung hoặc theo lĩnh vực) hoặc Sổ nguồn đã xác nhận bậc 1-3.
+ * Độ tin cậy NGUỒN tìm được trên web, do LUẬT CỐ ĐỊNH quyết (config/trusted_sources.php + Căn cứ chuẩn mực của Trí tuệ). AI không được tự phong "uy tín".
+ * blocked: mạng xã hội, diễn đàn, chợ, affiliate (danh sách trong config) hoặc nguồn bị chặn trong Căn cứ chuẩn mực. Chặn thắng mọi thứ.
+ * trusted: tên miền thuộc danh sách tin cậy (chung hoặc theo lĩnh vực) hoặc Căn cứ chuẩn mực đã xác nhận bậc 1-3.
  * neutral: còn lại. Luôn trả lý do bằng tiếng Việt để hiện cho người dùng.
  */
 final class SourceTrust
@@ -24,13 +24,13 @@ final class SourceTrust
         }
         $reg = $brain ? BrainSourceRegistry::forBrains([$brain->id])->classify($host) : null;
         if ($reg !== null && $reg['tier'] === 'blocked') {
-            return ['level' => 'blocked', 'reason' => 'Bị chặn trong Sổ nguồn của Trí tuệ.', 'field' => $field];
+            return ['level' => 'blocked', 'reason' => 'Bị chặn trong Căn cứ chuẩn mực của Trí tuệ.', 'field' => $field];
         }
         if (self::matchAny($host, (array) config('trusted_sources.blocked', []))) {
             return ['level' => 'blocked', 'reason' => 'Mạng xã hội, diễn đàn, chợ hoặc nội dung do người dùng tạo: không dùng làm nguồn.', 'field' => $field];
         }
         if ($reg !== null && in_array($reg['tier'], ['1', '2', '3'], true)) {
-            return ['level' => 'trusted', 'reason' => 'Có trong Sổ nguồn đã xác nhận ('.$reg['source']->name.').', 'field' => $field];
+            return ['level' => 'trusted', 'reason' => 'Có trong Căn cứ chuẩn mực đã xác nhận ('.$reg['source']->name.').', 'field' => $field];
         }
         if (self::matchAny($host, (array) config('trusted_sources.general', []))) {
             return ['level' => 'trusted', 'reason' => 'Tên miền cơ quan nhà nước hoặc giáo dục.', 'field' => $field];
@@ -42,7 +42,7 @@ final class SourceTrust
             }
         }
 
-        return ['level' => 'neutral', 'reason' => 'Chưa có trong danh sách tin cậy: chỉ đề xuất, cần người duyệt. Thêm vào Sổ nguồn để tin cậy.', 'field' => $field];
+        return ['level' => 'neutral', 'reason' => 'Chưa có trong danh sách tin cậy: chỉ đề xuất, cần người duyệt. Thêm vào Căn cứ chuẩn mực để tin cậy.', 'field' => $field];
     }
 
     /** @return list<string> tên miền tin cậy của một lĩnh vực (dùng làm include_domains khi tìm). */

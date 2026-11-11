@@ -98,14 +98,14 @@ class BrainUiTest extends TestCase
     {
         $w = $this->site();
         $this->actingAs($this->user('admin'));
-        Livewire::test(BrainLibraryPage::class)->call('openCreate')->assertSet('showCreate', true)->assertSee('Tên')
+        Livewire::test(BrainLibraryPage::class)->call('openCreate')->assertSet('showCreate', true)->call('pickKind', 'domain')->assertSee('Tên')
             ->set('create.template', 'giao_duc')->set('create.name', 'Giáo dục du học')->set('create.websites', [(string) $w->id])
             ->call('createBrain')->assertHasNoErrors();
         $b = Brain::where('name', 'Giáo dục du học')->firstOrFail();
         $this->assertSame('giao_duc', $b->template_key);
         $this->assertSame([$w->id], $b->websites()->pluck('websites.id')->all());
 
-        Livewire::test(BrainLibraryPage::class)->call('openCreate')->set('create.name', '  ')->call('createBrain');
+        Livewire::test(BrainLibraryPage::class)->call('openCreate')->call('pickKind', 'domain')->set('create.name', '  ')->call('createBrain');
         $this->assertSame(1, Brain::count(), 'tên trống không tạo');
 
         $this->actingAs($this->user('writer'));

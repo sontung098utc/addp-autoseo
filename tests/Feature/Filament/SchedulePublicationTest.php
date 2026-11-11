@@ -2,21 +2,23 @@
 
 namespace Tests\Feature\Filament;
 
-use App\Filament\Pages\WeeklySchedule;
+use App\Contracts\PublisherInterface;
 use App\Filament\Resources\PublicationResource;
 use App\Filament\Resources\PublicationResource\Pages\ListPublications;
 use App\Filament\Resources\PublicationResource\Pages\ViewPublication;
 use App\Filament\Support\Demo\ScheduleDemoData;
 use App\Filament\Support\Schedule\ReconcileRequest;
-use App\Filament\Support\Schedule\VnTime;
 use App\Jobs\ReconcilePublicationJob;
 use App\Models\Article;
 use App\Models\ArticleVersion;
 use App\Models\Publication;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Publishing\EmergencyStopService;
+use App\Services\Publishing\PublisherManager;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -38,7 +40,7 @@ class SchedulePublicationTest extends TestCase
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();
-        \Illuminate\Support\Carbon::setTestNow();
+        Carbon::setTestNow();
         parent::tearDown();
     }
 
@@ -63,7 +65,7 @@ class SchedulePublicationTest extends TestCase
     {
         $t = CarbonImmutable::parse($utc, 'UTC');
         CarbonImmutable::setTestNow($t);
-        \Illuminate\Support\Carbon::setTestNow($t);
+        Carbon::setTestNow($t);
     }
 
     public function test_tab_dem_dung_theo_trang_thai_va_gio_vn(): void
@@ -88,8 +90,9 @@ class SchedulePublicationTest extends TestCase
     {
         Bus::fake();
         // CMS chưa có connector (WordPress đã có từ task 1.2; cms_type là enum nên giả lập bằng manager)
-        $this->app->instance(\App\Services\Publishing\PublisherManager::class, new class extends \App\Services\Publishing\PublisherManager {
-            public function getPublisher(\App\Models\Website $website): \App\Contracts\PublisherInterface
+        $this->app->instance(PublisherManager::class, new class extends PublisherManager
+        {
+            public function getPublisher(Website $website): PublisherInterface
             {
                 throw new \InvalidArgumentException('Nền tảng CMS không được hỗ trợ (giả lập: cột cms_type là enum nên không lưu được giá trị lạ).');
             }
@@ -110,7 +113,7 @@ class SchedulePublicationTest extends TestCase
     public function test_doi_soat_chay_voi_needs_reconcile_va_khong_tao_moi(): void
     {
         Bus::fake();
-        $this->app->instance(\App\Contracts\PublisherInterface::class, $this->createMock(\App\Contracts\PublisherInterface::class));
+        $this->app->instance(PublisherInterface::class, $this->createMock(PublisherInterface::class));
         $p = $this->pub('needs_reconcile', '2026-11-05 01:00:00');
         $this->actingAs($this->user('approver'));
         $pubs = Publication::count();
@@ -190,7 +193,7 @@ class SchedulePublicationTest extends TestCase
             ->callAction('pause', ['reason' => 'Bảo trì hệ thống CMS'])
             ->assertHasNoActionErrors();
 
-        $this->assertTrue(app(\App\Services\Publishing\EmergencyStopService::class)->isStopped());
+        $this->assertTrue(app(EmergencyStopService::class)->isStopped());
 
         // 3. Sau khi dừng, nút chuyển sang Khôi phục
         Livewire::test(ListPublications::class)
@@ -198,7 +201,7 @@ class SchedulePublicationTest extends TestCase
             ->callAction('resume')
             ->assertHasNoActionErrors();
 
-        $this->assertFalse(app(\App\Services\Publishing\EmergencyStopService::class)->isStopped());
+        $this->assertFalse(app(EmergencyStopService::class)->isStopped());
     }
 
     public function test_badge_menu(): void
@@ -220,16 +223,16 @@ class SchedulePublicationTest extends TestCase
         $this->pub('failed', '2026-11-12 03:00:00'); // tuần sau
         $this->actingAs($this->user('approver'));
 
-        $c = Livewire::test(WeeklySchedule::class)
+        $c = Livewire::test(ListPublications::class)
             ->assertSee('02/11/2026')->assertSee('08/11/2026');
-        $days = collect($c->instance()->getViewData()['days'] ?? []);
+        $days = collect($c->instance()->weeklyBoardData()['days'] ?? []);
         $thu = $days->firstWhere('key', '2026-11-05');
         $this->assertTrue($thu['isToday']);
         $this->assertCount(2, $thu['items']);
         $this->assertSame(0, $days->firstWhere('key', '2026-11-06')['items']->count());
 
         $c->call('nextWeek')->assertSee('09/11/2026');
-        $this->assertCount(1, collect($c->instance()->getViewData()['days'])->firstWhere('key', '2026-11-12')['items']);
+        $this->assertCount(1, collect($c->instance()->weeklyBoardData()['days'])->firstWhere('key', '2026-11-12')['items']);
         $c->call('previousWeek')->call('previousWeek')->assertSee('26/10/2026');
     }
 
