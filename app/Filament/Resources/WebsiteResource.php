@@ -3,21 +3,23 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\WebsiteResource\Pages;
-use App\Models\Website;
-use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Table;
 use App\Filament\Support\Audit\AuditAction;
 use App\Filament\Support\Audit\AuditRecorder;
 use App\Filament\Support\StatusPresenter;
 use App\Models\Publication;
+use App\Models\User;
+use App\Models\Website;
 use App\Services\Publishing\PublisherManager;
 use App\Services\Security\UrlSafetyService;
+use Filament\Forms;
+use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Infolists;
 use Filament\Notifications\Notification;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Log;
@@ -45,11 +47,11 @@ class WebsiteResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
-    protected static function user(): ?\App\Models\User
+    protected static function user(): ?User
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
+        $user = Auth::user();
 
-        return $user instanceof \App\Models\User && $user->is_active ? $user : null;
+        return $user instanceof User && $user->is_active ? $user : null;
     }
 
     public static function canViewAny(): bool
@@ -62,13 +64,13 @@ class WebsiteResource extends Resource
         return static::user()?->isAdmin() ?? false;
     }
 
-    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    public static function canEdit(Model $record): bool
     {
         return static::user()?->isAdmin() ?? false;
     }
 
     // Tạm khóa hoàn toàn việc xóa website; "Thu hồi kết nối" làm ở PR sau.
-    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    public static function canDelete(Model $record): bool
     {
         return false;
     }
@@ -101,7 +103,7 @@ class WebsiteResource extends Resource
                             ->placeholder('https://example.com')
                             ->url()
                             ->required()
-                            ->rules(fn (Get $get, ?\Illuminate\Database\Eloquent\Model $record): array => [
+                            ->rules(fn (Get $get, ?Model $record): array => [
                                 static::httpsSafeUrlRule(),
                                 Rule::unique('websites', 'base_url')
                                     ->where('store_scope', (string) $get('store_scope'))
@@ -123,18 +125,18 @@ class WebsiteResource extends Resource
                         ? [
                             Forms\Components\Placeholder::make('credentials_hint')->hiddenLabel()
                                 ->content('Chọn hệ thống CMS ở trên để nhập đúng loại credential.')
-                                ->visible(fn (Forms\Get $get): bool => ! in_array($get('cms_type'), ['wordpress', 'magento2'], true)),
-                            Forms\Components\TextInput::make('credentials_input.username')->label('Tên đăng nhập (WordPress)')->maxLength(255)->visible(fn (Forms\Get $get): bool => $get('cms_type') === 'wordpress'),
-                            Forms\Components\TextInput::make('credentials_input.application_password')->label('Application Password (WordPress)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Forms\Get $get): bool => $get('cms_type') === 'wordpress'),
-                            Forms\Components\TextInput::make('credentials_input.consumer_key')->label('Consumer Key (Magento)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Forms\Get $get): bool => $get('cms_type') === 'magento2'),
-                            Forms\Components\TextInput::make('credentials_input.consumer_secret')->label('Consumer Secret (Magento)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Forms\Get $get): bool => $get('cms_type') === 'magento2'),
-                            Forms\Components\TextInput::make('credentials_input.access_token')->label('Access Token (Magento)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Forms\Get $get): bool => $get('cms_type') === 'magento2'),
-                            Forms\Components\TextInput::make('credentials_input.access_token_secret')->label('Access Token Secret (Magento)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Forms\Get $get): bool => $get('cms_type') === 'magento2'),
+                                ->visible(fn (Get $get): bool => ! in_array($get('cms_type'), ['wordpress', 'magento2'], true)),
+                            Forms\Components\TextInput::make('credentials_input.username')->label('Tên đăng nhập (WordPress)')->maxLength(255)->visible(fn (Get $get): bool => $get('cms_type') === 'wordpress'),
+                            Forms\Components\TextInput::make('credentials_input.application_password')->label('Application Password (WordPress)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Get $get): bool => $get('cms_type') === 'wordpress'),
+                            Forms\Components\TextInput::make('credentials_input.consumer_key')->label('Consumer Key (Magento)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Get $get): bool => $get('cms_type') === 'magento2'),
+                            Forms\Components\TextInput::make('credentials_input.consumer_secret')->label('Consumer Secret (Magento)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Get $get): bool => $get('cms_type') === 'magento2'),
+                            Forms\Components\TextInput::make('credentials_input.access_token')->label('Access Token (Magento)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Get $get): bool => $get('cms_type') === 'magento2'),
+                            Forms\Components\TextInput::make('credentials_input.access_token_secret')->label('Access Token Secret (Magento)')->password()->revealable(false)->autocomplete('new-password')->visible(fn (Get $get): bool => $get('cms_type') === 'magento2'),
                         ]
                         : [
                             Forms\Components\Placeholder::make('credentials_saved')
                                 ->label('Tham số xác thực')
-                                ->content(fn (?\Illuminate\Database\Eloquent\Model $record): string => $record && ! empty($record->encrypted_credentials) ? '•••• đã lưu' : 'Chưa có'),
+                                ->content(fn (?Model $record): string => $record && ! empty($record->encrypted_credentials) ? '•••• đã lưu' : 'Chưa có'),
                         ]),
             ]);
     }
@@ -153,10 +155,11 @@ class WebsiteResource extends Resource
                     ->label('Tên website')
                     ->searchable()
                     ->sortable()
+                    ->wrap()
                     ->weight('bold'),
                 // cms_type là ENUM: MariaDB sắp theo thứ tự khai báo, SQLite theo chữ cái → ép CAST để cả hai cùng theo chữ cái.
-                Tables\Columns\TextColumn::make('cms_type')->toggleable()
-                    ->sortable(query: fn ($query, string $direction) => $query->orderByRaw('CAST(cms_type AS CHAR) ' . ($direction === 'desc' ? 'desc' : 'asc')))
+                Tables\Columns\TextColumn::make('cms_type')->toggleable()->visibleFrom('lg')
+                    ->sortable(query: fn ($query, string $direction) => $query->orderByRaw('CAST(cms_type AS CHAR) '.($direction === 'desc' ? 'desc' : 'asc')))
                     ->label('CMS')
                     ->badge()
                     ->color('gray')
@@ -177,7 +180,7 @@ class WebsiteResource extends Resource
                     ->formatStateUsing(fn (?string $state): string => StatusPresenter::label($state, 'website'))
                     ->color(fn (?string $state): string => StatusPresenter::color($state, 'website'))
                     ->icon(fn (?string $state): string => StatusPresenter::icon($state, 'website')),
-                Tables\Columns\TextColumn::make('last_synced_at')->toggleable()
+                Tables\Columns\TextColumn::make('last_synced_at')->toggleable()->visibleFrom('xl')
                     ->label('Đồng bộ gần nhất')
                     ->dateTime('d/m/Y H:i')
                     ->placeholder('Chưa đồng bộ')
@@ -194,14 +197,15 @@ class WebsiteResource extends Resource
                         ->all()),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()->label('Chi tiết')->slideOver()->modalHeading('Chi tiết kết nối')
-                    ->infolist(static::infolistSchema()),
-                Tables\Actions\EditAction::make(),
-                static::testConnectionAction(),
+                // Gom mọi thao tác vào một menu ba chấm để bảng không cần cuộn ngang ở màn hẹp.
                 Tables\Actions\ActionGroup::make([
+                    Tables\Actions\ViewAction::make()->label('Chi tiết')->slideOver()->modalHeading('Chi tiết kết nối')
+                        ->infolist(static::infolistSchema()),
+                    Tables\Actions\EditAction::make(),
+                    static::testConnectionAction(),
                     static::rotateCredentialsAction(),
                     static::revokeAction(),
-                ]),
+                ])->label('Thao tác')->tooltip('Thao tác'),
             ]);
     }
 

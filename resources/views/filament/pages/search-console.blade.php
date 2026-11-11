@@ -32,7 +32,6 @@
     ];
 @endphp
 <x-filament-panels::page>
-    <x-chain-context step="Khám phá" purpose="Đo hiệu quả bài đã đăng và phát hiện bài tụt hạng để làm mới." :inputs="[['label'=>'Bài đã đăng','url'=>\App\Filament\Resources\PublicationResource::listUrl(),'note'=>'Lịch xuất bản']]" :outputs="[['label'=>'Đề xuất làm mới','url'=>\App\Filament\Pages\AuditPage::getUrl(),'note'=>'bài tụt hạng'],['label'=>'Từ khóa mới','url'=>\App\Filament\Pages\KeywordsPage::getUrl()]]" :compact="true" />
     <style>
         .gs-chart{width:100%;height:auto}
         .gs-list{margin:0;padding:0;list-style:none;display:grid;gap:.5rem}

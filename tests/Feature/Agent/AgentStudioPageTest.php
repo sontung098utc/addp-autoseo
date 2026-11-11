@@ -5,6 +5,7 @@ namespace Tests\Feature\Agent;
 use App\Filament\Clusters\AgentTeam\Pages\AgentRoles;
 use App\Models\AgentRun;
 use App\Models\AgentRunStep;
+use App\Models\Brain;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Agent\Roles\AgentProfiles;
@@ -109,6 +110,67 @@ class AgentStudioPageTest extends TestCase
         $t->call('openStudio', 'writer');
         foreach (array_keys(AgentRoles::STUDIO_TABS) as $tab) {
             $t->call('setStudioTab', $tab)->assertOk();
+        }
+    }
+
+    private function site(): Website
+    {
+        return Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://s.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+    }
+
+    public function test_tab_hoat_dong_khong_lo_ma_tho(): void
+    {
+        $this->login('admin');
+        $run = AgentRun::create(['website_id' => $this->site()->id, 'job_type' => 'article_write', 'status' => 'ready_for_review', 'trigger' => 'manual']);
+        AgentRunStep::create(['agent_run_id' => $run->id, 'seq' => 1, 'stage' => 'write', 'role' => 'writer', 'status' => 'ok', 'title' => 'Viết bài']);
+        $html = Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'activity')
+            ->assertSee('Xem diễn biến')->assertSee('Chờ duyệt')->assertSee('#'.$run->id)->html();
+        $this->assertStringNotContainsString('ready_for_review', $html);
+        $this->assertStringNotContainsString('article_write', $html);
+        $this->assertSame('Viết bài #'.$run->id, AgentStudioData::runTitle('article_write', $run->id));
+    }
+
+    public function test_bai_hoc_gop_nhom_co_so_lan(): void
+    {
+        $this->login('admin');
+        $run = AgentRun::create(['website_id' => $this->site()->id, 'job_type' => 'article_write', 'status' => 'failed', 'trigger' => 'manual']);
+        for ($n = 1; $n <= 3; $n++) {
+            AgentRunStep::create(['agent_run_id' => $run->id, 'seq' => $n, 'stage' => 'write', 'role' => 'writer', 'status' => 'warn', 'title' => 'Viết bản đầu', 'detail' => str_repeat('Thiếu nguồn. ', 30)]);
+        }
+        $t = Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'training')->call('setTrainSec', 'lessons')
+            ->assertSee('Cảnh báo: Viết bản đầu · 3 lần')->assertSee('studio-teach-group', false);
+        $this->assertSame(1, substr_count($t->html(), 'studio-issue-group'));
+        $t->set('teach', ['grp-x' => 'a']); // không lỗi khi khóa lạ
+        $key = 'grp-'.substr(md5('Cảnh báo: Viết bản đầu'), 0, 10);
+        $t->set('teach', [$key => 'Luôn dẫn nguồn.'])->call('teachRow', $key, $run->id);
+        $this->assertCount(1, AgentProfiles::lessons('writer'));
+    }
+
+    public function test_tri_tue_la_cong_tac_va_chi_luu_khi_bam_luu(): void
+    {
+        $this->login('admin');
+        $a = Brain::create(['name' => 'Trí tuệ A', 'slug' => 'a-'.uniqid(), 'status' => 'active']);
+        foreach (range(1, 9) as $n) {
+            Brain::create(['name' => 'Kho '.$n, 'slug' => 'k'.$n.uniqid(), 'status' => 'active']);
+        }
+        $t = Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'training')->call('setTrainSec', 'brain')
+            ->assertSee('studio-brain-search', false)->assertSee('role="switch"', false)->assertDontSee('wire:model="grants.', false);
+        $t->call('toggleGrant', $a->id)->assertSet('grants.'.$a->id, true);
+        $this->assertSame([], AgentProfiles::brainGrants('writer'));
+        $t->call('saveGrants');
+        $this->assertSame([$a->id], AgentProfiles::brainGrants('writer'));
+        $t->call('toggleGrant', $a->id)->call('saveGrants');
+        $this->assertSame([], AgentProfiles::brainGrants('writer'));
+    }
+
+    public function test_nguoi_duyet_khong_bat_duoc_cong_tac_tri_tue(): void
+    {
+        $a = Brain::create(['name' => 'Trí tuệ A', 'slug' => 'a-'.uniqid(), 'status' => 'active']);
+        $this->login('approver');
+        try {
+            Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'training')->call('toggleGrant', $a->id)->assertSet('grants', []);
+        } catch (\Throwable) {
+            $this->assertSame([], AgentProfiles::brainGrants('writer'));
         }
     }
 }

@@ -310,4 +310,11 @@ class CompetitorsPageTest extends TestCase
         $p->set('selected', [$g['norm']])->call('addToPlan');
         $this->assertSame(1, Article::count());
     }
+
+    public function test_dau_i_nam_canh_tieu_de_khong_o_hang_rieng(): void
+    {
+        $heading = (string) (new CompetitorsPage)->getHeading();
+        $this->assertStringContainsString('Đối thủ', $heading);
+        $this->assertStringContainsString('data-testid="chain-context"', $heading);
+    }
 }

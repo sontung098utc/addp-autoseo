@@ -11,20 +11,31 @@
         </div>
     </x-filament::section>
 
-    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem">
+    @php $order = ['idea' => 0, 'in_development' => 1, 'not_connected' => 2, 'demo' => 3, 'active' => 4]; @endphp
+    <div class="hw-grid" data-testid="hw-stages">
+        <style>.hw-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}@media (max-width:1100px){.hw-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (max-width:640px){.hw-grid{grid-template-columns:minmax(0,1fr)}}</style>
         @foreach ($stages as $s)
+            @php
+                // Huy hiệu của thẻ = mức KÉM nhất trong các tính năng của giai đoạn, để không nói quá sự thật.
+                $weakest = collect($s['items'])->sortBy(fn ($f) => $order[$f['readiness']] ?? 0)->first();
+            @endphp
             <x-filament::section>
-                <div class="text-xs" style="opacity:.65">Giai đoạn {{ $s['n'] }}</div>
-                <div style="font-weight:600">{{ $s['title'] }}</div>
-                <div class="text-xs" style="opacity:.75;margin:.25rem 0 .5rem">{{ $s['what'] }}</div>
-                @foreach ($s['items'] as $f)
-                    @php $url = \App\Filament\Pages\HowItWorksPage::urlFor($f['route']); @endphp
-                    <div style="margin:.35rem 0">
-                        <x-studio.chip domain="readiness" :value="$f['readiness']" />
-                        @if ($url)<a href="{{ $url }}" class="text-xs underline">{{ $f['title'] }}</a>@else<span class="text-xs">{{ $f['title'] }}</span>@endif
-                        @if ($f['caveat'])<div class="text-xs" style="opacity:.65;margin-top:.1rem">{{ $f['caveat'] }}</div>@endif
-                    </div>
-                @endforeach
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+                    <div class="text-xs" style="opacity:.65">Giai đoạn {{ $s['n'] }}</div>
+                    @if ($weakest)<span data-testid="hw-badge"><x-studio.chip domain="readiness" :value="$weakest['readiness']" /></span>@endif
+                </div>
+                <div style="font-weight:600">
+                    {{ $s['title'] }}
+                    <x-help title="Chi tiết {{ $s['title'] }}">
+                        @foreach ($s['items'] as $f)
+                            @php $url = \App\Filament\Pages\HowItWorksPage::urlFor($f['route']); @endphp
+                            <p><x-studio.chip domain="readiness" :value="$f['readiness']" />
+                                @if ($url)<a href="{{ $url }}" class="underline">{{ $f['title'] }}</a>@else<strong>{{ $f['title'] }}</strong>@endif
+                                @if ($f['caveat'])<br><span style="opacity:.75">{{ $f['caveat'] }}</span>@endif</p>
+                        @endforeach
+                    </x-help>
+                </div>
+                <div class="text-xs" style="opacity:.75;margin-top:.25rem">{{ $s['what'] }}</div>
             </x-filament::section>
         @endforeach
     </div>

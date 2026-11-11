@@ -6,10 +6,6 @@ use App\Filament\Support\Competitors\ClusterSuggester;
 use App\Filament\Support\Competitors\CompetitorDomain;
 use App\Filament\Support\Competitors\CompetitorService;
 use App\Filament\Support\Competitors\CompetitorStore;
-use App\Filament\Support\Keywords\CsvKeywordParser;
-use App\Models\Competitor;
-use App\Models\KeywordGap;
-use Livewire\WithFileUploads;
 use App\Filament\Support\Competitors\CostPolicy;
 use App\Filament\Support\Competitors\GapCalculator;
 use App\Filament\Support\Competitors\KeywordGapSource;
@@ -18,17 +14,25 @@ use App\Filament\Support\Competitors\SourceUnavailableException;
 use App\Filament\Support\Demo\CompetitorsDemoData;
 use App\Filament\Support\Demo\DemoMode;
 use App\Filament\Support\Demo\DemoStore;
+use App\Filament\Support\Keywords\CsvKeywordParser;
 use App\Filament\Support\Planning\DuplicateKeywordException;
 use App\Filament\Support\Planning\PlannedArticleCreator;
+use App\Models\Competitor;
+use App\Models\KeywordGap;
 use App\Models\User;
 use App\Models\Website;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\HtmlString;
 use InvalidArgumentException;
 use Livewire\Attributes\Url;
+use Livewire\WithFileUploads;
 
 class CompetitorsPage extends Page
 {
@@ -92,6 +96,14 @@ class CompetitorsPage extends Page
         $u = Auth::user();
 
         return $u instanceof User && $u->is_active && $u->isApprover();
+    }
+
+    /** Một (i) duy nhất của trang, đặt cạnh tiêu đề (cùng hàng). */
+    public function getHeading(): string|Htmlable
+    {
+        return new HtmlString('Đối thủ '.Blade::render(<<<'BLADE'
+<x-chain-context step="Khám phá" purpose="Tìm khoảng trống nội dung so với đối thủ." :inputs="[['label'=>'Từ khóa đối thủ','url'=>null,'note'=>'nhập CSV']]" :outputs="[['label'=>'Kho từ khóa (trang Từ khóa)','url'=>\App\Filament\Pages\KeywordsPage::getUrl(),'note'=>'từ khóa đối thủ có mà mình chưa có'],['label'=>'Kế hoạch nội dung','url'=>\App\Filament\Pages\ContentPlanPage::getUrl()]]" :compact="true" />
+BLADE));
     }
 
     public function mount(): void
@@ -248,7 +260,7 @@ class CompetitorsPage extends Page
             Notification::make()->title('Đã thêm vào Từ khóa')->body('"'.$kw->keyword.'" nguồn Đối thủ. Vào trang Từ khóa để Thêm vào kế hoạch.')->success()->send();
         } catch (InvalidArgumentException $e) {
             Notification::make()->title('Không thêm được')->body($e->getMessage())->warning()->send();
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+        } catch (ModelNotFoundException) {
             Notification::make()->title('Không tìm thấy khoảng trống')->danger()->send();
         }
     }
@@ -413,7 +425,7 @@ class CompetitorsPage extends Page
         foreach ($this->gaps() as $g) {
             $byNorm[$g['norm']] = $g;
         }
-        $creator = new PlannedArticleCreator();
+        $creator = new PlannedArticleCreator;
         $created = 0;
         foreach (array_unique($this->selected) as $n) {
             $g = $byNorm[$n] ?? null;

@@ -11,13 +11,17 @@ use App\Filament\Support\SeoAudit\ScanGuard;
 use App\Filament\Support\SeoAudit\SeoAuditService;
 use App\Models\AuditSuggestion;
 use App\Models\User;
+use App\Models\Website;
 use App\Services\Audit\AuditSuggestionException;
 use App\Services\Audit\AuditSuggestionService;
 use App\Services\Audit\RealScanService;
-use App\Models\Website;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Url;
 
 /**
@@ -63,6 +67,14 @@ class AuditPage extends Page
         $u = Auth::user();
 
         return $u instanceof User && $u->is_active && $u->isWriter();
+    }
+
+    /** Một (i) duy nhất của trang, đặt cạnh tiêu đề (cùng hàng). */
+    public function getHeading(): string|Htmlable
+    {
+        return new HtmlString('Audit website '.Blade::render(<<<'BLADE'
+<x-chain-context step="Khám phá" purpose="Kiểm sức khỏe kỹ thuật và nội dung của website, rồi biến lỗi thành việc làm mới bài." :inputs="[['label'=>'Website kết nối','url'=>\App\Filament\Resources\WebsiteResource::getUrl('index'),'note'=>'trang đã quét của website']]" :outputs="[['label'=>'Kế hoạch nội dung','url'=>\App\Filament\Pages\ContentPlanPage::getUrl(),'note'=>'đề xuất làm mới tạo bài loại làm mới (chỉ từ quét thật)'],['label'=>'Danh sách lỗi cho dev','url'=>null,'note'=>'ngay trên trang này'],['label'=>'Search Console','url'=>\App\Filament\Pages\SearchConsolePage::getUrl(),'note'=>'đối chiếu hiệu quả']]" :compact="true" />
+BLADE));
     }
 
     public function mount(): void
@@ -144,7 +156,7 @@ class AuditPage extends Page
         $limit = RealScanService::clamp($this->realScanLimit);
         $this->realScanLimit = $limit;
         try {
-            $audit = (new RealScanService())->run($site, $user, $limit);
+            $audit = (new RealScanService)->run($site, $user, $limit);
         } catch (ScanBlocked $e) {
             Notification::make()->title('Không quét được')->body($e->getMessage())->danger()->send();
 
@@ -190,7 +202,6 @@ class AuditPage extends Page
         $this->briefOpen = false;
     }
 
-
     /** AG-S26: chỉ dữ liệu quét THẬT mới sinh đề xuất; dữ liệu minh họa không tạo việc. */
     private function realRun(?array $run): bool
     {
@@ -212,7 +223,7 @@ class AuditPage extends Page
 
             return;
         }
-        $r = (new AuditSuggestionService())->generate($site);
+        $r = (new AuditSuggestionService)->generate($site);
         if ($r['skipped_reason']) {
             Notification::make()->title('Chưa tạo đề xuất')->body($r['skipped_reason'])->warning()->send();
 
@@ -240,7 +251,7 @@ class AuditPage extends Page
         }
         try {
             $ids = AuditSuggestion::query()->where('website_id', $site->id)->where('status', 'de_xuat')->whereNotNull('article_id')->pluck('id')->all();
-            $r = (new AuditSuggestionService())->acceptMany($ids, $user);
+            $r = (new AuditSuggestionService)->acceptMany($ids, $user);
         } catch (AuditSuggestionException $e) {
             Notification::make()->title('Không chấp nhận được')->body($e->getMessage())->danger()->send();
 
@@ -257,7 +268,7 @@ class AuditPage extends Page
             return;
         }
         try {
-            $do(new AuditSuggestionService(), $user, $s);
+            $do(new AuditSuggestionService, $user, $s);
         } catch (AuditSuggestionException $e) {
             Notification::make()->title('Không thực hiện được')->body($e->getMessage())->danger()->send();
 
@@ -285,7 +296,7 @@ class AuditPage extends Page
             ])->all();
     }
 
-    /** @return \Illuminate\Support\Collection<int, Website> */
+    /** @return Collection<int, Website> */
     private function activeWebsites()
     {
         return Website::where('status', 'active')->orderBy('name')->get();
@@ -434,7 +445,7 @@ class AuditPage extends Page
             'sevStats' => $this->sevStats($run),
             'realRun' => $this->realRun($run),
             'suggestions' => $this->realRun($run) ? $this->suggestionRows($site) : [],
-            'suggestBlocker' => $this->realRun($run) && $site ? (new AuditSuggestionService())->blocker($site) : null,
+            'suggestBlocker' => $this->realRun($run) && $site ? (new AuditSuggestionService)->blocker($site) : null,
             'fixSteps' => $group ? IssueCatalog::fixSteps($group['type'], $group['items']) : [],
             'nextAtLabel' => $nextAt ? 'Quét lại được từ '.VnTime::format($nextAt, 'H:i d/m/Y').' (giờ VN).' : null,
             'briefs' => $site ? $service->briefs($site) : [],

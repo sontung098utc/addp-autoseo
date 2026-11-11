@@ -1,5 +1,4 @@
 <x-filament-panels::page>
-    <x-chain-context step="Khám phá" purpose="Kiểm sức khỏe kỹ thuật và nội dung của website, rồi biến lỗi thành việc làm mới bài." :inputs="[['label'=>'Website kết nối','url'=>\App\Filament\Resources\WebsiteResource::getUrl('index'),'note'=>'trang đã quét của website']]" :outputs="[['label'=>'Kế hoạch nội dung','url'=>\App\Filament\Pages\ContentPlanPage::getUrl(),'note'=>'đề xuất làm mới tạo bài loại làm mới (chỉ từ quét thật)'],['label'=>'Danh sách lỗi cho dev','url'=>null,'note'=>'ngay trên trang này'],['label'=>'Search Console','url'=>\App\Filament\Pages\SearchConsolePage::getUrl(),'note'=>'đối chiếu hiệu quả']]" :compact="true" />
     <style>
         .au-mono{font-family:ui-monospace,monospace}
         .au-code{margin:0;padding:.4rem .6rem;background:var(--ss-surface);border:1px solid var(--ss-border);border-radius:.3rem;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -50,20 +49,29 @@
             <span style="flex:1"></span>
             @if ($site && $state !== 'chua-ket-noi')
                 @if ($scanning)
-                    <span class="ss-text-sm ss-muted">Đang quét, chờ xong mới quét lại được.</span>
+                    <span class="ss-text-sm ss-muted">Đang quét…</span>
                 @elseif (! $guard['ok'])
-                    <span class="ss-text-sm ss-muted" title="{{ $guard['reason'] }}"><x-filament::icon icon="heroicon-o-lock-closed" style="width:1rem;height:1rem;display:inline;vertical-align:-.2em" /> {{ $guard['reason'] }} {{ $nextAtLabel }}</span>
+                    <span class="ss-text-sm ss-muted" title="{{ $guard['reason'] }} {{ $nextAtLabel }}"><x-filament::icon icon="heroicon-o-lock-closed" style="width:1rem;height:1rem;display:inline;vertical-align:-.2em" /> Chưa quét lại được</span>
+                    <x-help text="{{ $guard['reason'] }} {{ $nextAtLabel }}" />
                 @endif
                 @if ($run)
-                    <span class="ss-text-sm ss-muted">{{ $realRun ? 'Quét thật lúc '.$vn($run['at']) : 'Dữ liệu mẫu, không phải kết quả quét website thật' }}@if ($stale) <x-studio.badge tone="warn">Kết quả cũ</x-studio.badge>@endif</span>
+                    <span class="ss-text-sm ss-muted" data-testid="au-run-label">{{ $realRun ? 'Quét thật lúc '.$vn($run['at']) : 'Dữ liệu mẫu' }}@if ($stale) <x-studio.badge tone="warn">Kết quả cũ</x-studio.badge>@endif</span>
+                    @if (! $realRun)<x-help text="Dữ liệu mẫu, không phải kết quả quét website thật. Muốn số liệu thật, dùng Quét thật." />@endif
                 @endif
-                @if ($hasData)
-                    <x-filament::button color="gray" wire:click="createBrief" :disabled="! $canBrief" title="{{ ! $canAct ? 'Chỉ approver trở lên được tạo brief.' : ($scanning ? 'Đang quét nên chưa tạo được.' : 'Tạo brief từ nhóm lỗi đang chọn') }}">Tạo brief từ lỗi</x-filament::button>
-                @endif
-                <x-filament::button color="gray" wire:click="rescan" :disabled="! $canRescan">{{ $run ? 'Quét lại (dữ liệu mẫu)' : 'Quét lần đầu (dữ liệu mẫu)' }}</x-filament::button>
                 @if ($canRealScan)
-                    <x-filament::button color="primary" wire:click="openRealScan">Quét thật (giới hạn {{ $realScanMax }} trang)</x-filament::button>
+                    <x-filament::button color="primary" wire:click="openRealScan">Quét thật</x-filament::button>
                 @endif
+                <x-filament::dropdown placement="bottom-end" data-testid="au-more">
+                    <x-slot name="trigger">
+                        <x-filament::button color="gray" icon="heroicon-o-ellipsis-horizontal" aria-label="Thêm thao tác">Thêm</x-filament::button>
+                    </x-slot>
+                    <x-filament::dropdown.list>
+                        @if ($hasData)
+                            <x-filament::dropdown.list.item wire:click="createBrief" :disabled="! $canBrief" title="{{ ! $canAct ? 'Chỉ approver trở lên được tạo brief.' : ($scanning ? 'Đang quét nên chưa tạo được.' : 'Tạo brief từ nhóm lỗi đang chọn') }}">Tạo brief từ lỗi</x-filament::dropdown.list.item>
+                        @endif
+                        <x-filament::dropdown.list.item wire:click="rescan" :disabled="! $canRescan">{{ $run ? 'Quét lại (dữ liệu mẫu)' : 'Quét lần đầu (dữ liệu mẫu)' }}</x-filament::dropdown.list.item>
+                    </x-filament::dropdown.list>
+                </x-filament::dropdown>
             @endif
         </div>
         @if ($realScanOpen && $canRealScan)

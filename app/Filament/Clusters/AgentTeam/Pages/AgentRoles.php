@@ -83,6 +83,8 @@ class AgentRoles extends Page
     /** @var array<int, bool> */
     public array $grants = [];
 
+    public string $brainSearch = '';
+
     /** @var array<string, string> bản nháp bài học theo dòng ở Phòng huấn luyện */
     public array $teach = [];
 
@@ -332,6 +334,13 @@ class AgentRoles extends Page
     public function deleteDocument(int $id): void
     {
         $this->guarded(fn (User $u) => AgentProfiles::deleteDocument($id, $u), 'Đã xóa.');
+    }
+
+    public function toggleGrant(int $id): void
+    {
+        $this->guarded(function () use ($id) {
+            $this->grants[$id] = empty($this->grants[$id]);
+        });
     }
 
     public function saveGrants(): void

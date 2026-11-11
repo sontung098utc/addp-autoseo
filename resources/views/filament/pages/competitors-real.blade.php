@@ -12,7 +12,6 @@
     ];
 @endphp
 <x-filament-panels::page>
-    <x-chain-context step="Khám phá" purpose="Tìm khoảng trống nội dung so với đối thủ." :inputs="[['label' => 'Từ khóa đối thủ', 'note' => 'nhập CSV']]" :outputs="[['label' => 'Kho từ khóa (trang Từ khóa)', 'url' => \App\Filament\Pages\KeywordsPage::getUrl()], ['label' => 'Kế hoạch nội dung', 'url' => \App\Filament\Pages\ContentPlanPage::getUrl()]]" :compact="true" />
     @php $multiSite = count($websites) > 1; @endphp
     <div class="ss-page" data-co-state="real">
         @if (! $site)

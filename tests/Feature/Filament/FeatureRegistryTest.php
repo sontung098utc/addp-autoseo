@@ -99,4 +99,11 @@ class FeatureRegistryTest extends TestCase
         $this->actingAs($this->user('approver', false));
         $this->assertFalse(HowItWorksPage::canAccess());
     }
+
+    public function test_moi_the_giai_doan_chi_mot_huy_hieu_la_muc_kem_nhat(): void
+    {
+        $this->actingAs($this->user('admin'));
+        $html = Livewire::test(HowItWorksPage::class)->html();
+        $this->assertSame(count(HowItWorksPage::STAGES), substr_count($html, 'data-testid="hw-badge"'));
+    }
 }

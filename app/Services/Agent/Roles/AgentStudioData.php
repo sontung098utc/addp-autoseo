@@ -7,6 +7,8 @@ use App\Models\AgentRunStep;
 use App\Models\ArticleVersion;
 use App\Services\Agent\Pipeline\JobTypeRegistry;
 use App\Services\Ai\Playbook\PlaybookLoader;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -69,7 +71,38 @@ final class AgentStudioData
         return $out;
     }
 
-    /** @return array{steps: int, ok: int, ok_rate: ?int, cost_vnd: float, runs: list<array{id: int, status: string, title: string, at: ?string}>} 30 ngày gần nhất */
+    /** Nhãn trạng thái phiên chạy (cùng bảng chữ với trang Pipeline / Xem phiên). */
+    public const STATUS_LABEL = ['running' => 'Đang chạy', 'ready_for_review' => 'Chờ duyệt', 'held' => 'Giữ nháp', 'blocked' => 'Bị chặn', 'failed' => 'Lỗi', 'approved' => 'Đã duyệt', 'published' => 'Đã đăng', 'ok' => 'Xong', 'completed' => 'Xong'];
+
+    public const STATUS_TONE = ['running' => 'info', 'ready_for_review' => 'ok', 'held' => 'warn', 'blocked' => 'danger', 'failed' => 'danger', 'approved' => 'ok', 'published' => 'ok', 'ok' => 'ok', 'completed' => 'ok'];
+
+    public static function statusLabel(string $status): string
+    {
+        return self::STATUS_LABEL[$status] ?? ucfirst(str_replace('_', ' ', $status));
+    }
+
+    /** "Viết bài #34": tên loại việc tiếng Việt từ JobTypeRegistry, không lộ mã thô. */
+    public static function runTitle(string $jobType, int $id): string
+    {
+        $title = null;
+        try {
+            $title = JobTypeRegistry::find($jobType)['title'] ?? null;
+        } catch (Throwable) {
+        }
+
+        return ($title ?: 'Phiên chạy').' #'.$id;
+    }
+
+    private static function ago(?Carbon $at): ?string
+    {
+        try {
+            return $at?->locale('vi')->diffForHumans(null, CarbonInterface::DIFF_RELATIVE_TO_NOW, true);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /** @return array{steps: int, ok: int, ok_rate: ?int, cost_vnd: float, runs: list<array{id: int, status: string, title: string, label: string, tone: string, at: ?string, ago: ?string}>} 30 ngày gần nhất */
     public static function activity(string $roleKey): array
     {
         $empty = ['steps' => 0, 'ok' => 0, 'ok_rate' => null, 'cost_vnd' => 0.0, 'runs' => []];
@@ -79,7 +112,7 @@ final class AgentStudioData
             $agg = (clone $q)->selectRaw("count(*) as n, sum(case when status in ('ok','skipped') then 1 else 0 end) as ok, coalesce(sum(cost_vnd),0) as cost")->first();
             $n = (int) ($agg->n ?? 0);
             $ids = (clone $q)->select('agent_run_id', DB::raw('max(id) as last_id'))->groupBy('agent_run_id')->orderByDesc('last_id')->limit(10)->pluck('agent_run_id')->all();
-            $runs = AgentRun::query()->whereIn('id', $ids)->orderByDesc('id')->get()->map(fn ($r) => ['id' => (int) $r->id, 'status' => (string) $r->status, 'title' => $r->job_type.' #'.$r->id, 'at' => $r->created_at?->toIso8601String()])->all();
+            $runs = AgentRun::query()->whereIn('id', $ids)->orderByDesc('id')->get()->map(fn ($r) => ['id' => (int) $r->id, 'status' => (string) $r->status, 'title' => self::runTitle((string) $r->job_type, (int) $r->id), 'label' => self::statusLabel((string) $r->status), 'tone' => self::STATUS_TONE[(string) $r->status] ?? 'muted', 'at' => $r->created_at?->toIso8601String(), 'ago' => self::ago($r->created_at)])->all();
 
             return ['steps' => $n, 'ok' => (int) ($agg->ok ?? 0), 'ok_rate' => $n > 0 ? (int) round(100 * (int) $agg->ok / $n) : null, 'cost_vnd' => (float) ($agg->cost ?? 0), 'runs' => $runs] + $empty;
         } catch (Throwable) {

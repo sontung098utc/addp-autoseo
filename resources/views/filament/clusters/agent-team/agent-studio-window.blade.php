@@ -188,21 +188,34 @@
                             <div style="display:flex;gap:.4rem;margin-top:.4rem"><input style="{{ $input }}" wire:model="lessonText" wire:keydown.enter.prevent="addLesson" maxlength="500" placeholder="Ví dụ: Không dùng số liệu khi chưa có nguồn" data-testid="studio-lesson-text"><button type="button" style="{{ $btnPrimary }}" wire:click="addLesson" data-testid="studio-lesson-add">Thêm</button></div>
                         @endif
                         @if ($s['issues'])
-                            <div class="ags-sec">Lần chạy cần dạy lại · {{ count($s['issues']) }} <x-help title="Phòng huấn luyện"><p>Các lần chạy gần đây có vấn đề với vai trò này. "Dạy lại" biến lỗi thành bài học: sửa câu cho đúng ý rồi lưu.</p></x-help></div>
-                            @foreach ($s['issues'] as $i)
-                                <div class="ags-card" data-testid="studio-issue">
-                                    <div style="display:flex;justify-content:space-between;gap:.5rem"><strong class="text-sm">{{ $i['label'] }}</strong>
-                                        @if ($i['run_id'])<a href="{{ ($s['runUrl'])($i['run_id']) }}" class="text-xs" style="text-decoration:underline">Phiên #{{ $i['run_id'] }}</a>@endif</div>
-                                    @if ($i['detail'])<div class="text-xs" style="opacity:.75;margin:.2rem 0">{{ $i['detail'] }}</div>@endif
-                                    @if ($edit)
-                                        @if (isset($teach[$i['key']]))
-                                            <textarea style="{{ $input }}" rows="2" wire:model="teach.{{ $i['key'] }}" maxlength="500"></textarea>
-                                            <button type="button" style="{{ $btnPrimary }};margin-top:.3rem" wire:click="teachRow('{{ $i['key'] }}', {{ $i['run_id'] ?? 'null' }})">Lưu bài học</button>
+                            @php $groups = collect($s['issues'])->groupBy('label'); @endphp
+                            <div class="ags-sec">Lần chạy cần dạy lại · {{ count($s['issues']) }} <x-help title="Phòng huấn luyện"><p>Các lần chạy gần đây có vấn đề với vai trò này, gộp theo cùng cảnh báo. "Dạy lại" biến lỗi thành bài học: sửa câu cho đúng ý rồi lưu. "Dạy cả nhóm" lưu MỘT bài học chung cho cả nhóm.</p></x-help></div>
+                            @foreach ($groups as $label => $items)
+                                @php $gk = 'grp-'.substr(md5((string) $label), 0, 10); $first = $items->first(); $reason = \Illuminate\Support\Str::limit((string) $first['detail'], 120); @endphp
+                                <details class="ags-card ags-grp-card" data-testid="studio-issue-group">
+                                    <summary style="cursor:pointer;display:flex;justify-content:space-between;gap:.5rem;align-items:baseline"><strong class="text-sm">{{ $label }} · {{ $items->count() }} lần</strong><span class="text-xs" style="opacity:.6;white-space:nowrap">Mở danh sách</span></summary>
+                                    @if ($reason !== '')<div class="text-xs" style="opacity:.75;margin:.25rem 0" @if (mb_strlen((string) $first['detail']) > 120) title="{{ $first['detail'] }}" @endif>{{ $reason }}</div>@endif
+                                    @if ($edit && $items->count() > 1)
+                                        @if (isset($teach[$gk]))
+                                            <textarea style="{{ $input }}" rows="2" wire:model="teach.{{ $gk }}" maxlength="500"></textarea>
+                                            <button type="button" style="{{ $btnPrimary }};margin-top:.3rem" wire:click="teachRow('{{ $gk }}', {{ $first['run_id'] ?? 'null' }})" data-testid="studio-teach-group-save">Lưu bài học chung</button>
                                         @else
-                                            <button type="button" style="{{ $btn }}" wire:click="$set('teach.{{ $i['key'] }}', {{ \Illuminate\Support\Js::from($i['draft']) }})" data-testid="studio-teach">Dạy lại</button>
+                                            <button type="button" style="{{ $btn }}" wire:click="$set('teach.{{ $gk }}', {{ \Illuminate\Support\Js::from($first['draft']) }})" data-testid="studio-teach-group">Dạy cả nhóm ({{ $items->count() }})</button>
                                         @endif
                                     @endif
-                                </div>
+                                    @foreach ($items as $i)
+                                        <div style="border-top:1px solid rgba(128,128,128,.2);margin-top:.4rem;padding-top:.4rem" data-testid="studio-issue">
+                                            <div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center">
+                                                @if ($i['run_id'])<a href="{{ ($s['runUrl'])($i['run_id']) }}" class="text-xs" style="text-decoration:underline">Phiên #{{ $i['run_id'] }}</a>@else<span class="text-xs">{{ $i['label'] }}</span>@endif
+                                                @if ($edit && ! isset($teach[$i['key']]))<button type="button" style="{{ $btn }}" wire:click="$set('teach.{{ $i['key'] }}', {{ \Illuminate\Support\Js::from($i['draft']) }})" data-testid="studio-teach">Dạy lại</button>@endif
+                                            </div>
+                                            @if ($edit && isset($teach[$i['key']]))
+                                                <textarea style="{{ $input }};margin-top:.3rem" rows="2" wire:model="teach.{{ $i['key'] }}" maxlength="500"></textarea>
+                                                <button type="button" style="{{ $btnPrimary }};margin-top:.3rem" wire:click="teachRow('{{ $i['key'] }}', {{ $i['run_id'] ?? 'null' }})">Lưu bài học</button>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </details>
                             @endforeach
                         @endif
 
@@ -260,12 +273,21 @@
                             <div class="ags-sec" style="margin:0">Trí tuệ được đọc <x-help title="Quyền đọc Trí tuệ"><p>Chọn Trí tuệ mà vai trò này được đọc kiến thức. Quyền "Đọc và ghi" chưa có: vai trò chỉ đọc.</p><p>Với Người viết: nếu chọn ít nhất một Trí tuệ, kiến thức khi viết chỉ lấy từ lựa chọn này và các Trí tuệ đã gắn website. Không chọn gì = như cũ.</p>@unless ($s['applied'])<p>Quyền này mới được lưu, chưa áp dụng khi chạy vai trò này.</p>@endunless</x-help></div>
                             @if ($edit)<button type="button" style="{{ $btnPrimary }}" wire:click="saveGrants" data-testid="studio-grants-save">Lưu quyền</button>@endif
                         </div>
-                        @foreach ($s['brains'] as $b)
-                            <label class="ags-card" style="display:flex;justify-content:space-between;align-items:center;margin:0 0 .4rem;opacity:1;font-size:.85rem">
-                                <span>{{ $b['name'] }}</span>
-                                <select wire:model="grants.{{ $b['id'] }}" @disabled(! $edit) style="{{ $input }};width:7rem"><option value="">Không</option><option value="1">Đọc</option></select>
-                            </label>
+                        @php $saved = \App\Services\Agent\Roles\AgentProfiles::brainGrants($s['key']); $brains = collect($s['brains'])->sortBy(fn ($b) => in_array($b['id'], $saved) ? 0 : 1)->values(); $q = mb_strtolower(trim($brainSearch)); @endphp
+                        @if (count($brains) > 8)
+                            <input type="search" style="{{ $input }};margin-bottom:.5rem" wire:model.live.debounce.250ms="brainSearch" placeholder="Tìm Trí tuệ…" aria-label="Tìm Trí tuệ" data-testid="studio-brain-search">
+                        @endif
+                        <div data-testid="studio-brain-list">
+                        @foreach ($brains as $b)
+                            @continue($q !== '' && ! str_contains(mb_strtolower($b['name']), $q))
+                            @php $on = ! empty($grants[$b['id']]); @endphp
+                            <div class="ags-card" style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin:0 0 .3rem;padding:.4rem .75rem;font-size:.85rem" data-testid="studio-brain-row" data-on="{{ $on ? 1 : 0 }}">
+                                <span style="min-width:0;{{ $on ? 'font-weight:600' : 'opacity:.8' }}">{{ $b['name'] }} @if (in_array($b['id'], $saved))<x-studio.badge tone="ok">Đang đọc</x-studio.badge>@endif</span>
+                                <span style="display:flex;align-items:center;gap:.4rem"><span class="text-xs" style="opacity:.6">{{ $on ? 'Đọc' : 'Không' }}</span>
+                                <button type="button" class="ags-sw" role="switch" aria-checked="{{ $on ? 'true' : 'false' }}" aria-label="Cho phép đọc {{ $b['name'] }}" @disabled(! $edit) wire:click="toggleGrant({{ $b['id'] }})"><i></i></button></span>
+                            </div>
                         @endforeach
+                        </div>
                     @endif
                     @break
 
@@ -360,7 +382,7 @@
                         </div>
                     @endif
                     @forelse ($a['runs'] as $r)
-                        <div class="ags-card" style="display:flex;justify-content:space-between;gap:.5rem"><span>{{ $r['title'] }} <x-studio.badge :tone="$statusTone[$r['status']] ?? 'muted'">{{ $r['status'] }}</x-studio.badge></span><a href="{{ ($s['runUrl'])($r['id']) }}" class="text-xs" style="text-decoration:underline">Xem diễn biến</a></div>
+                        <div class="ags-card" style="display:flex;justify-content:space-between;align-items:center;gap:.5rem" data-testid="studio-activity-run"><span style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap"><strong class="text-sm">{{ $r['title'] }}</strong> <x-studio.badge :tone="$r['tone']">{{ $r['label'] }}</x-studio.badge>@if ($r['ago'])<span class="text-xs" style="opacity:.6">{{ $r['ago'] }}</span>@endif</span><a href="{{ ($s['runUrl'])($r['id']) }}" class="text-xs" style="text-decoration:underline;white-space:nowrap">Xem diễn biến</a></div>
                     @empty<div class="text-sm" style="opacity:.65" data-testid="studio-activity">Chưa có phiên nào.</div>@endforelse
                     @break
             @endswitch

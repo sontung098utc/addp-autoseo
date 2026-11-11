@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Contracts\PublisherInterface;
 use App\Filament\Resources\WebsiteResource\Pages\EditWebsite;
 use App\Filament\Resources\WebsiteResource\Pages\ListWebsites;
 use App\Filament\Support\Audit\AuditSink;
@@ -10,6 +11,7 @@ use App\Models\ArticleVersion;
 use App\Models\Publication;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Publishing\PublisherManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -19,6 +21,7 @@ class WebsiteUiTest extends TestCase
     use RefreshDatabase;
 
     private const SECRET = 'S3CRET-TEST-VALUE';
+
     private const URL = 'https://8.8.8.8';
 
     private function user(string $role): User
@@ -77,9 +80,14 @@ class WebsiteUiTest extends TestCase
 
     public function test_thu_hoi_thanh_cong_giu_bai_va_ghi_audit(): void
     {
-        $sink = new class implements AuditSink {
+        $sink = new class implements AuditSink
+        {
             public array $entries = [];
-            public function write(array $entry): void { $this->entries[] = $entry; }
+
+            public function write(array $entry): void
+            {
+                $this->entries[] = $entry;
+            }
         };
         $this->app->instance(AuditSink::class, $sink);
         $this->as('admin');
@@ -145,8 +153,9 @@ class WebsiteUiTest extends TestCase
     {
         $this->as('admin');
         $w = $this->site();
-        $this->app->instance(\App\Services\Publishing\PublisherManager::class, new class extends \App\Services\Publishing\PublisherManager {
-            public function getPublisher(\App\Models\Website $website): \App\Contracts\PublisherInterface
+        $this->app->instance(PublisherManager::class, new class extends PublisherManager
+        {
+            public function getPublisher(Website $website): PublisherInterface
             {
                 throw new \InvalidArgumentException('Nền tảng CMS không được hỗ trợ (giả lập: cột cms_type là enum nên không lưu được giá trị lạ).');
             }
@@ -154,5 +163,20 @@ class WebsiteUiTest extends TestCase
         Livewire::test(ListWebsites::class)->callTableAction('testConnection', $w)
             ->assertNotified('Chưa hỗ trợ kiểm tra kết nối cho CMS này');
         $this->assertNull($w->fresh()->last_synced_at);
+    }
+
+    public function test_cot_phu_an_o_man_hep_va_thao_tac_gom_vao_mot_menu(): void
+    {
+        $this->as('admin');
+        $this->site();
+        $c = Livewire::test(ListWebsites::class);
+        $table = $c->instance()->getTable();
+        foreach (['cms_type', 'last_synced_at'] as $name) {
+            $col = $table->getColumn($name);
+            $prop = (new \ReflectionClass($col))->getProperty('visibleFrom');
+            $prop->setAccessible(true);
+            $this->assertNotNull($prop->getValue($col), "cột $name phải ẩn ở màn hẹp");
+        }
+        $this->assertCount(1, $table->getActions(), 'mọi thao tác nằm trong một menu ba chấm');
     }
 }
