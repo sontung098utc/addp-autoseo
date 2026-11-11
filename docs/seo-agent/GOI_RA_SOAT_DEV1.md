@@ -18,7 +18,9 @@ Ngày: 11/11/2026. Nhánh: `feat/m09/ag-s27/dev2/article-workspace`, nền `d8b4
 
 Chi phí mỗi ảnh (1.000 ₫), chi phí/100 từ khóa, trần chi phí: **ước tính cấu hình, chưa đo**.
 
-## 3. Migration (8; PR riêng theo quy ước)
+## 3. Migration (25 của nhánh Dev2, đã đổi ngày để chạy SAU lô A; PR riêng theo quy ước)
+
+Từ 11/11 chiều toàn bộ migration của nhánh này mang tiền tố `2026_11_10_1000NN_` (NN = 01..25, giữ thứ tự cũ) để luôn chạy sau lô A của Dev1 (`2026_11_10_000001..5`). Bảng dưới còn ghi tên cũ theo ngày; số thứ tự cũ không còn dùng.
 
 Kiểm trên MariaDB 10.6 (container tạm): chạy lên cả 28 migration, rollback 5 migration cuối (`2026_11_24` → `2026_11_20`) rồi chạy lại cả 5, đều thành công, không lỗi.
 
@@ -60,6 +62,18 @@ Thứ tự rollback: 24 → 23 → 22 → 21 → 20.
 - `CampaignRunner`: điểm dừng `draft` chặn tự duyệt; `AutopilotRunner`: điểm dừng `plan` chỉ ghi đề xuất chờ nhận (`pendingProposals`, `acceptProposals`).
 - Các trang dùng chung bị sửa để gộp menu: `BrainLibraryPage`, `BrainBuildPage`, `WebsiteOnboardingPage` (vào cụm Kho trí tuệ), `AiUsagePage` (thêm tab Cấu hình AI), `AgentConnection` bị xóa (URL cũ chuyển hướng), `AgentTeam::canAccess` nay cho biên tập viên (để dùng tab Kế hoạch; từng tab tự kiểm quyền).
 - Quan hệ: chiến dịch là cha, bài là con (`articles.campaign_id`), bài không chiến dịch là "Bài lẻ".
+
+## 4c. Gộp với develop (PR-C migration lô A, PR-D PublisherInterface FINAL) — 11/11/2026
+
+Nhánh đã merge `origin/develop` @ `6942f8c` (merge commit `570337e`). **Không sửa file nào của Dev1**: `git diff origin/develop -- database/migrations/2026_11_10_00000*` rỗng; hợp đồng `PublisherInterface`, `CmsError*`, `MagentoBridgeClient` giữ nguyên. File dùng chung bị chạm (chỉ phần ta thêm): `Article`, `Campaign` (hợp của hai bên), `Publication` (hằng `STATUS_PAUSED`, `STATUS_AWAITING_CONFIRM`), `Website`, `WebsiteResource` (UI), `WordPressPublisher` (đăng từ nháp), `PublishArticleJob`.
+
+**Cách gỡ bảng `campaigns` (hai bên cùng tạo):** migration `create_campaigns` của ta đổi thành `2026_11_10_100002_extend_campaigns_for_autonomous_runs` — chỉ THÊM `keywords` (nullable), `daily_limit`, `last_tick_at` lên bảng của Dev1; `add_modes_caps_and_waits` thêm `mode`, trần chi phí/bản nháp, `source`, bảng `campaign_waits`. `down()` chỉ xóa cột/bảng của ta. `articles.campaign_id` do lô A tạo (FK); migration từ khóa của ta chỉ thêm nếu chưa có và không xóa khi lùi. `Campaign::$attributes['status'] = 'paused'` (cột của Dev1 mặc định `active` sẽ làm Autopilot chạy ngay và tốn tiền); `CampaignRunner` đọc `keywords ?? target_keywords`; nút bật/tắt chỉ cho `active`/`paused`.
+
+**Đã khớp phía ta:** guard `held`/`paused`/`awaiting_confirm` trong `PublishArticleJob` đứng TRƯỚC nhánh dừng khẩn cấp (trước đó dừng khẩn cấp đặt lại lượt về `scheduled`, xóa điểm chờ người); `CmsDraftHandoff` coi `CmsErrorInterface` không mơ hồ là thất bại chắc chắn (cho thử lại), không truyền `publication_key` vào `createDraft` (WordPress dùng khóa làm dấu nhận dạng, đăng sẽ bỏ qua SEO meta/taxonomy); `seo_title`/`meta_description` cắt 70/160; `ReviewWorkflow::approve` ghi `approved_version_id`, `ArticleVersion::created` xóa khi có bản mới; truy vấn "hôm nay" của `agent_runs` dùng khoảng ngày theo múi giờ ứng dụng (trước lệch 7 giờ so với chuỗi UTC; lỗi thật khi `APP_TIMEZONE=Asia/Ho_Chi_Minh`).
+
+**Cần Dev1 quyết (đã ghi trong issue):** (1) ai sở hữu schema/mặc định/vòng đời `campaigns` và gộp cột trùng; (2) danh sách trạng thái xuất bản thống nhất (`held` so với `paused`/`awaiting_confirm`); (3) ý nghĩa `approved_version_id`; (4) ai ghi `website_connection_checks` (hiện `testConnection` không còn hạ site lỗi sang `error` nên automation của ta vẫn coi site `active`). Ghi chú: `DatabaseAuditSink` chưa bind (khi bind, tự duyệt ghi là user hệ thống `self_approved`); `agent_runs.status='held'` trùng tên với `publications.status='held'`.
+
+**Kiểm sau merge:** SQLite 1533 đạt / 2 bỏ qua; MariaDB 10.6 1533 đạt / 2 bỏ qua (kể cả 5 `PilotRunTest`, nay xanh). Migration: từ DB trống `migrate` → lùi 25 → `migrate` lại sạch; DB đã chạy lô A trước rồi chạy migration của ta sạch (bảng `campaigns` đủ cột hai bên). DB xem thử cũ phải `migrate:fresh --seed` (đã đổi tên migration). Mức bằng chứng không đổi: chỉ AI giả, chưa dùng AI/mạng thật; giao diện duyệt trên bản xem thử 8105, trang nào chưa xem ghi ở báo cáo.
 
 ## 5. Thay đổi hành vi cần Dev1 đồng ý (không chỉ là mã)
 
