@@ -19,18 +19,28 @@ class AiProvider extends Model
         'openai_compat' => [],
     ];
 
-    protected $fillable = ['name', 'kind', 'base_url', 'api_key', 'monthly_budget_vnd', 'enabled', 'pricing', 'last_test_at', 'last_test_ok', 'last_test_message', 'updated_by'];
+    public const TIER_LABELS = ['cheap' => 'Rẻ', 'standard' => 'Chuẩn', 'reasoning' => 'Suy luận'];
+
+    protected $fillable = ['name', 'kind', 'base_url', 'api_key', 'monthly_budget_vnd', 'enabled', 'pricing', 'models', 'last_test_at', 'last_test_ok', 'last_test_message', 'updated_by'];
 
     protected $hidden = ['api_key'];
 
     protected function casts(): array
     {
-        return ['api_key' => 'encrypted', 'monthly_budget_vnd' => 'float', 'enabled' => 'boolean', 'pricing' => 'array', 'last_test_at' => 'datetime', 'last_test_ok' => 'boolean'];
+        return ['api_key' => 'encrypted', 'monthly_budget_vnd' => 'float', 'enabled' => 'boolean', 'pricing' => 'array', 'models' => 'array', 'last_test_at' => 'datetime', 'last_test_ok' => 'boolean'];
     }
 
     public function hasKey(): bool
     {
         return ! empty($this->api_key);
+    }
+
+    /** 4 ký tự cuối của khóa để nhận diện; khóa ngắn hơn 12 ký tự thì chỉ hiện dấu chấm (không lộ phần lớn khóa). */
+    public function keyTail(): ?string
+    {
+        $k = (string) $this->api_key;
+
+        return mb_strlen($k) >= 12 ? mb_substr($k, -4) : null;
     }
 
     public function kindLabel(): string

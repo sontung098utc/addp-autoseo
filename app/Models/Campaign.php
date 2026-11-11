@@ -36,6 +36,12 @@ class Campaign extends Model
         return $this->hasMany(CampaignWait::class);
     }
 
+    /** Bài con của chiến dịch (articles.campaign_id). */
+    public function articles(): HasMany
+    {
+        return $this->hasMany(Article::class);
+    }
+
     public function runs(): HasMany
     {
         return $this->hasMany(AgentRun::class);

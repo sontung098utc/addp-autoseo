@@ -2,15 +2,20 @@
 
 namespace Tests\Feature\Brain;
 
+use App\Filament\Clusters\KhoTriTue;
 use App\Filament\Pages\BrainLibraryPage;
 use App\Filament\Pages\BrainPage;
+use App\Filament\Pages\KnowledgePage;
+use App\Filament\Resources\ArticleResource\Pages\ListArticles;
 use App\Filament\Resources\CampaignResource;
 use App\Models\Article;
 use App\Models\Brain;
+use App\Models\BrainProfile;
 use App\Models\Campaign;
 use App\Models\KnowledgeGap;
 use App\Models\KnowledgeItem;
 use App\Models\KnowledgeSource;
+use App\Models\KnowledgeTopic;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Brain\BrainContext;
@@ -37,7 +42,7 @@ class BrainUiTest extends TestCase
 
     private function brain(string $name = 'Y khoa', string $tpl = 'y_khoa_duoc', array $sites = []): Brain
     {
-        return (new BrainService())->createFromTemplate($name, $tpl, $sites, $this->user('admin'));
+        return (new BrainService)->createFromTemplate($name, $tpl, $sites, $this->user('admin'));
     }
 
     private function item(Brain $b, array $a = []): KnowledgeItem
@@ -51,11 +56,12 @@ class BrainUiTest extends TestCase
     public function test_url_cu_chuyen_huong_va_menu_la_kho_tri_tue(): void
     {
         $this->actingAs($this->user('admin'));
-        $this->get('/admin/kho-kien-thuc')->assertRedirect('/admin/kho-tri-tue');
-        $this->get('/admin/kho-tri-tue')->assertOk()->assertSee('Kho trí tuệ');
-        $this->assertFalse(\App\Filament\Pages\KnowledgePage::shouldRegisterNavigation());
+        $this->get('/admin/kho-kien-thuc')->assertRedirect('/admin/kho-tri-tue/tri-tue');
+        $this->get('/admin/kho-tri-tue')->assertRedirect('/admin/kho-tri-tue/tri-tue'); // Z2: cụm Kho trí tuệ, tab đầu là Trí tuệ
+        $this->get('/admin/kho-tri-tue/tri-tue')->assertOk()->assertSee('Kho trí tuệ');
+        $this->assertFalse(KnowledgePage::shouldRegisterNavigation());
         $this->assertTrue(BrainLibraryPage::shouldRegisterNavigation());
-        $this->assertSame('Khám phá', BrainLibraryPage::getNavigationGroup());
+        $this->assertSame('Khám phá', KhoTriTue::getNavigationGroup()); // nhóm menu nay nằm ở cụm
     }
 
     public function test_thu_vien_hien_so_dem_that(): void
@@ -125,7 +131,7 @@ class BrainUiTest extends TestCase
         $this->assertSame(['Quy tắc một', 'Quy tắc hai'], $p->reasoning['rules']);
         $this->assertSame('Ghi chú rubric', $p->rubric_notes);
         $this->assertNotEmpty($p->structure['article_types'], 'khung mẫu được giữ khi lưu');
-        $this->assertSame(1, \App\Models\BrainProfile::where('brain_id', $b->id)->count());
+        $this->assertSame(1, BrainProfile::where('brain_id', $b->id)->count());
     }
 
     public function test_tai_lieu_va_chu_de_them_o_trang_tri_tue_gan_brain_id(): void
@@ -139,7 +145,7 @@ class BrainUiTest extends TestCase
         $this->assertSame($b->id, KnowledgeSource::where('title', 'Tài liệu')->value('brain_id'));
         $this->assertSame($b->id, KnowledgeItem::where('title', 'Mục tay')->value('brain_id'));
         $this->assertGreaterThan(0, KnowledgeItem::where('source_id', KnowledgeSource::where('title', 'Tài liệu')->value('id'))->where('brain_id', $b->id)->count());
-        $this->assertSame($b->id, \App\Models\KnowledgeTopic::where('name', 'Chủ đề riêng')->value('brain_id'));
+        $this->assertSame($b->id, KnowledgeTopic::where('name', 'Chủ đề riêng')->value('brain_id'));
     }
 
     public function test_hien_thi_noi_dung_ho_so_duoc_escape(): void
@@ -219,6 +225,6 @@ class BrainUiTest extends TestCase
         $this->brain('Trí tuệ Alpha', 'trong', [$w->id]);
         Article::create(['website_id' => $w->id, 'primary_keyword' => 'từ khóa x', 'workflow_status' => 'planned']);
         $this->actingAs($this->user('admin'));
-        Livewire::test(\App\Filament\Resources\ArticleResource\Pages\ListArticles::class)->assertOk()->assertSee('Trí tuệ Alpha');
+        Livewire::test(ListArticles::class)->assertOk()->assertSee('Trí tuệ Alpha');
     }
 }

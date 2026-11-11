@@ -17,7 +17,7 @@ class ListCampaigns extends ListRecords
 
     protected static ?string $title = 'Chiến dịch của đội AI';
 
-    public const CONCEPT = 'Chiến dịch = mục tiêu sản xuất: website nào, lấy từ khóa từ đâu, chế độ, hạn mức mỗi ngày. Mỗi nhịp hệ thống chọn bài kế tiếp và tạo MỘT phiên chạy cho bài đó. Chiến dịch không phải chuỗi phiên. Kết quả luôn là bản nháp chờ duyệt, chưa có gì tự đăng.';
+    public const CONCEPT = 'Chiến dịch gom các bài cùng mục tiêu, lịch và quy tắc; bài lẻ là bài không thuộc chiến dịch nào. Chiến dịch = mục tiêu sản xuất: website nào, lấy từ khóa từ đâu, chế độ, hạn mức mỗi ngày. Mỗi nhịp hệ thống chọn bài kế tiếp và tạo MỘT phiên chạy cho bài đó. Chiến dịch không phải chuỗi phiên. Kết quả luôn là bản nháp chờ duyệt, chưa có gì tự đăng.';
 
     public function getHeading(): string|Htmlable
     {

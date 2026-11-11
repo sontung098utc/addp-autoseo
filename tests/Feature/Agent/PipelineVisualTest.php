@@ -56,8 +56,11 @@ class PipelineVisualTest extends TestCase
             $this->assertStringContainsString('data-flow="'.$j['id'].'"', $html);
             $this->assertSame(count($j['steps']), substr_count($this->section($html, $j['id']), 'data-step="'), $j['id']);
             $this->assertSame(count($j['steps']), substr_count($this->section($html, $j['id']), 'data-avatar'), $j['id']);
-            $this->assertStringContainsString('ĐẦU VÀO', $this->section($html, $j['id']));
-            $this->assertStringContainsString('KẾT QUẢ', $this->section($html, $j['id']));
+            $this->assertStringContainsString('Đầu vào', $this->section($html, $j['id']));
+            $this->assertStringContainsString('Kết quả', $this->section($html, $j['id']));
+            // đủ nút bước đúng thứ tự registry
+            preg_match_all('/data-step="([^"]+)"/', $this->section($html, $j['id']), $m);
+            $this->assertSame(array_column($j['steps'], 'id'), $m[1], $j['id']);
         }
     }
 
@@ -74,10 +77,11 @@ class PipelineVisualTest extends TestCase
         $this->actingAs($this->user('approver'));
         $html = $this->get('/admin/doi-ai/pipeline')->getContent();
         $mr = $this->section($html, 'market_research');
-        $this->assertStringContainsString('pv-node--planned', $mr);
+        $this->assertStringContainsString('fl-node--planned', $mr);
         $this->assertStringContainsString('Chưa chạy', $mr);
-        $this->assertStringContainsString('pv-node--human', $this->section($html, 'article_write'));
-        $this->assertStringContainsString('tùy điều kiện', $this->section($html, 'article_write'));
+        $this->assertStringContainsString('fl-node--human', $this->section($html, 'article_write'));
+        $this->assertStringContainsString('data-when', $this->section($html, 'article_write'));
+        $this->assertStringContainsString('fl-link--dashed', $this->section($html, 'article_write'));
     }
 
     public function test_dau_vao_va_ket_qua_co_lien_ket_dung_url(): void

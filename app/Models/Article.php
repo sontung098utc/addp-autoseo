@@ -45,6 +45,12 @@ class Article extends Model
         return $this->belongsTo(Website::class);
     }
 
+    /** Chiến dịch chứa bài (cha). Rỗng = bài lẻ. */
+    public function campaign(): BelongsTo
+    {
+        return $this->belongsTo(Campaign::class);
+    }
+
     public function keyword(): BelongsTo
     {
         return $this->belongsTo(Keyword::class);

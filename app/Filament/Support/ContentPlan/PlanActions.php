@@ -24,7 +24,7 @@ final class PlanActions
      * @param  array<string,string>  $intents  từ khóa => ý định (từ kho từ khóa)
      * @return list<array{keyword:string, status:'created'|'duplicate'|'error', message:string, article_id:?int}>
      */
-    public function createFromCluster(User $actor, Website $site, array $cluster, array $keywords, ?string $day = null, array $intents = []): array
+    public function createFromCluster(User $actor, Website $site, array $cluster, array $keywords, ?string $day = null, array $intents = [], ?int $campaignId = null): array
     {
         $keywords = array_values(array_unique(array_intersect($keywords, $cluster['keywords'])));
         if ($keywords === []) {
@@ -52,6 +52,9 @@ final class PlanActions
         foreach ($keywords as $i => $k) {
             try {
                 $a = $creator->create($actor, $site, $k, $cluster['name'], $intents[$k] ?? $cluster['intent'] ?? 'informational', [], $stored->get(Keyword::keyFor($k)), 'keyword');
+                if ($campaignId !== null) {
+                    $a->update(['campaign_id' => $campaignId]);
+                }
                 if ($times) {
                     PlanData::setPlannedDate($a->id, $times[$i]);
                 }

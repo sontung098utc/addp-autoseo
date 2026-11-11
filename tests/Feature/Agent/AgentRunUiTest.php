@@ -53,7 +53,7 @@ class AgentRunUiTest extends TestCase
 
         $this->get(AgentRunResource::getUrl('index'))->assertOk()->assertSee('Phiên chạy')->assertSee('tối ưu seo cho website')->assertSee('AI giả lập');
         $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()
-            ->assertSee('Luồng đã đi qua')->assertSee('Nhật ký từng bước')->assertSee('Dev1 cần')
+            ->assertSee('data-testid="stage-rail"', false)->assertSee('Nhật ký từng bước')->assertSee('Dev1 cần')
             ->assertSee('AI giả lập')->assertSee('chỉ tạo bản nháp');
     }
 

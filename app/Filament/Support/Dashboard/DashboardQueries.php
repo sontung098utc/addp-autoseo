@@ -2,11 +2,13 @@
 
 namespace App\Filament\Support\Dashboard;
 
+use App\Models\AgentRun;
 use App\Models\Article;
 use App\Models\ArticleVersion;
 use App\Models\Publication;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Agent\Checkpoints\OutlineHold;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -46,6 +48,35 @@ final class DashboardQueries
      */
     public static function decisions(User $user, CarbonInterface $now): Collection
     {
+        // Điểm dừng của chiến dịch: phiên dừng sau dàn ý chờ người xem; xếp trước các việc khác (đội AI đang đứng chờ).
+        $checkpoints = $user->isWriter() ? self::outlineCheckpoints($now) : collect();
+
+        return $checkpoints->concat(self::baseDecisions($user, $now))->values();
+    }
+
+    /** @return Collection<int, array<string, mixed>> */
+    private static function outlineCheckpoints(CarbonInterface $now): Collection
+    {
+        return OutlineHold::pending()->map(function (AgentRun $r) use ($now) {
+            $waited = (int) max(0, ($r->finished_at ?? $r->created_at)?->diffInMinutes($now, false) ?? 0);
+
+            return [
+                'kind' => 'checkpoint',
+                'version_id' => null,
+                'article_id' => $r->article_id,
+                'keyword' => $r->article?->primary_keyword,
+                'website' => $r->article?->website?->name,
+                'waiting_minutes' => $waited,
+                'waiting_label' => 'Dàn ý chờ bạn xem · '.self::waitingLabel($waited),
+                'overdue' => false,
+                'note' => null,
+            ];
+        });
+    }
+
+    /** @return Collection<int, array<string, mixed>> */
+    private static function baseDecisions(User $user, CarbonInterface $now): Collection
+    {
         if (self::isApprover($user)) {
             return self::latestVersions('needs_review')->get()->map(function (ArticleVersion $v) use ($now) {
                 $waited = $v->created_at ? $v->created_at->diffInMinutes($now, false) : 0;
@@ -69,7 +100,7 @@ final class DashboardQueries
             ->get()->map(fn (ArticleVersion $v) => [
                 'kind' => 'rejected',
                 'version_id' => $v->id,
-                    'article_id' => $v->article_id,
+                'article_id' => $v->article_id,
                 'keyword' => $v->article?->primary_keyword,
                 'website' => $v->article?->website?->name,
                 'waiting_minutes' => 0,
@@ -99,13 +130,13 @@ final class DashboardQueries
     public static function waitingLabel(int $minutes): string
     {
         if ($minutes < 60) {
-            return 'chờ ' . max(1, $minutes) . ' phút';
+            return 'chờ '.max(1, $minutes).' phút';
         }
         if ($minutes < 24 * 60) {
-            return 'chờ ' . intdiv($minutes, 60) . ' giờ';
+            return 'chờ '.intdiv($minutes, 60).' giờ';
         }
 
-        return 'chờ ' . intdiv($minutes, 1440) . ' ngày';
+        return 'chờ '.intdiv($minutes, 1440).' ngày';
     }
 
     /**
@@ -187,7 +218,7 @@ final class DashboardQueries
             ->orderByDesc('reviewed_at')->limit(self::RECENT_ACTIVITY_LIMIT)->get()
             ->map(fn (ArticleVersion $v) => [
                 'version_id' => $v->id,
-                    'article_id' => $v->article_id,
+                'article_id' => $v->article_id,
                 'keyword' => $v->article?->primary_keyword,
                 'reviewer' => $v->reviewer?->name,
                 'status' => $v->review_status,

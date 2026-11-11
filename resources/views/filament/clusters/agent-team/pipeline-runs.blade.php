@@ -1,4 +1,5 @@
 <div data-testid="pipeline-runs">
+    <div class="text-xs" style="opacity:.75;margin-bottom:.5rem">Các phiên đang chạy và vừa chạy <x-help title="Điều khiển pipeline"><p>Chạy lại / Tạm dừng pipeline: chưa nối. Cần job nền và API pipeline (AG-B10), nên chưa có nút.</p></x-help></div>
     @if (! $live && $runs !== [])<div class="text-xs" style="opacity:.7;margin-bottom:.5rem">Không có phiên nào đang chạy. Các phiên 24 giờ qua:</div>@endif
     @forelse ($runs as $r)
         <div class="pv-run" data-run="{{ $r['run']->id }}" data-live="{{ $r['live'] ? 1 : 0 }}">

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Agent;
 
-use App\Filament\Pages\AgentConnection;
+use App\Filament\Pages\AiUsagePage;
 use App\Models\AgentSetting;
 use App\Models\Campaign;
 use App\Models\User;
@@ -126,16 +126,16 @@ class AgentTeamHubTest extends TestCase
     public function test_khoa_luu_ma_hoa_va_khong_bao_gio_hien_lai(): void
     {
         $this->actingAs($this->user('admin'));
-        Livewire::test(AgentConnection::class)
-            ->callAction('addProvider', ['name' => 'Gemini chính', 'kind' => 'gemini', 'api_key' => 'AIzaSECRETKEY9999', 'suggest' => true])
+        Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)
+            ->callAction('addProvider', ['name' => 'Gemini chính', 'preset' => 'gemini', 'api_key' => 'AIzaSECRETKEY9999', 'suggest' => true])
             ->assertHasNoActionErrors();
 
         $raw = \DB::table('ai_providers')->value('api_key');
         $this->assertStringNotContainsString('SECRETKEY', (string) $raw, 'khóa phải được mã hóa trong CSDL');
         $this->assertSame('AIzaSECRETKEY9999', \App\Models\AiProvider::first()->api_key);
-        $this->get('/admin/tich-hop-ai')->assertOk()->assertDontSee('SECRETKEY')->assertDontSee('9999')->assertSee('•••• đã lưu');
+        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk()->assertDontSee('SECRETKEY')->assertDontSee('AIzaSECRETKEY9999')->assertSee('•••• đã lưu')->assertSee('…9999');
 
-        Livewire::test(AgentConnection::class)->callAction('editLimits', ['run_budget_vnd' => 70000, 'max_repair_rounds' => 2])->assertHasNoActionErrors();
+        Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)->callAction('editLimits', ['run_budget_vnd' => 70000, 'max_repair_rounds' => 2])->assertHasNoActionErrors();
         $this->assertSame(70000.0, AgentAi::policy()->budgetVnd);
         $this->assertSame(2, AgentAi::policy()->maxRepairRounds);
     }
@@ -145,7 +145,7 @@ class AgentTeamHubTest extends TestCase
         $p = \App\Models\AiProvider::create(['name' => 'G', 'kind' => 'gemini', 'api_key' => 'AIza-OLD-1111']);
         $this->actingAs($this->user('admin'));
 
-        Livewire::test(AgentConnection::class)->callAction('updateKey', ['api_key' => 'AIza-NEW-2222'], ['id' => $p->id])->assertHasNoActionErrors();
+        Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)->callAction('updateKey', ['api_key' => 'AIza-NEW-2222'], ['id' => $p->id])->assertHasNoActionErrors();
 
         $this->assertSame('AIza-NEW-2222', $p->fresh()->api_key);
     }
@@ -155,8 +155,8 @@ class AgentTeamHubTest extends TestCase
         $p = \App\Models\AiProvider::create(['name' => 'G', 'kind' => 'gemini', 'api_key' => 'AIza-OLD-1111']);
         $this->actingAs($this->user('approver'));
 
-        $this->get('/admin/tich-hop-ai')->assertOk()->assertSee('Chỉ quản trị viên được thêm')->assertSee('Tác vụ nào chưa có khóa provider sẽ không chạy')->assertDontSee('Cập nhật khóa');
-        Livewire::test(AgentConnection::class)->assertActionHidden('addProvider')->assertActionHidden('updateKey', ['id' => $p->id])->assertActionHidden('editRoute', ['task' => 'write']);
+        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk()->assertSee('Chỉ quản trị viên được thêm')->assertSee('Tác vụ nào chưa có khóa tài khoản sẽ không chạy')->assertDontSee('Sửa khóa');
+        Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)->assertActionHidden('addProvider')->assertActionHidden('updateKey', ['id' => $p->id])->assertActionHidden('deleteProvider', ['id' => $p->id]);
         $this->assertSame('AIza-OLD-1111', $p->fresh()->api_key);
     }
 

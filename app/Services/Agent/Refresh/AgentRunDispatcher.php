@@ -35,12 +35,16 @@ final class AgentRunDispatcher
         ?CmsDraftHandoff $handoff = null,
         ?AiModelRouter $router = null,
         bool $allowWithoutKnowledge = false, // deprecated: không còn cổng dừng, giữ để nơi gọi cũ không vỡ
+        ?array $presetOutline = null, // dàn ý người đã duyệt/sửa (điểm dừng 'outline'): không gọi AI lập dàn ý
+        ?array $checkpoints = null, // điểm dừng chờ người của chiến dịch
     ): AgentRun {
         $policy ??= new RunPolicy;
+        // Chưa chỉ định thì lấy điểm dừng của chiến dịch chứa bài (giao tay một bài của chiến dịch cũng dừng đúng chỗ); [] = không dừng.
+        $checkpoints ??= $article->campaign_id ? (array) $article->campaign?->checkpoints : null;
         if (self::usesRefresh($article)) {
             return (new ArticleRefreshRunner($ai, stop: $stop, policy: $policy, handoff: $handoff, router: $router))->run($article, $actor, $trigger, $campaignId);
         }
 
-        return (new AgentRunOrchestrator($ai, stop: $stop, policy: $policy, handoff: $handoff, router: $router))->run($article, $actor, $trigger, $campaignId, null, $allowWithoutKnowledge);
+        return (new AgentRunOrchestrator($ai, stop: $stop, policy: $policy, handoff: $handoff, router: $router))->run($article, $actor, $trigger, $campaignId, $presetOutline, $allowWithoutKnowledge, $checkpoints);
     }
 }

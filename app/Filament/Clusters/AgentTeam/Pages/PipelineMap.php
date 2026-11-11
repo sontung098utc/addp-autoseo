@@ -12,14 +12,13 @@ use App\Filament\Resources\ArticleResource;
 use App\Filament\Support\Agent\RunActivity;
 use App\Models\User;
 use App\Services\Agent\Pipeline\JobTypeRegistry;
-use App\Services\Agent\Pipeline\PipelineBlueprint;
 use App\Services\Agent\Pipeline\PipelineVisual;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Filament\Pages\SubNavigationPosition;
 use Illuminate\Support\Facades\Auth;
 
-/** AG-S12: tab "Pipeline" của Đội AI: bản đồ 9 giai đoạn với trạng thái thật. Chi tiết mỗi giai đoạn mở trong cửa sổ trượt. */
+/** Tab "Pipeline" của Đội AI: hai tab ngang, "Các luồng" (mỗi loại việc một luồng nút ngang) và "Đang chạy". Chi tiết bước và loại việc mở trong cửa sổ trượt. */
 class PipelineMap extends Page
 {
     protected static ?string $cluster = AgentTeam::class;
@@ -45,28 +44,6 @@ class PipelineMap extends Page
         return $u instanceof User && $u->is_active && $u->isApprover();
     }
 
-    /** @return array<string, mixed>|null */
-    private function stage(string $id): ?array
-    {
-        foreach (PipelineBlueprint::stages() as $s) {
-            if ($s['id'] === $id) {
-                return $s;
-            }
-        }
-
-        return null;
-    }
-
-    public function stageAction(): Action
-    {
-        return Action::make('stage')
-            ->modalHeading(fn (array $arguments): string => ($s = $this->stage($arguments['stage'] ?? '')) ? "{$s['n']} · {$s['title']}" : 'Giai đoạn')
-            ->slideOver()
-            ->modalContent(fn (array $arguments) => view('filament.clusters.agent-team.pipeline-stage', ['s' => $this->stage($arguments['stage'] ?? ''), 'controls' => PipelineBlueprint::controlsWired()]))
-            ->modalSubmitAction(false)
-            ->modalCancelActionLabel('Đóng');
-    }
-
     /** Cửa sổ trượt của một loại việc (thẻ dưới mắt xích). */
     public function jobAction(): Action
     {
@@ -76,7 +53,6 @@ class PipelineMap extends Page
             ->modalContent(fn (array $arguments) => view('filament.clusters.agent-team.pipeline-job', [
                 'j' => JobTypeRegistry::find($arguments['job'] ?? ''),
                 'names' => $this->jobNames(),
-                'chain' => JobTypeRegistry::CHAIN,
                 'url' => ($j = JobTypeRegistry::find($arguments['job'] ?? '')) ? self::workUrl($j['id']) : null,
             ]))
             ->modalSubmitAction(false)
@@ -151,31 +127,6 @@ class PipelineMap extends Page
         return $technical ? (self::PLAIN[$j['id']] ?? $first).(self::PLAIN[$j['id']] ?? false ? '' : '.') : $first.'.';
     }
 
-    /**
-     * Mức dùng được, quy tắc cố định: status planned => 'none' (Chưa có); active mà summary có "Chưa làm:" hoặc "một phần"
-     * => 'partial' (Dùng được một phần); còn lại active => 'ready' (Dùng được).
-     */
-    public static function usability(array $j): string
-    {
-        if ($j['status'] !== 'active') {
-            return 'none';
-        }
-
-        return preg_match('/Chưa làm:|một phần/iu', (string) $j['summary']) ? 'partial' : 'ready';
-    }
-
-    /** @return array{ready:int, partial:int, none:int, total:int} */
-    public static function tally(): array
-    {
-        $t = ['ready' => 0, 'partial' => 0, 'none' => 0];
-        $all = JobTypeRegistry::all();
-        foreach ($all as $j) {
-            $t[self::usability($j)]++;
-        }
-
-        return $t + ['total' => count($all)];
-    }
-
     /** Địa chỉ trang làm việc của loại việc; null nếu không có class, không có quyền hoặc lỗi route. */
     public static function workUrl(string $jobId): ?string
     {
@@ -195,17 +146,30 @@ class PipelineMap extends Page
         return null;
     }
 
+    /** Dòng trợ giúp (i) của một luồng: điểm người can thiệp, ngân sách, nơi hiện kết quả. @return list<string> */
+    private function helpLines(array $j): array
+    {
+        $lines = [];
+        if ($j['human']) {
+            $lines[] = 'Việc bạn cần làm: '.implode('; ', $j['human']).'.';
+        }
+        if ($j['budget']) {
+            $lines[] = 'Ngân sách: '.$j['budget'].'.';
+        }
+        if ($j['shown_at']) {
+            $lines[] = 'Kết quả hiện ở: '.collect($j['shown_at'])->map(fn ($x) => trim(preg_replace('/\s*\(.*?\)/u', '', $x)))->implode('; ').'.';
+        }
+
+        return $lines;
+    }
+
     protected function getViewData(): array
     {
-        $chain = [];
-        foreach (JobTypeRegistry::CHAIN as $key => $label) {
-            $jobs = array_map(fn (array $j) => $j + [
-                'plain' => self::plainLine($j),
-                'usability' => self::usability($j),
-                'url' => self::workUrl($j['id']),
-            ], JobTypeRegistry::forLink($key));
-            $chain[] = ['key' => $key, 'label' => $label, 'jobs' => $jobs];
-        }
+        $flows = array_map(function (array $f) {
+            $j = JobTypeRegistry::find($f['id']) ?? [];
+
+            return $f + ['plain' => $j ? self::plainLine($j) : '', 'url' => self::workUrl($f['id']), 'help' => $j ? $this->helpLines($j) : []];
+        }, PipelineVisual::flows());
 
         $runs = PipelineVisual::runs();
         $live = RunActivity::anyRunning();
@@ -217,16 +181,12 @@ class PipelineMap extends Page
         }
 
         return [
-            'flows' => PipelineVisual::flows(),
+            'flows' => $flows,
             'runs' => $runs,
             'live' => $live,
             'pollSeconds' => RunActivity::POLL_LIVE,
             'liveSteps' => $liveSteps,
-            'stages' => PipelineBlueprint::stages(),
-            'controls' => PipelineBlueprint::controlsWired(),
-            'chain' => $chain,
             'names' => $this->jobNames(),
-            'tally' => self::tally(),
         ];
     }
 }

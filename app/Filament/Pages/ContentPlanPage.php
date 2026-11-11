@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Clusters\AgentTeam;
+use App\Filament\Support\ContentPlan\HasPlanProposals;
 use App\Filament\Support\ContentPlan\MockTitleSuggester;
 use App\Filament\Support\ContentPlan\PlanActions;
 use App\Filament\Support\ContentPlan\PlanData;
@@ -13,12 +15,14 @@ use App\Filament\Support\Planning\PlannedArticleCreator;
 use App\Filament\Support\Schedule\VnTime;
 use App\Filament\Support\StatusPresenter;
 use App\Models\Article;
+use App\Models\Campaign;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\Planning\ContentPlanner;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
@@ -26,17 +30,20 @@ use InvalidArgumentException;
 
 class ContentPlanPage extends Page
 {
+    use HasPlanProposals;
+
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
 
-    protected static ?string $navigationLabel = 'Kế hoạch nội dung';
+    protected static ?string $navigationLabel = 'Kế hoạch';
 
-    protected static ?string $navigationGroup = 'Khám phá';
+    /** Kế hoạch thuộc chiến dịch: là tab "Kế hoạch" cạnh "Chiến dịch" trong cụm Đội AI, không còn mục riêng ở menu. */
+    protected static ?string $cluster = AgentTeam::class;
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $title = 'Kế hoạch nội dung';
 
-    protected static ?string $slug = 'ke-hoach-noi-dung';
+    protected static ?string $slug = 'ke-hoach';
 
     protected static string $view = 'filament.pages.content-plan';
 
@@ -55,8 +62,8 @@ class ContentPlanPage extends Page
     /** @var list<array<string,mixed>> kết quả lần tạo gần nhất, từng từ khóa */
     public array $lastResults = [];
 
-    /** @var list<int> keyword_id đã chọn trong hộp "Đề xuất kế hoạch (theo luật)" */
-    public array $planPick = [];
+    /** Bộ chọn chiến dịch ở đầu trang: '' = Tất cả, 'solo' = Bài lẻ, hoặc id chiến dịch. */
+    public ?string $campaignId = '';
 
     public static function canAccess(): bool
     {
@@ -70,6 +77,13 @@ class ContentPlanPage extends Page
         if (! static::canAccess()) {
             abort(403);
         }
+    }
+
+    public function updatedWebsiteId(): void
+    {
+        $this->campaignId = '';
+        $this->planTarget = null;
+        $this->planPick = [];
     }
 
     public function selectCluster(string $name): void
@@ -162,6 +176,8 @@ class ContentPlanPage extends Page
             ->tooltip(fn (): ?string => $this->freeOptions() === [] ? 'Cụm đã có bài cho mọi từ khóa (hoặc chưa chọn cụm).' : null)
             ->form([
                 CheckboxList::make('keywords')->label('Từ khóa chưa có bài')->options(fn (): array => $this->freeOptions())->required()->columns(1),
+                Select::make('target')->label('Gán vào')->required()->options(fn (): array => $this->targetOptions())
+                    ->default(fn (): ?string => $this->planFixedTarget())->helperText('Bài thuộc đúng một chiến dịch, hoặc là bài lẻ.'),
                 DatePicker::make('day')->label('Ngày dự kiến (giờ Việt Nam, tùy chọn)')->native(false)->minDate(fn () => VnTime::now()->startOfDay())
                     ->helperText('Tối đa '.PlanRules::DAILY_LIMIT.' bài/ngày (giới hạn tạm cho tới khi có bảng chiến dịch). Ngày dự kiến lưu tạm, sẽ có cột khi Dev1 thêm.'),
             ])
@@ -172,7 +188,7 @@ class ContentPlanPage extends Page
                 if (! $site || ! $c) {
                     return;
                 }
-                $this->runCreate($site, $c, (array) ($data['keywords'] ?? []), $data['day'] ?? null);
+                $this->runCreate($site, $c, (array) ($data['keywords'] ?? []), $data['day'] ?? null, (string) ($data['target'] ?? ''));
             });
     }
 
@@ -201,14 +217,19 @@ class ContentPlanPage extends Page
     }
 
     /** @param  array<string,mixed>  $c  @param  list<string>  $keywords */
-    private function runCreate(Website $site, array $c, array $keywords, ?string $day): void
+    private function runCreate(Website $site, array $c, array $keywords, ?string $day, string $target): void
     {
+        if ($target !== 'solo' && ! ctype_digit($target)) {
+            Notification::make()->title('Chọn nơi nhận bài')->body('Chọn một chiến dịch hoặc "Bài lẻ" trước khi tạo.')->warning()->send();
+
+            return;
+        }
         $intents = [];
         foreach (KeywordService::make($this->site())->repo()->all() as $r) {
             $intents[$r['keyword']] = $r['intent'];
         }
         try {
-            $this->lastResults = (new PlanActions)->createFromCluster(Auth::user(), $site, $c, $keywords, $day, $intents);
+            $this->lastResults = (new PlanActions)->createFromCluster(Auth::user(), $site, $c, $keywords, $day, $intents, $target === 'solo' ? null : (int) $target);
         } catch (InvalidArgumentException $e) {
             Notification::make()->title('Chưa tạo bài')->body($e->getMessage())->danger()->send();
 
@@ -245,30 +266,40 @@ class ContentPlanPage extends Page
         $site = $this->site();
         $c = $this->currentCluster();
         if ($site && $c) {
-            $this->runCreate($site, $c, $this->suggestPick, null);
+            $this->runCreate($site, $c, $this->suggestPick, null, (string) ($this->planFixedTarget() ?? $this->planTarget));
         }
     }
 
-    /** Thêm các từ khóa đã chọn vào kế hoạch (bài planned, chờ người duyệt; không giao đội AI). */
-    public function addProposed(): void
+    protected function planSite(): ?Website
     {
-        $this->guard();
-        $site = $this->site();
-        if (! $site || $this->planPick === []) {
-            return;
-        }
-        try {
-            $r = (new ContentPlanner)->create(Auth::user(), $site, array_map('intval', $this->planPick));
-        } catch (InvalidArgumentException $e) {
-            Notification::make()->title('Chưa thêm vào kế hoạch')->body($e->getMessage())->danger()->send();
+        return $this->site();
+    }
 
-            return;
+    /** @return array<string,string> */
+    private function targetOptions(): array
+    {
+        $site = $this->site();
+        $opts = ['solo' => 'Bài lẻ — không thuộc chiến dịch'];
+        if ($site) {
+            foreach (Campaign::query()->where('website_id', $site->id)->orderBy('name')->get() as $c) {
+                $opts[(string) $c->id] = $c->name;
+            }
         }
-        $n = Notification::make()->title("Đã thêm {$r['created']} bài vào kế hoạch")
-            ->body($r['skipped'] ? 'Bỏ qua: '.implode('; ', $r['skipped']) : 'Bài ở trạng thái Đã lên kế hoạch. Giao đội AI ở trang Bài viết, hoặc để chiến dịch tự lấy bài.');
-        $r['skipped'] ? $n->warning() : $n->success();
-        $n->send();
-        $this->planPick = [];
+
+        return $opts;
+    }
+
+    protected function planFixedTarget(): ?string
+    {
+        return (string) $this->campaignId !== '' ? (string) $this->campaignId : null;
+    }
+
+    /** Chiến dịch đang lọc (website hiện tại); id không hợp lệ thì coi như Tất cả. */
+    private function campaignFilter(): ?string
+    {
+        $v = (string) $this->campaignId;
+
+        return $v === 'solo' || ctype_digit($v) && $v !== '' ? $v : null;
     }
 
     /** @return array<string,mixed> */
@@ -278,6 +309,9 @@ class ContentPlanPage extends Page
         $sites = Website::where('status', 'active')->orderBy('name')->get();
         $site = $this->site();
         $articles = $site ? PlanData::articles($site) : [];
+        $campaigns = $site ? Campaign::query()->where('website_id', $site->id)->orderBy('name')->get() : collect();
+        $filter = $this->campaignFilter();
+        $shown = $filter === null ? $articles : array_values(array_filter($articles, fn ($a) => $filter === 'solo' ? $a['campaign_id'] === null : (int) $a['campaign_id'] === (int) $filter));
         $clusters = $this->clusters();
         $artKeywords = array_column($articles, 'keyword');
         $cur = $this->currentCluster();
@@ -316,14 +350,14 @@ class ContentPlanPage extends Page
         for ($i = 0; $i < 7; $i++) {
             $d = $start->addDays($i);
             $key = $d->format('Y-m-d');
-            $items = array_values(array_filter($articles, fn ($a) => $a['at'] && $a['at']->format('Y-m-d') === $key && $demo !== 'tuan-trong'));
+            $items = array_values(array_filter($shown, fn ($a) => $a['at'] && $a['at']->format('Y-m-d') === $key && $demo !== 'tuan-trong'));
             usort($items, fn ($a, $b) => $a['at'] <=> $b['at']);
             $count = count($dayTimes[$key] ?? []);
             $weekCount += count($items);
             $days[] = ['key' => $key, 'name' => $dayNames[$i], 'label' => $d->format('d/m'), 'isToday' => $key === $today, 'isPast' => $key < $today,
                 'items' => $items, 'count' => $count, 'full' => $count >= PlanRules::DAILY_LIMIT];
         }
-        $undated = array_values(array_filter($articles, fn ($a) => $a['at'] === null && in_array($a['status'], ['planned', 'drafting', 'needs_review', 'rejected', 'approved'], true)));
+        $undated = array_values(array_filter($shown, fn ($a) => $a['at'] === null && in_array($a['status'], ['planned', 'drafting', 'needs_review', 'rejected', 'approved'], true)));
 
         $intentLabel = KeywordIntent::LABELS;
         $clusterRows = array_map(function ($r) use ($intentLabel) {
@@ -339,7 +373,8 @@ class ContentPlanPage extends Page
         return [
             'clusterColumns' => $this->clusterColumns(), 'clusterRows' => $clusterRows,
             'undatedColumns' => $this->undatedColumns(), 'undatedRows' => $undatedRows,
-            'proposals' => $site ? (new ContentPlanner)->propose($site, 10) : [],
+            'proposals' => $site ? (new ContentPlanner)->propose($site, 10) : [], 'pendingAudit' => $site ? (new ContentPlanner)->pendingAuditCount($site) : 0,
+            'campaigns' => $campaigns, 'campaignFilter' => $filter, 'showTarget' => $filter === null,
             'demo' => $demo, 'demoOn' => DemoMode::enabled(), 'sites' => $sites, 'site' => $site, 'rows' => $rows, 'detail' => $detail,
             'allConflicts' => $allConflicts, 'byId' => $byId, 'days' => $days, 'weekCount' => $weekCount, 'undated' => $undated,
             'rangeLabel' => $start->format('d/m').' – '.$start->addDays(6)->format('d/m/Y'),

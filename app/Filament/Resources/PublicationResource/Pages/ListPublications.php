@@ -100,7 +100,7 @@ class ListPublications extends ListRecords
 
         $today = fn (Builder $query) => $query->where('scheduled_at_utc', '>=', $start)->where('scheduled_at_utc', '<', $end);
         $upcoming = fn (Builder $query) => $query->where('status', 'scheduled')->where('scheduled_at_utc', '>=', $nowUtc);
-        $attention = fn (Builder $query) => $query->whereIn('status', ['failed', 'needs_reconcile']);
+        $attention = fn (Builder $query) => $query->whereIn('status', ['failed', 'needs_reconcile', 'paused', 'awaiting_confirm']);
         $done = fn (Builder $query) => $query->where('status', 'published');
 
         return [

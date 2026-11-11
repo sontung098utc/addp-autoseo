@@ -11,6 +11,7 @@ use App\Models\Article;
 use App\Models\Campaign;
 use App\Models\CampaignWait;
 use App\Models\User;
+use App\Services\Agent\Autopilot\AutopilotRunner;
 use App\Services\Agent\Handoff\CmsDraftHandoff;
 use App\Services\Agent\Refresh\AgentRunDispatcher;
 use App\Services\Agent\Settings\AgentAi;
@@ -89,7 +90,7 @@ final class CampaignRunner
         }
 
         // Autopilot (chỉ chế độ Toàn quyền): giữ hàng chờ kế hoạch đủ đầy trước khi chọn bài kế tiếp.
-        $autopilot = (new \App\Services\Agent\Autopilot\AutopilotRunner)->tick($c, $now);
+        $autopilot = (new AutopilotRunner)->tick($c, $now);
         $this->autopilotActions = $autopilot['actions'];
 
         $article = null;
@@ -113,9 +114,12 @@ final class CampaignRunner
         }
 
         $fromPlan = $article !== null;
+        if ($fromPlan && $article->campaign_id === null) {
+            $article->update(['campaign_id' => $c->id]); // bài lấy từ kế hoạch chung trở thành bài con của chiến dịch này
+        }
         $article ??= Article::create(['website_id' => $c->website_id, 'created_by' => $c->created_by, 'primary_keyword' => $keyword, 'workflow_status' => 'planned', 'origin' => 'keyword', 'campaign_id' => $c->id]);
         try {
-            $run = AgentRunDispatcher::run($article, $ai, null, 'schedule', $c->id, stop: $this->stop, policy: AgentAi::policy(), handoff: app(CmsDraftHandoff::class));
+            $run = AgentRunDispatcher::run($article, $ai, null, 'schedule', $c->id, stop: $this->stop, policy: AgentAi::policy(), handoff: app(CmsDraftHandoff::class), checkpoints: (array) $c->checkpoints);
         } catch (\Throwable $e) {
             // Không để lại bài mồ côi làm mất lượt của từ khóa này ở nhịp sau.
             if (! $fromPlan && ! AgentRun::query()->where('article_id', $article->id)->exists()) {
@@ -132,6 +136,10 @@ final class CampaignRunner
                 "Bài \"{$keyword}\" thuộc chủ đề rủi ro cao mà kho chưa có kiến thức đã duyệt khớp nên đội AI không viết (phiên #{$run->id}). Cách xử lý: bổ sung kho (Kho trí tuệ / Xây kho từ website) rồi giao lại bài này, hoặc giao lại và chọn \"Vẫn viết dù kho chưa có kiến thức\". Sau 24 giờ sẽ tự bỏ qua và ghi giới hạn.", $now);
 
             return ['result' => 'blocked_gap', 'message' => "Dừng \"{$keyword}\": chủ đề rủi ro cao, kho chưa có kiến thức (phiên #{$run->id}). Đã ghi mục chờ bổ sung.", 'run' => $run];
+        }
+
+        if ($run->status === 'held' && $run->steps()->where('stage', 'checkpoint')->exists()) {
+            return ['result' => 'held_outline', 'message' => "Dừng sau dàn ý \"{$keyword}\": chờ bạn xem và sửa dàn ý (phiên #{$run->id}).", 'run' => $run];
         }
 
         if ($c->mode === 'autonomous' && $run->status === 'ready_for_review') {
@@ -154,6 +162,9 @@ final class CampaignRunner
         $needsExpert = $run->risk_level === 'high'
             || $run->steps->contains(fn ($s) => in_array($s->data['decision'] ?? null, ['high_risk_expert_review', 'brain_must_cite_review'], true) || ! empty($s->data['needs_expert_review']));
         $version = $run->finalVersion;
+        if (in_array('draft', (array) $c->checkpoints, true)) {
+            return $this->holdForPeople($c, $run, $keyword, 'chiến dịch đặt điểm dừng "Sau bản nháp" (Dừng sau bản nháp theo cài đặt chiến dịch)');
+        }
         $held = fn (string $why) => $this->holdForPeople($c, $run, $keyword, $why);
         if ($needsExpert) {
             return $held('rủi ro cao hoặc cần người có chuyên môn');
@@ -208,6 +219,7 @@ final class CampaignRunner
     public function nextPlanned(Campaign $c): ?Article
     {
         return Article::query()->where('website_id', $c->website_id)->where('workflow_status', 'planned')
+            ->where(fn ($q) => $q->whereNull('campaign_id')->orWhere('campaign_id', $c->id)) // bài của chiến dịch khác thì không lấy
             ->whereNotNull('primary_keyword')->where('primary_keyword', '!=', '')
             ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('agent_runs')->whereColumn('agent_runs.article_id', 'articles.id'))
             ->orderByRaw('COALESCE(priority, 0) DESC')->orderBy('id')->first();

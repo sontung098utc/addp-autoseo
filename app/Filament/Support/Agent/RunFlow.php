@@ -6,9 +6,11 @@ use App\Filament\Support\Schedule\VnTime;
 use App\Models\AgentRun;
 use App\Models\AgentRunStep;
 use App\Services\Agent\Pipeline\JobTypeRegistry;
+use App\Services\Agent\Pipeline\PipelineVisual;
 use App\Services\Agent\Run\RunPolicy;
 use App\Services\Agent\Run\RunScorer;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * AG-S15: dựng dữ liệu hiển thị cho trang chi tiết phiên chạy TỪ DỮ LIỆU THẬT (agent_runs + agent_run_steps).
@@ -30,6 +32,7 @@ final class RunFlow
         'failed' => ['Lỗi', 'heroicon-m-x-circle'],
         'running' => ['Đang chạy', 'heroicon-m-arrow-path'],
         'stale' => ['Có thể treo', 'heroicon-m-clock'],
+        'waiting' => ['Chờ bạn', 'heroicon-m-user'],
         'pending' => ['Chưa tới', 'heroicon-m-ellipsis-horizontal-circle'],
         'idle' => ['Không chạy', 'heroicon-m-minus-circle'],
         'skipped' => ['Bỏ qua', 'heroicon-m-forward'],
@@ -69,7 +72,9 @@ final class RunFlow
     {
         $blueprint = AgentFlowBlueprint::byStage();
         [$codes, $labels] = self::stagesOf($run, $steps);
-        $closed = $run->status !== 'running';
+        $codes = self::withCheckpoint($codes, $steps);
+        $registryLabels = JobTypeRegistry::stageLabels((string) ($run->job_type ?: 'article_write'), true);
+        $jobDef = collect(JobTypeRegistry::find((string) ($run->job_type ?: 'article_write'))['steps'] ?? [])->keyBy('id');
 
         // Thời lượng mỗi bước: khoảng cách giữa mốc ghi của bước này và bước trước (bước đầu: từ lúc bắt đầu phiên). Chỉ là ước lượng theo mốc ghi.
         $prev = VnTime::fromRaw($run, 'started_at') ?? VnTime::fromRaw($run, 'created_at');
@@ -104,11 +109,16 @@ final class RunFlow
         $nodes = [];
         foreach ($codes as $code) {
             $b = $blueprint[$code] ?? ['title' => $code, 'role' => ''];
-            $b['title'] = $labels[$code] ?? $b['title'];
+            $b['title'] = $labels[$code] ?? ($code === 'checkpoint' ? 'Điểm dừng' : (isset($blueprint[$code]) ? $b['title'] : ($registryLabels[$code] ?? $code)));
             $ran = $steps->where('stage', $code)->values();
             $isNow = $live && $currentStage === $code;
             $isStale = $stale && $currentStage === $code;
-            if ($isNow) {
+            $def = $jobDef[$code] ?? [];
+            $isCheckpoint = $code === 'checkpoint';
+            $waiting = $isCheckpoint && self::isWaiting($run, $ran);
+            if ($waiting) {
+                $state = 'waiting';
+            } elseif ($isNow) {
                 $state = 'running';
             } elseif ($isStale) {
                 $state = 'stale';
@@ -134,6 +144,10 @@ final class RunFlow
                 'cost' => (float) $ran->sum('cost_vnd'),
                 'incidents' => array_map(fn ($i) => self::incident($i), $incidents[$code] ?? []),
                 'faded' => $state === 'idle',
+                'kind' => ($isCheckpoint || ! empty($def['human'])) ? 'human' : ($def['kind'] ?? 'rule'),
+                'who' => $isCheckpoint ? ['key' => 'human', 'name' => 'Bạn', 'title' => 'Bạn', 'avatar' => 'B'] : PipelineVisual::profile((string) ($def['role'] ?? 'system')),
+                'steps' => $ran->all(),
+                'waiting' => $waiting,
             ];
         }
 
@@ -240,5 +254,87 @@ final class RunFlow
         }
 
         return ['title' => $s->title, 'detail' => $s->detail, 'status' => $s->status, 'code' => $d['decision'] ?? null, 'pairs' => $pairs, 'facts' => $facts];
+    }
+
+    /** Chặng 'checkpoint' (dừng chờ người) do bộ điều phối ghi; chưa có trong sổ loại việc thì chèn ngay sau chặng đã chạy liền trước nó (theo seq). @param list<string> $codes @return list<string> */
+    private static function withCheckpoint(array $codes, Collection $steps): array
+    {
+        $cp = $steps->where('stage', 'checkpoint')->sortBy('seq')->first();
+        if (! $cp || in_array('checkpoint', $codes, true)) {
+            return $codes;
+        }
+        $prev = $steps->where('seq', '<', $cp->seq)->last(fn ($x) => in_array($x->stage, $codes, true));
+        $at = $prev ? array_search($prev->stage, $codes, true) : false;
+        array_splice($codes, $at === false ? 0 : (int) $at + 1, 0, ['checkpoint']);
+
+        return $codes;
+    }
+
+    /** Phiên đang dừng chờ người ở chặng checkpoint: bước ghi cờ data.waiting, hoặc cảnh báo khi phiên đang giữ. */
+    private static function isWaiting(AgentRun $run, Collection $ran): bool
+    {
+        $cp = $ran->last();
+        if (! $cp) {
+            return false;
+        }
+        if (isset($cp->data['waiting'])) {
+            return (bool) $cp->data['waiting'];
+        }
+
+        return $cp->status === 'warn' && $run->status === 'held';
+    }
+
+    /**
+     * Một dòng kết luận cho người quản lý: chuyện gì xảy ra, dừng ở đâu, tốn bao nhiêu, làm gì tiếp.
+     *
+     * @param  array<string, mixed>  $flow  kết quả của build()
+     * @return array{tone:string, text:string, action:?array{label:string,url:string}}
+     */
+    public static function verdict(AgentRun $run, array $flow, bool $live, bool $stale): array
+    {
+        $nodes = collect($flow['nodes']);
+        $cost = number_format((float) $flow['cost'], 0, ',', '.').' ₫';
+        $article = $run->article_id ? PipelineVisual::urlOf('App\\Filament\\Resources\\ArticleResource', ['record' => $run->article_id], 'view') : null;
+        $draft = $run->final_version_id ? PipelineVisual::urlOf('App\\Filament\\Resources\\ArticleVersionResource', ['record' => $run->final_version_id], 'view') : null;
+        $open = $article ? ['label' => 'Mở bài viết', 'url' => $article] : null;
+        $view = $draft ? ['label' => 'Xem bản nháp', 'url' => $draft] : $open;
+        $reason = trim((string) $run->outcome_reason);
+        $at = fn (?array $n) => $n ? '«'.$n['title'].'»' : 'một chặng';
+
+        if ($w = $nodes->firstWhere('state', 'waiting')) {
+            return ['tone' => 'warn', 'text' => 'Dừng ở '.$at($w).': đang chờ bạn. Đã tốn '.$cost.'.', 'action' => $open];
+        }
+        if ($live) {
+            $n = $nodes->firstWhere('state', 'running');
+
+            return ['tone' => 'running', 'text' => 'Đang chạy'.($n ? ' chặng '.$at($n) : '').', đã tốn '.$cost.'.', 'action' => null];
+        }
+        if ($stale) {
+            $n = $nodes->firstWhere('state', 'stale');
+
+            return ['tone' => 'warn', 'text' => 'Có thể bị treo ở '.$at($n).': lâu không có bước mới. Đã tốn '.$cost.'.', 'action' => $open];
+        }
+        $bad = $nodes->first(fn ($n) => in_array($n['state'], ['failed', 'blocked'], true)) ?? ($run->status === 'held' ? $nodes->last(fn ($n) => $n['state'] === 'warn') : null);
+
+        return match ($run->status) {
+            'failed' => ['tone' => 'failed', 'text' => 'Lỗi ở '.$at($bad).($reason !== '' ? ': '.Str::limit($reason, 140) : '.').' Đã tốn '.$cost.'.', 'action' => $open],
+            'blocked' => ['tone' => 'warn', 'text' => 'Bị chặn '.($bad ? 'ở '.$at($bad) : 'trước khi chạy').($reason !== '' ? ': '.Str::limit($reason, 140) : '.').' Chưa tốn gì đáng kể ('.$cost.').', 'action' => $open],
+            'held' => ['tone' => 'warn', 'text' => 'Giữ nháp, cần người xem'.($reason !== '' ? ': '.Str::limit($reason, 140) : '.').' Đã tốn '.$cost.'.', 'action' => $view],
+            'ready_for_review' => ['tone' => 'done', 'text' => 'Xong: có bản nháp chờ bạn duyệt'.($flow['finalScore'] !== null ? ' (điểm '.$flow['finalScore'].'/100)' : '').', tốn '.$cost.'.', 'action' => $view],
+            default => ['tone' => 'idle', 'text' => 'Phiên đã kết thúc, tốn '.$cost.'.', 'action' => $view],
+        };
+    }
+
+    /** Chặng nên mở sẵn trong khung chi tiết: chặng đang chạy/chờ bạn, rồi chặng gặp sự cố, rồi chặng chạy cuối. @param list<array<string,mixed>> $nodes */
+    public static function focusStage(array $nodes): ?string
+    {
+        $c = collect($nodes);
+        foreach ([['waiting', 'running', 'stale'], ['failed', 'blocked'], ['warn']] as $states) {
+            if ($n = $c->first(fn ($x) => in_array($x['state'], $states, true) && ($x['state'] !== 'warn' || $x['code'] !== 'grade'))) {
+                return $n['code'];
+            }
+        }
+
+        return $c->last(fn ($x) => $x['count'] > 0)['code'] ?? $c->first()['code'] ?? null;
     }
 }

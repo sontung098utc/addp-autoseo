@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Agent;
 
-use App\Filament\Clusters\AgentTeam\Pages\PipelineMap;
 use App\Filament\Pages\TrustPolicy;
 use App\Models\AgentRun;
 use App\Models\AgentRunStep;
@@ -122,7 +121,8 @@ class TrustPolicyTest extends TestCase
         $this->assertSame(['admin' => true, 'approver' => true, 'writer' => false], $rows['Xem lịch xuất bản']['cells']);
         $this->assertSame(['admin' => true, 'approver' => false, 'writer' => false], $rows['Xóa bài']['cells']);
         $this->assertSame(['admin' => true, 'approver' => false, 'writer' => false], $rows['Quản lý website kết nối']['cells']);
-        $this->assertSame(['admin' => true, 'approver' => true, 'writer' => false], $rows['Xem hub Đội AI (cả trang này)']['cells']);
+        // Biên tập viên vào cụm để dùng tab Kế hoạch; các tab khác tự kiểm quyền.
+        $this->assertSame(['admin' => true, 'approver' => true, 'writer' => true], $rows['Xem hub Đội AI (cả trang này)']['cells']);
         $this->assertSame(['admin' => true, 'approver' => false, 'writer' => false], $rows['Nhập / đổi khóa AI']['cells']);
         $this->assertSame(['admin' => false, 'approver' => false, 'writer' => false], $rows['Nâng lên Mức 2 (tự đăng)']['cells']);
     }
@@ -184,16 +184,8 @@ class TrustPolicyTest extends TestCase
         $this->actingAs($this->user('approver'));
         $this->get('/admin/doi-ai/pipeline')->assertOk()
             ->assertSee('Chạy lại / Tạm dừng pipeline: chưa nối', false)
-            ->assertDontSee('Chạy toàn bộ');
+            ->assertDontSee('Chạy toàn bộ')->assertDontSee('Bản đồ 9 giai đoạn');
         $this->assertFalse(PipelineBlueprint::controlsWired());
-    }
-
-    public function test_cua_so_chi_tiet_giai_doan(): void
-    {
-        $this->actingAs($this->user('approver'));
-        Livewire::test(PipelineMap::class)
-            ->call('mountAction', 'stage', ['stage' => 'quality'])
-            ->assertSee('Nguồn dữ liệu')->assertSee('Không còn lỗi chặn P0')->assertSee('Việc cần Dev1');
     }
 
     public function test_trang_chinh_sach_render_bang_livewire(): void

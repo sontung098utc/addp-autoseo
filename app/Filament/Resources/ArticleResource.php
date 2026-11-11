@@ -22,6 +22,8 @@ use App\Services\Content\ContentPipelineService;
 use App\Services\Content\Quality\QualityReport;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Notifications\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
@@ -222,6 +224,8 @@ class ArticleResource extends Resource
                         Forms\Components\Select::make('website_id')
                             ->label('Website đích')
                             ->relationship('website', 'name')
+                            ->live()
+                            ->afterStateUpdated(fn (Set $set) => $set('campaign_id', null))
                             ->required(),
                         Forms\Components\TextInput::make('primary_keyword')
                             ->label('Từ khóa chính')
@@ -240,6 +244,14 @@ class ArticleResource extends Resource
                             ->required(),
                         Forms\Components\TextInput::make('topic_cluster')
                             ->label('Cụm chủ đề (Topic Cluster)'),
+                        Forms\Components\Select::make('campaign_id')
+                            ->label('Chiến dịch')
+                            ->placeholder('Bài lẻ — không thuộc chiến dịch')
+                            ->options(fn (Get $get) => Campaign::query()->when($get('website_id'), fn ($q, $w) => $q->where('website_id', $w), fn ($q) => $q->whereRaw('1 = 0'))->orderBy('name')->pluck('name', 'id')->all())
+                            ->default(fn () => request()->query('campaign') ?: null)
+                            ->nullable()
+                            ->live()
+                            ->hintIcon('heroicon-o-information-circle', 'Để trống là bài lẻ. Chọn chiến dịch thì bài là bài con của chiến dịch đó và theo quy tắc của nó.'),
                     ])->columns(2),
             ]);
     }
@@ -294,6 +306,12 @@ class ArticleResource extends Resource
         return 'Phiên #'.$run->id.' · '.(self::RUN_WORDS[$run->status] ?? $run->status).($score !== null ? ' · '.$score.' điểm' : '').' · Xem diễn biến';
     }
 
+    /** Chiến dịch cha của bài (articles.campaign_id); null = bài lẻ. Cache theo bài trong request. */
+    public static function campaignOf(Article $r): ?Campaign
+    {
+        return $r->campaign_id ? $r->campaign : null;
+    }
+
     private static function narrow(Tables\Columns\Column $c): Tables\Columns\Column
     {
         return $c->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%;white-space:nowrap']);
@@ -302,7 +320,7 @@ class ArticleResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with(['website', 'latestVersion']))
+            ->modifyQueryUsing(fn ($query) => $query->with(['website', 'latestVersion', 'campaign']))
             ->poll(fn () => RunActivity::anyRunning() ? RunActivity::POLL_LIVE.'s' : RunActivity::POLL_IDLE.'s')
             ->persistFiltersInSession()
             ->persistSortInSession()
@@ -340,10 +358,13 @@ class ArticleResource extends Resource
                     ->extraAttributes(fn (Article $r) => ArticleRows::liveRun($r) ? ['class' => 'ss-badge-live', 'data-running' => '1'] : [])),
                 static::narrow(Tables\Columns\TextColumn::make('campaign_name')
                     ->label('Chiến dịch')
-                    ->state(fn (Article $r) => ArticleRows::campaignName($r) ?? '—')
+                    ->state(fn (Article $r) => static::campaignOf($r)?->name ?? 'Bài lẻ')
+                    ->badge()
+                    ->color(fn (Article $r) => static::campaignOf($r) ? 'info' : 'gray')
                     ->limit(16)
-                    ->tooltip(fn (Article $r) => ArticleRows::campaignName($r))
-                    ->visibleFrom('xl')),
+                    ->tooltip(fn (Article $r) => static::campaignOf($r) ? 'Mở chiến dịch' : 'Không thuộc chiến dịch nào')
+                    ->url(fn (Article $r) => ($c = static::campaignOf($r)) && CampaignResource::canViewAny() ? CampaignResource::getUrl('view', ['record' => $c]) : null)
+                    ->visibleFrom('md')),
                 static::narrow(Tables\Columns\TextColumn::make('brains')
                     ->label('Trí tuệ')
                     ->state(fn (Article $r) => ($n = BrainContext::forArticle($r, ArticleRows::lastRun($r)?->campaign_id)->names()) !== '' ? $n : '—')
@@ -373,10 +394,12 @@ class ArticleResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('website_id')->label('Website')->relationship('website', 'name'),
                 Tables\Filters\SelectFilter::make('campaign_id')->label('Chiến dịch')
-                    ->options(fn () => Campaign::query()->orderBy('name')->pluck('name', 'id')->all())
-                    ->query(fn ($query, array $data) => filled($data['value'] ?? null)
-                        ? $query->whereIn('articles.id', AgentRun::query()->where('campaign_id', $data['value'])->select('article_id'))
-                        : $query),
+                    ->options(fn () => ['solo' => 'Bài lẻ (không chiến dịch)'] + Campaign::query()->orderBy('name')->pluck('name', 'id')->all())
+                    ->query(fn ($query, array $data) => match (true) {
+                        ! filled($data['value'] ?? null) => $query,
+                        $data['value'] === 'solo' => $query->whereNull('articles.campaign_id'),
+                        default => $query->where('articles.campaign_id', $data['value']),
+                    }),
                 Tables\Filters\TernaryFilter::make('ai_running')->label('Phiên AI đang chạy')
                     ->placeholder('Tất cả')->trueLabel('Đang có phiên chạy')->falseLabel('Không có phiên chạy')
                     ->queries(

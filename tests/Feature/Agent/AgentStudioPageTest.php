@@ -79,7 +79,7 @@ class AgentStudioPageTest extends TestCase
         $this->assertCount(1, $issues);
         $this->assertStringContainsString('Thiếu nguồn', $issues[0]['draft']);
 
-        Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'lab')->assertSee('Dạy lại')
+        Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'training')->assertSee('Dạy lại')
             ->set('teach', [$issues[0]['key'] => 'Luôn kèm nguồn cho số liệu.'])
             ->call('teachRow', $issues[0]['key'], $run->id);
         $l = AgentProfiles::lessons('writer');
@@ -91,7 +91,7 @@ class AgentStudioPageTest extends TestCase
     public function test_tai_lieu_ky_nang_rieng_va_nhan_ban_playbook(): void
     {
         $this->login('admin');
-        Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'skills')
+        Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'training')->call('setTrainSec', 'skills')
             ->call('cloneSkill', 'writer/article-draft')
             ->assertNotSet('skillBody', '')
             ->set('skillTitle', 'Bản riêng')

@@ -125,10 +125,11 @@ class ContentPlannerTest extends TestCase
         $k = $this->kw('du học úc', 300);
         $this->actingAs($this->user('writer'));
         Livewire::test(ContentPlanPage::class)
-            ->assertSee('Đề xuất theo luật')
-            ->assertSee('Xếp theo luật, không dùng AI')
+            ->assertSee('Đề xuất kế hoạch (theo luật)')
+            ->assertSee('Không dùng AI, không tốn token')
             ->assertSee('du học úc')
             ->set('planPick', [$k->id])
+            ->set('planTarget', 'solo')
             ->call('addProposed');
         $this->assertSame('plan', Article::where('keyword_id', $k->id)->value('origin'));
         $this->assertSame('planned', Article::where('keyword_id', $k->id)->value('workflow_status'));

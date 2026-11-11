@@ -14,6 +14,21 @@
     ]));
 @endphp
 <x-filament-panels::page>
+    <style>
+        .aiu-tabs{display:flex;gap:.25rem;border-bottom:1px solid rgba(128,128,128,.3);margin-bottom:1rem}
+        .aiu-tab{padding:.55rem 1rem;border:0;border-bottom:2px solid transparent;background:transparent;color:inherit;cursor:pointer;font-size:.9rem;opacity:.7;margin-bottom:-1px}
+        .aiu-tab:hover{opacity:1}
+        .aiu-tab[aria-selected=true]{opacity:1;font-weight:600;border-bottom-color:#0f6b5c;color:#0f6b5c}
+        :root[data-theme=dark] .aiu-tab[aria-selected=true],.dark .aiu-tab[aria-selected=true]{color:#5eead4;border-bottom-color:#5eead4}
+    </style>
+    <div class="aiu-tabs" role="tablist" aria-label="Chi phí AI" data-testid="ai-tabs">
+        @foreach (\App\Filament\Pages\AiUsagePage::TABS as $k => $label)
+            <button type="button" role="tab" class="aiu-tab" aria-selected="{{ $tab === $k ? 'true' : 'false' }}" wire:click="setTab('{{ $k }}')" data-tab="{{ $k }}">{{ $label }}</button>
+        @endforeach
+    </div>
+    @if ($tab === 'cau-hinh')
+        @include('filament.pages.ai-config')
+    @else
     <div class="ss-page">
         <div class="ss-toolbar" role="group" aria-label="Bộ lọc">
             <label for="ai-period" class="ss-text-sm ss-muted">Kỳ</label>
@@ -167,4 +182,5 @@
             </x-studio.panel>
         </x-studio.tabs>
     </div>
+    @endif
 </x-filament-panels::page>

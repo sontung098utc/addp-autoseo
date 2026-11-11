@@ -60,7 +60,7 @@ class AgentRolesTest extends TestCase
         $this->assertSame('claude-seo/seo-content', $editor['editor/qa-review']['lineage']['source']);
 
         $this->actingAs($this->user('admin'));
-        Livewire::test(AgentRoles::class)->mountAction('detail', ['role' => 'manager'])->assertSee('manager/seo-orchestrator');
+        Livewire::test(AgentRoles::class)->call('openStudio', 'manager', 'tech')->assertSee('manager/seo-orchestrator');
     }
 
     public function test_rubric_refs_deu_la_ma_luat_that(): void
@@ -125,7 +125,7 @@ class AgentRolesTest extends TestCase
     {
         $this->actingAs($this->user('approver'));
         $this->get('/admin/doi-ai/vai-tro')->assertOk()->assertSee('Chuyên viên Audit')->assertSee('Biên tập / QA nội dung')->assertDontSee('Đang hoạt động');
-        Livewire::test(AgentRoles::class)->mountAction('detail', ['role' => 'editor'])
+        Livewire::test(AgentRoles::class)->call('openStudio', 'editor', 'tech')
             ->assertSee('Đang phát triển')->assertSee('Mục tiêu')->assertSee('Rubric')->assertSee('LEN01')->assertSee('Rào chắn')->assertSee('Điều kiện đạt')->assertSee('Xuất xứ')
             ->assertSee('editor/eeat-check');
     }

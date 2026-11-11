@@ -56,7 +56,7 @@ class AgentRunDetailTest extends TestCase
         $html = $this->page($r);
         $this->assertStringContainsString('từ khóa chính abc', $html);
         $this->assertStringNotContainsString('Diễn biến phiên chạy', $html);
-        $this->assertStringContainsString('#'.$r->id.' · bắt đầu lúc', $html);
+        $this->assertStringContainsString('#'.$r->id.' · Viết bài', $html);
 
         $v = ArticleVersion::create(['article_id' => $r->article_id, 'version' => 1, 'title' => 'Tiêu đề bản bài thật', 'slug' => 'tieu-de', 'html_content' => '<p>x</p>', 'review_status' => 'needs_review']);
         $r->update(['final_version_id' => $v->id]);
@@ -80,7 +80,7 @@ class AgentRunDetailTest extends TestCase
         $html = $this->page($r);
 
         $this->assertStringContainsString('data-testid="run-score"', $html);
-        $this->assertStringContainsString('Ngưỡng tham khảo 80', $html);
+        $this->assertStringContainsString('ngưỡng tham khảo 80/100', $html);
         $this->assertStringContainsString('v1 62 → sửa 1 78 → sửa 2 91', $html);
         $this->assertStringContainsString('▲ +16', $html);
         $this->assertStringContainsString('▲ +13', $html);
@@ -152,11 +152,13 @@ class AgentRunDetailTest extends TestCase
     {
         $r = $this->run_('ready_for_review', [], ['ai_mode' => 'mock']);
         $html = $this->page($r);
-        $this->assertStringContainsString('Chưa có lần chấm', $html);
+        $score = substr(strstr($html, 'data-testid="run-score"'), 0, 1800);
+        $this->assertStringNotContainsString('/100 <', str_replace("\n", ' ', $score));
+        $this->assertStringContainsString('—', $score);
         $this->assertStringNotContainsString('data-testid="score-timeline"', $html);
         $this->assertStringContainsString('AI giả lập', $html);
         $this->assertStringContainsString('Chưa nối', $html);
-        $this->assertStringNotContainsString('Ngưỡng tham khảo', $html);
+        $this->assertStringNotContainsString('ngưỡng tham khảo', $html);
     }
 
     public function test_chi_phi_so_voi_ngan_sach_va_thanh_tien_do(): void
@@ -174,5 +176,82 @@ class AgentRunDetailTest extends TestCase
         $r = $this->run_('ready_for_review', [['guard', 'ok']]);
         $this->actingAs($this->user('writer'));
         $this->get(AgentRunResource::getUrl('view', ['record' => $r]))->assertForbidden();
+    }
+
+    public function test_trang_phien_co_bon_tab_ngang_dung_khoa_va_mac_dinh_theo_trang_thai(): void
+    {
+        $done = $this->page($this->run_('ready_for_review', [['guard', 'ok']]));
+        preg_match_all('/role="tab" class="ss-tab" data-key="([^"]+)"/', $done, $m);
+        $this->assertSame(['dien-bien', 'bao-cao', 'chi-phi', 'du-lieu'], $m[1]);
+        $this->assertMatchesRegularExpression('/studioTabs\\([\'"]bao-cao/', $done);
+
+        foreach (['failed', 'held', 'blocked', 'running'] as $st) {
+            $html = $this->page($this->run_($st, [['guard', 'ok']], $st === 'failed' ? ['outcome_reason' => 'Hết tiền'] : []));
+            $this->assertMatchesRegularExpression('/studioTabs\\([\'"]dien-bien/', $html, $st);
+        }
+        foreach (['stage-rail', 'run-verdict', 'run-report', 'run-cost', 'run-data'] as $id) {
+            $this->assertStringContainsString('data-testid="'.$id.'"', $done, $id);
+        }
+        $this->assertStringContainsString('Chi phí và model', $done);
+    }
+
+    public function test_tab_dien_bien_hien_du_chang_dung_trang_thai_va_ket_luan_mot_dong(): void
+    {
+        $r = $this->run_('failed', [['guard', 'ok'], ['risk', 'ok'], ['brief', 'failed']], ['outcome_reason' => 'Nhà cung cấp lỗi', 'cost_vnd' => 1500]);
+        $html = $this->page($r);
+        preg_match_all('/data-stage="([a-z]+)" data-state="/', $html, $m);
+        $this->assertSame(RunFlow::main(), $m[1]);
+        $this->assertSame('done', $this->state($html, 'guard'));
+        $this->assertSame('failed', $this->state($html, 'brief'));
+        $this->assertSame('idle', $this->state($html, 'write'));
+        $verdict = substr(strstr($html, 'data-testid="run-verdict"'), 0, 600);
+        $this->assertStringContainsString('Lỗi ở «Dàn ý»', $verdict);
+        $this->assertStringContainsString('Nhà cung cấp lỗi', $verdict);
+        $this->assertStringContainsString('1.500 ₫', $verdict);
+        $this->assertStringContainsString('data-testid="run-verdict-action"', $html);
+        // một khung chi tiết cho mỗi chặng, chỉ chặng lỗi mở sẵn
+        $this->assertMatchesRegularExpression('/sel: [\'"]brief/', $html);
+    }
+
+    public function test_vong_sua_hien_so_lan_o_noi_cham_sua(): void
+    {
+        $g = fn (int $round, int $score) => ['grade', $score >= 80 ? 'ok' : 'warn', ['score' => $score, 'round' => $round, 'threshold' => 80]];
+        $r = $this->run_('ready_for_review', [['guard', 'ok'], ['write', 'ok'], $g(0, 60), ['repair', 'ok'], $g(1, 70), ['repair', 'ok'], $g(2, 90), ['handoff', 'ok']], ['repair_rounds' => 2]);
+        $html = $this->page($r);
+        $this->assertStringContainsString('data-loop', $html);
+        $this->assertStringContainsString('↻ 2 vòng', $html);
+    }
+
+    public function test_chang_checkpoint_hien_cho_ban(): void
+    {
+        $r = $this->run_('held', [['guard', 'ok'], ['risk', 'ok'], ['checkpoint', 'warn', ['waiting' => true]]], ['cost_vnd' => 800]);
+        $html = $this->page($r);
+        $this->assertSame('waiting', $this->state($html, 'checkpoint'));
+        $this->assertStringContainsString('data-testid="flow-waiting"', $html);
+        $this->assertStringContainsString('Chờ bạn', $html);
+        $this->assertStringContainsString('Dừng ở «', substr(strstr($html, 'data-testid="run-verdict"'), 0, 600));
+        $order = RunFlow::build($r, $r->steps, false, false, null)['nodes'];
+        $codes = array_column($order, 'code');
+        $this->assertContains('checkpoint', $codes);
+        $this->assertSame(array_search('risk', $codes, true) + 1, array_search('checkpoint', $codes, true));
+    }
+
+    public function test_chi_phi_tung_chang_va_du_lieu_chi_quan_tri(): void
+    {
+        $r = $this->run_('ready_for_review', [['guard', 'ok']], ['input_refs' => ['purpose' => 'xyz'], 'output_ref' => ['kq' => 1]]);
+        $this->actingAs($this->user('approver'));
+        $html = $this->page($r);
+        $this->assertStringContainsString('data-cost-stage="guard"', $html);
+        $this->assertStringContainsString('Dữ liệu kỹ thuật chỉ hiện cho quản trị', $html);
+        $this->assertStringNotContainsString('data-testid="run-input-ref"', $html);
+    }
+
+    public function test_quan_tri_thay_du_lieu_tho(): void
+    {
+        $r = $this->run_('ready_for_review', [['guard', 'ok']], ['input_refs' => ['purpose' => 'xyz']]);
+        $this->actingAs($this->user('admin'));
+        $html = $this->page($r);
+        $this->assertStringContainsString('data-testid="run-input-ref"', $html);
+        $this->assertStringContainsString('xyz', substr(strstr($html, 'data-testid="run-input-ref"'), 0, 300));
     }
 }

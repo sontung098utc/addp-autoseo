@@ -25,6 +25,25 @@
             <label class="ss-muted ss-text-xs" style="margin-left:auto"><input type="checkbox" wire:model.live="showArchived"> Xem đã lưu trữ ({{ $archivedCount }})</label>
         </div>
 
+        {{-- Z2: việc đầu tiên khi vào kho: kho đang có gì, thiếu gì (số thật từ các thẻ bên dưới). --}}
+        @if (! $archived && $cards->isNotEmpty())
+            @php
+                $tot = ['items' => $cards->sum('items'), 'proposed' => $cards->sum('proposed'), 'warn' => $cards->sum(fn ($c) => $c['conflicts'] + $c['expired'] + $c['gaps']),
+                        'nosrc' => $cards->where('needs_source', true)->count(), 'nosite' => $cards->filter(fn ($c) => $c['sites'] === [])->count()];
+            @endphp
+            <div class="bl-row" style="margin-bottom:.8rem" data-testid="bl-summary">
+                <x-studio.badge tone="info">{{ $cards->count() }} Trí tuệ</x-studio.badge>
+                <x-studio.badge tone="ok">{{ $tot['items'] }} mục kiến thức</x-studio.badge>
+                @if ($tot['proposed'])<x-studio.badge tone="warn">{{ $tot['proposed'] }} chờ duyệt</x-studio.badge>@endif
+                @if ($tot['warn'])<x-studio.badge tone="danger">{{ $tot['warn'] }} cảnh báo (mâu thuẫn, cũ, khoảng trống)</x-studio.badge>@endif
+                @if ($tot['nosrc'])<x-studio.badge tone="warn">{{ $tot['nosrc'] }} chưa có nguồn xác nhận</x-studio.badge>@endif
+                @if ($tot['nosite'])<x-studio.badge tone="muted">{{ $tot['nosite'] }} chưa gắn website</x-studio.badge>@endif
+                @if (\App\Filament\Pages\BrainBuildPage::canAccess())
+                    <x-filament::button size="xs" color="gray" tag="a" :href="\App\Filament\Pages\BrainBuildPage::getUrl()" icon="heroicon-o-arrow-down-tray" style="margin-left:auto">Nạp thêm kiến thức</x-filament::button>
+                @endif
+            </div>
+        @endif
+
         @if ($cards->isEmpty())
             <div class="ss-card"><div class="ss-card__b">{{ $archived ? 'Chưa có Trí tuệ nào được lưu trữ.' : 'Chưa có Trí tuệ nào.' }}@if ($manage && ! $archived) Bấm "Tạo trí tuệ" để bắt đầu từ một mẫu.@endif</div></div>
         @else

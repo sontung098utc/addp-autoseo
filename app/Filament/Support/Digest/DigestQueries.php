@@ -136,7 +136,7 @@ final class DigestQueries
 
         return [
             ['label' => 'Bài chờ duyệt của bạn', 'value' => (string) $rows->where('kind', 'review')->count(), 'sub' => 'đang chờ người duyệt', 'n' => $rows->where('kind', 'review')->count()],
-            ['label' => 'Bài cần sửa', 'value' => (string) $rows->where('kind', '!=', 'review')->count(), 'sub' => 'bị từ chối, cần chỉnh', 'n' => $rows->where('kind', '!=', 'review')->count()],
+            ['label' => 'Bài cần sửa', 'value' => (string) $rows->whereNotIn('kind', ['review', 'checkpoint'])->count(), 'sub' => 'bị từ chối, cần chỉnh', 'n' => $rows->whereNotIn('kind', ['review', 'checkpoint'])->count()],
         ];
     }
 
@@ -169,7 +169,7 @@ final class DigestQueries
     /** @return list<array{key: string, title: string, count: int, detail: string, url: string, severity: string}> */
     private static function writerGroups(User $user, CarbonImmutable $now): array
     {
-        $needFix = DashboardQueries::decisions($user, $now)->where('kind', '!=', 'review')->count();
+        $needFix = DashboardQueries::decisions($user, $now)->whereNotIn('kind', ['review', 'checkpoint'])->count();
 
         return $needFix > 0
             ? [self::group('needs_fix', 'Bài cần bạn sửa', $needFix, 'Đã bị từ chối, xem lý do và chỉnh lại.', ArticleResource::getUrl('index', ['activeTab' => 'rejected']), 'warning')]

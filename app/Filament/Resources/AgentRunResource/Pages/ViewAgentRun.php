@@ -83,8 +83,14 @@ class ViewAgentRun extends ViewRecord
         $stale = RunActivity::isStale($run);
         $current = ($live || $stale) ? RunActivity::currentStageOf($run, $run->steps) : null;
 
+        $flow = RunFlow::build($run, $run->steps, $live, $stale, $current);
+        $problem = $live || $stale || in_array($run->status, ['failed', 'blocked', 'held'], true) || collect($flow['nodes'])->contains('state', 'waiting');
+
         return [
             'run' => $run,
+            'verdict' => RunFlow::verdict($run, $flow, $live, $stale),
+            'focus' => RunFlow::focusStage($flow['nodes']),
+            'tab' => $problem ? 'dien-bien' : 'bao-cao',
             'name' => self::articleName($run),
             'campaign' => $run->campaign_id ? Campaign::query()->find($run->campaign_id) : null,
             'blueprint' => AgentFlowBlueprint::byStage(),
@@ -92,7 +98,7 @@ class ViewAgentRun extends ViewRecord
             'live' => $live,
             'stale' => $stale,
             'currentStage' => $live ? $current : null,
-            'flow' => RunFlow::build($run, $run->steps, $live, $stale, $current),
+            'flow' => $flow,
             'elapsed' => RunActivity::formatElapsed(RunActivity::elapsedSeconds($run)),
             'pollSeconds' => $live ? RunActivity::POLL_LIVE : null,
         ];

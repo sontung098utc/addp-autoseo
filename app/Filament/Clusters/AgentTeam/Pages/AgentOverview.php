@@ -3,7 +3,9 @@
 namespace App\Filament\Clusters\AgentTeam\Pages;
 
 use App\Filament\Clusters\AgentTeam;
-use App\Filament\Pages\AgentConnection;
+use App\Filament\Pages\AiUsagePage;
+use App\Filament\Pages\BrainPage;
+use App\Filament\Pages\BrandProfilePage;
 use App\Filament\Resources\AgentRunResource;
 use App\Filament\Resources\ArticleVersionResource;
 use App\Filament\Resources\CampaignResource;
@@ -11,16 +13,24 @@ use App\Filament\Resources\PublicationResource;
 use App\Filament\Resources\WebsiteResource;
 use App\Filament\Support\Agent\AgentFlowBlueprint;
 use App\Filament\Support\Agent\RunActivity;
+use App\Filament\Support\Schedule\VnTime;
 use App\Models\AgentRun;
 use App\Models\AgentRunStep;
 use App\Models\ArticleVersion;
+use App\Models\BrandProfile;
 use App\Models\Campaign;
+use App\Models\CampaignWait;
 use App\Models\CrawledUrl;
 use App\Models\Publication;
+use App\Models\User;
 use App\Models\Website;
 use App\Services\Agent\Settings\AgentAi;
+use App\Services\Brain\BrainService;
+use App\Services\Brand\BrandProfileData;
+use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Filament\Pages\SubNavigationPosition;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 
 /** Tab "Tổng quan" của Đội AI: trạng thái một dòng, việc CẦN bạn, các phiên đang chạy, số liệu hôm nay. Luồng và phần Dev1 cần xây để trong cửa sổ phụ. */
@@ -36,7 +46,7 @@ class AgentOverview extends Page
 
     protected static ?string $slug = 'tong-quan';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 0;
 
     protected static SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
@@ -44,15 +54,15 @@ class AgentOverview extends Page
 
     public static function canAccess(): bool
     {
-        $u = \Illuminate\Support\Facades\Auth::user();
+        $u = Auth::user();
 
-        return $u instanceof \App\Models\User && $u->is_active && $u->isApprover();
+        return $u instanceof User && $u->is_active && $u->isApprover();
     }
 
     protected function getHeaderActions(): array
     {
         return [
-            \Filament\Actions\Action::make('flow')->label('Luồng & phần còn thiếu')->icon('heroicon-o-map')->color('gray')
+            Action::make('flow')->label('Luồng & phần còn thiếu')->icon('heroicon-o-map')->color('gray')
                 ->modalHeading('Luồng của đội AI')->modalWidth('5xl')
                 ->modalContent(fn () => view('filament.clusters.agent-team.flow-modal', $this->flowData()))
                 ->modalSubmitAction(false)->modalCancelActionLabel('Đóng'),
@@ -91,7 +101,7 @@ class AgentOverview extends Page
         $ai = AgentAi::status();
         $liveCount = RunActivity::liveCount();
         $steps = $this->setupSteps($ai);
-        [$from, $to] = \App\Filament\Support\Schedule\VnTime::todayRangeUtc();
+        [$from, $to] = VnTime::todayRangeUtc();
         $today = AgentRun::query()->where('started_at', '>=', $from)->where('started_at', '<', $to);
         $costCap = Schema::hasColumn('campaigns', 'daily_cost_cap_vnd') ? (float) Campaign::query()->where('status', 'active')->sum('daily_cost_cap_vnd') : 0.0;
 
@@ -100,13 +110,13 @@ class AgentOverview extends Page
         $held = AgentRun::query()->where('status', 'held')->where('created_at', '>=', $week)->count();
         $stale = AgentRun::query()->where('status', 'running')->get()->filter(fn ($r) => RunActivity::isStale($r))->count();
         $drafts = ArticleVersion::query()->where('review_status', 'needs_review')->count();
-        $waits = Schema::hasTable('campaign_waits') ? \App\Models\CampaignWait::query()->where('status', 'open')->where('expires_at', '>', now())->count() : 0;
+        $waits = Schema::hasTable('campaign_waits') ? CampaignWait::query()->where('status', 'open')->where('expires_at', '>', now())->count() : 0;
 
         // Chỉ liệt kê điều CẦN bạn; xếp theo mức nghiêm trọng. Không có gì thì trang chỉ báo bình thường, không nhồi số liệu.
         $attention = array_values(array_filter([
             $failed > 0 ? ['tone' => 'danger', 'text' => "{$failed} phiên bị lỗi trong 7 ngày qua", 'action' => 'Xem', 'url' => AgentRunResource::getUrl('index')] : null,
             $stale > 0 ? ['tone' => 'danger', 'text' => "{$stale} phiên có thể bị treo (lâu không có bước mới)", 'action' => 'Xem', 'url' => AgentRunResource::getUrl('index')] : null,
-            ! $ai['connected'] ? ['tone' => 'warning', 'text' => 'Chưa kết nối AI, lượt tự động không chạy', 'action' => 'Nhập khóa', 'url' => AgentConnection::getUrl()] : null,
+            ! $ai['connected'] ? ['tone' => 'warning', 'text' => 'Chưa kết nối AI, lượt tự động không chạy', 'action' => 'Nhập khóa', 'url' => AiUsagePage::configUrl()] : null,
             $held > 0 ? ['tone' => 'warning', 'text' => "{$held} phiên giữ nháp, cần người xem", 'action' => 'Xem', 'url' => AgentRunResource::getUrl('index')] : null,
             $waits > 0 ? ['tone' => 'info', 'text' => "{$waits} việc đang chờ bạn bổ sung (không chặn việc khác)", 'action' => 'Xem', 'url' => CampaignResource::getUrl('index')] : null,
             $drafts > 0 ? ['tone' => 'primary', 'text' => "{$drafts} bản nháp chờ bạn duyệt", 'action' => 'Duyệt', 'url' => ArticleVersionResource::getUrl('index')] : null,
@@ -135,16 +145,16 @@ class AgentOverview extends Page
     private function brandStep(int $activeSites): array
     {
         // AG-B2: hồ sơ doanh nghiệp nằm trong Trí tuệ Thương hiệu. Một website đã có Trí tuệ thương hiệu → mở thẳng tab; còn lại → URL cũ (tự chuyển hướng, tạo khi cần).
-        $url = \App\Filament\Pages\BrandProfilePage::getUrl();
+        $url = BrandProfilePage::getUrl();
         if ($activeSites === 1 && Schema::hasTable('brains')) {
             $site = Website::query()->where('status', 'active')->first();
-            $brain = $site ? (new \App\Services\Brain\BrainService())->findBrandBrain($site) : null;
-            $url = $brain ? \App\Filament\Pages\BrainPage::getUrl(['brain' => $brain->id]).'#tab-brand' : $url;
+            $brain = $site ? (new BrainService)->findBrandBrain($site) : null;
+            $url = $brain ? BrainPage::getUrl(['brain' => $brain->id]).'#tab-brand' : $url;
         }
         $profiles = Schema::hasTable('brand_profiles')
-            ? \App\Models\BrandProfile::query()->whereIn('website_id', Website::query()->where('status', 'active')->select('id'))->get()
+            ? BrandProfile::query()->whereIn('website_id', Website::query()->where('status', 'active')->select('id'))->get()
             : collect();
-        $complete = $profiles->filter(fn ($p) => \App\Services\Brand\BrandProfileData::isComplete($p))->count();
+        $complete = $profiles->filter(fn ($p) => BrandProfileData::isComplete($p))->count();
         $done = $activeSites > 0 && $complete >= $activeSites;
         $note = $activeSites === 0 ? 'Cần có website hoạt động trước.'
             : ($done ? "Cả {$complete} website hoạt động đã có hồ sơ đủ." : "Mới {$complete}/{$activeSites} website có hồ sơ đủ ({$profiles->count()} đã bắt đầu điền). Bấm để điền.");

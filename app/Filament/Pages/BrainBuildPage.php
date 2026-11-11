@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Clusters\KhoTriTue;
 use App\Models\AgentRun;
 use App\Models\KnowledgeItem;
 use App\Models\Website;
@@ -14,6 +15,7 @@ use App\Services\Knowledge\Discover\SourceDiscoveryService;
 use App\Services\Knowledge\KnowledgeError;
 use App\Services\Knowledge\KnowledgeReview;
 use App\Services\Knowledge\Suggest\KnowledgeSuggestions;
+use App\Services\Onboarding\WebsiteOnboarding;
 use App\Services\Search\WebSearchResolver;
 use App\Services\Search\WebSearchUnavailable;
 use Filament\Actions\Action;
@@ -26,17 +28,18 @@ use Livewire\Attributes\Url;
 /** G2: xây kho trí tuệ từ chính website. Chạy đồng bộ trong trang (chưa có chạy nền). Chỉ người duyệt trở lên. */
 class BrainBuildPage extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-o-building-library';
+    /** Z2: thành tab "Nạp kiến thức" của cụm Kho trí tuệ (gồm cả Khởi tạo nhanh, trước là trang Khởi tạo website). URL cũ /admin/xay-kho chuyển hướng ở routes/web.php. */
+    protected static ?string $cluster = KhoTriTue::class;
 
-    protected static ?string $navigationLabel = 'Xây kho từ website';
+    protected static ?string $navigationIcon = 'heroicon-o-arrow-down-tray';
 
-    protected static ?string $navigationGroup = 'Khám phá';
+    protected static ?string $navigationLabel = 'Nạp kiến thức';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 2;
 
-    protected static ?string $title = 'Xây kho từ website';
+    protected static ?string $title = 'Nạp kiến thức';
 
-    protected static ?string $slug = 'xay-kho';
+    protected static ?string $slug = 'nap-kien-thuc';
 
     protected static string $view = 'filament.pages.brain-build';
 
@@ -65,9 +68,34 @@ class BrainBuildPage extends Page
     /** @var array<string,mixed>|null */
     public ?array $webReport = null;
 
+    /** @var array<string,mixed>|null Z2 Khởi tạo nhanh (trước là WebsiteOnboardingPage): kết quả các bước của lần chạy vừa xong */
+    public ?array $onboardResult = null;
+
     public static function canAccess(): bool
     {
         return KnowledgeReview::canManage(Auth::user());
+    }
+
+    /** Khởi tạo nhanh giữ quyền cũ của trang Khởi tạo website: người duyệt trở lên. */
+    public static function canOnboard(): bool
+    {
+        return WebsiteOnboardingPage::canAccess();
+    }
+
+    /** Khởi tạo nhanh: kho + hồ sơ + Trí tuệ + từ khóa + gợi ý kế hoạch, một nút. Chạy đồng bộ như trước. */
+    public function startOnboarding(): void
+    {
+        abort_unless(static::canAccess() && static::canOnboard(), 403);
+        $site = Website::query()->where('status', 'active')->find($this->websiteId);
+        if (! $site) {
+            Notification::make()->title('Chọn một website đang hoạt động')->warning()->send();
+
+            return;
+        }
+        @set_time_limit(300);
+        $this->onboardResult = (new WebsiteOnboarding)->run($site, Auth::user());
+        $ok = count(array_filter($this->onboardResult['steps'], fn ($s) => $s['status'] === 'ok'));
+        Notification::make()->title("Khởi tạo xong: {$ok}/".count($this->onboardResult['steps']).' bước hoàn tất')->success()->send();
     }
 
     private function guard(): void
@@ -106,7 +134,7 @@ class BrainBuildPage extends Page
         $suggestions = $site ? (new KnowledgeSuggestions)->forWebsite($site, 20) : [];
         $brandProfile = $site ? BrandProfileData::forWebsite($site->id) : null;
 
-        return ['brandAuto' => $brand, 'brandMissing' => BrandProfileData::completeness($brandProfile)['missing'], 'suggestions' => $suggestions, 'sites' => Website::query()->orderBy('name')->get(['id', 'name', 'base_url', 'status']), 'off' => $off, 'avLabel' => $av['label'], 'avDemo' => $av['demo'], 'runs' => $runs, 'autoItems' => $auto, 'statusLabels' => ['running' => 'Đang chạy', 'ready_for_review' => 'Xong', 'blocked' => 'Bị chặn', 'failed' => 'Lỗi', 'held' => 'Tạm giữ'], 'reviewUrl' => KnowledgePage::getUrl(), 'webAv' => (new WebSearchResolver)->availability()];
+        return ['brandAuto' => $brand, 'brandMissing' => BrandProfileData::completeness($brandProfile)['missing'], 'suggestions' => $suggestions, 'sites' => Website::query()->orderBy('name')->get(['id', 'name', 'base_url', 'status']), 'off' => $off, 'avLabel' => $av['label'], 'avDemo' => $av['demo'], 'runs' => $runs, 'autoItems' => $auto, 'statusLabels' => ['running' => 'Đang chạy', 'ready_for_review' => 'Xong', 'blocked' => 'Bị chặn', 'failed' => 'Lỗi', 'held' => 'Tạm giữ'], 'reviewUrl' => KnowledgePage::getUrl(), 'pendingCount' => KnowledgeItem::query()->where('status', 'proposed')->when($this->websiteId, fn ($q) => $q->where('website_id', $this->websiteId))->count(), 'canOnboard' => static::canOnboard(), 'onboardLinks' => ['keywords' => KeywordsPage::getUrl(), 'plan' => ContentPlanPage::getUrl()], 'webAv' => (new WebSearchResolver)->availability()];
     }
 
     /** Nút "Bắt đầu xây kho" chỉ mở hộp xác nhận; việc chạy thật nằm ở build(). */

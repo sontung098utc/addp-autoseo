@@ -2,11 +2,13 @@
 
 namespace App\Filament\Clusters;
 
+use App\Models\User;
 use Filament\Clusters\Cluster;
 use Filament\Pages\SubNavigationPosition;
+use Illuminate\Support\Facades\Auth;
 
 /**
- * AG-S01d: MỘT mục menu "Đội AI" gom mọi thứ liên quan: tổng quan luồng, chiến dịch, phiên chạy, kết nối AI.
+ * AG-S01d: MỘT mục menu "Đội AI" gom mọi thứ liên quan: tổng quan luồng, chiến dịch (cha của bài viết), kế hoạch nội dung của chiến dịch, phiên chạy, kết nối AI.
  * Người dùng đi theo thứ tự các tab: Kết nối AI → Chiến dịch → (hệ thống tự chạy) → Phiên chạy → Duyệt bài (ngoài cụm).
  */
 class AgentTeam extends Cluster
@@ -27,8 +29,9 @@ class AgentTeam extends Cluster
 
     public static function canAccess(): bool
     {
-        $u = \Illuminate\Support\Facades\Auth::user();
+        $u = Auth::user();
 
-        return $u instanceof \App\Models\User && $u->is_active && $u->isApprover();
+        // Biên tập viên vào được tab Kế hoạch; mỗi tab tự kiểm quyền riêng (Chiến dịch, Phiên chạy... vẫn chỉ cho người duyệt).
+        return $u instanceof User && $u->is_active && $u->isWriter();
     }
 }

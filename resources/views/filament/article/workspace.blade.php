@@ -40,20 +40,10 @@
     $pubDone = $publications->firstWhere('status', 'published');
     $pubNext = $publications->first(fn ($p) => $p->status !== 'published');
 
-    // Một câu "việc tiếp theo" theo trạng thái + MỘT nút hành động chính (nếu người dùng làm được).
-    $next = match (true) {
-        $live !== null => 'Đội AI đang viết bài này; trang tự làm mới.',
-        $latest === null => 'Bài chưa có nội dung.',
-        $article->workflow_status === 'needs_review' && $canApprove => 'Bản mới nhất đang chờ bạn đọc và duyệt.',
-        $article->workflow_status === 'needs_review' => 'Đang chờ người có quyền duyệt.',
-        $article->workflow_status === 'approved' => 'Đã duyệt, chưa có lịch đăng.',
-        $article->workflow_status === 'rejected' => 'Bài bị từ chối: xem ghi chú duyệt rồi sửa hoặc giao lại.',
-        $article->workflow_status === 'scheduled' => 'Đã có lịch đăng.',
-        $article->workflow_status === 'published' => 'Bài đã đăng.',
-        default => 'Đã có bản nháp, sẵn sàng gửi duyệt.',
-    };
+    // MỘT nút hành động chính (nếu người dùng làm được), đặt ở đầu tab Tổng quan.
     $latestUrl = $latest && $canOpenVersion ? V::getUrl('view', ['record' => $latest]) : null;
     $primary = match (true) {
+        $outlineHold !== null && $canOutline => ['action' => 'approveOutline', 'label' => 'Duyệt dàn ý và viết tiếp'],
         $live !== null => ['tab' => 'activity', 'label' => 'Theo dõi phiên chạy'],
         $latest === null => ArticleResource::canAssignToAgent($article) ? ['action' => 'run_agent', 'label' => 'Giao đội AI'] : null,
         $article->workflow_status === 'needs_review' && $canApprove => $latestUrl ? ['url' => $latestUrl, 'label' => 'Đọc để duyệt'] : ['tab' => 'content', 'label' => 'Đọc để duyệt'],
@@ -177,9 +167,8 @@
                     @if (! empty($stopInfo))
                         <p class="aw-note" data-testid="aw-stopped" style="color:#b91c1c;border:1px solid #b91c1c;border-radius:.5rem;padding:.5rem .75rem">⛔ Hệ thống đang DỪNG KHẨN CẤP ({{ $stopInfo['reason'] ?? 'không ghi lý do' }}): đội AI sẽ không chạy cho đến khi được khôi phục ở Lịch xuất bản.</p>
                     @endif
-                    <div class="aw-next" data-testid="aw-next">
-                        <p><strong>Việc tiếp theo:</strong> {{ $next }}</p>
-                        @if ($primary)
+                    @if ($primary)
+                        <div class="aw-next" data-testid="aw-primary-bar">
                             @if (isset($primary['url']))
                                 <a class="aw-cta" data-testid="aw-primary" href="{{ $primary['url'] }}">{{ $primary['label'] }}</a>
                             @elseif (isset($primary['tab']))
@@ -187,8 +176,33 @@
                             @else
                                 <button type="button" class="aw-cta" data-testid="aw-primary" wire:click="mountAction(@js($primary['action']))">{{ $primary['label'] }}</button>
                             @endif
-                        @endif
-                    </div>
+                        </div>
+                    @endif
+                    @if ($outlineHold !== null)
+                        <section class="ss-review-card" data-testid="aw-outline-hold" style="border-color:#d97706">
+                            <div class="aw-head" style="justify-content:flex-start;gap:.4rem">
+                                <h2 class="ss-review-card__title">Dàn ý chờ bạn xem</h2>
+                                <x-help tone="warning" title="Vì sao đội AI dừng ở đây">
+                                    <p>Chiến dịch đặt điểm dừng sau dàn ý. Đội AI chưa viết, nên chưa tốn token viết. Sửa dàn ý rồi bấm "Duyệt dàn ý và viết tiếp"; đội AI sẽ viết đúng theo dàn ý đã duyệt.</p>
+                                    <p>"Giao lại từ đầu" bỏ dàn ý này và lập dàn ý mới.</p>
+                                </x-help>
+                            </div>
+                            @if ($outlineHold['outline'] === [])
+                                <p class="aw-muted">Dàn ý trống.</p>
+                            @else
+                                <ol data-testid="aw-outline-items" style="margin:.4rem 0 .4rem 1.2rem;list-style:decimal">
+                                    @foreach ($outlineHold['outline'] as $item)<li>{{ $item }}</li>@endforeach
+                                </ol>
+                            @endif
+                            @if ($canOutline)
+                                <div class="aw-chips">
+                                    <button type="button" class="aw-link" data-testid="aw-outline-redo" wire:click="mountAction('regenerateOutline')">Giao lại từ đầu</button>
+                                </div>
+                            @else
+                                <p class="aw-muted">Cần người viết trở lên để sửa và duyệt dàn ý.</p>
+                            @endif
+                        </section>
+                    @endif
                     @if (filled($article->guidance))
                         <p class="aw-muted" data-testid="aw-guidance"><strong>Chỉ dẫn cho đội AI:</strong> {{ \Illuminate\Support\Str::limit($article->guidance, 160) }}</p>
                     @endif
@@ -624,7 +638,7 @@
             <x-studio.panel key="publish">
                 <section class="ss-review-card">
                     <div class="aw-head">
-                        <h2 class="ss-review-card__title">Lịch xuất bản của bài</h2>
+                        <h2 class="ss-review-card__title">Lịch xuất bản của bài <x-help title="Dừng riêng bài này"><p>"Tạm dừng bài này" chỉ giữ lượt đăng của bài này, các bài khác vẫn đăng. Dừng khẩn cấp cho cả hệ thống ở trang Lịch xuất bản.</p></x-help></h2>
                         <span class="aw-muted">
                             @if (WeeklySchedule::canAccess())<a class="aw-link" href="{{ WeeklySchedule::getUrl() }}">Lịch tuần</a>@endif
                             @if (PublicationResource::canViewAny()) · <a class="aw-link" href="{{ PublicationResource::getUrl() }}">Tất cả lịch xuất bản</a>@endif
@@ -641,7 +655,7 @@
                                         <tr>
                                             <td>v{{ $p->articleVersion?->version }}</td>
                                             <td>{{ $dash($p->website?->name) }}</td>
-                                            <td>{{ StatusPresenter::label($p->status, 'publication') }}</td>
+                                            <td>{{ StatusPresenter::label($p->status, 'publication') }}@if ($canHold)<div>@if ($p->status === 'scheduled')                                                         <button type="button" class="aw-link" data-testid="aw-pub-pause" wire:click="mountAction('pausePublication', @js(['id' => $p->id]))">Tạm dừng bài này</button>                                                     @elseif (in_array($p->status, ['paused', 'awaiting_confirm'], true))                                                         <button type="button" class="aw-link" data-testid="aw-pub-resume" wire:click="mountAction('resumePublication', @js(['id' => $p->id]))">{{ $p->status === 'awaiting_confirm' ? 'Xác nhận đăng' : 'Tiếp tục đăng' }}</button>                                                     @endif</div>@endif</td>
                                             <td>{{ VnTime::format($p->scheduled_at_utc) }}</td>
                                             <td>{{ $p->published_at_utc ? VnTime::format($p->published_at_utc) : '—' }}</td>
                                             <td>@if ($p->published_url && preg_match('#^https?://#i', $p->published_url))<a class="aw-link" href="{{ $p->published_url }}" target="_blank" rel="noopener noreferrer">Mở bài</a>@else — @endif</td>

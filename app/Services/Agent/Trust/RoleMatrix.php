@@ -35,7 +35,7 @@ final class RoleMatrix
             $rows[] = ['label' => $label, 'source' => $source, 'cells' => self::eachRole(fn (User $u) => (bool) $fn(Gate::forUser($u)))];
         }
         $rows[] = ['label' => 'Xem hub Đội AI (cả trang này)', 'source' => 'AgentTeam::canAccess', 'cells' => self::eachRole(fn (User $u) => self::asUser($u, fn () => AgentTeam::canAccess()))];
-        $rows[] = ['label' => 'Nhập / đổi khóa AI', 'source' => 'AgentConnection (chỉ quản trị viên)', 'cells' => self::eachRole(fn (User $u) => $u->isAdmin())];
+        $rows[] = ['label' => 'Nhập / đổi khóa AI', 'source' => 'Cấu hình AI (chỉ quản trị viên)', 'cells' => self::eachRole(fn (User $u) => $u->isAdmin())];
         $rows[] = ['label' => 'Nâng lên Mức 2 (tự đăng)', 'source' => 'Khóa cứng (TrustGate)', 'cells' => self::eachRole(fn () => false)];
 
         return $rows;

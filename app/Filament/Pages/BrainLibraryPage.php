@@ -2,7 +2,11 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Clusters\KhoTriTue;
 use App\Models\Brain;
+use App\Models\BrainProfile;
+use App\Models\BrainSource;
+use App\Models\BrandProfile;
 use App\Models\KnowledgeGap;
 use App\Models\KnowledgeItem;
 use App\Models\KnowledgeSource;
@@ -10,6 +14,7 @@ use App\Models\User;
 use App\Models\Website;
 use App\Services\Brain\BrainService;
 use App\Services\Brain\BrainTemplates;
+use App\Services\Brand\BrandProfileData;
 use App\Services\Knowledge\KnowledgeConflicts;
 use App\Services\Knowledge\KnowledgeError;
 use App\Services\Knowledge\KnowledgeFreshness;
@@ -23,17 +28,18 @@ use Illuminate\Support\Facades\Auth;
  */
 class BrainLibraryPage extends Page
 {
+    /** Z2: thành tab "Trí tuệ" (đầu tiên) của cụm Kho trí tuệ; URL mới /admin/kho-tri-tue/tri-tue, URL cũ /admin/kho-tri-tue chuyển hướng ở routes/web.php. */
+    protected static ?string $cluster = KhoTriTue::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-academic-cap';
 
-    protected static ?string $navigationLabel = 'Kho trí tuệ';
+    protected static ?string $navigationLabel = 'Trí tuệ';
 
-    protected static ?string $navigationGroup = 'Khám phá';
-
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $title = 'Kho trí tuệ';
 
-    protected static ?string $slug = 'kho-tri-tue';
+    protected static ?string $slug = 'tri-tue';
 
     protected static string $view = 'filament.pages.brain-library';
 
@@ -116,7 +122,7 @@ class BrainLibraryPage extends Page
             return;
         }
         try {
-            $r = (new BrainService())->installTemplates($keys, null, Auth::user());
+            $r = (new BrainService)->installTemplates($keys, null, Auth::user());
         } catch (KnowledgeError $e) {
             Notification::make()->title('Chưa cài được')->body($e->getMessage())->danger()->send();
 
@@ -135,7 +141,7 @@ class BrainLibraryPage extends Page
     {
         abort_unless(static::canAccess() && static::canManage(), 403);
         try {
-            $brain = (new BrainService())->createFromTemplate((string) $this->create['name'], (string) $this->create['template'] ?: null, array_map('intval', (array) $this->create['websites']), Auth::user());
+            $brain = (new BrainService)->createFromTemplate((string) $this->create['name'], (string) $this->create['template'] ?: null, array_map('intval', (array) $this->create['websites']), Auth::user());
         } catch (KnowledgeError|\InvalidArgumentException $e) {
             Notification::make()->title('Chưa tạo được')->body($e->getMessage())->danger()->send();
 
@@ -158,20 +164,20 @@ class BrainLibraryPage extends Page
         $ids = $brains->pluck('id')->all();
         $by = fn ($q) => $q->whereIn('brain_id', $ids)->selectRaw('brain_id, count(*) c')->groupBy('brain_id')->pluck('c', 'brain_id');
         $sources = $by(KnowledgeSource::query());
-        $confirmedSrc = \App\Models\BrainSource::query()->whereIn('brain_id', $ids)->where('status', 'confirmed')->whereNotNull('tier')->where('tier', '!=', 'blocked')
+        $confirmedSrc = BrainSource::query()->whereIn('brain_id', $ids)->where('status', 'confirmed')->whereNotNull('tier')->where('tier', '!=', 'blocked')
             ->selectRaw('brain_id, count(*) c')->groupBy('brain_id')->pluck('c', 'brain_id');
         $items = $by(KnowledgeItem::query());
         $proposed = $by(KnowledgeItem::query()->where('status', 'proposed'));
         $gaps = $by(KnowledgeGap::query()->where('status', 'open'));
-        $conflicts = collect((new KnowledgeConflicts())->all())->groupBy(fn ($p) => $p['a']->brain_id)->map->count();
-        $expired = (new KnowledgeFreshness())->expired()->groupBy('brain_id')->map->count();
+        $conflicts = collect((new KnowledgeConflicts)->all())->groupBy(fn ($p) => $p['a']->brain_id)->map->count();
+        $expired = (new KnowledgeFreshness)->expired()->groupBy('brain_id')->map->count();
 
         $cards = $brains->map(function (Brain $b) use ($sources, $confirmedSrc, $items, $proposed, $gaps, $conflicts, $expired) {
-            [$f, $t] = ($b->profile ?? new \App\Models\BrainProfile())->completeness();
+            [$f, $t] = ($b->profile ?? new BrainProfile)->completeness();
             $brand = null;
             if ($b->template_key === 'thuong_hieu') { // AG-B2: số trường THẬT của hồ sơ doanh nghiệp (website đầu tiên đã gắn)
                 $sid = $b->websites->first()?->id;
-                $c = \App\Services\Brand\BrandProfileData::completeness($sid ? \App\Models\BrandProfile::query()->where('website_id', $sid)->first() : null);
+                $c = BrandProfileData::completeness($sid ? BrandProfile::query()->where('website_id', $sid)->first() : null);
                 $brand = ['filled' => $c['filled'], 'total' => $c['total'], 'has_site' => (bool) $sid];
             }
 

@@ -104,6 +104,8 @@ class PublicationResource extends Resource
                                 'published' => 'Đã xuất bản',
                                 'failed' => 'Thất bại',
                                 'needs_reconcile' => 'Cần đối soát (Timeout)',
+                                'paused' => 'Tạm dừng',
+                                'awaiting_confirm' => 'Chờ xác nhận',
                             ])
                             ->default('scheduled')
                             ->required(),
@@ -153,7 +155,7 @@ class PublicationResource extends Resource
             ->defaultSort('scheduled_at_utc', 'asc')
             ->filters([
                 Tables\Filters\SelectFilter::make('status')->label('Trạng thái')
-                    ->options(fn (): array => collect(['scheduled', 'publishing', 'published', 'failed', 'needs_reconcile'])
+                    ->options(fn (): array => collect(['scheduled', 'paused', 'awaiting_confirm', 'publishing', 'published', 'failed', 'needs_reconcile'])
                         ->mapWithKeys(fn (string $v): array => [$v => StatusPresenter::label($v, 'publication')])->all()),
                 Tables\Filters\SelectFilter::make('website_id')->label('Website')->relationship('website', 'name'),
                 Tables\Filters\Filter::make('scheduled_range')->label('Khoảng ngày đăng')
@@ -259,6 +261,8 @@ class PublicationResource extends Resource
                                 ->send();
                         }
                     }),
+                \App\Filament\Support\Schedule\PublicationHoldAction::pauseRow(),
+                \App\Filament\Support\Schedule\PublicationHoldAction::resumeRow(),
                 ReconcileAction::row(),
                 \App\Filament\Support\Schedule\RescheduleAction::row(),
             ]);

@@ -196,12 +196,13 @@ class ArticlesMergedScreenTest extends TestCase
         $camp = Campaign::create(['website_id' => $this->site->id, 'name' => 'Chiến dịch Xuân', 'status' => 'active', 'keywords' => []]);
         $in = $this->article('needs_review');
         $out = $this->article('needs_review');
+        $in->update(['campaign_id' => $camp->id]);
         $run = $this->mkRun($in, 'ready_for_review', ['campaign_id' => $camp->id]);
         AgentRunStep::create(['agent_run_id' => $run->id, 'seq' => 1, 'role' => 'grader', 'stage' => 'grade', 'status' => 'ok', 'title' => 'Chấm', 'detail' => 'x', 'data' => ['score' => 87]]);
         $this->mkRun($out, 'running');
 
         Livewire::test(ListArticles::class)
-            ->assertSee('Chiến dịch Xuân')->assertSee('Chờ duyệt')->assertSee('—')
+            ->assertSee('Chiến dịch Xuân')->assertSee('Chờ duyệt')->assertSee('Bài lẻ')
             ->filterTable('campaign_id', $camp->id)->assertCanSeeTableRecords([$in])->assertCanNotSeeTableRecords([$out])
             ->removeTableFilters()
             ->filterTable('ai_running', true)->assertCanSeeTableRecords([$out])->assertCanNotSeeTableRecords([$in])

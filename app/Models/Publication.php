@@ -33,6 +33,24 @@ class Publication extends Model
         ];
     }
 
+    /**
+     * Điểm dừng 'publish' của chiến dịch: bài thuộc chiến dịch có điểm dừng này thì lượt đăng mới tạo vào "Chờ xác nhận"
+     * (không bao giờ được gửi cho tới khi người xác nhận). Đặt ở đây để mọi nơi xếp lịch (duyệt tay, Pilot) đều được áp dụng.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (Publication $p) {
+            if ($p->status !== 'scheduled') {
+                return;
+            }
+            $campaignId = $p->articleVersion?->article?->campaign_id;
+            $c = $campaignId ? Campaign::query()->find($campaignId) : null;
+            if ($c && in_array('publish', (array) $c->checkpoints, true)) {
+                $p->forceFill(['status' => 'awaiting_confirm', 'last_error' => 'Chờ xác nhận: chiến dịch đặt điểm dừng "Trước khi đăng".'])->saveQuietly();
+            }
+        });
+    }
+
     public function website(): BelongsTo
     {
         return $this->belongsTo(Website::class);

@@ -96,13 +96,17 @@ final class AgentRunOrchestrator
     /** @var list<mixed>|null dàn ý có sẵn do người gọi truyền vào (G4); null = tự lập dàn ý như cũ */
     private ?array $presetOutline = null;
 
+    /** @var list<string>|null điểm dừng chờ người của chiến dịch ('outline' dừng sau dàn ý do AI lập) */
+    private ?array $checkpoints = null;
+
     public const GAP_PAGES = 5;
 
     /** kho vẫn chưa có mục đã duyệt khớp sau khi tự chuẩn bị, chủ đề rủi ro cao: bài cần chuyên gia xem lại sau khi viết */
     private bool $needsExpert = false;
 
-    public function run(Article $article, ?User $actor = null, string $trigger = 'manual', ?int $campaignId = null, ?array $presetOutline = null, bool $allowWithoutKnowledge = false /* deprecated: không còn tác dụng, không có cổng dừng */): AgentRun
+    public function run(Article $article, ?User $actor = null, string $trigger = 'manual', ?int $campaignId = null, ?array $presetOutline = null, bool $allowWithoutKnowledge = false /* deprecated: không còn tác dụng, không có cổng dừng */, ?array $checkpoints = null): AgentRun
     {
+        $this->checkpoints = $checkpoints;
         $this->needsExpert = false;
         $this->presetOutline = $presetOutline === [] ? null : $presetOutline;
         $this->seq = 0;
@@ -315,6 +319,9 @@ final class AgentRunOrchestrator
             $this->step($run, 'brief', 'strategist', $offTopic ? 'warn' : 'ok', 'Lập dàn ý ('.count($outline['outline'] ?? []).' mục)', 'Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. '.($this->guidanceOptions($article) !== [] ? 'Đã áp dụng chỉ dẫn thêm của người phụ trách bài. ' : '').$briefNote.$this->brandNote().$this->brainCtx->note()
                 .($offTopic ? ' Cảnh báo: chủ đề "'.mb_substr((string) $article->primary_keyword, 0, 80).'" có thể không phù hợp website (lĩnh vực trong hồ sơ: '.mb_substr((string) $this->brandProfile?->business_field, 0, 120).'). Chỉ cảnh báo, không chặn.' : ''),
                 ['outline' => $outline['outline'] ?? [], 'playbook' => $this->pbData($briefPb)] + $this->brandData() + $this->brainCtx->stepData() + ($offTopic ? ['off_topic' => true] : []) + $this->providerData($outline), $outline['model'] ?? null, (int) ($outline['tokens_used'] ?? 0), (float) ($outline['cost_vnd'] ?? 0));
+            if (in_array('outline', (array) $this->checkpoints, true)) {
+                return $this->holdAtOutline($run, $article, $outline['outline'] ?? []);
+            }
         }
         $this->skills['grade'] = $this->skills['repair'] = $this->usePlaybook('editor', 'qa-review');
         [$editorPb, $editorNote] = $this->skills['grade'];
@@ -732,6 +739,15 @@ final class AgentRunOrchestrator
     private function spent(AgentRun $run): float
     {
         return (float) $run->steps()->sum('cost_vnd');
+    }
+
+    /** Điểm dừng 'outline': ghi bước chờ người rồi kết thúc phiên, KHÔNG gọi AI viết. Bài ở lại 'drafting' (chờ). */
+    private function holdAtOutline(AgentRun $run, Article $article, array $outline): AgentRun
+    {
+        $this->step($run, 'checkpoint', 'system', 'warn', 'Dừng sau dàn ý: chờ bạn xem', 'Chiến dịch đặt điểm dừng sau dàn ý. Đội AI chưa viết (không tốn token viết); bạn sửa dàn ý rồi bấm "Duyệt dàn ý và viết tiếp" trên trang bài.', ['checkpoint' => 'outline', 'outline' => $outline]);
+        $article->update(['workflow_status' => 'drafting']);
+
+        return $this->finish($run, 'held', 'Dừng sau dàn ý: chờ bạn xem và sửa dàn ý.');
     }
 
     private function step(AgentRun $run, string $stage, string $role, string $status, string $title, string $detail, array $data = [], ?string $model = null, int $tokens = 0, float $cost = 0.0): AgentRunStep

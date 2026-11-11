@@ -23,6 +23,8 @@ final class StatusPresenter
         'failed' => ['Lỗi', 'danger', 'heroicon-o-x-circle'],
         'needs_reconcile' => ['Chờ đối soát', 'danger', 'heroicon-o-exclamation-triangle'],
         'held' => ['Tạm giữ', 'gray', 'heroicon-o-pause-circle'],
+        'paused' => ['Tạm dừng', 'gray', 'heroicon-o-pause-circle'],
+        'awaiting_confirm' => ['Chờ bạn xác nhận', 'warning', 'heroicon-o-hand-raised'],
     ];
 
     private const WEBSITE = [

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Agent;
 
-use App\Filament\Pages\AgentConnection;
+use App\Filament\Pages\AiUsagePage;
 use App\Models\AgentRun;
 use App\Models\AgentSetting;
 use App\Models\AiModelRoute;
@@ -462,14 +462,14 @@ class AiRoutingTest extends TestCase
     public function test_them_provider_ma_hoa_khoa_goi_y_route_va_khong_lo_trong_html(): void
     {
         $this->actingAs($this->user('admin'));
-        Livewire::test(AgentConnection::class)
-            ->callAction('addProvider', ['name' => 'Claude', 'kind' => 'anthropic', 'api_key' => self::KEY, 'monthly_budget_vnd' => 3000000, 'suggest' => true])
+        Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)
+            ->callAction('addProvider', ['name' => 'Claude', 'preset' => 'anthropic', 'api_key' => self::KEY, 'monthly_budget_vnd' => 3000000, 'suggest' => true])
             ->assertHasNoActionErrors();
 
         $this->assertStringNotContainsString('SECRETKEY', (string) \DB::table('ai_providers')->value('api_key'));
         $this->assertSame('claude-opus-5-5', AiModelRoute::where('task', 'write')->value('primary_model'));
         $this->assertSame('claude-haiku-5-5', AiModelRoute::where('task', 'outline')->value('primary_model'));
-        $html = $this->get('/admin/tich-hop-ai')->assertOk()->assertSee('Claude')->assertSee('•••• đã lưu')->assertSee('Định tuyến theo loại việc')->assertSee('Hệ thống không tự dùng Mock thay thế')->getContent();
+        $html = $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk()->assertSee('Claude')->assertSee('•••• đã lưu')->assertDontSee('Định tuyến theo loại việc')->assertSee('Hệ thống không tự dùng Mock thay thế')->getContent();
         $this->assertStringNotContainsString('SECRETKEY', $html);
         $this->assertStringNotContainsString(self::KEY, $html);
     }
@@ -481,38 +481,28 @@ class AiRoutingTest extends TestCase
         Http::fake(['api.anthropic.com/*' => Http::response(['error' => self::KEY], 401)]);
         $this->actingAs($this->user('admin'));
 
-        Livewire::test(AgentConnection::class)->callAction('testProvider', [], ['id' => $p->id]);
+        Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)->callAction('testProvider', [], ['id' => $p->id]);
 
         $p->refresh();
         $this->assertFalse($p->last_test_ok);
         $this->assertStringNotContainsString('SECRETKEY', (string) $p->last_test_message);
-        $this->get('/admin/tich-hop-ai')->assertOk()->assertDontSee('SECRETKEY');
+        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk()->assertDontSee('SECRETKEY');
     }
 
-    public function test_admin_sua_route_va_dat_du_phong_khong_duoc_trung(): void
+    public function test_trang_cau_hinh_ai_khong_con_bang_dinh_tuyen_hay_gan_vai_tro(): void
     {
-        $a = $this->provider('anthropic');
-        $o = $this->provider('openai_compat');
+        $p = $this->provider('anthropic');
+        $this->route('write', $p);
         $this->actingAs($this->user('admin'));
-
-        Livewire::test(AgentConnection::class)
-            ->callAction('editRoute', ['tier' => 'reasoning', 'primary_provider_id' => $a->id, 'primary_model' => 'claude-opus-5-5', 'fallback_provider_id' => $o->id, 'fallback_model' => 'mb', 'cost_cap_vnd_per_call' => 2000], ['task' => 'write'])
-            ->assertHasNoActionErrors();
-        $r = AiModelRoute::where('task', 'write')->first();
-        $this->assertSame('mb', $r->fallback_model);
-        $this->assertSame(2000.0, $r->cost_cap_vnd_per_call);
-
-        Livewire::test(AgentConnection::class)
-            ->callAction('editRoute', ['tier' => 'standard', 'primary_provider_id' => $a->id, 'primary_model' => 'x', 'fallback_provider_id' => $a->id, 'fallback_model' => 'x'], ['task' => 'repair']);
-        $this->assertNull(AiModelRoute::where('task', 'repair')->first(), 'dự phòng trùng chính bị từ chối');
+        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk()->assertDontSee('Định tuyến theo loại việc')->assertDontSee('Model chính')->assertDontSee('Trần chi phí');
     }
 
     public function test_base_url_noi_bo_bi_tu_choi_khi_them_provider(): void
     {
         $this->actingAs($this->user('admin'));
 
-        Livewire::test(AgentConnection::class)
-            ->callAction('addProvider', ['name' => 'Bad', 'kind' => 'openai_compat', 'base_url' => 'http://127.0.0.1:8000/v1', 'api_key' => self::KEY, 'suggest' => false])
+        Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)
+            ->callAction('addProvider', ['name' => 'Bad', 'preset' => 'custom', 'base_url' => 'http://127.0.0.1:8000/v1', 'api_key' => self::KEY, 'suggest' => false])
             ->assertHasActionErrors(['base_url']);
         $this->assertSame(0, AiProvider::count());
     }
@@ -520,8 +510,8 @@ class AiRoutingTest extends TestCase
     public function test_bien_tap_vien_bi_chan_khoi_trang_tich_hop_ai(): void
     {
         $this->actingAs($this->user('writer'));
-        $this->get('/admin/tich-hop-ai')->assertForbidden();
-        Livewire::test(AgentConnection::class)->assertForbidden();
+        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertForbidden();
+        Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)->assertForbidden();
     }
 
     public function test_quyen_nguoi_duyet_xem_khong_sua(): void
@@ -530,12 +520,12 @@ class AiRoutingTest extends TestCase
         $this->route('write', $p);
 
         $this->actingAs($this->user('approver'));
-        $this->get('/admin/tich-hop-ai')->assertOk()->assertSee('P-anthropic')->assertDontSee('Cập nhật khóa');
-        Livewire::test(AgentConnection::class)
-            ->assertActionHidden('addProvider')->assertActionHidden('editRoute', ['task' => 'write'])->assertActionHidden('testProvider', ['id' => $p->id])
+        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk()->assertSee('P-anthropic')->assertDontSee('Sửa khóa');
+        Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)
+            ->assertActionHidden('addProvider')->assertActionHidden('testProvider', ['id' => $p->id])
             ->call('mountAction', 'addProvider')->assertSet('mountedActions', []);
         try {
-            Livewire::test(AgentConnection::class)->callAction('addProvider', ['name' => 'X', 'kind' => 'gemini', 'api_key' => 'k']);
+            Livewire::withQueryParams(['tab' => 'cau-hinh'])->test(AiUsagePage::class)->callAction('addProvider', ['name' => 'X', 'preset' => 'gemini', 'api_key' => 'k']);
             $this->fail('hành động ẩn phải bị từ chối');
         } catch (\PHPUnit\Framework\ExpectationFailedException) {
             // đúng: người duyệt không thực hiện được

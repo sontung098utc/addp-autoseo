@@ -5,7 +5,7 @@
     $tones = ['success' => 'ok', 'warning' => 'warn', 'danger' => 'danger', 'info' => 'info', 'gray' => 'muted'];
 @endphp
 <x-filament-panels::page>
-    <x-chain-context step="Kế hoạch" purpose="Quyết định viết gì, theo thứ tự ưu tiên." :inputs="[['label'=>'Từ khóa và cụm chủ đề','url'=>\App\Filament\Pages\KeywordsPage::getUrl()],['label'=>'Đề xuất làm mới từ Audit','url'=>\App\Filament\Pages\AuditPage::getUrl()]]" :outputs="[['label'=>'Bài «Đã lên kế hoạch» để đội AI viết','url'=>\App\Filament\Resources\ArticleResource::getUrl('index'),'note'=>'Bài viết']]" />
+    <x-chain-context step="Kế hoạch của chiến dịch" purpose="Quyết định viết gì, theo thứ tự ưu tiên. Mỗi bài thuộc một chiến dịch hoặc là bài lẻ." :inputs="[['label'=>'Từ khóa và cụm chủ đề','url'=>\App\Filament\Pages\KeywordsPage::getUrl()],['label'=>'Đề xuất làm mới từ Audit','url'=>\App\Filament\Pages\AuditPage::getUrl()]]" :outputs="[['label'=>'Bài «Đã lên kế hoạch» để đội AI viết','url'=>\App\Filament\Resources\ArticleResource::getUrl('index'),'note'=>'Bài viết']]" />
     <style>
         .cp-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.5rem}
         @media (max-width:1024px){.cp-week{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -30,6 +30,11 @@
                 <select class="cp-in" wire:model.live="websiteId" aria-label="Website đích">
                     @foreach ($sites as $s)<option value="{{ $s->id }}" @selected($s->id === $site->id)>{{ $s->name }}</option>@endforeach
                 </select>
+                <select class="cp-in" wire:model.live="campaignId" aria-label="Chiến dịch" data-campaign-filter>
+                    <option value="">Tất cả chiến dịch</option>
+                    <option value="solo">Bài lẻ (không chiến dịch)</option>
+                    @foreach ($campaigns as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach
+                </select>
                 <span class="ss-muted ss-text-sm">{{ $total }} bài · tối đa {{ $limit }} bài/ngày · giờ VN</span>
                 <x-help title="Quy tắc của kế hoạch">
 <ul>
@@ -50,25 +55,7 @@
             @endif
         </div>
 
-        <div class="ss-card" style="margin-bottom:.75rem" data-plan-proposals><div class="ss-card__b">
-            <div class="ss-card__h">Đề xuất kế hoạch <x-help title="Đề xuất theo luật" text="Xếp theo luật, không dùng AI: lượt tìm (nếu có), độ phủ cụm, khoảng trống đối thủ. Bạn duyệt kế hoạch trước khi đội AI viết." /></div>
-            @forelse ($proposals as $p)
-                <label class="ss-text-sm" style="display:block;padding:.3rem 0;border-bottom:1px solid rgba(128,128,128,.2)" wire:key="pp-{{ $p['keyword_id'] }}">
-                    <input type="checkbox" value="{{ $p['keyword_id'] }}" wire:model="planPick">
-                    <strong>{{ $p['keyword'] }}</strong>
-                    · cụm: {{ $p['cluster'] ?? 'chưa gom' }}
-                    · {{ $p['volume'] !== null ? number_format($p['volume'], 0, ',', '.').' lượt tìm' : 'chưa có số liệu' }}
-                    · điểm {{ $p['priority'] }}
-                    <span class="ss-muted">({{ implode('; ', $p['reasons']) }})</span>
-                    @if ($p['off_topic'])<x-studio.badge tone="warn">Có vẻ lệch chủ đề, sẽ không được thêm</x-studio.badge>@endif
-                </label>
-            @empty
-                <p class="ss-muted ss-text-sm">Không còn từ khóa mới nào chưa có bài.</p>
-            @endforelse
-            @if ($proposals)
-                <div style="margin-top:.5rem"><x-filament::button size="sm" wire:click="addProposed">Thêm vào kế hoạch</x-filament::button></div>
-            @endif
-        </div></div>
+        @include('filament.partials.plan-proposals', ['proposals' => $proposals, 'pendingAudit' => $pendingAudit, 'showTarget' => $showTarget, 'targetCampaigns' => $campaigns])
 
         @if ($lastResults)
             <div class="ss-card" style="margin-bottom:.75rem" role="status"><div class="ss-card__b">
@@ -157,6 +144,12 @@
                                     @foreach ($suggestions as $s)
                                         <label class="ss-text-sm" style="display:block;margin-top:.4rem"><input type="checkbox" wire:model="suggestPick" value="{{ $s['keyword'] }}"> {{ $s['title'] }} <span class="ss-muted">— {{ $s['keyword'] }}</span></label>
                                     @endforeach
+                                    @if ($suggestions && $showTarget)
+                                        <select class="cp-in" wire:model="planTarget" aria-label="Gán vào chiến dịch" style="margin-top:.4rem">
+                                            <option value="">Gán vào…</option><option value="solo">Bài lẻ — không thuộc chiến dịch</option>
+                                            @foreach ($campaigns as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach
+                                        </select>
+                                    @endif
                                     @if ($suggestions)
                                         <x-filament::button color="gray" size="sm" wire:click="createSuggested" style="margin-top:.4rem">Tạo các bài đã chọn</x-filament::button>
                                     @endif

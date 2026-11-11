@@ -3,6 +3,7 @@
 namespace Tests\Feature\Filament;
 
 use App\Filament\Pages\ContentPlanPage;
+use App\Filament\Support\ContentPlan\PlanActions;
 use App\Filament\Support\ContentPlan\PlanData;
 use App\Filament\Support\Keywords\KeywordService;
 use App\Models\Article;
@@ -63,10 +64,10 @@ class ContentPlanPageTest extends TestCase
         $this->assertTrue(ContentPlanPage::canAccess());
         $this->actingAs($this->user('writer', false));
         $this->assertFalse(ContentPlanPage::canAccess());
-        $this->get('/admin/ke-hoach-noi-dung')->assertForbidden();
+        $this->get('/admin/doi-ai/ke-hoach')->assertForbidden();
         auth()->logout();
         $this->assertFalse(ContentPlanPage::canAccess());
-        $r = $this->actingAs($this->writer)->get('/admin/ke-hoach-noi-dung')->assertOk()->assertDontSee('Dữ liệu minh họa');
+        $r = $this->actingAs($this->writer)->get('/admin/doi-ai/ke-hoach')->assertOk()->assertDontSee('Dữ liệu minh họa');
         foreach (['Lịch tuần', 'Cụm chủ đề', 'Quy tắc của kế hoạch'] as $tab) {
             $r->assertSee($tab);
         }
@@ -75,7 +76,7 @@ class ContentPlanPageTest extends TestCase
     public function test_tao_bai_tu_cum_tao_dung_bai_that_va_chan_trung(): void
     {
         $this->article('Học bổng B', 'drafting');
-        $this->page()->callAction('createFromCluster', ['keywords' => ['học bổng a', 'học bổng b'], 'day' => null])
+        $this->page()->callAction('createFromCluster', ['keywords' => ['học bổng a', 'học bổng b'], 'target' => 'solo', 'day' => null])
             ->assertHasNoActionErrors()->assertSee('Bị chặn')->assertSee('Đã tạo bài');
         $a = Article::where('primary_keyword', 'học bổng a')->first();
         $this->assertNotNull($a);
@@ -110,9 +111,9 @@ class ContentPlanPageTest extends TestCase
         $day = '2026-11-09';
         PlanData::setPlannedDate($this->article('x1')->id, "$day 09:00");
         PlanData::setPlannedDate($this->article('x2')->id, "$day 14:00");
-        $this->page()->callAction('createFromCluster', ['keywords' => ['học bổng a', 'học bổng b'], 'day' => $day])->assertNotified('Chưa tạo bài');
+        $this->page()->callAction('createFromCluster', ['keywords' => ['học bổng a', 'học bổng b'], 'target' => 'solo', 'day' => $day])->assertNotified('Chưa tạo bài');
         $this->assertSame(2, Article::count());
-        $this->page()->callAction('createFromCluster', ['keywords' => ['học bổng a'], 'day' => $day]);
+        $this->page()->callAction('createFromCluster', ['keywords' => ['học bổng a'], 'target' => 'solo', 'day' => $day]);
         $a = Article::where('primary_keyword', 'học bổng a')->first();
         $this->assertSame("$day 19:00", PlanData::plannedDates()[$a->id]);
     }
@@ -129,7 +130,7 @@ class ContentPlanPageTest extends TestCase
 
         $t->callAction('reschedule', ['day' => '2026-11-05'], ['article' => $p->id])->assertHasActionErrors(['day']);
         try {
-            (new \App\Filament\Support\ContentPlan\PlanActions)->reschedule($this->writer, $p, '2026-11-05');
+            (new PlanActions)->reschedule($this->writer, $p, '2026-11-05');
             $this->fail('Phải từ chối ngày đã qua');
         } catch (\InvalidArgumentException $e) {
             $this->assertStringContainsString('đã qua', $e->getMessage());
@@ -185,7 +186,7 @@ class ContentPlanPageTest extends TestCase
         $t = Livewire::actingAs($u)->test(ContentPlanPage::class)->set('clusterName', 'Học bổng');
         $u->is_active = false;
         try {
-            $t->callAction('createFromCluster', ['keywords' => ['học bổng a'], 'day' => null]);
+            $t->callAction('createFromCluster', ['keywords' => ['học bổng a'], 'target' => 'solo', 'day' => null]);
         } catch (\Throwable) {
         }
         $this->assertSame(0, Article::count());

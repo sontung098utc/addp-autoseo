@@ -19,12 +19,17 @@ use App\Models\KeywordCluster;
 use App\Models\KnowledgeItemUsage;
 use App\Models\Publication;
 use App\Models\Website;
+use App\Services\Agent\Checkpoints\OutlineHold;
 use App\Services\Agent\Pipeline\JobTypeRegistry;
 use App\Services\Agent\Readiness\BrainAutoAttach;
+use App\Services\Agent\Settings\AgentAi;
 use App\Services\Brain\BrainContext;
 use App\Services\Publishing\EmergencyStopService;
+use App\Services\Publishing\PublicationHold;
 use Filament\Actions;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 
 /**
@@ -130,6 +135,85 @@ class ViewArticle extends EditArticle
         }
 
         return array_values(BrainAutoAttach::recent($site));
+    }
+
+    /** Điểm dừng 'outline': người sửa dàn ý rồi duyệt để đội AI viết tiếp (dàn ý có sẵn: không lập lại, không dừng lần nữa). */
+    public function approveOutlineAction(): Actions\Action
+    {
+        return Actions\Action::make('approveOutline')
+            ->label('Duyệt dàn ý và viết tiếp')->icon('heroicon-o-check')
+            ->visible(fn () => (ReviewActions::user()?->isWriter() ?? false) && OutlineHold::forArticle($this->record) !== null)
+            ->modalHeading('Sửa dàn ý rồi cho đội AI viết tiếp')
+            ->modalDescription('Sửa chữ, xóa, thêm mục hoặc kéo đổi thứ tự. Đội AI sẽ viết đúng theo dàn ý này.')
+            ->modalSubmitActionLabel('Duyệt và viết tiếp')
+            ->fillForm(fn () => ['items' => OutlineHold::forArticle($this->record)['outline'] ?? []])
+            ->form([
+                Repeater::make('items')->label('Dàn ý')->simple(TextInput::make('item')->required()->maxLength(OutlineHold::MAX_ITEM_LENGTH))
+                    ->reorderable()->addActionLabel('Thêm mục')->minItems(1)->maxItems(OutlineHold::MAX_ITEMS),
+            ])
+            ->action(function (array $data) {
+                $user = ReviewActions::user();
+                abort_unless($user?->isWriter(), 403);
+                $ai = AgentAi::forInteractiveUse();
+                if ($ai === null) {
+                    Notification::make()->title('Chưa kết nối AI')->body('Vào Đội AI → Kết nối AI để nhập khóa trước khi cho viết tiếp.')->warning()->send();
+
+                    return;
+                }
+                try {
+                    $run = (new OutlineHold)->approve($this->record, (array) ($data['items'] ?? []), $user, $ai, AgentAi::policy());
+                    Notification::make()->title('Đã duyệt dàn ý · phiên #'.$run->id)->body($run->outcome_reason ?: 'Đội AI đã viết xong bản nháp.')->success()->send();
+                } catch (\InvalidArgumentException $e) {
+                    Notification::make()->title('Chưa duyệt được dàn ý')->body($e->getMessage())->danger()->send();
+                }
+                $this->refreshRecord();
+            });
+    }
+
+    /** Bỏ dàn ý cũ, đội AI lập dàn ý mới (vẫn dừng sau dàn ý nếu chiến dịch đặt điểm dừng). */
+    public function regenerateOutlineAction(): Actions\Action
+    {
+        return Actions\Action::make('regenerateOutline')
+            ->label('Giao lại từ đầu')->icon('heroicon-o-arrow-path')->color('gray')
+            ->visible(fn () => (ReviewActions::user()?->isWriter() ?? false) && OutlineHold::forArticle($this->record) !== null)
+            ->requiresConfirmation()->modalHeading('Giao lại từ đầu')
+            ->modalDescription('Bỏ dàn ý này; đội AI lập dàn ý mới (tốn thêm một lượt lập dàn ý).')
+            ->action(function () {
+                abort_unless(ReviewActions::user()?->isWriter(), 403);
+                ArticleResource::assignToAgent($this->record);
+                $this->refreshRecord();
+            });
+    }
+
+    /** Tạm dừng / cho đăng tiếp RIÊNG lượt đăng này (tab Xuất bản); khác với Dừng khẩn cấp toàn hệ thống. */
+    public function pausePublicationAction(): Actions\Action
+    {
+        return Actions\Action::make('pausePublication')->label('Tạm dừng bài này')->color('gray')
+            ->requiresConfirmation()->modalHeading('Tạm dừng đăng bài này')
+            ->modalDescription('Chỉ lượt đăng của bài này bị dừng; các bài khác vẫn đăng bình thường. Bấm "Tiếp tục đăng" để cho đăng lại.')
+            ->action(fn (array $arguments) => $this->holdPublication((int) ($arguments['id'] ?? 0), pause: true));
+    }
+
+    public function resumePublicationAction(): Actions\Action
+    {
+        return Actions\Action::make('resumePublication')->label('Tiếp tục đăng')->color('success')
+            ->action(fn (array $arguments) => $this->holdPublication((int) ($arguments['id'] ?? 0), pause: false));
+    }
+
+    private function holdPublication(int $id, bool $pause): void
+    {
+        $user = ReviewActions::user();
+        // Chỉ lượt đăng thuộc bài đang mở (không cho đổi lượt của bài khác qua tham số).
+        $p = Publication::query()->whereKey($id)->whereHas('articleVersion', fn ($q) => $q->where('article_id', $this->record->id))->first();
+        abort_if($p === null, 404);
+        try {
+            $hold = new PublicationHold;
+            $pause ? $hold->pause($user, $p) : $hold->resume($user, $p);
+            Notification::make()->title($pause ? 'Đã tạm dừng lượt đăng của bài này' : 'Đã cho bài này đăng tiếp')->success()->send();
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()->title('Không thực hiện được')->body($e->getMessage())->danger()->send();
+        }
+        $this->refreshRecord();
     }
 
     protected function getHeaderActions(): array
@@ -282,6 +366,9 @@ class ViewArticle extends EditArticle
             'research' => (array) ($researchStep?->data ?? []) + (array) ($writeStep?->data ?? []),
             'webSources' => (array) ($runs->flatMap->steps->where('stage', 'research')->filter(fn ($st) => ! empty($st->data['web_sources']))->sortByDesc('id')->first()?->data['web_sources'] ?? []),
             'publications' => $publications,
+            'outlineHold' => OutlineHold::forArticle($article),
+            'canHold' => ReviewActions::user()?->isApprover() ?? false,
+            'canOutline' => ReviewActions::user()?->isWriter() ?? false,
             'quality' => $latest ? ReviewActions::qualityFor($latest) : null,
             'totalCost' => (float) $runs->sum('cost_vnd'),
             'totalTokens' => (int) $runs->sum('tokens_used'),

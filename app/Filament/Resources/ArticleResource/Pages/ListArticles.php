@@ -8,7 +8,10 @@ use App\Models\Article;
 use Filament\Actions;
 use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\HtmlString;
 
 /** AG-S16: một màn Bài viết gộp cả duyệt bài, chia tab ngang theo trạng thái. */
 class ListArticles extends ListRecords
@@ -17,10 +20,17 @@ class ListArticles extends ListRecords
 
     protected static string $resource = ArticleResource::class;
 
+    public const CONCEPT = 'Chiến dịch gom các bài cùng mục tiêu, lịch và quy tắc; bài lẻ là bài không thuộc chiến dịch nào. Muốn thêm bài vào chiến dịch, mở chiến dịch đó rồi bấm "Thêm bài".';
+
+    public function getHeading(): string|Htmlable
+    {
+        return new HtmlString(e(static::$title).' '.Blade::render('<x-help :text="$t" />', ['t' => self::CONCEPT]));
+    }
+
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            Actions\CreateAction::make()->label('Tạo bài lẻ')->tooltip('Bài không thuộc chiến dịch nào'),
         ];
     }
 

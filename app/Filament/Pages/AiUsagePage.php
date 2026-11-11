@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Pages\Concerns\ManagesAiAccounts;
+use App\Filament\Resources\ArticleResource;
 use App\Filament\Support\AiUsage\UsageAggregator;
 use App\Filament\Support\AiUsage\UsageReader;
 use App\Filament\Support\AiUsage\UsageThresholds;
@@ -17,10 +19,30 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
+use Livewire\Attributes\Url;
 use Throwable;
 
+/** Chi phí AI: hai tab ngang. "Chi phí" (số liệu) và "Cấu hình AI" (tài khoản/khóa/model, trước là trang Tích hợp AI; URL cũ chuyển về ?tab=cau-hinh). */
 class AiUsagePage extends Page
 {
+    use ManagesAiAccounts;
+
+    public const TABS = ['chi-phi' => 'Chi phí', 'cau-hinh' => 'Cấu hình AI'];
+
+    #[Url(as: 'tab')]
+    public string $tab = 'chi-phi';
+
+    public static function configUrl(): string
+    {
+        return static::getUrl(['tab' => 'cau-hinh']);
+    }
+
+    public function setTab(string $tab): void
+    {
+        $this->tab = array_key_exists($tab, self::TABS) ? $tab : 'chi-phi';
+        $this->showPicker = false;
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 
     protected static ?string $navigationLabel = 'Chi phí AI';
@@ -107,6 +129,11 @@ class AiUsagePage extends Page
 
     protected function getHeaderActions(): array
     {
+        if ($this->tab === 'cau-hinh') {
+            // addProvider được mở từ bộ chọn nhà cung cấp trong trang (nút ẩn chỉ để Filament nhận diện action).
+            return [$this->editLimitsAction(), $this->addProviderAction()->extraAttributes(['style' => 'display:none', 'aria-hidden' => 'true', 'tabindex' => '-1'])];
+        }
+
         return [
             Action::make('setThreshold')
                 ->label('Đặt ngưỡng cảnh báo')
@@ -144,6 +171,10 @@ class AiUsagePage extends Page
 
     public function getViewData(): array
     {
+        if ($this->tab === 'cau-hinh') {
+            return ['tab' => 'cau-hinh'] + $this->configViewData();
+        }
+
         [$from, $to, $label, $rangeError] = $this->range();
         $rows = UsageReader::rows($this->siteId());
         $agg = new UsageAggregator($rows);
@@ -171,6 +202,7 @@ class AiUsagePage extends Page
         $pace = $th['month'] !== null ? $th['month'] / $now->daysInMonth : null;
 
         return [
+            'tab' => 'chi-phi',
             'websites' => Website::orderBy('name')->get(['id', 'name']),
             'label' => $label,
             'rangeError' => $rangeError,
@@ -253,7 +285,7 @@ class AiUsagePage extends Page
         foreach ($articles as $a) {
             $rows[] = [
                 'id' => $a['article_id'],
-                'title' => ['text' => $a['title'], 'href' => \App\Filament\Resources\ArticleResource::getUrl('view', ['record' => $a['article_id']])],
+                'title' => ['text' => $a['title'], 'href' => ArticleResource::getUrl('view', ['record' => $a['article_id']])],
                 'website' => $a['website'],
                 'models' => implode(', ', $a['models']) ?: 'không rõ model',
                 'cost' => round($a['cost']),

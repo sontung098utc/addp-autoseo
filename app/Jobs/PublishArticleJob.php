@@ -67,6 +67,12 @@ class PublishArticleJob implements ShouldQueue
             return;
         }
 
+        // Điểm dừng chờ người: lượt đã tạm dừng / chờ xác nhận KHÔNG bao giờ được gửi lên CMS (kể cả khi job đã nằm sẵn trong hàng đợi).
+        if (in_array($publication->status, ['paused', 'awaiting_confirm'], true)) {
+            Log::info("[PublishArticleJob] Publication #{$publication->id} đang {$publication->status}, bỏ qua không gửi.");
+            return;
+        }
+
         // Nếu bài đang ở trạng thái cần đối soát, không xuất bản mới mà chuyển sang job đối soát
         if ($publication->status === 'needs_reconcile') {
             Log::warning("[PublishArticleJob] Publication #{$publication->id} đang ở trạng thái needs_reconcile. Chuyển sang ReconcilePublicationJob.");

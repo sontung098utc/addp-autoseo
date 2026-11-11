@@ -51,7 +51,7 @@ final class PublishExplainer
         // 2. Trạng thái của lượt đăng.
         $statusState = match ($status) {
             'published' => self::OK,
-            'failed', 'needs_reconcile', 'held' => self::BLOCKING,
+            'failed', 'needs_reconcile', 'held', 'paused', 'awaiting_confirm' => self::BLOCKING,
             default => self::WAITING,
         };
         $checks[] = self::check('Trạng thái lượt đăng', StatusPresenter::label($status, 'publication'), $statusState, $statusInfo['why']);
@@ -161,6 +161,8 @@ final class PublishExplainer
             $status === 'needs_reconcile' => ['blocked', 'Chờ đối soát với CMS (không đăng lại để tránh trùng bài)', 1],
             $status === 'failed' => ['failed', 'Lần gửi trước bị lỗi', 1],
             $status === 'held' => ['blocked', 'Lượt đăng đang được tạm giữ', 1],
+            $status === 'paused' => ['blocked', 'Lượt đăng đã được tạm dừng, chưa gửi lên CMS', 1],
+            $status === 'awaiting_confirm' => ['blocked', 'Chờ bạn xác nhận trước khi đăng (điểm dừng của chiến dịch)', 1],
             ! $siteActive => ['blocked', 'Website không hoạt động nên sẽ không đăng được', 2],
             $status === 'publishing' => ['waiting', 'Hệ thống đang gửi bài lên CMS', 1],
             $at && $at->greaterThan($now) => ['waiting', 'Chưa tới giờ đăng', 3],

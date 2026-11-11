@@ -1,6 +1,5 @@
 @if ($j)
 <div data-testid="job-detail" class="space-y-3 text-sm">
-    <div>Mắt xích: {{ $chain[$j['link']] ?? $j['link'] }}@foreach ((array) $j['also'] as $l), {{ $chain[$l] ?? $l }}@endforeach</div>
     @if ($url)<div><x-filament::button size="sm" tag="a" :href="$url">Mở trang làm việc này</x-filament::button></div>@endif
     @if ($j['human'])<div><strong>Việc bạn cần làm:</strong>@foreach ($j['human'] as $h)<div style="margin-left:.5rem">• {{ $h }}</div>@endforeach</div>@endif
     <div><strong>Kết quả hiện ở:</strong> {{ collect($j['shown_at'])->map(fn ($x) => trim(preg_replace('/\s*\(.*?\)/u', '', $x)))->implode('; ') ?: 'chưa rõ' }}</div>

@@ -3,7 +3,7 @@
 namespace Tests\Feature\Agent;
 
 use App\Filament\Clusters\AgentTeam\Pages\AgentRoles;
-use App\Filament\Pages\AgentConnection;
+use App\Filament\Pages\AiUsagePage;
 use App\Filament\Pages\TrustPolicy;
 use App\Models\AgentRoleAssignment;
 use App\Models\AiModelRoute;
@@ -56,20 +56,21 @@ class RoleAssignmentTest extends TestCase
 
     public function test_url_cu_chuyen_huong_sang_cai_dat(): void
     {
-        $this->get('/admin/doi-ai/ket-noi-ai')->assertStatus(301)->assertRedirect('/admin/tich-hop-ai');
+        $this->get('/admin/tich-hop-ai')->assertStatus(301)->assertRedirect('/admin/chi-phi-ai?tab=cau-hinh');
+        $this->get('/admin/doi-ai/ket-noi-ai')->assertStatus(301)->assertRedirect('/admin/chi-phi-ai?tab=cau-hinh');
         $this->get('/admin/doi-ai/chinh-sach')->assertStatus(301)->assertRedirect('/admin/chinh-sach-tin-cay');
     }
 
     public function test_hai_trang_nam_o_nhom_cai_dat_ngoai_cum(): void
     {
-        foreach ([AgentConnection::class, TrustPolicy::class] as $page) {
+        foreach ([AiUsagePage::class, TrustPolicy::class] as $page) {
             $this->assertSame('Cài đặt', $page::getNavigationGroup());
             $this->assertNull($page::getCluster());
         }
         $this->actingAs($this->user('approver'));
-        $this->assertStringEndsWith('/admin/tich-hop-ai', AgentConnection::getUrl());
+        $this->assertStringEndsWith('/admin/chi-phi-ai?tab=cau-hinh', AiUsagePage::configUrl());
         $this->assertStringEndsWith('/admin/chinh-sach-tin-cay', TrustPolicy::getUrl());
-        $this->get('/admin/tich-hop-ai')->assertOk();
+        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertOk();
         $this->get('/admin/chinh-sach-tin-cay')->assertOk();
         $this->get('/admin/doi-ai/vai-tro')->assertOk()->assertDontSee('/admin/doi-ai/ket-noi-ai', false);
     }
@@ -77,7 +78,7 @@ class RoleAssignmentTest extends TestCase
     public function test_bien_tap_vien_bi_chan_o_trang_moi(): void
     {
         $this->actingAs($this->user('writer'));
-        $this->get('/admin/tich-hop-ai')->assertForbidden();
+        $this->get('/admin/chi-phi-ai?tab=cau-hinh')->assertForbidden();
         $this->get('/admin/chinh-sach-tin-cay')->assertForbidden();
         $this->get('/admin/doi-ai/vai-tro')->assertForbidden();
     }
@@ -88,9 +89,12 @@ class RoleAssignmentTest extends TestCase
         $g = $this->provider('Gemini', 'gemini');
         $this->actingAs($this->user('admin'));
         Livewire::test(AgentRoles::class)
-            ->callAction('assign', ['provider_id' => $a->id, 'model' => 'claude-sonnet-5-5', 'fallback_provider_id' => $g->id, 'fallback_model' => 'gemini-1.5-pro', 'model_enabled' => true, 'sk_0_on' => true, 'sk_0_pin' => ''], ['role' => 'writer'])
-            ->assertHasNoActionErrors()
-            ->assertSee('Anthropic · claude-sonnet-5-5, dự phòng Gemini · gemini-1.5-pro');
+            ->call('openStudio', 'writer', 'model')
+            ->assertSee('Model khả dụng')->assertSee('claude-sonnet-5-5')->assertSee('gemini-1.5-flash')
+            ->call('pickModel', 'primary', $a->id, 'claude-sonnet-5-5')
+            ->call('pickModel', 'fallback', $g->id, 'gemini-1.5-flash')
+            ->assertSee('Anthropic')->assertSee('Gemini');
+        $this->assertSame('Anthropic · claude-sonnet-5-5, dự phòng Gemini · gemini-1.5-flash', (new RoleAssignments)->summary('writer'));
         $row = AgentRoleAssignment::where('role_key', 'writer')->first();
         $this->assertSame($a->id, $row->provider_id);
         $this->assertSame('claude-sonnet-5-5', $row->model);
@@ -104,7 +108,9 @@ class RoleAssignmentTest extends TestCase
         $this->actingAs($this->user('approver'));
         $this->get('/admin/doi-ai/vai-tro')->assertOk()->assertSee('Anthropic · claude-sonnet-5-5')->assertDontSee('role-assign-btn-writer', false)
             ->assertDontSee('wire:click="mountAction(&#039;assign&#039;', false);
-        Livewire::test(AgentRoles::class)->assertActionHidden('assign', ['role' => 'writer']);
+        Livewire::test(AgentRoles::class)->assertActionHidden('assign', ['role' => 'writer'])
+            ->call('openStudio', 'writer', 'model')->assertDontSee('Chọn chính')->call('pickModel', 'primary', $a->id, 'claude-haiku-5-5');
+        $this->assertSame('claude-sonnet-5-5', AgentRoleAssignment::where('role_key', 'writer')->value('model'), 'người duyệt không đổi được model');
         $this->expectException(\InvalidArgumentException::class);
         (new RoleAssignments)->saveModel('writer', $a->id, 'x', null, null, true, $this->user('approver'));
     }
@@ -121,7 +127,12 @@ class RoleAssignmentTest extends TestCase
         $this->assertSame(0, AgentRoleAssignment::count());
         // Qua giao diện: không lưu, báo lỗi.
         $this->actingAs($this->user('admin'));
-        Livewire::test(AgentRoles::class)->callAction('assign', ['provider_id' => 9999, 'model' => 'm', 'model_enabled' => true], ['role' => 'writer']);
+        Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'model')->call('pickModel', 'primary', 9999, 'm');
+        $this->assertSame(0, AgentRoleAssignment::count());
+        // Model chưa bật ở Cấu hình AI cũng bị từ chối.
+        $a = $this->provider();
+        $a->update(['models' => ['claude-sonnet-5-5']]);
+        Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'model')->call('pickModel', 'primary', $a->id, 'claude-opus-5-5');
         $this->assertSame(0, AgentRoleAssignment::count());
     }
 
@@ -245,15 +256,17 @@ class RoleAssignmentTest extends TestCase
     public function test_khong_co_provider_the_hien_canh_bao_va_khoa_khong_lo(): void
     {
         $this->actingAs($this->user('admin'));
-        $this->get('/admin/doi-ai/vai-tro')->assertOk()->assertSee('Chưa có provider — vào Cài đặt → Tích hợp AI', false)->assertSee('/admin/tich-hop-ai', false);
+        $this->get('/admin/doi-ai/vai-tro')->assertOk()->assertSee('Chưa có tài khoản AI', false)->assertSee('/admin/chi-phi-ai?tab=cau-hinh', false);
+        Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'model')->assertSee('Chưa có tài khoản AI nào đang bật')->assertSee('Mở Cấu hình AI');
         $this->provider();
-        $this->get('/admin/doi-ai/vai-tro')->assertOk()->assertDontSee(self::KEY)->assertDontSee('Chưa có provider — vào Cài đặt');
+        $this->get('/admin/doi-ai/vai-tro')->assertOk()->assertDontSee(self::KEY)->assertDontSee('Chưa có tài khoản AI');
+        Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'model')->assertDontSee(self::KEY)->assertSee('claude-sonnet-5-5');
         Livewire::test(AgentRoles::class)->mountAction('assign', ['role' => 'writer'])->assertDontSee(self::KEY);
     }
 
     public function test_vai_tro_chua_noi_hien_ghi_chu_chua_noi_vao_luong(): void
     {
         $this->actingAs($this->user('admin'));
-        Livewire::test(AgentRoles::class)->mountAction('assign', ['role' => 'auditor'])->assertSee('Chưa nối vào luồng');
+        Livewire::test(AgentRoles::class)->call('openStudio', 'auditor', 'model')->assertSee('Chưa nối vào luồng gọi AI');
     }
 }

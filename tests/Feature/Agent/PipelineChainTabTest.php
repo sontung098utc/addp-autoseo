@@ -12,7 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
 
-/** G1: tab Pipeline hiện chuỗi 7 mắt xích với thẻ loại việc, giữ bản đồ 9 giai đoạn. */
+/** Tab Pipeline: hai tab ngang, mỗi loại việc một luồng; không còn chuỗi mắt xích và bản đồ 9 giai đoạn. */
 class PipelineChainTabTest extends TestCase
 {
     use RefreshDatabase;
@@ -22,19 +22,42 @@ class PipelineChainTabTest extends TestCase
         return User::create(['name' => $role, 'email' => uniqid().'@x.vn', 'password' => 'secret123', 'role' => $role, 'is_active' => true]);
     }
 
-    public function test_hien_du_7_mat_xich_theo_thu_tu_va_the_viet_bai(): void
+    public function test_khong_con_chuoi_mat_xich_va_ban_do_9_giai_doan(): void
     {
         $this->actingAs($this->user('approver'));
-        $labels = array_values(JobTypeRegistry::CHAIN);
-        $this->assertCount(7, $labels);
-        $res = $this->get('/admin/doi-ai/pipeline')->assertOk()->assertSeeInOrder($labels)
-            ->assertSee('Viết bài')->assertSee('Dùng được')->assertSee('Việc bạn cần làm')
-            ->assertSee('Bản đồ 9 giai đoạn (trạng thái bằng chứng)')
-            ->assertDontSee('Chạy toàn bộ');
+        $res = $this->get('/admin/doi-ai/pipeline')->assertOk()
+            ->assertDontSee('Chuỗi làm ra một bài')->assertDontSee('Chuỗi 7 mắt xích')->assertDontSee('Mắt xích')
+            ->assertDontSee('Bản đồ 9 giai đoạn')->assertDontSee('việc dùng được')
+            ->assertDontSee('data-testid="pipeline-chain"', false)->assertDontSee('data-testid="pipeline-map9"', false)
+            ->assertDontSee('Chạy toàn bộ')->assertDontSee('Văn phòng AI')
+            ->assertSee('data-testid="help"', false);
         $this->assertFalse(PipelineBlueprint::controlsWired());
-        $res->assertDontSee('Văn phòng AI')->assertSee('data-testid="help"', false);
-        $this->assertCount(9, PipelineBlueprint::stages());
-        $res->assertSee('data-stage="quality"', false);
+        $res->assertDontSee('data-stage="quality"', false);
+    }
+
+    public function test_chi_con_hai_tab_ngang(): void
+    {
+        $this->actingAs($this->user('approver'));
+        $html = $this->get('/admin/doi-ai/pipeline')->assertOk()->getContent();
+        preg_match_all('/role="tab" class="ss-tab" data-key="([^"]+)"/', $html, $m);
+        $this->assertSame(['flows', 'runs'], $m[1]);
+    }
+
+    public function test_moi_luong_la_mot_khung_co_chip_loc_tieu_de_mo_ta_va_nut_mo_trang(): void
+    {
+        $this->actingAs($this->user('approver'));
+        $html = $this->get('/admin/doi-ai/pipeline')->assertOk()->getContent();
+        foreach (JobTypeRegistry::all() as $j) {
+            $this->assertStringContainsString('data-flow-chip="'.$j['id'].'"', $html);
+            $a = strpos($html, '<section class="pv-flow" data-flow="'.$j['id'].'"');
+            $this->assertNotFalse($a, $j['id']);
+            $sec = substr($html, $a, strpos($html, '</section>', $a) - $a);
+            $this->assertStringContainsString($j['title'], $sec);
+            $this->assertStringContainsString('pv-flow__plain', $sec);
+            $this->assertStringNotContainsString('agent_runs', $sec);
+        }
+        $this->assertStringContainsString('open-work-site_audit', $html);
+        $this->assertStringContainsString('Mở trang làm việc', $html);
     }
 
     public function test_cua_so_truot_loai_viec(): void
@@ -54,36 +77,11 @@ class PipelineChainTabTest extends TestCase
         $this->assertTrue(PipelineMap::canAccess());
     }
 
-    public function test_the_ngoai_khong_in_ten_bang_va_co_nut_mo_trang(): void
+    public function test_cua_so_chi_tiet_ky_thuat_cho_quan_tri_con_nguyen(): void
     {
         $this->actingAs($this->user('approver'));
-        $html = $this->get('/admin/doi-ai/pipeline')->assertOk()->getContent();
-        $chain = substr($html, strpos($html, 'data-testid="pipeline-chain"'), strpos($html, 'data-testid="pipeline-map9"') - strpos($html, 'data-testid="pipeline-chain"'));
-        $this->assertStringNotContainsString('agent_runs', $chain);
-        $this->assertStringNotContainsString('source=ai', $chain);
-        $this->assertStringContainsString('open-work-site_audit', $chain);
-        $this->assertStringContainsString('Mở trang làm việc này', $chain);
         Livewire::test(PipelineMap::class)->call('mountAction', 'job', ['job' => 'article_write'])
-            ->assertSee('Chi tiết kỹ thuật (dành cho quản trị)')->assertSee('agent_runs');
-    }
-
-    public function test_dong_tom_tat_dung_so(): void
-    {
-        $t = PipelineMap::tally();
-        $all = JobTypeRegistry::all();
-        $this->assertSame(count($all), $t['total']);
-        $this->assertSame($t['total'], $t['ready'] + $t['partial'] + $t['none']);
-        $this->assertSame(count(array_filter($all, fn ($j) => $j['status'] !== 'active')), $t['none']);
-        $this->actingAs($this->user('approver'));
-        $this->get('/admin/doi-ai/pipeline')->assertSee("{$t['ready']}/{$t['total']} việc dùng được, {$t['partial']} dùng được một phần, {$t['none']} chưa có.", false);
-    }
-
-    public function test_quy_tac_muc_dung_duoc(): void
-    {
-        $this->assertSame('none', PipelineMap::usability(['status' => 'planned', 'summary' => 'x']));
-        $this->assertSame('partial', PipelineMap::usability(['status' => 'active', 'summary' => 'Có A. Chưa làm: B']));
-        $this->assertSame('partial', PipelineMap::usability(['status' => 'active', 'summary' => 'Sửa MỘT PHẦN']));
-        $this->assertSame('ready', PipelineMap::usability(['status' => 'active', 'summary' => 'Viết bài.']));
+            ->assertSee('Chi tiết kỹ thuật (dành cho quản trị)')->assertSee('agent_runs')->assertDontSee('Mắt xích');
     }
 
     public function test_cau_mo_ta_tranh_ma_ky_thuat(): void

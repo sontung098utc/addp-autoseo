@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Agent;
 
+use App\Filament\Pages\BrainBuildPage;
 use App\Filament\Pages\WebsiteOnboardingPage;
 use App\Models\Article;
 use App\Models\Brain;
@@ -109,10 +110,13 @@ class WebsiteOnboardingTest extends TestCase
         $writer = User::create(['name' => 'w', 'email' => 'w@x.vn', 'password' => 'secret123', 'role' => 'writer', 'is_active' => true]);
         $this->actingAs($writer);
         $this->assertFalse(WebsiteOnboardingPage::canAccess());
+        $this->assertFalse(BrainBuildPage::canOnboard());
 
         $this->actingAs(User::create(['name' => 'a', 'email' => 'a@x.vn', 'password' => 'secret123', 'role' => 'approver', 'is_active' => true]));
         $this->assertTrue(WebsiteOnboardingPage::canAccess());
-        $this->get(WebsiteOnboardingPage::getUrl())->assertOk()->assertSee('Khởi tạo website')->assertSee('chain-context', false);
-        Livewire::test(WebsiteOnboardingPage::class)->call('start')->assertSet('result.steps.0.key', 'kb');
+        // Z2: khởi tạo thành khối "Khởi tạo nhanh" ở tab Nạp kiến thức; URL cũ chuyển hướng về đó.
+        $this->get(WebsiteOnboardingPage::getUrl())->assertRedirect(BrainBuildPage::getUrl().'#khoi-tao-nhanh');
+        $this->get(BrainBuildPage::getUrl())->assertOk()->assertSee('Khởi tạo nhanh')->assertSee('ob-start', false);
+        Livewire::test(BrainBuildPage::class)->call('startOnboarding')->assertSet('onboardResult.steps.0.key', 'kb');
     }
 }

@@ -36,6 +36,14 @@ final class ScheduleExplainer
                 'why' => 'Lượt đăng đang được tạm giữ.',
                 'next' => 'Chờ được thả lại.',
             ],
+            'paused' => [
+                'why' => 'Có người đã tạm dừng riêng lượt đăng này. Hệ thống KHÔNG gửi bài lên CMS khi đang dừng.',
+                'next' => 'Bấm "Tiếp tục đăng" khi sẵn sàng; lượt sẽ về "Đã xếp lịch" (quá giờ thì đăng ở lần quét kế tiếp).',
+            ],
+            'awaiting_confirm' => [
+                'why' => 'Chiến dịch đặt điểm dừng "Trước khi đăng": cần người xác nhận rồi mới gửi bài lên CMS.',
+                'next' => 'Bấm "Xác nhận đăng" để xếp lại vào lịch; không xác nhận thì bài không bao giờ được gửi.',
+            ],
             default => ['why' => 'Trạng thái không xác định.', 'next' => 'Liên hệ quản trị hệ thống.'],
         };
     }

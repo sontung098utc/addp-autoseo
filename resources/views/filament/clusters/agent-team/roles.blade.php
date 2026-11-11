@@ -32,14 +32,14 @@
             <x-help title="Đội AI SEO">
                 <p>Mỗi nhân sự là một vai trò trong dây chuyền làm bài, học từ bộ claude-seo và chỉnh cho website tiếng Việt.</p>
                 <ul>
-                    <li>Bấm tên để mở hồ sơ: vai trò, quy tắc, bài học, kỹ năng, vị trí trong luồng.</li>
-                    <li>Bấm chip model để chọn hoặc đổi model; công tắc để bật/tắt (chỉ admin).</li>
+                    <li>Bấm tên để mở hồ sơ: vai trò, mô hình, huấn luyện, vị trí trong luồng, chi tiết kỹ thuật.</li>
+                    <li>Bấm chip model để mở danh sách model khả dụng và chọn; công tắc để bật/tắt (chỉ admin).</li>
                     <li>Trạng thái phản ánh việc thật sự được nối vào phiên chạy, không phải kế hoạch. Biên tập (chấm luật) và Người viết luôn bật.</li>
                 </ul>
             </x-help>
         </div>
         @if (! $hasProviders && count(array_filter($cards, fn ($c) => $c['model_wired'])) > 0)
-            <div class="text-sm" style="color:#d97706" data-testid="roles-no-provider">(!) Chưa có provider — vào Cài đặt → Tích hợp AI để thêm. <a href="{{ $connectionUrl }}" style="text-decoration:underline">Tích hợp AI</a></div>
+            <div class="text-sm" style="color:#d97706" data-testid="roles-no-provider">(!) Chưa có tài khoản AI. <a href="{{ $connectionUrl }}" style="text-decoration:underline">Thêm ở Cấu hình AI</a></div>
         @endif
         <div class="rc-grid">
             @foreach ($cards as $c)
@@ -47,7 +47,7 @@
                 <article class="rc {{ $c['is_off'] ? 'rc--off' : '' }}" data-testid="role-card-{{ $k }}" wire:key="rc-{{ $k }}">
                     <div class="rc-top">
                         <button type="button" class="rc-id" wire:click="openStudio('{{ $k }}')" aria-label="Mở hồ sơ {{ $c['name'] }}">
-                            @include('filament.clusters.agent-team.agent-studio-avatar', ['avatar' => $c['profile']['avatar'], 'size' => 2.4])
+                            @include('filament.clusters.agent-team.agent-studio-avatar', ['role' => $k, 'size' => 2.4])
                             <span class="rc-name"><strong>{{ $c['name'] }}</strong><span>{{ $c['profile']['title'] }}</span></span>
                         </button>
                         @if ($c['switchable'])
@@ -65,12 +65,12 @@
                         @if ($c['model_wired'])
                             @if ($c['assigned'])
                                 @if ($canSwitch)
-                                    <button type="button" class="rc-chip" wire:click="mountAction('assign', {{ \Illuminate\Support\Js::from(['role' => $k]) }})" data-testid="role-model-chip-{{ $k }}" title="Bấm để đổi model"><span data-testid="role-model-{{ $k }}">{{ $c['assigned'] }}</span></button>
+                                    <button type="button" class="rc-chip" wire:click="openStudio('{{ $k }}', 'model')" data-testid="role-model-chip-{{ $k }}" title="Bấm để chọn model từ danh sách"><span data-testid="role-model-{{ $k }}">{{ $c['assigned'] }}</span></button>
                                 @else
                                     <span class="rc-chip" data-testid="role-model-chip-{{ $k }}"><span data-testid="role-model-{{ $k }}">{{ $c['assigned'] }}</span></span>
                                 @endif
                             @elseif ($canSwitch)
-                                <button type="button" class="rc-chip rc-chip--empty" wire:click="mountAction('assign', {{ \Illuminate\Support\Js::from(['role' => $k]) }})" data-testid="role-model-chip-{{ $k }}" title="Bấm để chọn model"><span data-testid="role-model-{{ $k }}">Chưa gán model</span></button>
+                                <button type="button" class="rc-chip rc-chip--empty" wire:click="openStudio('{{ $k }}', 'model')" data-testid="role-model-chip-{{ $k }}" title="Bấm để chọn model từ danh sách"><span data-testid="role-model-{{ $k }}">Chưa gán model</span></button>
                             @else
                                 <span class="rc-chip rc-chip--empty" data-testid="role-model-chip-{{ $k }}"><span data-testid="role-model-{{ $k }}">Chưa gán model</span></span>
                             @endif

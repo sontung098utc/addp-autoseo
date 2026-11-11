@@ -50,7 +50,17 @@ class CampaignResource extends Resource
     /** Quy ước giao diện: câu thường ("Chiến dịch tự động"), không để Filament tự Viết Hoa Từng Chữ ở tiêu đề và breadcrumb. */
     protected static bool $hasTitleCaseModelLabel = false;
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 1;
+
+    public const MODE_LABELS = ['cautious' => 'Duyệt trước · thận trọng', 'balanced' => 'Duyệt trước · cân bằng', 'autonomous' => 'Toàn quyền'];
+
+    /** Mô tả một dòng cho từng điểm dừng chờ người (khóa lấy từ Campaign::CHECKPOINTS). */
+    public const CHECKPOINT_HINTS = [
+        'plan' => 'Đội AI đề xuất kế hoạch xong thì dừng, bạn duyệt danh sách bài rồi mới viết.',
+        'outline' => 'Có dàn ý thì dừng, bạn xem dàn ý rồi mới viết tiếp.',
+        'draft' => 'Có bản nháp thì dừng, bạn xem bản nháp rồi mới chấm và sửa tiếp.',
+        'publish' => 'Bài đã duyệt vẫn chờ bạn bấm mới được đăng.',
+    ];
 
     protected static function allowed(): bool
     {
@@ -151,16 +161,21 @@ class CampaignResource extends Resource
                 Forms\Components\TextInput::make('daily_draft_cap')->label('Trần bài đẩy nháp mỗi ngày')->numeric()->minValue(1)->maxValue(50)->default(5)->required()
                     ->hintIcon('heroicon-o-information-circle', 'Số bản nháp tối đa được đẩy sang hàng chờ duyệt mỗi ngày.'),
             ])->columns(2),
+            Forms\Components\Section::make('Điểm dừng chờ người')->schema([
+                Forms\Components\CheckboxList::make('checkpoints')->label('Dừng ở giai đoạn')->hintIcon('heroicon-o-information-circle', 'Không tick: đội AI chạy liền mạch trong hạn mức. Tick giai đoạn nào thì dừng ở đó chờ bạn.')->options(Campaign::CHECKPOINTS)->descriptions(self::CHECKPOINT_HINTS)->default([])
+                    ->columns(1)->bulkToggleable(false),
+            ])->compact(),
         ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with('website')->withCount(['runs as runs_total', 'runs as runs_review' => fn ($q) => $q->where('status', 'ready_for_review'), 'runs as runs_held' => fn ($q) => $q->where('status', 'held')]))
+            ->modifyQueryUsing(fn ($query) => $query->with('website')->withCount(['articles as articles_total', 'articles as articles_planned' => fn ($q) => $q->where('workflow_status', 'planned'), 'articles as articles_review' => fn ($q) => $q->where('workflow_status', 'needs_review'), 'runs as runs_total', 'runs as runs_review' => fn ($q) => $q->where('status', 'ready_for_review'), 'runs as runs_held' => fn ($q) => $q->where('status', 'held')]))
             ->defaultSort('id', 'desc')
             ->poll(fn () => RunActivity::anyRunning() ? '3s' : '20s')
             ->recordClasses('ss-sticky-row')
+            ->recordUrl(fn (Campaign $r) => static::getUrl('view', ['record' => $r]))
             ->columns([
                 Tables\Columns\TextColumn::make('name')->label('Chiến dịch')->searchable()->wrap()->description(fn (Campaign $r) => $r->website?->name.' · Đã giao '.(int) $r->runs_total.' bài · '.(int) $r->runs_review.' chờ duyệt · '.(int) $r->runs_held.' giữ nháp')
                     ->extraHeaderAttributes(['class' => 'ss-col-main'])->extraCellAttributes(['class' => 'ss-col-main']),
@@ -171,6 +186,8 @@ class CampaignResource extends Resource
                     ->extraAttributes(fn (Campaign $r) => self::liveRunCount($r) > 0 ? ['class' => 'ss-badge-live', 'data-running' => '1'] : [])
                     ->description(fn (Campaign $r) => self::liveRunCount($r) > 0 ? 'Đang viết '.self::liveRunCount($r).' bài' : null)
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
+                Tables\Columns\TextColumn::make('progress')->label('Bài con')->state(fn (Campaign $r) => (int) $r->articles_total.' bài · '.(int) $r->articles_planned.' kế hoạch · '.(int) $r->articles_review.' chờ duyệt')->description(fn (Campaign $r) => self::MODE_LABELS[$r->mode] ?? $r->mode)->visibleFrom('md')
+                    ->extraHeaderAttributes(['style' => 'white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
                 Tables\Columns\TextColumn::make('today')->label('Hôm nay')->state(fn (Campaign $r) => self::todayCount($r).' / '.$r->daily_limit)->alignCenter()
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%;white-space:nowrap']),
                 Tables\Columns\TextColumn::make('left')->label('Từ khóa còn lại')->visibleFrom('lg')->state(fn (Campaign $r) => self::remaining($r))->alignCenter()
@@ -180,18 +197,28 @@ class CampaignResource extends Resource
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
             ])
             ->actions([
-                Tables\Actions\EditAction::make()->label('Sửa'),
+                Tables\Actions\EditAction::make()->label('Cấu hình'),
                 Tables\Actions\Action::make('tick')->label('Chạy một nhịp ngay')->icon('heroicon-o-play')
                     ->visible(fn (Campaign $r) => $r->status === 'active' && static::allowed())
                     ->requiresConfirmation()->modalDescription('Chọn bài kế tiếp và tạo một phiên chạy cho bài đó ngay bây giờ, vẫn trong giới hạn bài/ngày. Bài thường ở chế độ Toàn quyền sẽ được đội AI tự duyệt; còn lại là bản nháp chờ duyệt.')
-                    ->action(function (Campaign $r) {
-                        abort_unless(static::allowed(), 403);
-                        $res = (new CampaignRunner(static::providerFactory()))->tick($r);
-                        $n = Notification::make()->title($res['message']);
-                        in_array($res['result'], ['ran', 'auto_approved'], true) ? $n->success() : $n->warning();
-                        $n->send();
-                    }),
+                    ->action(fn (Campaign $r) => static::runTick($r)),
             ]);
+    }
+
+    /** Chạy một nhịp ngay (dùng chung cho bảng và trang chiến dịch); kết quả báo qua thông báo. */
+    public static function runTick(Campaign $r): void
+    {
+        abort_unless(static::allowed(), 403);
+        $res = (new CampaignRunner(static::providerFactory()))->tick($r);
+        $n = Notification::make()->title($res['message']);
+        in_array($res['result'], ['ran', 'auto_approved'], true) ? $n->success() : $n->warning();
+        $n->send();
+    }
+
+    /** Số bài của chiến dịch theo trạng thái. @return array<string,int> */
+    public static function articleCounts(Campaign $c): array
+    {
+        return Article::query()->where('campaign_id', $c->id)->selectRaw('workflow_status, count(*) as n')->groupBy('workflow_status')->pluck('n', 'workflow_status')->map(fn ($n) => (int) $n)->all();
     }
 
     /** Số phiên đang chạy thật (chưa quá hạn treo) của chiến dịch; cache theo request để không truy vấn lặp. */
@@ -251,6 +278,7 @@ class CampaignResource extends Resource
         return [
             'index' => Pages\ListCampaigns::route('/'),
             'create' => Pages\CreateCampaign::route('/create'),
+            'view' => Pages\ViewCampaign::route('/{record}'),
             'edit' => Pages\EditCampaign::route('/{record}/edit'),
         ];
     }

@@ -108,7 +108,7 @@ final class RoleAssignments
         }
         foreach ([$providerId, $fallbackProviderId] as $pid) {
             if ($pid !== null && ! AiProvider::query()->whereKey($pid)->exists()) {
-                throw new InvalidArgumentException('Nhà cung cấp đã chọn không tồn tại. Thêm ở Cài đặt → Tích hợp AI.');
+                throw new InvalidArgumentException('Nhà cung cấp đã chọn không tồn tại. Thêm ở Chi phí AI → Cấu hình AI.');
             }
         }
         foreach ([$model, $fallbackModel] as $m) {

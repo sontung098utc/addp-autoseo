@@ -5,6 +5,8 @@ namespace App\Services\Planning;
 use App\Filament\Support\Planning\DuplicateKeywordException;
 use App\Filament\Support\Planning\PlannedArticleCreator;
 use App\Models\Article;
+use App\Models\AuditSuggestion;
+use App\Models\Campaign;
 use App\Models\Keyword;
 use App\Models\KeywordGap;
 use App\Models\User;
@@ -25,7 +27,7 @@ final class ContentPlanner
     /** Cụm đã có 0/1/2/3+ bài → điểm độ phủ. */
     private const COVERAGE = [30, 20, 10, 0];
 
-    /** @return list<array{keyword_id:int,keyword:string,cluster:?string,volume:?int,volume_source:?string,priority:int,reasons:list<string>,off_topic:bool}> */
+    /** @return list<array{keyword_id:int,keyword:string,cluster:?string,volume:?int,volume_source:?string,priority:int,reasons:list<string>,off_topic:bool,sources:list<array{type:string,label:string}>}> */
     public function propose(Website $site, int $limit = 10): array
     {
         $profile = BrandProfileData::forWebsite($site->id);
@@ -44,6 +46,9 @@ final class ContentPlanner
         $rows = [];
         foreach ($cands as $k) {
             $reasons = [];
+            $sources = [['type' => 'keyword', 'label' => 'Từ khóa kho'
+                .($k->volume !== null ? ' · '.number_format($k->volume, 0, ',', '.').' lượt/tháng' : '')
+                .($k->cluster ? ' · cụm '.$k->cluster->name : '')]];
             $score = 0;
             if ($k->volume === null) {
                 $reasons[] = 'chưa có số liệu lượt tìm';
@@ -62,6 +67,9 @@ final class ContentPlanner
                 $g = min(100, $gaps[Keyword::keyFor($k->keyword)]);
                 $score += (int) round($g / 5);
                 $reasons[] = "khoảng trống đối thủ (điểm $g)";
+                $sources[] = ['type' => 'competitor', 'label' => 'Khoảng trống đối thủ'];
+            } elseif ($k->source === 'competitor') {
+                $sources[] = ['type' => 'competitor', 'label' => 'Khoảng trống đối thủ'];
             }
             $off = BrandProfileData::looksOffTopic($profile, $k->keyword);
             if ($off) {
@@ -69,7 +77,7 @@ final class ContentPlanner
                 $reasons[] = 'có vẻ lệch lĩnh vực trong hồ sơ doanh nghiệp';
             }
             $rows[] = ['keyword_id' => $k->id, 'keyword' => $k->keyword, 'cluster' => $k->cluster?->name, 'volume' => $k->volume, 'volume_source' => $k->volume_source,
-                'priority' => min(100, $score), 'reasons' => $reasons, 'off_topic' => $off];
+                'priority' => min(100, $score), 'reasons' => $reasons, 'off_topic' => $off, 'sources' => $sources];
         }
         usort($rows, fn ($a, $b) => [$a['off_topic'], $b['priority'], $b['volume'] === null ? -1 : $b['volume'], $a['keyword']]
             <=> [$b['off_topic'], $a['priority'], $a['volume'] === null ? -1 : $a['volume'], $b['keyword']]);
@@ -77,14 +85,32 @@ final class ContentPlanner
         return array_slice($rows, 0, max(0, $limit));
     }
 
-    /** @param  list<int>  $keywordIds  @return array{created:int,skipped:list<string>} */
-    public function create(User $actor, Website $site, array $keywordIds): array
+    public static function canPlan(?User $u): bool
+    {
+        return $u instanceof User && $u->is_active && $u->isWriter();
+    }
+
+    /** Số đề xuất làm mới từ Audit đang chờ quyết định (chấp nhận ở trang Audit mới thành bài trong kế hoạch). */
+    public function pendingAuditCount(Website $site): int
+    {
+        return AuditSuggestion::query()->where('website_id', $site->id)->where('status', 'de_xuat')->count();
+    }
+
+    /**
+     * @param  list<int>  $keywordIds
+     * @param  ?int  $campaignId  chiến dịch nhận các bài (null = bài lẻ, không thuộc chiến dịch nào)
+     * @return array{created:int,skipped:list<string>}
+     */
+    public function create(User $actor, Website $site, array $keywordIds, ?int $campaignId = null): array
     {
         if (! $actor->is_active || ! $actor->isWriter()) {
             throw new InvalidArgumentException('Vai trò hiện tại không đủ quyền tạo bài.');
         }
         if ($site->status !== 'active') {
             throw new InvalidArgumentException('Website đích chưa ở trạng thái Hoạt động.');
+        }
+        if ($campaignId !== null && ! Campaign::query()->whereKey($campaignId)->where('website_id', $site->id)->exists()) {
+            throw new InvalidArgumentException('Chiến dịch không thuộc website này.');
         }
         $byId = collect($this->propose($site, PHP_INT_MAX))->keyBy('keyword_id');
         $profile = BrandProfileData::forWebsite($site->id);
@@ -115,7 +141,7 @@ final class ContentPlanner
             }
             try {
                 $a = $creator->create($actor, $site, $kw->keyword, $kw->cluster?->name, $kw->intent ?: 'informational', [], $kw, 'plan');
-                $a->update(['priority' => $byId[$id]['priority']]);
+                $a->update(['priority' => $byId[$id]['priority'], 'campaign_id' => $campaignId]);
                 $created++;
             } catch (DuplicateKeywordException) {
                 $skipped[] = "{$kw->keyword}: đã có bài";
