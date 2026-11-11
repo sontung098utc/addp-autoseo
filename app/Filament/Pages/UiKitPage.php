@@ -4,7 +4,6 @@ namespace App\Filament\Pages;
 
 use App\Filament\Support\Demo\DemoMode;
 use Filament\Pages\Page;
-use Illuminate\Support\Facades\Auth;
 
 /** Thư viện thành phần UI dùng chung (tab, bảng, màu trạng thái). Chỉ hiện ngoài production, để dev xem và thử. */
 class UiKitPage extends Page
@@ -23,10 +22,10 @@ class UiKitPage extends Page
 
     protected static string $view = 'filament.pages.ui-kit';
 
-    /** Trang tham chiếu thành phần giao diện dành cho lập trình viên/quản trị: ẩn khỏi menu của nhân viên (vẫn vào được bằng đường dẫn nếu có quyền). */
+    /** Trang tham chiếu thành phần giao diện dành cho lập trình viên: không hiện trong menu của ai (vẫn vào được bằng đường dẫn /admin/thanh-phan-ui nếu có quyền và chế độ mẫu bật). */
     public static function shouldRegisterNavigation(): bool
     {
-        return (bool) Auth::user()?->isAdmin();
+        return false;
     }
 
     public static function canAccess(): bool
