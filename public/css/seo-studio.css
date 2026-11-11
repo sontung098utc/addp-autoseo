@@ -388,3 +388,7 @@ select:not([multiple]) {
 .filepond--root .filepond--drop-label .filepond--label-action { text-decoration: none; font-weight: 600; color: #0f6b5c; }
 :root[data-theme=dark] .filepond--root .filepond--drop-label .filepond--label-action, .dark .filepond--root .filepond--drop-label .filepond--label-action { color: #5eead4; }
 .filepond--root:hover .filepond--panel-root { border-color: #6366f1; background: rgba(99,102,241,.07); }
+
+/* Hàng tab của Filament (tab lọc danh sách, điều hướng cụm): cuộn ngang bằng vuốt/cuộn, không hiện thanh cuộn kèm mũi tên ở hai đầu. */
+.fi-tabs { scrollbar-width: none; -ms-overflow-style: none; }
+.fi-tabs::-webkit-scrollbar { display: none; }
