@@ -18,7 +18,7 @@ Ngày: 11/11/2026. Nhánh: `feat/m09/ag-s27/dev2/article-workspace`, nền `d8b4
 
 Chi phí mỗi ảnh (1.000 ₫), chi phí/100 từ khóa, trần chi phí: **ước tính cấu hình, chưa đo**.
 
-## 3. Migration (5, đều NULLABLE hoặc có mặc định; PR riêng theo quy ước)
+## 3. Migration (8; PR riêng theo quy ước)
 
 Kiểm trên MariaDB 10.6 (container tạm): chạy lên cả 28 migration, rollback 5 migration cuối (`2026_11_24` → `2026_11_20`) rồi chạy lại cả 5, đều thành công, không lỗi.
 
@@ -29,6 +29,11 @@ Kiểm trên MariaDB 10.6 (container tạm): chạy lên cả 28 migration, roll
 | `2026_11_22_000001_create_agent_profiles_tables` | `agent_profiles`, `agent_profile_versions`, `agent_lessons`, `agent_documents` (hồ sơ agent) | Bảng mới | Up/down/up MariaDB |
 | `2026_11_23_000001_add_volume_source_to_keywords` | `keywords`: `volume_source`, `metrics_at`, `competition`, `cpc_vnd` | Thấp | Up/down/up MariaDB |
 | `2026_11_24_000001_add_guidance_to_articles` | `articles.guidance` (text, nullable) | Thấp | Up/down/up MariaDB |
+| `2026_11_25_000001_add_checkpoints_to_campaigns` | `campaigns.checkpoints` (json, nullable): điểm dừng chờ người `plan/outline/draft/publish` | Thấp | Up/down trên SQLite; chưa chạy lại MariaDB |
+| `2026_11_26_000001_add_models_to_ai_providers` | `ai_providers`: danh sách model bật cho từng tài khoản (hiển thị/chọn) | Thấp, không đổi định tuyến | Chưa chạy lại MariaDB |
+| `2026_11_27_000001_allow_paused_publication_status` | **`publications.status` từ enum sang chuỗi 20 ký tự** để thêm `paused` và `awaiting_confirm` | **CAO NHẤT: đổi kiểu cột bảng xuất bản.** `down()` chuyển lượt paused/chờ xác nhận sang `failed` rồi trả enum | Chỉ chạy SQLite; **bắt buộc thử up/down/up trên MariaDB** |
+
+Đợt 11/11 (3 migration cuối) chưa được chạy trên MariaDB; rollback thêm: 27 → 26 → 25.
 
 Thứ tự rollback: 24 → 23 → 22 → 21 → 20.
 
@@ -47,6 +52,14 @@ Thứ tự rollback: 24 → 23 → 22 → 21 → 20.
 | `Filament/Support/Review/ReviewActions.php` (+4), `Schedule/RescheduleAction.php` (+1) | Bộ chọn ngày giờ: `dd/mm/yyyy HH:mm`, bước 5 phút, mặc định 9 giờ sáng mai, không chọn ngày đã qua | Chỉ là cấu hình `DateTimePicker`, nhưng `ReviewActions` là mã của Dev1 |
 | `Filament/Resources/ArticleResource.php` (+186/−61) | Writer được giao đội AI (trước: chỉ approver); giao hàng loạt; cột "Phiên gần nhất" đổi cách hiển thị | Quyền: duyệt/xếp lịch/đăng **vẫn chỉ approver** (không đổi) |
 | `resources/playbooks/risk/topics.php` | Thêm thuật ngữ y tế vào nhóm rủi ro cao (đường huyết, HbA1c, insulin, cholesterol…) | Danh sách từ khóa rủi ro nên do ai chốt |
+
+## 4b. Bổ sung đợt 11/11 (cấu trúc thông tin và điểm dừng)
+
+- `AgentRunOrchestrator::run(..., ?array $checkpoints = null)`: điểm dừng `outline` kết thúc phiên `held` (step `checkpoint`), không gọi bước viết. Diff lõi ~18 dòng.
+- `PublishArticleJob`: bỏ qua lượt `paused` / `awaiting_confirm` (6 dòng); `Publication` thêm hằng/hàm trạng thái (~18 dòng). Lệnh quét chỉ nhặt `scheduled`. **Cần Dev1 soi kỹ nhất: đây là đường đăng thật.**
+- `CampaignRunner`: điểm dừng `draft` chặn tự duyệt; `AutopilotRunner`: điểm dừng `plan` chỉ ghi đề xuất chờ nhận (`pendingProposals`, `acceptProposals`).
+- Các trang dùng chung bị sửa để gộp menu: `BrainLibraryPage`, `BrainBuildPage`, `WebsiteOnboardingPage` (vào cụm Kho trí tuệ), `AiUsagePage` (thêm tab Cấu hình AI), `AgentConnection` bị xóa (URL cũ chuyển hướng), `AgentTeam::canAccess` nay cho biên tập viên (để dùng tab Kế hoạch; từng tab tự kiểm quyền).
+- Quan hệ: chiến dịch là cha, bài là con (`articles.campaign_id`), bài không chiến dịch là "Bài lẻ".
 
 ## 5. Thay đổi hành vi cần Dev1 đồng ý (không chỉ là mã)
 
