@@ -33,18 +33,17 @@
     </style>
 
     <div class="ss-sched-box">
-        <div class="ss-sched-h">Trạng thái: {{ StatusPresenter::label($p->status, 'publication') }}</div>
+        <div class="ss-sched-h">Trạng thái: {{ StatusPresenter::label($p->status, 'publication') }}
+            <x-help title="Dừng khẩn cấp" text="Quản trị viên/Trưởng nhóm có thể bấm «Tạm dừng lịch đăng» ở trang danh sách lịch đăng." /></div>
         <p><strong>Vì sao ở trạng thái này:</strong> {{ $explain['why'] }}</p>
         <p><strong>Bước tiếp theo:</strong> {{ $explain['next'] }}</p>
         @if ($reconcileWhy)
-            <p class="ss-sched-muted">Nút "Đối soát ngay" đang ẩn: {{ $reconcileWhy }}</p>
+            <p class="ss-sched-muted">Không đối soát được lúc này. <x-help title="Nút «Đối soát ngay» đang ẩn" :text="$reconcileWhy" /></p>
         @endif
         @if ($isStopped)
             <div class="ss-sched-emergency">
                 ⛔ Lịch đăng đang TẠM DỪNG KHẨN CẤP: {{ $stopInfo['reason'] ?? 'Toàn hệ thống đang tạm hoãn xuất bản' }}
             </div>
-        @else
-            <p class="ss-sched-muted">Nút "Tạm dừng lịch đăng": Quản trị viên/Trưởng nhóm có thể kích hoạt tại trang danh sách lịch đăng.</p>
         @endif
     </div>
 

@@ -52,11 +52,20 @@ class RunReportAndTodayTest extends TestCase
 
     public function test_writer_khong_thay_so_lieu_chi_phi_cua_quan_ly(): void
     {
-        $this->site();
+        $w = $this->site();
+        Article::create(['website_id' => $w->id, 'primary_keyword' => 'abc', 'workflow_status' => 'needs_review']);
         $this->actingAs(User::create(['name' => 'w', 'email' => 'w@x.vn', 'password' => 'secret123', 'role' => 'writer', 'is_active' => true]));
 
         $this->get('/admin')->assertOk()->assertSee('Đội AI hôm nay')->assertSee('bài chờ duyệt')->assertDontSee('chi phí AI hôm nay')->assertDontSee('gợi ý bổ sung kho');
         $this->assertFalse(UiKitPage::shouldRegisterNavigation());
+    }
+
+    public function test_khoi_doi_ai_hom_nay_trong_thi_chi_mot_dong(): void
+    {
+        $this->site();
+        $this->actingAs($this->user());
+
+        $this->get('/admin')->assertOk()->assertSee('Hôm nay chưa có việc nào cần bạn xử lý.')->assertDontSee('class="at-card', false)->assertDontSee('gợi ý bổ sung kho');
     }
 
     public function test_tong_quan_hien_khoi_doi_ai_hom_nay(): void

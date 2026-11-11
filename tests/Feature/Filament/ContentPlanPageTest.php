@@ -67,7 +67,7 @@ class ContentPlanPageTest extends TestCase
         auth()->logout();
         $this->assertFalse(ContentPlanPage::canAccess());
         $r = $this->actingAs($this->writer)->get('/admin/ke-hoach-noi-dung')->assertOk()->assertDontSee('Dữ liệu minh họa');
-        foreach (['Lịch tuần', 'Cụm chủ đề', 'Chưa có ngày', 'Cảnh báo', 'Quy tắc'] as $tab) {
+        foreach (['Lịch tuần', 'Cụm chủ đề', 'Quy tắc của kế hoạch'] as $tab) {
             $r->assertSee($tab);
         }
     }

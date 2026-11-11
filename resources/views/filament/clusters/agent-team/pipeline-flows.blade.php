@@ -1,10 +1,9 @@
 <div data-testid="pipeline-flows">
-    <div class="text-xs" style="opacity:.8;margin-bottom:.6rem">Mỗi loại việc là một luồng. Nút ở các trang chính chạy đúng một luồng trong đây. Bấm vào một bước để xem chi tiết và số liệu 30 ngày. Viền đứt: chưa chạy. Viền vàng: có người can thiệp.</div>
     @foreach ($flows as $f)
         <section class="pv-flow" data-flow="{{ $f['id'] }}">
             <div class="pv-flow__head">
                 <strong>{{ $f['title'] }}</strong>
-                <span class="pv-tag {{ $f['status'] === 'active' ? '' : 'pv-tag--warn' }}">{{ $f['status'] === 'active' ? 'Chạy được' : 'Chưa chạy' }}</span>
+                <span class="pv-tag">{{ $f['status'] === 'active' ? 'Chạy được' : 'Chưa chạy' }}</span>
                 <x-filament::button size="xs" color="gray" wire:click="mountAction('job', {job: '{{ $f['id'] }}'})">Chi tiết loại việc</x-filament::button>
             </div>
             <div class="pv-scroll">
@@ -30,7 +29,7 @@
                                 @endif
                             </span>
                             <span class="pv-who"><span class="pv-chip" data-avatar>{{ $s['profile']['avatar'] }}</span><span>{{ $s['profile']['title'] }}</span></span>
-                            @if ($s['planned'])<span class="pv-tag pv-tag--warn">Chưa chạy</span>@endif
+                            @if ($s['planned'])<span class="pv-tag">Chưa chạy</span>@endif
                         </button>
                     @endforeach
                     <div class="pv-arrow"></div>

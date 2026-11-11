@@ -1,5 +1,4 @@
 @php($sources = $getRecord()->sources_cited ?? [])
-<p style="font-size:.8rem;margin-bottom:.5rem;"><strong>AI đề xuất</strong> — nguồn trích dưới đây do AI nêu, cần người kiểm chứng.</p>
 @if (empty($sources))
     <p>Chưa có nguồn trích.</p>
 @else

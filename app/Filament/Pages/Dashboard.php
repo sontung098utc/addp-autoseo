@@ -45,8 +45,8 @@ class Dashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
-            AgentTodayWidget::class,
             DecisionsWidget::class,
+            AgentTodayWidget::class,
             PublicationProblemsWidget::class,
             NextPublicationsWidget::class,
             RecentActivityWidget::class,

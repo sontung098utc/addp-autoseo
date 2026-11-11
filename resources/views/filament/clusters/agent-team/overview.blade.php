@@ -14,11 +14,11 @@
                 @elseif (! $ai['connected'])
                     <span style="font-weight:600;color:#d97706">Chưa kết nối AI</span>
                 @else
-                    <span style="font-weight:600">Đang nghỉ</span> <x-studio.hint text="Nhịp kế tiếp trong vòng 15 phút. Mỗi nhịp, chiến dịch đang chạy chọn bài kế tiếp và tạo một phiên chạy cho bài đó." />
+                    <span style="font-weight:600">Đang nghỉ</span> <x-help text="Nhịp kế tiếp trong vòng 15 phút. Mỗi nhịp, chiến dịch đang chạy chọn bài kế tiếp và tạo một phiên chạy cho bài đó." />
                 @endif
             </div>
             <div class="text-sm" data-testid="today" style="display:flex;gap:1.25rem;flex-wrap:wrap">
-                <span><strong>{{ $today['runs'] }}</strong> bài đã giao hôm nay <x-studio.hint text="Chiến dịch giao bài, mỗi bài là một phiên chạy. Chiến dịch không phải chuỗi phiên." /></span>
+                <span><strong>{{ $today['runs'] }}</strong> bài đã giao hôm nay <x-help text="Chiến dịch giao bài, mỗi bài là một phiên chạy. Chiến dịch không phải chuỗi phiên." /></span>
                 <span><strong>{{ $today['toReview'] }}</strong> đã tới chờ duyệt</span>
                 <span>Chi phí <strong>{{ $fmt($today['cost']) }} ₫</strong>@if ($today['cap'] > 0) <span style="opacity:.6">/ {{ $fmt($today['cap']) }} ₫</span>@endif</span>
             </div>
@@ -57,7 +57,7 @@
         {{-- 4. Cài đặt: gập sẵn; chỉ là gợi ý, không chiếm chỗ --}}
         @if ($stepsLeft > 0)
             <x-filament::section :heading="'Hoàn tất cài đặt: còn '.$stepsLeft.' bước'" collapsible collapsed compact>
-                <x-slot name="headerEnd"><x-studio.hint text="Bước chưa có dữ liệu thật được ghi là chưa làm, không tính là xong." /></x-slot>
+                <x-slot name="headerEnd"><x-help text="Bước chưa có dữ liệu thật được ghi là chưa làm, không tính là xong." /></x-slot>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(10.5rem,1fr));gap:.6rem">
                     @foreach ($steps as $s)
                         <{{ $s['url'] ? 'a' : 'div' }} @if ($s['url']) href="{{ $s['url'] }}" @endif data-step="{{ $s['n'] }}" data-state="{{ $s['state'] }}" style="border:1px solid rgba(128,128,128,.35);border-radius:.6rem;padding:.6rem;text-decoration:none;color:inherit;{{ $s['state'] === 'todo' ? 'border-color:#d97706;' : '' }}">

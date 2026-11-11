@@ -44,7 +44,7 @@ class GscScreenTest extends TestCase
         $this->actingAs($this->user('approver'));
         $c = Livewire::test(SearchConsolePage::class)
             ->assertDontSee('Dữ liệu minh họa')->assertDontSee('(minh họa)')
-            ->assertSee('Tổng quan')->assertSee('Truy vấn')->assertSee('Thiết bị')->assertSee('Quốc gia')->assertSee('Cơ hội')->assertSee('Đề xuất')->assertSee('Quy tắc')
+            ->assertSee('Tổng quan')->assertSee('Truy vấn')->assertSee('Thiết bị')->assertSee('Quốc gia')->assertSee('Cơ hội')->assertSee('Đề xuất')->assertSee('Nguồn dữ liệu và quy tắc')->assertSee('data-testid="help"', false)
             ->assertSee('Clicks theo ngày')
             ->call('setDays', 14)->assertSet('days', 14);
         $dv = $c->viewData('dimRows');

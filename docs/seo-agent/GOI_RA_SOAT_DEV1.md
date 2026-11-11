@@ -12,7 +12,7 @@ Ngày: 11/11/2026. Nhánh: `feat/m09/ag-s27/dev2/article-workspace`, nền `d8b4
 
 | | Đã làm | Chưa làm |
 |---|---|---|
-| Test | Chạy cuối trên mã `9a92beb`: SQLite **1393 đạt, 0 lỗi, 2 bỏ qua**; MariaDB 10.6 **1388 đạt, 5 lỗi, 2 bỏ qua**. 5 lỗi đều là `PilotRunTest` của Dev1 (`QueryException`, lỗi cũ, issue #6); chênh 5 test so với SQLite đúng bằng số này, không có lỗi mới | MariaDB chỉ chạy một lần trên mã này; cần chạy lại nếu có commit mới |
+| Test | Chạy cuối (sau đợt gọn giao diện): SQLite **1405 đạt, 0 lỗi, 2 bỏ qua**; MariaDB 10.6 **1400 đạt, 5 lỗi, 2 bỏ qua**. 5 lỗi đều là `PilotRunTest` của Dev1 (`QueryException`, lỗi cũ, issue #6); chênh 5 test so với SQLite đúng bằng số này, không có lỗi mới | MariaDB chỉ chạy một lần trên mã này; cần chạy lại nếu có commit mới |
 | Giao diện | Đi qua bằng tay trên bản xem thử cục bộ (writer, approver, admin) | Không có website thật |
 | **AI thật, API ngoài** | **Chưa lần nào**: chưa gọi model thật, Tavily, DataForSEO, API ảnh; mọi test dùng AI giả và `Http::fake` | Đo chất lượng, token, chi phí thật |
 

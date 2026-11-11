@@ -10,15 +10,19 @@
 
     @if ($d['state'] === 'empty')
         <x-filament::section>
-            <p class="text-sm">Bản tin sẽ xuất hiện ở đây khi hệ thống có hoạt động (bản bài mới, duyệt, đăng bài). Hiện chưa có gì để báo.</p>
-            <p class="text-sm mt-2">
-                Bắt đầu: <a href="{{ \App\Filament\Resources\ArticleResource::getUrl('index') }}" class="underline">tạo bài viết</a>
-                hoặc xem <a href="{{ \App\Filament\Pages\Dashboard::getUrl() }}" class="underline">Tổng quan</a>.
-            </p>
+            <div style="display:flex;gap:1rem;align-items:center;justify-content:space-between;flex-wrap:wrap">
+                <div class="text-sm">Chưa có hoạt động nào để báo.
+                    <x-help title="Bản tin hiện khi nào"><p>Bản tin xuất hiện khi hệ thống có hoạt động (bản bài mới, duyệt, đăng bài).</p>@foreach ($d['notes'] as $n)<p>• {{ $n }}</p>@endforeach</x-help></div>
+                <x-filament::button tag="a" :href="\App\Filament\Resources\ArticleResource::getUrl('index')">Mở danh sách bài viết</x-filament::button>
+            </div>
         </x-filament::section>
     @else
-        <div style="display:grid;grid-template-columns:repeat({{ min(4, max(1, count($d['stats']))) }},minmax(0,1fr));gap:.75rem">
-            @foreach ($d['stats'] as $s)
+        @php
+            $mainStats = array_slice($d['stats'], 0, 4);
+            $moreStats = array_filter(array_slice($d['stats'], 4), fn ($s) => ! in_array(trim((string) $s['value']), ['0', '—', '0 ₫', '0 / 0'], true));
+        @endphp
+        <div style="display:grid;grid-template-columns:repeat({{ min(4, max(1, count($mainStats))) }},minmax(0,1fr));gap:.75rem">
+            @foreach ($mainStats as $s)
                 <x-filament::section>
                     <div class="text-xs" style="opacity:.7">{{ $s['label'] }}</div>
                     <div style="font-size:1.6rem;font-weight:600;line-height:1.2">{{ $s['value'] }}</div>
@@ -26,8 +30,21 @@
                 </x-filament::section>
             @endforeach
         </div>
+        @if ($moreStats !== [])
+            <div class="text-xs" style="display:flex;flex-wrap:wrap;gap:.25rem 1rem;opacity:.8">
+                @foreach ($moreStats as $s)<span>{{ $s['label'] }}: <strong>{{ $s['value'] }}</strong></span>@endforeach
+            </div>
+        @endif
 
-        <x-filament::section heading="Nhóm việc đáng xem" :description="$d['state'] === 'busy' ? 'Ngày nhiều việc: gom thành tối đa '.\App\Filament\Support\Digest\DigestQueries::MAX_GROUPS.' nhóm, xếp theo mức cần chú ý.' : null">
+        <x-filament::section>
+            <x-slot name="heading">Nhóm việc đáng xem
+                @if ($d['state'] === 'busy' || $d['notes'] !== [])
+                    <x-help title="Về bản tin">
+                        @if ($d['state'] === 'busy')<p>Ngày nhiều việc: gom thành tối đa {{ \App\Filament\Support\Digest\DigestQueries::MAX_GROUPS }} nhóm, xếp theo mức cần chú ý.</p>@endif
+                        @foreach ($d['notes'] as $n)<p>• {{ $n }}</p>@endforeach
+                    </x-help>
+                @endif
+            </x-slot>
             @forelse ($d['groups'] as $g)
                 <div style="display:flex;justify-content:space-between;gap:.75rem;align-items:center;padding:.5rem 0;border-bottom:1px solid rgba(128,128,128,.2)">
                     <div>
@@ -44,9 +61,4 @@
         </x-filament::section>
     @endif
 
-    <div class="text-xs" style="opacity:.75">
-        @foreach ($d['notes'] as $n)
-            <p style="margin:.15rem 0">• {{ $n }}</p>
-        @endforeach
-    </div>
 </x-filament-panels::page>

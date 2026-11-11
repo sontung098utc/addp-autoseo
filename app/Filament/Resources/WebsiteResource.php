@@ -119,7 +119,6 @@ class WebsiteResource extends Resource
                     ])->columns(2),
 
                 Forms\Components\Section::make('Xác thực bảo mật (Mã hóa AES-256)')
-                    ->description('Thông tin credentials được mã hóa tự động trước khi lưu trữ vào cơ sở dữ liệu')
                     ->schema(fn (string $operation): array => $operation === 'create'
                         ? [
                             Forms\Components\Placeholder::make('credentials_hint')->hiddenLabel()

@@ -40,17 +40,28 @@
     $pubDone = $publications->firstWhere('status', 'published');
     $pubNext = $publications->first(fn ($p) => $p->status !== 'published');
 
-    // Một câu "việc tiếp theo" theo trạng thái, để người mới vào biết phải làm gì.
+    // Một câu "việc tiếp theo" theo trạng thái + MỘT nút hành động chính (nếu người dùng làm được).
     $next = match (true) {
-        $live !== null => 'Đội AI đang làm bài này. Theo dõi ở tab Hoạt động; trang tự làm mới.',
-        $latest === null => 'Bài chưa có nội dung. Bấm Giao đội AI ở đầu trang để tạo bản nháp đầu tiên.',
-        $article->workflow_status === 'needs_review' && $canApprove => 'Mở bản mới nhất ở tab Nội dung để đọc, rồi bấm Duyệt hoặc Từ chối ở đầu trang.',
-        $article->workflow_status === 'needs_review' => 'Bài đang chờ người có quyền duyệt.',
-        $article->workflow_status === 'approved' => 'Bài đã duyệt nhưng chưa có lịch. Bấm Xếp lịch ở đầu trang.',
-        $article->workflow_status === 'rejected' => 'Bài cần sửa. Xem ghi chú duyệt ở tab Nội dung, rồi giao lại đội AI hoặc gửi duyệt lại.',
-        $article->workflow_status === 'scheduled' => 'Bài đã có lịch đăng. Xem ở tab Xuất bản.',
-        $article->workflow_status === 'published' => 'Bài đã đăng. Xem liên kết ở tab Xuất bản.',
-        default => 'Bài đã có bản nháp. Mở ở tab Nội dung để đọc rồi bấm Gửi duyệt khi sẵn sàng.',
+        $live !== null => 'Đội AI đang viết bài này; trang tự làm mới.',
+        $latest === null => 'Bài chưa có nội dung.',
+        $article->workflow_status === 'needs_review' && $canApprove => 'Bản mới nhất đang chờ bạn đọc và duyệt.',
+        $article->workflow_status === 'needs_review' => 'Đang chờ người có quyền duyệt.',
+        $article->workflow_status === 'approved' => 'Đã duyệt, chưa có lịch đăng.',
+        $article->workflow_status === 'rejected' => 'Bài bị từ chối: xem ghi chú duyệt rồi sửa hoặc giao lại.',
+        $article->workflow_status === 'scheduled' => 'Đã có lịch đăng.',
+        $article->workflow_status === 'published' => 'Bài đã đăng.',
+        default => 'Đã có bản nháp, sẵn sàng gửi duyệt.',
+    };
+    $latestUrl = $latest && $canOpenVersion ? V::getUrl('view', ['record' => $latest]) : null;
+    $primary = match (true) {
+        $live !== null => ['tab' => 'activity', 'label' => 'Theo dõi phiên chạy'],
+        $latest === null => ArticleResource::canAssignToAgent($article) ? ['action' => 'run_agent', 'label' => 'Giao đội AI'] : null,
+        $article->workflow_status === 'needs_review' && $canApprove => $latestUrl ? ['url' => $latestUrl, 'label' => 'Đọc để duyệt'] : ['tab' => 'content', 'label' => 'Đọc để duyệt'],
+        $article->workflow_status === 'approved' && $canApprove => ['action' => 'schedule', 'label' => 'Xếp lịch'],
+        in_array($article->workflow_status, ['scheduled', 'published'], true) => ['tab' => 'publish', 'label' => 'Xem lịch xuất bản'],
+        ArticleResource::canAssignToAgent($article) => ['action' => 'run_agent', 'label' => 'Giao đội AI'],
+        ArticleResource::primaryActionFor($article) === 'submit_review' => ['action' => 'submit_review', 'label' => 'Gửi duyệt'],
+        default => null,
     };
 
     // Chuỗi làm ra một bài: mỗi mắt xích lấy kết quả của mắt xích trước. state: done | run | warn | todo.
@@ -91,7 +102,12 @@
         .aw-meta{display:flex;flex-wrap:wrap;gap:.4rem .5rem;align-items:center;margin-top:-.4rem}
         .aw-chip{font-size:.75rem;padding:.1rem .55rem;border-radius:999px;border:1px solid var(--ss-border,rgba(128,128,128,.35))}
         a.aw-chip{text-decoration:underline}
-        .aw-next{border-left:3px solid currentColor;padding:.5rem .75rem;font-size:.9rem;margin:0}
+        .aw-next{border-left:3px solid currentColor;padding:.5rem .75rem;font-size:.95rem;margin:0;display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;justify-content:space-between}
+        .aw-next p{margin:0}
+        .aw-cta{display:inline-block;font-size:.875rem;font-weight:700;padding:.4rem 1rem;border-radius:.5rem;background:var(--ss-teal-700,#0F6B5C);color:#fff;cursor:pointer;text-decoration:none;white-space:nowrap}
+        .aw-cta:hover{filter:brightness(1.1)}
+        .aw-chips{display:flex;flex-wrap:wrap;gap:.4rem .5rem;align-items:center}
+        .aw-chip--warn{border-color:#d97706;color:#b45309}
         .aw-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));align-items:start}
         .aw-stack{display:grid;gap:1rem}
         .aw-table{width:100%;border-collapse:collapse;font-size:.875rem}
@@ -155,61 +171,67 @@
         </div>
 
         <x-studio.tabs :persist="$showPreflight ? null : 'bai-viet-v4-'.$article->id" :default="$tabDefault" :tabs="$tabs">
-            {{-- Tổng quan: bài đang ở đâu trong chuỗi, việc tiếp theo, và sửa thông tin bài ngay tại đây. --}}
+            {{-- Tổng quan: việc tiếp theo + một nút chính, tiến trình, thông tin bài. Giải thích cất vào (i). --}}
             <x-studio.panel key="overview">
                 <div class="aw-stack">
                     @if (! empty($stopInfo))
                         <p class="aw-note" data-testid="aw-stopped" style="color:#b91c1c;border:1px solid #b91c1c;border-radius:.5rem;padding:.5rem .75rem">⛔ Hệ thống đang DỪNG KHẨN CẤP ({{ $stopInfo['reason'] ?? 'không ghi lý do' }}): đội AI sẽ không chạy cho đến khi được khôi phục ở Lịch xuất bản.</p>
                     @endif
-                    <p class="aw-next" data-testid="aw-next"><strong>Việc tiếp theo:</strong> {{ $next }}</p>
+                    <div class="aw-next" data-testid="aw-next">
+                        <p><strong>Việc tiếp theo:</strong> {{ $next }}</p>
+                        @if ($primary)
+                            @if (isset($primary['url']))
+                                <a class="aw-cta" data-testid="aw-primary" href="{{ $primary['url'] }}">{{ $primary['label'] }}</a>
+                            @elseif (isset($primary['tab']))
+                                <button type="button" class="aw-cta" data-testid="aw-primary" x-on:click="set(@js($primary['tab']))">{{ $primary['label'] }}</button>
+                            @else
+                                <button type="button" class="aw-cta" data-testid="aw-primary" wire:click="mountAction(@js($primary['action']))">{{ $primary['label'] }}</button>
+                            @endif
+                        @endif
+                    </div>
                     @if (filled($article->guidance))
-                        <p class="aw-muted" data-testid="aw-guidance"><strong>Chỉ dẫn cho đội AI:</strong> {{ \Illuminate\Support\Str::limit($article->guidance, 240) }} <span>(đổi bằng nút "Chỉ dẫn cho đội AI" ở đầu trang)</span></p>
+                        <p class="aw-muted" data-testid="aw-guidance"><strong>Chỉ dẫn cho đội AI:</strong> {{ \Illuminate\Support\Str::limit($article->guidance, 160) }}</p>
                     @endif
                     @if ($showPreflight)
                         <section class="ss-review-card" data-testid="aw-preflight">
-                            <h2 class="ss-review-card__title">AI sẽ tự chuẩn bị</h2>
-                            @if (! empty($readiness['auto_actions']))
-                                <ul class="aw-list" data-testid="pf-auto">
-                                    @foreach ($readiness['auto_actions'] as $act)<li>{{ $act }}</li>@endforeach
-                                </ul>
-                            @endif
-                            <dl class="ss-review-dl">
-                                <dt>Rủi ro chủ đề</dt>
-                                <dd data-testid="pf-risk"><strong>{{ $riskLabel }}</strong>@if (! empty($readiness['risk']['reasons'])) <span class="aw-muted">· {{ implode(' ', array_slice($readiness['risk']['reasons'], 0, 2)) }}</span>@endif</dd>
-                                <dt>Kho kiến thức</dt>
-                                <dd data-testid="pf-kb">
-                                    @if ($readiness['knowledge']['count'] > 0)
-                                        Kho có {{ $readiness['knowledge']['count'] }} mục kiến thức đã duyệt khớp chủ đề:
-                                        {{ implode('; ', array_map(fn ($i) => $i['title'], array_slice($readiness['knowledge']['items'], 0, 3))) }}
-                                    @else
-                                        Kho có 0 mục kiến thức đã duyệt khớp chủ đề.
+                            <div class="aw-head" style="justify-content:flex-start;gap:.4rem">
+                                <h2 class="ss-review-card__title">AI sẽ tự chuẩn bị</h2>
+                                <x-help title="Trước khi viết, AI sẽ">
+                                    @if (! empty($readiness['auto_actions']))
+                                        <ul data-testid="pf-auto">@foreach ($readiness['auto_actions'] as $act)<li>{{ $act }}</li>@endforeach</ul>
                                     @endif
-                                </dd>
-                                <dt>Sản phẩm liên quan</dt><dd data-testid="pf-products">{{ $readiness['products']['count'] }}</dd>
-                                <dt>Hồ sơ doanh nghiệp</dt>
-                                <dd data-testid="pf-brand">{{ $readiness['brand']['percent'] }}%@if ($readiness['brand']['missing'] !== []) <span class="aw-muted">· thiếu: {{ implode(', ', $readiness['brand']['missing']) }}</span>@endif</dd>
-                                <dt>Trí tuệ đang gắn</dt>
-                                <dd data-testid="pf-brains">{{ $readiness['brains']['attached'] === [] ? 'Chưa gắn Trí tuệ nào' : implode(', ', array_column($readiness['brains']['attached'], 'name')) }}</dd>
-                                <dt>Chi phí ước lượng</dt>
-                                <dd data-testid="pf-cost">
-                                    {{ $readiness['cost']['estimate_vnd'] === null ? 'Chưa có số liệu để ước lượng' : 'Khoảng '.$money($readiness['cost']['estimate_vnd']) }}
-                                    <span class="aw-muted">· ngân sách phiên tối đa {{ $money($readiness['cost']['budget_vnd']) }}</span>
-                                </dd>
-                            </dl>
-                            @if ($readiness['brains']['suggested'] !== [])
-                                <div data-testid="pf-suggested" style="margin-top:.6rem">
+                                    <p>
+                                        Kho có {{ $readiness['knowledge']['count'] }} mục kiến thức đã duyệt khớp chủ đề@if ($readiness['knowledge']['count'] > 0): {{ implode('; ', array_map(fn ($i) => $i['title'], array_slice($readiness['knowledge']['items'], 0, 3))) }}@endif.
+                                    </p>
+                                    @if (! empty($readiness['risk']['reasons']))<p>Rủi ro: {{ implode(' ', array_slice($readiness['risk']['reasons'], 0, 2)) }}</p>@endif
+                                    @if ($readiness['brand']['missing'] !== [])<p>Hồ sơ doanh nghiệp còn thiếu: {{ implode(', ', $readiness['brand']['missing']) }}.</p>@endif
+                                    @if ($readiness['brains']['attached'] !== [])<p>Trí tuệ đang gắn: {{ implode(', ', array_column($readiness['brains']['attached'], 'name')) }}.</p>@endif
+                                    <p>Ngân sách phiên tối đa {{ $money($readiness['cost']['budget_vnd']) }}.</p>
                                     @foreach ($readiness['brains']['suggested'] as $sg)
-                                        <p class="aw-muted">Trí tuệ sẽ tự gắn khi giao: «{{ $sg['name'] }}» · {{ $sg['reason'] }}</p>
+                                        <p data-testid="pf-suggested">Trí tuệ sẽ tự gắn khi giao: «{{ $sg['name'] }}» · {{ $sg['reason'] }}</p>
                                     @endforeach
-                                </div>
-                            @endif
+                                    @if (! empty($readiness['needs_expert']))
+                                        <p data-testid="pf-expert">Chủ đề này cần người có chuyên môn: sau khi viết sẽ chuyển cho người có chuyên môn xem lại.</p>
+                                    @endif
+                                </x-help>
+                            </div>
+                            <div class="aw-chips" data-testid="pf-chips">
+                                <span class="aw-chip @if ($riskLevel === 'high') aw-chip--warn @endif" data-testid="pf-risk">Rủi ro: <strong>{{ $riskLabel }}</strong></span>
+                                <span class="aw-chip" data-testid="pf-kb">Kho: {{ $readiness['knowledge']['count'] }} mục</span>
+                                <span class="aw-chip" data-testid="pf-products">Sản phẩm: {{ $readiness['products']['count'] }}</span>
+                                <span class="aw-chip" data-testid="pf-brand">Hồ sơ: {{ $readiness['brand']['percent'] }}%</span>
+                                <span class="aw-chip" data-testid="pf-brains">Trí tuệ: {{ $readiness['brains']['attached'] === [] ? 'chưa gắn' : count($readiness['brains']['attached']) }}</span>
+                                <span class="aw-chip" data-testid="pf-cost">Ước tính: {{ $readiness['cost']['estimate_vnd'] === null ? 'chưa có' : '~'.$money($readiness['cost']['estimate_vnd']) }}</span>
+                            </div>
                             @if (! empty($autoAttached))
-                                <div data-testid="pf-auto-attached" style="margin-top:.6rem">
-                                    @foreach ($autoAttached as $at)
-                                        <p class="aw-muted" data-testid="pf-auto-row">Đã tự gắn «{{ $at['name'] }}» lúc {{ \Illuminate\Support\Carbon::parse($at['at'])->timezone('Asia/Ho_Chi_Minh')->format('d/m H:i') }}
-                                            @if ($canUndoAttach && $article->website) · <button type="button" class="aw-link" data-testid="pf-undo" wire:click="mountAction('undoAutoAttach', @js(['brain' => $at['brain_id']]))">Hoàn tác</button>@endif
-                                        </p>
-                                    @endforeach
+                                <div class="aw-muted" data-testid="pf-auto-attached" style="margin-top:.5rem">Đã tự gắn {{ count($autoAttached) }} Trí tuệ: {{ collect($autoAttached)->pluck('name')->implode(', ') }}
+                                    <x-help title="Trí tuệ đã tự gắn (hoàn tác được)">
+                                        @foreach ($autoAttached as $at)
+                                            <p data-testid="pf-auto-row">«{{ $at['name'] }}» lúc {{ \Illuminate\Support\Carbon::parse($at['at'])->timezone('Asia/Ho_Chi_Minh')->format('d/m H:i') }}
+                                                @if ($canUndoAttach && $article->website) · <button type="button" class="aw-link" data-testid="pf-undo" wire:click="mountAction('undoAutoAttach', @js(['brain' => $at['brain_id']]))">Hoàn tác</button>@endif
+                                            </p>
+                                        @endforeach
+                                    </x-help>
                                 </div>
                             @endif
                             @foreach ($readiness['issues'] as $is)
@@ -227,14 +249,13 @@
                                     </p>
                                 @endif
                             @endforeach
-                            @if (! empty($readiness['needs_expert']))
-                                <p class="aw-note" data-testid="pf-expert" style="color:#b45309">Chủ đề này cần người có chuyên môn: sau khi viết sẽ chuyển cho người có chuyên môn xem lại.</p>
-                            @endif
                         </section>
                     @endif
                     <section class="ss-review-card" data-testid="aw-chain">
-                        <h2 class="ss-review-card__title">Bài này được làm ra thế nào</h2>
-                        <p class="aw-muted" style="margin-bottom:.6rem">Mỗi bước dùng kết quả của bước trước. Bấm vào một bước để xem chi tiết.</p>
+                        <div class="aw-head" style="justify-content:flex-start;gap:.4rem">
+                            <h2 class="ss-review-card__title">Tiến trình bài</h2>
+                            <x-help title="Bài được làm ra thế nào"><p>Mỗi bước dùng kết quả của bước trước. Bấm vào một bước để xem chi tiết.</p></x-help>
+                        </div>
                         <div class="aw-chain">
                             @foreach ($chain as $i => $n)
                                 @php $st = $liveLink === $n['key'] ? 'run' : $n['state']; @endphp
@@ -246,25 +267,23 @@
                             @endforeach
                         </div>
                     </section>
-                    <div class="aw-split">
-                        <div data-testid="aw-info-form">
-                            <x-filament-panels::form wire:submit="save">
-                                {{ $this->form }}
-                                <x-filament-panels::form.actions :actions="$this->getCachedFormActions()" :full-width="$this->hasFullWidthFormActions()" />
-                            </x-filament-panels::form>
+                    @if ($runs->isNotEmpty() || $versions->isNotEmpty())
+                        <div class="aw-chips" data-testid="aw-stats">
+                            <span class="aw-chip">{{ $versions->count() }} phiên bản</span>
+                            <span class="aw-chip">{{ $runs->count() }} phiên AI</span>
+                            @if ($totalTokens > 0)<span class="aw-chip">{{ $num($totalTokens) }} token</span>@endif
+                            @if ($totalCost > 0)<span class="aw-chip">Chi phí AI {{ V::formatVnd($totalCost) }}</span>@endif
+                            <x-help title="Số liệu của bài">
+                                <p>Trạng thái: {{ $statusLabel }}</p>
+                                <p>Tạo: {{ VnTime::format($article->created_at) }} · Cập nhật: {{ VnTime::format($article->updated_at) }}</p>
+                            </x-help>
                         </div>
-                        <section class="ss-review-card">
-                            <h2 class="ss-review-card__title">Số liệu của bài</h2>
-                            <dl class="ss-review-dl">
-                                <dt>Trạng thái</dt><dd>{{ $statusLabel }}</dd>
-                                <dt>Số phiên bản</dt><dd>{{ $versions->count() }}</dd>
-                                <dt>Số phiên AI chạy</dt><dd>{{ $runs->count() }}</dd>
-                                <dt>Token</dt><dd>{{ $num($totalTokens) }}</dd>
-                                <dt>Chi phí AI</dt><dd>{{ V::formatVnd($totalCost) }}</dd>
-                                <dt>Ngày tạo</dt><dd>{{ VnTime::format($article->created_at) }}</dd>
-                                <dt>Cập nhật</dt><dd>{{ VnTime::format($article->updated_at) }}</dd>
-                            </dl>
-                        </section>
+                    @endif
+                    <div data-testid="aw-info-form">
+                        <x-filament-panels::form wire:submit="save">
+                            {{ $this->form }}
+                            <x-filament-panels::form.actions :actions="$this->getCachedFormActions()" :full-width="$this->hasFullWidthFormActions()" />
+                        </x-filament-panels::form>
                     </div>
                 </div>
             </x-studio.panel>
@@ -275,7 +294,15 @@
                     <div class="aw-grid">
                         <section class="ss-review-card" data-testid="aw-keyword">
                             <div class="aw-head">
-                                <h2 class="ss-review-card__title">Từ khóa chính: {{ $article->primary_keyword }}</h2>
+                                <h2 class="ss-review-card__title">Từ khóa chính: {{ $article->primary_keyword }}
+                                    @if ($keyword === null || $keywordMatched || $keyword->volume === null)
+                                        <x-help title="Về số liệu từ khóa">
+                                            @if ($keyword === null)<p>Chưa có lượt tìm, độ khó hay cụm. Bài được tạo mà không qua bước nghiên cứu từ khóa.</p>@endif
+                                            @if ($keyword && $keywordMatched)<p>Bài chưa được gắn trực tiếp với từ khóa này; số liệu được dò theo tên trong kho từ khóa.</p>@endif
+                                            @if ($keyword && $keyword->volume === null)<p>Từ khóa chưa có số liệu tìm kiếm, nên chưa biết mức độ đáng viết. Nhập số liệu ở kho từ khóa (CSV hoặc Search Console).</p>@endif
+                                        </x-help>
+                                    @endif
+                                </h2>
                                 @if (KeywordsPage::canAccess())<a class="aw-link aw-muted" href="{{ KeywordsPage::getUrl() }}">Mở kho từ khóa</a>@endif
                             </div>
                             @if ($keyword)
@@ -286,14 +313,8 @@
                                     <dt>Nguồn từ khóa</dt><dd>{{ W::KEYWORD_SOURCES[$keyword->source] ?? $dash($keyword->source) }}</dd>
                                     <dt>Tình trạng trong kho</dt><dd>{{ W::KEYWORD_STATUSES[$keyword->status] ?? $dash($keyword->status) }}</dd>
                                 </dl>
-                                @if ($keywordMatched)
-                                    <p class="aw-note">Bài chưa được gắn trực tiếp với từ khóa này; số liệu trên được dò theo tên trong kho từ khóa.</p>
-                                @endif
-                                @if ($keyword->volume === null)
-                                    <p class="aw-note">Từ khóa chưa có số liệu tìm kiếm, nên chưa biết mức độ đáng viết. Nhập số liệu ở kho từ khóa (CSV hoặc Search Console).</p>
-                                @endif
                             @else
-                                <p>Từ khóa này chưa có trong kho từ khóa, nên chưa có lượt tìm, độ khó hay cụm. Bài được tạo mà không qua bước nghiên cứu từ khóa.</p>
+                                <p>Từ khóa này chưa có trong kho từ khóa.</p>
                             @endif
                             <dl class="ss-review-dl" style="margin-top:.6rem">
                                 <dt>Từ khóa phụ</dt><dd>{{ $dash(implode(', ', (array) $article->secondary_keywords)) }}</dd>
@@ -316,8 +337,7 @@
                     </div>
                     @if ($cluster)
                         <section class="ss-review-card" data-testid="aw-cluster">
-                            <h2 class="ss-review-card__title">Cụm “{{ $cluster->name }}”</h2>
-                            <p class="aw-muted" style="margin-bottom:.5rem">Các từ khóa cùng cụm nên được phủ bằng các bài liên kết nhau. Từ nào chưa có bài là chỗ còn trống.</p>
+                            <h2 class="ss-review-card__title">Cụm “{{ $cluster->name }}” <x-help title="Về cụm chủ đề"><p>Các từ khóa cùng cụm nên được phủ bằng các bài liên kết nhau. Từ nào chưa có bài là chỗ còn trống.</p></x-help></h2>
                             <div class="aw-scroll">
                                 <table class="aw-table">
                                     <thead><tr><th>Từ khóa</th><th>Lượt tìm/tháng</th><th>Độ khó</th><th>Bài viết</th></tr></thead>
@@ -355,13 +375,13 @@
             <x-studio.panel key="research">
                 <div class="aw-stack">
                     @if ($knowledgeGap)
-                        <p class="aw-note" data-testid="aw-gap" style="color:#b45309">{{ ArticleResource::GAP_NOTE }}</p>
+                        <div class="aw-note" data-testid="aw-gap" style="color:#b45309;margin:0">Bài này chưa có căn cứ từ kho kiến thức. <x-help tone="warning" title="Vì sao cần xem lại"><p>{{ ArticleResource::GAP_NOTE }}</p></x-help></div>
                     @endif
                     <div class="aw-grid">
                         <section class="ss-review-card" data-testid="aw-knowledge">
-                            <h2 class="ss-review-card__title">Từ Kho trí tuệ</h2>
+                            <h2 class="ss-review-card__title">Từ Kho trí tuệ <x-help title="Nguồn được kiểm soát"><p>Hệ thống hiện chưa tự tìm nguồn trên web hay từ tổ chức chuyên ngành; nguồn duy nhất được kiểm soát là Kho trí tuệ và hồ sơ doanh nghiệp.</p></x-help></h2>
                             @if ($brains === [])
-                                <p>Bài này chưa gắn Trí tuệ nào (theo chiến dịch hoặc website).</p>
+                                <p>Chưa gắn Trí tuệ nào.</p>
                             @else
                                 <p class="aw-muted">Trí tuệ đang dùng:
                                     @foreach ($brains as $b)
@@ -373,7 +393,7 @@
                                 <p style="margin-top:.5rem"><a class="aw-link" data-testid="aw-find-sources" href="{{ \App\Filament\Pages\BrainBuildPage::getUrl(['topic' => (string) $article->primary_keyword]) }}">Tìm nguồn cho chủ đề này</a></p>
                             @endif
                             @if ($usages->isEmpty())
-                                <p style="margin-top:.5rem">{{ $latest ? 'Bản mới nhất không dùng mục kiến thức nào từ kho.' : 'Chưa có bản nào nên chưa dùng kiến thức.' }}</p>
+                                <p class="aw-muted" style="margin-top:.5rem">{{ $latest ? 'Bản mới nhất chưa dùng mục nào từ kho.' : 'Chưa có bản nào.' }}</p>
                             @else
                                 <ul class="aw-list" style="margin-top:.5rem">
                                     @foreach ($usages as $u)
@@ -405,8 +425,7 @@
                         <section class="ss-review-card" data-testid="aw-products">
                             <h2 class="ss-review-card__title">Sản phẩm liên quan của công ty</h2>
                             @if ($products->isEmpty())
-                                <p>Chưa có sản phẩm nào trong kho. Thêm mục loại Sản phẩm (hoặc dán trang sản phẩm) ở Kho trí tuệ để bài nhắc đúng sản phẩm.</p>
-                                @if (BrainLibraryPage::canAccess())<p><a class="aw-link" href="{{ BrainLibraryPage::getUrl() }}">Mở Kho trí tuệ</a></p>@endif
+                                <div>Chưa có sản phẩm nào trong kho. @if (BrainLibraryPage::canAccess())<a class="aw-link" href="{{ BrainLibraryPage::getUrl() }}">Thêm ở Kho trí tuệ</a>@endif <x-help title="Vì sao cần sản phẩm"><p>Thêm mục loại Sản phẩm (hoặc dán trang sản phẩm) ở Kho trí tuệ để bài nhắc đúng sản phẩm.</p></x-help></div>
                             @else
                                 <ul class="aw-list">
                                     @foreach ($products as $u)
@@ -436,11 +455,11 @@
                                     <dt>Điều được phép khẳng định</dt><dd>{{ count((array) $brand->allowed_claims) }} mục</dd>
                                 </dl>
                             @else
-                                <p>Website này chưa có hồ sơ doanh nghiệp, nên AI viết mà không có giọng thương hiệu, thông điệp chính hay danh sách từ cấm.</p>
+                                <div>Website này chưa có hồ sơ doanh nghiệp. <x-help title="Hệ quả"><p>AI viết mà không có giọng thương hiệu, thông điệp chính hay danh sách từ cấm.</p></x-help></div>
                             @endif
                         </section>
                         <section class="ss-review-card" data-testid="aw-sources">
-                            <h2 class="ss-review-card__title">Nguồn AI nêu trong bài</h2>
+                            <h2 class="ss-review-card__title">Nguồn AI nêu trong bài @if ($sources !== [])<x-help tone="warning" title="Cần kiểm trước khi đăng"><p>Các nguồn này do AI tự nêu, hệ thống chưa kiểm chứng. Người duyệt cần kiểm trước khi đăng.</p></x-help>@endif</h2>
                             @if ($sources === [])
                                 <p>Chưa có nguồn trích.</p>
                             @else
@@ -449,7 +468,6 @@
                                         <li>{{ is_array($source) ? implode(' — ', array_map(fn ($v) => is_scalar($v) ? (string) $v : '', $source)) : (string) $source }}</li>
                                     @endforeach
                                 </ul>
-                                <p class="aw-note">Các nguồn này do AI tự nêu, hệ thống chưa kiểm chứng. Người duyệt cần kiểm trước khi đăng.</p>
                             @endif
                             @php
                                 $citable = array_values(array_filter((array) ($research['citable_sources'] ?? [])));
@@ -461,7 +479,7 @@
                         <section class="ss-review-card" data-testid="aw-outline">
                             <h2 class="ss-review-card__title">Dàn ý AI lập</h2>
                             @if ($outline === [])
-                                <p>Chưa có dàn ý (bài chưa qua bước lập dàn ý của đội AI).</p>
+                                <p>Chưa có dàn ý.</p>
                             @else
                                 <ol class="aw-list" style="list-style:decimal">@foreach ($outline as $o)<li>{{ $o }}</li>@endforeach</ol>
                             @endif
@@ -470,7 +488,6 @@
                             @endif
                         </section>
                     </div>
-                    <p class="aw-muted">Hệ thống hiện chưa tự tìm nguồn trên web hay từ tổ chức chuyên ngành; nguồn duy nhất được kiểm soát là Kho trí tuệ và hồ sơ doanh nghiệp.</p>
                 </div>
             </x-studio.panel>
 
@@ -478,13 +495,18 @@
             <x-studio.panel key="content">
                 <div class="aw-stack">
                     <section class="ss-review-card">
-                        <h2 class="ss-review-card__title">Các phiên bản</h2>
-                        @if ($latest)
-                            <p class="aw-muted" data-testid="aw-content-score-note">Điểm hình thức ({{ $qCounts['P0'] }} lỗi P0 · {{ $qCounts['P1'] }} P1 · {{ $qCounts['P2'] }} P2): {{ ArticleResource::SCORE_NOTE }}</p>
-                            @if ($noGrounding)<p class="aw-note" data-testid="aw-content-gap" style="color:#b45309">{{ ArticleResource::GAP_NOTE }}</p>@endif
-                        @endif
+                        <div class="aw-head" style="justify-content:flex-start;gap:.4rem">
+                            <h2 class="ss-review-card__title">Các phiên bản</h2>
+                            @if ($latest)
+                                <x-help title="Đọc điểm và duyệt">
+                                    <p data-testid="aw-content-score-note">Điểm hình thức ({{ $qCounts['P0'] }} lỗi P0 · {{ $qCounts['P1'] }} P1 · {{ $qCounts['P2'] }} P2): {{ ArticleResource::SCORE_NOTE }}</p>
+                                    <p>Bấm Xem để đọc toàn bộ nội dung, thẻ SEO, kiểm chất lượng và so sánh với bản trước. Các nút duyệt ở đầu trang áp dụng cho bản mới nhất.</p>
+                                </x-help>
+                            @endif
+                        </div>
+                        @if ($latest && $noGrounding)<div class="aw-note" data-testid="aw-content-gap" style="color:#b45309">Bài chưa có căn cứ từ kho kiến thức. <x-help tone="warning" title="Vì sao cần xem lại"><p>{{ ArticleResource::GAP_NOTE }}</p></x-help></div>@endif
                         @if ($versions->isEmpty())
-                            <p>Bài chưa có nội dung. Bấm <strong>Giao đội AI</strong> ở đầu trang để tạo bản nháp đầu tiên.</p>
+                            <p>Bài chưa có nội dung.</p>
                         @else
                             <div class="aw-scroll">
                                 <table class="aw-table" data-testid="aw-versions">
@@ -511,7 +533,6 @@
                                     </tbody>
                                 </table>
                             </div>
-                            <p class="aw-muted" style="margin-top:.5rem">Bấm Xem để đọc toàn bộ nội dung, thẻ SEO, kiểm chất lượng và so sánh với bản trước. Các nút duyệt ở đầu trang áp dụng cho bản mới nhất.</p>
                         @endif
                     </section>
                     @if ($latest)
@@ -524,7 +545,7 @@
                                     @include('filament.article.images-gallery', ['version' => $v])
                                 @endif
                             @endforeach
-                            @if ($imageNote)<p class="aw-muted" style="margin-top:.5rem">Lần chọn ảnh từ thư viện gần nhất: {{ $imageNote }}.</p>@endif
+                            @if ($imageNote)<div class="aw-muted" style="margin-top:.5rem">Ảnh từ thư viện <x-help title="Lần chọn ảnh gần nhất"><p>{{ $imageNote }}.</p></x-help></div>@endif
                         </section>
                     @endif
                 </div>
@@ -563,15 +584,14 @@
                         </section>
                     @endif
                     <section class="ss-review-card">
-                        <h2 class="ss-review-card__title">Các phiên chạy của đội AI</h2>
+                        <h2 class="ss-review-card__title">Các phiên chạy của đội AI @if ($runs->isNotEmpty())<x-help title="Điểm hình thức"><p data-testid="aw-score-note">{{ ArticleResource::SCORE_NOTE }}</p></x-help>@endif</h2>
                         @if ($runs->isEmpty())
                             <p>Bài này chưa được giao cho đội AI.</p>
                         @else
-                            <p class="aw-muted" data-testid="aw-score-note" style="margin-bottom:.4rem">Điểm hình thức: {{ ArticleResource::SCORE_NOTE }}</p>
-                            @if ($noGrounding)<p class="aw-note" data-testid="aw-score-gap" style="color:#b45309">{{ ArticleResource::GAP_NOTE }}</p>@endif
+                            @if ($noGrounding)<div class="aw-note" data-testid="aw-score-gap" style="color:#b45309">Bài chưa có căn cứ từ kho kiến thức. <x-help tone="warning" title="Vì sao cần xem lại"><p>{{ ArticleResource::GAP_NOTE }}</p></x-help></div>@endif
                             <div class="aw-scroll">
                                 <table class="aw-table" data-testid="aw-runs">
-                                    <thead><tr><th>Phiên</th><th>Kết quả</th><th title="{{ ArticleResource::SCORE_NOTE }}">Điểm hình thức</th><th>Tạo ra bản</th><th>AI</th><th>Vòng sửa</th><th>Chi phí</th><th>Bắt đầu</th><th></th></tr></thead>
+                                    <thead><tr><th>Phiên</th><th>Kết quả</th><th>Điểm hình thức</th><th>Tạo ra bản</th><th>AI</th><th>Vòng sửa</th><th>Chi phí</th><th>Bắt đầu</th><th></th></tr></thead>
                                     <tbody>
                                         @foreach ($runs as $r)
                                             @php $isLive = $live && $r->id === $live->id; $fv = $r->final_version_id ? $versions->firstWhere('id', $r->final_version_id) : null; @endphp
@@ -611,7 +631,7 @@
                         </span>
                     </div>
                     @if ($publications->isEmpty())
-                        <p>{{ $article->workflow_status === 'approved' ? 'Bài đã duyệt nhưng chưa có lịch. Bấm Xếp lịch ở đầu trang.' : 'Bài chưa có lịch xuất bản. Bài cần được duyệt trước khi xếp lịch.' }}</p>
+                        <div>{{ $article->workflow_status === 'approved' ? 'Bài đã duyệt, chưa có lịch.' : 'Chưa có lịch xuất bản.' }}@if ($article->workflow_status !== 'approved') <x-help title="Khi nào xếp lịch được"><p>Bài cần được duyệt trước khi xếp lịch.</p></x-help>@endif</div>
                     @else
                         <div class="aw-scroll">
                             <table class="aw-table" data-testid="aw-publications">

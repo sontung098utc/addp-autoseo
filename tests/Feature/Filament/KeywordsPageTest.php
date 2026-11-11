@@ -39,7 +39,7 @@ class KeywordsPageTest extends TestCase
     public function test_writer_mo_trang_thay_du_tab_va_khong_banner(): void
     {
         $r = $this->actingAs($this->user('writer'))->get('/admin/tu-khoa')->assertOk()->assertDontSee('Dữ liệu minh họa');
-        foreach (['Danh sách', 'Nhập từ khóa', 'Gom cụm', 'Cụm đã nhận', 'Quy tắc'] as $tab) {
+        foreach (['Danh sách', 'Nhập từ khóa', 'Gom cụm'] as $tab) {
             $r->assertSee($tab);
         }
     }

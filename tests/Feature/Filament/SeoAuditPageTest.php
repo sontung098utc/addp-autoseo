@@ -96,7 +96,7 @@ class SeoAuditPageTest extends TestCase
     public function test_giao_dien_tab_bang_kpi_va_nut_primary_duy_nhat(): void
     {
         $this->as('approver');
-        $c = Livewire::test(AuditPage::class)->assertSee('Nhóm lỗi')->assertSee('Brief đã tạo')->assertSee('Quy tắc')
+        $c = Livewire::test(AuditPage::class)->assertSee('Nhóm lỗi')->assertSee('Brief đã tạo')->assertSee('Cách quét và quy tắc')->assertSee('data-testid="help"', false)
             ->assertSee('Tạo brief từ lỗi')->assertDontSee('Luật nghiệp vụ của màn này');
         $rows = $c->viewData('groupRows');
         $this->assertNotEmpty($rows);

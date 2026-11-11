@@ -1,5 +1,5 @@
 <x-filament-panels::page>
-    <x-chain-context step="Khám phá" purpose="Kiểm sức khỏe kỹ thuật và nội dung của website, rồi biến lỗi thành việc làm mới bài. Nút «Quét thật» đọc các trang website thật (giới hạn số trang); nút «Quét lại (dữ liệu mẫu)» chỉ chạy dữ liệu minh họa, không tạo việc." :inputs="[['label'=>'Website kết nối','url'=>\App\Filament\Resources\WebsiteResource::getUrl('index'),'note'=>'trang đã quét của website']]" :outputs="[['label'=>'Kế hoạch nội dung','url'=>\App\Filament\Pages\ContentPlanPage::getUrl(),'note'=>'đề xuất làm mới tạo bài loại làm mới (chỉ từ quét thật)'],['label'=>'Danh sách lỗi cho dev','url'=>null,'note'=>'ngay trên trang này'],['label'=>'Search Console','url'=>\App\Filament\Pages\SearchConsolePage::getUrl(),'note'=>'đối chiếu hiệu quả']]" />
+    <x-chain-context step="Khám phá" purpose="Kiểm sức khỏe kỹ thuật và nội dung của website, rồi biến lỗi thành việc làm mới bài." :inputs="[['label'=>'Website kết nối','url'=>\App\Filament\Resources\WebsiteResource::getUrl('index'),'note'=>'trang đã quét của website']]" :outputs="[['label'=>'Kế hoạch nội dung','url'=>\App\Filament\Pages\ContentPlanPage::getUrl(),'note'=>'đề xuất làm mới tạo bài loại làm mới (chỉ từ quét thật)'],['label'=>'Danh sách lỗi cho dev','url'=>null,'note'=>'ngay trên trang này'],['label'=>'Search Console','url'=>\App\Filament\Pages\SearchConsolePage::getUrl(),'note'=>'đối chiếu hiệu quả']]" />
     <style>
         .au-mono{font-family:ui-monospace,monospace}
         .au-code{margin:0;padding:.4rem .6rem;background:var(--ss-surface);border:1px solid var(--ss-border);border-radius:.3rem;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -25,8 +25,7 @@
             $openSug = collect($suggestions)->where('status', 'de_xuat')->count();
             $tabs[] = ['key' => 'suggest', 'label' => 'Đề xuất làm mới', 'count' => $realRun ? $openSug : null];
         }
-        $tabs[] = ['key' => 'briefs', 'label' => 'Brief đã tạo', 'count' => count($briefRows)];
-        $tabs[] = ['key' => 'rules', 'label' => 'Quy tắc'];
+        if (count($briefRows) > 0 || $run) { $tabs[] = ['key' => 'briefs', 'label' => 'Brief đã tạo', 'count' => count($briefRows)]; }
         $ctone = ['P0' => 'danger', 'P1' => 'warn', 'P2' => 'muted'];
     @endphp
 
@@ -36,30 +35,42 @@
             <select id="au-site" wire:model.live="websiteId">
                 @foreach ($websites as $w)<option value="{{ $w->id }}">{{ $w->name }}</option>@endforeach
             </select>
+            <x-help title="Cách quét và quy tắc">
+                <p>«Quét thật» đọc các trang website thật (giới hạn số trang) và cho ra đề xuất làm mới bài. «Quét lại (dữ liệu mẫu)» chỉ chạy dữ liệu minh họa, không tạo việc.</p>
+                <ul>
+                    <li>Chỉ quét website thuộc allowlist (đang active); chặn IP nội bộ và metadata cloud (chống SSRF). Không đủ điều kiện thì nút quét vô hiệu kèm lý do.</li>
+                    <li>Tối đa 1 lần quét mỗi website mỗi 6 giờ (giả định, cần chủ dự án chốt).</li>
+                    <li>Chưa quét thì ghi "Chưa quét", không hiện số 0. Mỗi lỗi có URL và bằng chứng.</li>
+                    <li>Quét lỗi (robots.txt, chặn bot, timeout) thì nói rõ; kết quả cũ gắn nhãn "cũ".</li>
+                    <li>Mức P0/P1/P2 theo loại lỗi (bảng cố định); xu hướng so với lần quét hoàn tất liền trước; số lỗi tăng là xấu.</li>
+                    <li>Xem: writer trở lên. Quét lại và Tạo brief: approver trở lên (kiểm ở server).</li>
+                    <li>"AI đề xuất" chỉ dựa trên URL và bằng chứng của nhóm, cần người kiểm. Brief chỉ tạo việc, không tự sửa website.</li>
+                </ul>
+            </x-help>
+            <span style="flex:1"></span>
             @if ($site && $state !== 'chua-ket-noi')
-                <x-filament::button color="gray" wire:click="rescan" :disabled="! $canRescan">{{ $run ? 'Quét lại (dữ liệu mẫu)' : 'Quét lần đầu (dữ liệu mẫu)' }}</x-filament::button>
-                @if ($canRealScan)
-                    <x-filament::button color="gray" wire:click="openRealScan">Quét thật (giới hạn {{ $realScanMax }} trang)</x-filament::button>
-                @endif
                 @if ($scanning)
                     <span class="ss-text-sm ss-muted">Đang quét, chờ xong mới quét lại được.</span>
                 @elseif (! $guard['ok'])
                     <span class="ss-text-sm ss-muted" title="{{ $guard['reason'] }}">🔒 {{ $guard['reason'] }} {{ $nextAtLabel }}</span>
                 @endif
-            @endif
-            <span style="flex:1"></span>
-            @if ($run)
-                <span class="ss-text-sm ss-muted">{{ $realRun ? 'Quét thật lúc '.$vn($run['at']) : 'Dữ liệu mẫu, không phải kết quả quét website thật' }}</span>
-            @endif
-            @if ($hasData)
-                <x-filament::button wire:click="createBrief" :disabled="! $canBrief" title="{{ ! $canAct ? 'Chỉ approver trở lên được tạo brief.' : ($scanning ? 'Đang quét nên chưa tạo được.' : 'Tạo brief từ nhóm lỗi đang chọn') }}">Tạo brief từ lỗi</x-filament::button>
+                @if ($run)
+                    <span class="ss-text-sm ss-muted">{{ $realRun ? 'Quét thật lúc '.$vn($run['at']) : 'Dữ liệu mẫu, không phải kết quả quét website thật' }}@if ($stale) <x-studio.badge tone="warn">Kết quả cũ</x-studio.badge>@endif</span>
+                @endif
+                @if ($hasData)
+                    <x-filament::button color="gray" wire:click="createBrief" :disabled="! $canBrief" title="{{ ! $canAct ? 'Chỉ approver trở lên được tạo brief.' : ($scanning ? 'Đang quét nên chưa tạo được.' : 'Tạo brief từ nhóm lỗi đang chọn') }}">Tạo brief từ lỗi</x-filament::button>
+                @endif
+                <x-filament::button color="gray" wire:click="rescan" :disabled="! $canRescan">{{ $run ? 'Quét lại (dữ liệu mẫu)' : 'Quét lần đầu (dữ liệu mẫu)' }}</x-filament::button>
+                @if ($canRealScan)
+                    <x-filament::button color="primary" wire:click="openRealScan">Quét thật (giới hạn {{ $realScanMax }} trang)</x-filament::button>
+                @endif
             @endif
         </div>
         @if ($realScanOpen && $canRealScan)
             <div class="ss-alert ss-alert--info" role="dialog" aria-label="Xác nhận quét thật">
                 <label for="au-limit">Số trang tối đa (1 đến {{ $realScanMax }})</label>
                 <input id="au-limit" type="number" min="1" max="{{ $realScanMax }}" wire:model="realScanLimit">
-                <p class="ss-text-sm">Quét chạy ngay trên trang này và có thể mất vài chục giây; giới hạn số trang để không treo. Quét lớn hơn dùng lệnh dòng lệnh.</p>
+                <x-help text="Quét chạy ngay trên trang này và có thể mất vài chục giây; giới hạn số trang để không treo. Quét lớn hơn dùng lệnh dòng lệnh." />
                 <x-filament::button wire:click="realScan" wire:loading.attr="disabled">Quét thật</x-filament::button>
                 <x-filament::button color="gray" wire:click="closeRealScan">Hủy</x-filament::button>
             </div>
@@ -68,9 +79,9 @@
         @if ($state === 'chua-ket-noi' || ! $site)
             <div class="ss-alert ss-alert--warn" role="status">Website chưa được kết nối. Thêm website vào mục Website kết nối trước khi quét.</div>
         @elseif ($crawlerOff)
-            <div class="ss-alert ss-alert--info" role="status">Chưa kết nối crawler nên chưa có lần quét nào.</div>
+            <div class="ss-text-sm ss-muted" role="status">Chưa kết nối crawler nên chưa có lần quét nào.</div>
         @elseif (! $run)
-            <div class="ss-alert ss-alert--info" role="status">Chưa quét website này.</div>
+            <div class="ss-text-sm ss-muted" role="status">Chưa quét website này.</div>
         @endif
 
         @if ($state === 'dang-quet' && $site)
@@ -90,11 +101,10 @@
                     <div class="ss-kpi"><div class="ss-kpi__l">{{ $lab }} <x-studio.badge :tone="$ctone[$sv]">{{ $sv }}</x-studio.badge></div><div class="ss-kpi__v">{{ $sevStats[$sv]['n'] }}</div>
                         <div class="ss-kpi__d"><x-studio.delta :value="$sevStats[$sv]['delta']" good="down" :decimals="0" /> <span class="ss-muted">so với lần trước</span></div></div>
                 @endforeach
-                <div class="ss-kpi"><div class="ss-kpi__l">Quét gần nhất</div><div class="ss-kpi__v">{{ \App\Filament\Support\Schedule\VnTime::format($run['at'], 'H:i d/m') }}</div>
-                    <div class="ss-kpi__d ss-muted">giờ VN @if ($stale) <x-studio.badge tone="warn">Kết quả cũ</x-studio.badge> @endif</div></div>
             </div>
         @endif
 
+        @if (count($tabs) > 0)
         <x-studio.tabs persist="audit" :tabs="$tabs">
             @if ($hasData)
                 <x-studio.panel key="groups">
@@ -117,7 +127,7 @@
                                 @php $related = collect($suggestions)->filter(fn ($x) => in_array($group['type'], $x['types'], true)); @endphp
                                 <div class="au-ai" style="border-style:solid">
                                     <strong>Việc sửa liên quan</strong>
-                                    <x-studio.hint text="Đề xuất làm mới bài từ lỗi này. Đề xuất chỉ thành việc khi approver chấp nhận; hệ thống không tự sửa bài đã đăng." />
+                                    <x-help text="Đề xuất làm mới bài từ lỗi này. Đề xuất chỉ thành việc khi approver chấp nhận; hệ thống không tự sửa bài đã đăng." />
                                     @if (! $realRun)
                                         <div class="ss-text-sm ss-muted">Dữ liệu mẫu: không tạo việc.</div>
                                     @else
@@ -144,7 +154,7 @@
                     <div class="ss-card"><div class="ss-card__b" style="display:grid;gap:.75rem">
                         <div class="ss-toolbar">
                             <strong>Đề xuất làm mới bài</strong>
-                            <x-studio.hint text="Hệ thống sinh đề xuất từ lỗi P0/P1 của lần quét thật gần nhất. Không có gì tự thành việc: approver chấp nhận thì bài làm mới mới vào Kế hoạch để chiến dịch giao cho đội AI. Trang không phải bài viết chỉ sửa thủ công trên CMS." />
+                            <x-help text="Hệ thống sinh đề xuất từ lỗi P0/P1 của lần quét thật gần nhất. Không có gì tự thành việc: approver chấp nhận thì bài làm mới mới vào Kế hoạch để chiến dịch giao cho đội AI. Trang không phải bài viết chỉ sửa thủ công trên CMS." />
                             <span style="flex:1"></span>
                             <x-filament::button color="gray" wire:click="suggestRefresh" :disabled="! $canAct || ! $realRun" title="{{ ! $realRun ? 'Dữ liệu mẫu: không tạo việc.' : (! $canAct ? 'Chỉ approver trở lên được tạo đề xuất.' : 'Tạo đề xuất làm mới bài từ lỗi P0/P1') }}">Tạo đề xuất</x-filament::button>
                             @if ($realRun)
@@ -152,7 +162,7 @@
                             @endif
                         </div>
                         @if (! $realRun)
-                            <div class="ss-alert ss-alert--info" role="status">Dữ liệu mẫu: không tạo việc. Đề xuất chỉ sinh từ kết quả quét thật.</div>
+                            <div class="ss-text-sm ss-muted" role="status">Dữ liệu mẫu: không tạo việc. Đề xuất chỉ sinh từ kết quả quét thật.</div>
                         @elseif ($suggestBlocker)
                             <div class="ss-alert ss-alert--warn" role="status">{{ $suggestBlocker }}</div>
                         @endif
@@ -189,24 +199,8 @@
                     ['key' => 'at', 'label' => 'Thời điểm (giờ VN)', 'type' => 'text'],
                 ]" />
             </x-studio.panel>
-
-            <x-studio.panel key="rules">
-                <div class="ss-card"><div class="ss-card__b" style="overflow-x:auto">
-                    <table class="au-rules ss-text-sm">
-                        <thead><tr><th>Luật</th><th>Nguồn dữ liệu</th></tr></thead>
-                        <tbody>
-                        <tr><td>Chỉ quét website thuộc allowlist (đang active); chặn IP nội bộ và metadata cloud (chống SSRF). Không đủ điều kiện thì nút Quét lại vô hiệu kèm lý do.</td><td class="au-mono">websites.status, websites.base_url</td></tr>
-                        <tr><td>Tối đa 1 lần quét mỗi website mỗi 6 giờ (giả định, cần chủ dự án chốt).</td><td class="au-mono">audit_runs.started_at</td></tr>
-                        <tr><td>Chưa quét thì ghi "Chưa quét", không hiện số 0. Mỗi lỗi có URL và bằng chứng.</td><td class="au-mono">audit_issues</td></tr>
-                        <tr><td>Quét lỗi (robots.txt, chặn bot, timeout) thì nói rõ; kết quả cũ gắn nhãn "cũ".</td><td class="au-mono">audit_runs.status</td></tr>
-                        <tr><td>Mức P0/P1/P2 theo loại lỗi (bảng cố định); xu hướng so với lần quét hoàn tất liền trước; số lỗi tăng là xấu.</td><td class="au-mono">IssueCatalog</td></tr>
-                        <tr><td>Xem: writer trở lên. Quét lại và Tạo brief: approver trở lên (kiểm ở server).</td><td class="au-mono">users.role</td></tr>
-                        <tr><td>"AI đề xuất" chỉ dựa trên URL và bằng chứng của nhóm, cần người kiểm. Brief chỉ tạo việc, không tự sửa website.</td><td class="au-mono">briefs(source=audit)</td></tr>
-                        </tbody>
-                    </table>
-                </div></div>
-            </x-studio.panel>
         </x-studio.tabs>
+        @endif
     </div>
 
     @if ($briefOpen && $brief)

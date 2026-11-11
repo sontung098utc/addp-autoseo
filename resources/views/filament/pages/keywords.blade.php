@@ -11,35 +11,49 @@
     @php $unclustered = $total - $clustered; @endphp
     <div class="ss-page">
         <x-chain-context step="Khám phá" purpose="Kho từ khóa của website: nơi gom từ khóa từ CSV, AI đề xuất, đối thủ, Search Console; gom thành cụm để lập kế hoạch bài viết" :inputs="$chainInputs" :outputs="$chainOutputs" />
-        @if ($metricsInfo)
-            <div class="ss-card" style="margin-bottom:1rem" role="region" aria-label="Nguồn số liệu lượt tìm" data-testid="metrics-sources"><div class="ss-card__b">
-                <div class="ss-card__h">Nguồn số liệu lượt tìm <x-studio.hint text="AI không biết lượt tìm. Số liệu thật chỉ đến từ CSV bạn nhập, nhà cung cấp số liệu (DataForSEO) hoặc Search Console. Chi phí nêu ở đây là ước tính theo cấu hình." /></div>
-                <ul class="ss-text-sm" style="list-style:disc;padding-left:1.2rem">
-                    <li><strong>CSV</strong>: luôn có (tab "Nhập từ khóa", cột volume).</li>
-                    <li><strong>DataForSEO</strong>:
-                        @if ($metricsInfo['available'] && ! $metricsInfo['demo'])đã cấu hình. Nút "Lấy lượt tìm thật" tra theo lô.
-                        @elseif ($metricsInfo['demo'])chưa cấu hình; đang dùng số giả lập của môi trường local (không phải lượt tìm thật).
-                        @else chưa cấu hình. {{ $metricsInfo['reason'] }}@endif
-                    </li>
-                    <li><strong>Search Console</strong>: {{ $metricsInfo['gsc'] }}</li>
-                </ul>
-                <p class="ss-text-sm" data-testid="metrics-count">{{ $metricsInfo['with'] }}/{{ $metricsInfo['total'] }} từ khóa có số liệu, {{ $metricsInfo['dataforseo'] }} từ nguồn DataForSEO, cập nhật gần nhất {{ $metricsInfo['latest'] ?? 'chưa có' }}.</p>
-            </div></div>
-        @endif
-        <x-studio.tabs persist="tu-khoa" :tabs="[
-            ['key' => 'list', 'label' => 'Danh sách', 'count' => $total],
-            ['key' => 'import', 'label' => 'Nhập từ khóa', 'tone' => $preview ? 'info' : null],
-            ['key' => 'propose', 'label' => 'Gom cụm', 'count' => count($proposals) ?: null, 'tone' => count($proposals) ? 'warn' : null],
-            ['key' => 'clusters', 'label' => 'Cụm đã nhận', 'count' => count($clusters)],
-            ['key' => 'rules', 'label' => 'Quy tắc'],
-        ]">
+        <div class="kw-bar" role="region" aria-label="Nguồn số liệu lượt tìm" @if ($metricsInfo) data-testid="metrics-sources" @endif>
+            @if ($metricsInfo)
+                <span class="ss-text-sm" data-testid="metrics-count">{{ $metricsInfo['with'] }}/{{ $metricsInfo['total'] }} từ khóa có số liệu, {{ $metricsInfo['dataforseo'] }} từ nguồn DataForSEO, cập nhật gần nhất {{ $metricsInfo['latest'] ?? 'chưa có' }}.</span>
+                <x-help title="Nguồn số liệu lượt tìm">
+                    <p>AI không biết lượt tìm. Số liệu thật chỉ đến từ CSV bạn nhập, nhà cung cấp số liệu (DataForSEO) hoặc Search Console. Chi phí nêu ở đây là ước tính theo cấu hình.</p>
+                    <ul>
+                        <li><strong>CSV</strong>: luôn có (tab "Nhập từ khóa", cột volume).</li>
+                        <li><strong>DataForSEO</strong>:
+                            @if ($metricsInfo['available'] && ! $metricsInfo['demo'])đã cấu hình. Nút "Lấy lượt tìm thật" tra theo lô.
+                            @elseif ($metricsInfo['demo'])chưa cấu hình; đang dùng số giả lập của môi trường local (không phải lượt tìm thật).
+                            @else chưa cấu hình. {{ $metricsInfo['reason'] }}@endif
+                        </li>
+                        <li><strong>Search Console</strong>: {{ $metricsInfo['gsc'] }}</li>
+                    </ul>
+                </x-help>
+            @endif
+                <x-help title="Quy tắc của trang">
+                    <ul>
+                        <li>Chỉ Biên tập viên trở lên (đang hoạt động) xem và sửa được; máy chủ kiểm lại ở mọi thao tác.</li>
+                        <li>CSV: bắt buộc cột <code>keyword</code>; tối đa 5.000 dòng và 1 MB; dòng sai được báo số dòng và lý do.</li>
+                        <li>Từ khóa trùng (không phân biệt hoa/thường, gộp khoảng trắng) bị bỏ qua và báo lại.</li>
+                        <li>Xem trước 20 dòng đầu; chỉ lưu khi bấm "Xác nhận".</li>
+                        <li>Mỗi từ khóa thuộc tối đa một cụm. AI chỉ đề xuất; người duyệt nhận, sửa tên, gộp, tách hoặc bỏ.</li>
+                        <li>Xóa từ khóa không xóa bài đã tạo. Lượng tìm là số ghi trong tệp CSV bạn nhập, không phải dữ liệu Google; để trống khi nguồn không có.</li>
+                    </ul>
+                </x-help>
+        </div>
+        @php
+            $tabs = [
+                ['key' => 'list', 'label' => 'Danh sách', 'count' => $total],
+                ['key' => 'import', 'label' => 'Nhập từ khóa', 'tone' => $preview ? 'info' : null],
+                ['key' => 'propose', 'label' => 'Gom cụm', 'count' => count($proposals) ?: null, 'tone' => count($proposals) ? 'warn' : null],
+            ];
+            if (count($clusters) > 0 || $renaming !== null) { $tabs[] = ['key' => 'clusters', 'label' => 'Cụm đã nhận', 'count' => count($clusters)]; }
+        @endphp
+        <x-studio.tabs persist="tu-khoa" :default="$total === 0 || $preview ? 'import' : 'list'" :tabs="$tabs">
             <x-studio.panel key="list">
                 @if ($total === 0)
-                    <div class="ss-alert ss-alert--info" role="status">Chưa có từ khóa. Nhập CSV hoặc thêm tay ở tab "Nhập từ khóa".</div>
+                    <div class="ss-text-sm ss-muted" role="status">Chưa có từ khóa. Nhập CSV hoặc thêm tay ở tab "Nhập từ khóa".</div>
                 @else
                     <div class="kw-bar">
                         @if ($real)<x-studio.badge tone="ok">Dữ liệu thật</x-studio.badge>@endif
-                        <x-studio.hint text="Cột lượng tìm hiện — (Chưa có số liệu) khi chưa có số. Muốn có số: bấm 'Lấy lượt tìm thật' hoặc nhập CSV có cột volume. Hệ thống không tự điền số. Cột 'Nguồn số liệu' cho biết số đến từ đâu." />
+                        <x-help text="Cột lượng tìm hiện — (Chưa có số liệu) khi chưa có số. Muốn có số: bấm 'Lấy lượt tìm thật' hoặc nhập CSV có cột volume. Hệ thống không tự điền số. Cột 'Nguồn số liệu' cho biết số đến từ đâu." />
                     </div>
                     <x-studio.data-table id="keywords" :columns="$kwColumns" :rows="$kwRows" :page-size="25" search="Tìm từ khóa hoặc cụm" />
                 @endif
@@ -73,7 +87,7 @@
     @endif
                 <div class="ss-split">
                     <div class="ss-card"><div class="ss-card__b">
-                <div class="ss-card__h">Nhập CSV <x-studio.hint text="Từ khóa lấy từ đâu — không bắt buộc mua dịch vụ: nhập tay, CSV (Keyword Planner/Search Console…), Search Console khi nối, AI đề xuất (không có lượng tìm). Lượng tìm chỉ có khi tệp CSV của bạn có cột volume." /></div>
+                <div class="ss-card__h">Nhập CSV <x-help text="Từ khóa lấy từ đâu — không bắt buộc mua dịch vụ: nhập tay, CSV (Keyword Planner/Search Console…), Search Console khi nối, AI đề xuất (không có lượng tìm). Lượng tìm chỉ có khi tệp CSV của bạn có cột volume." /></div>
                 <p class="ss-muted ss-text-xs">Cột: <code>keyword</code> (bắt buộc), <code>volume</code>, <code>intent</code> · tối đa 5.000 dòng, 1 MB.</p>
                 <div class="kw-bar">
                     <input type="file" wire:model="csvFile" accept=".csv,text/csv,text/plain" aria-label="Chọn tệp CSV">
@@ -84,7 +98,7 @@
 
                     </div></div>
                     <div class="ss-card"><div class="ss-card__b">
-                <div class="ss-card__h">Thêm tay <x-studio.hint text="Từ khóa nhập tay được ghi nguồn 'Nhập tay'. Bỏ trống lượng tìm nếu bạn không có số liệu." /></div>
+                <div class="ss-card__h">Thêm tay <x-help text="Từ khóa nhập tay được ghi nguồn 'Nhập tay'. Bỏ trống lượng tìm nếu bạn không có số liệu." /></div>
                 <div class="kw-bar">
                     <input class="kw-in" wire:model="newKeyword" placeholder="Từ khóa" aria-label="Từ khóa mới" maxlength="255">
                     <input class="kw-in" wire:model="newVolume" placeholder="Volume (tùy chọn)" aria-label="Volume" style="width:9rem">
@@ -141,23 +155,10 @@
                     </div>
                 @endif
                 @if (count($clusters) === 0)
-                    <div class="ss-alert ss-alert--info" role="status">Chưa có cụm nào.</div>
+                    <div class="ss-text-sm ss-muted" role="status">Chưa có cụm nào.</div>
                 @else
                     <x-studio.data-table id="clusters" :columns="$clusterColumns" :rows="$clusterRows" :page-size="25" search="Tìm cụm" />
                 @endif
-            </x-studio.panel>
-
-            <x-studio.panel key="rules">
-                <div class="ss-card"><div class="ss-card__b">
-                    <ul class="ss-text-sm" style="list-style:disc;padding-left:1.2rem">
-            <li>Chỉ Biên tập viên trở lên (đang hoạt động) xem và sửa được; máy chủ kiểm lại ở mọi thao tác.</li>
-            <li>CSV: bắt buộc cột <code>keyword</code>; tối đa 5.000 dòng và 1 MB; dòng sai được báo số dòng và lý do.</li>
-            <li>Từ khóa trùng (không phân biệt hoa/thường, gộp khoảng trắng) bị bỏ qua và báo lại.</li>
-            <li>Xem trước 20 dòng đầu; chỉ lưu khi bấm "Xác nhận".</li>
-            <li>Mỗi từ khóa thuộc tối đa một cụm. AI chỉ đề xuất; người duyệt nhận, sửa tên, gộp, tách hoặc bỏ.</li>
-            <li>Xóa từ khóa không xóa bài đã tạo. Lượng tìm là số ghi trong tệp CSV bạn nhập, không phải dữ liệu Google; để trống khi nguồn không có.</li>
-        </ul>
-                </div></div>
             </x-studio.panel>
         </x-studio.tabs>
     </div>

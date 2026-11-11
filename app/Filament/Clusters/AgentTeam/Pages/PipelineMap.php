@@ -222,8 +222,6 @@ class PipelineMap extends Page
             'live' => $live,
             'pollSeconds' => RunActivity::POLL_LIVE,
             'liveSteps' => $liveSteps,
-            'office' => PipelineVisual::office(),
-            'rolesUrl' => PipelineVisual::urlOf(AgentRoles::class),
             'stages' => PipelineBlueprint::stages(),
             'controls' => PipelineBlueprint::controlsWired(),
             'chain' => $chain,

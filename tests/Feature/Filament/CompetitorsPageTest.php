@@ -197,7 +197,7 @@ class CompetitorsPageTest extends TestCase
     {
         $this->page('approver', 'chua-ket-noi')->assertOk();
         $this->page('approver', 'dang-tai')->assertSee('Đang lấy dữ liệu');
-        $this->page('approver', 'khong-doi-thu')->assertSee('Chưa có đối thủ nào');
+        $this->page('approver', 'khong-doi-thu')->assertSee('Chưa theo dõi đối thủ nào');
         $this->page('approver', 'ket-noi')->assertSee('tuyensinhhub.example');
         $e = $this->page('approver', 'loi-api')->set('newDomain', 'a.example')->call('addCompetitor')->call('doRefresh');
         $e->assertSee('Không lấy được dữ liệu')->assertSee('429');
@@ -210,37 +210,68 @@ class CompetitorsPageTest extends TestCase
         $this->app['env'] = 'production';
         $this->assertTrue(app()->isProduction());
         $this->page('approver', 'ket-noi')
-            ->assertSee('Chưa có dữ liệu khoảng trống')
+            ->assertSee('Chưa theo dõi đối thủ nào')
             ->assertDontSee('tuyensinhhub.example')->assertDontSee('Dữ liệu minh họa —')
             ->set('newDomain', 'a.vn')->call('addCompetitor');
         $this->assertSame([], CompetitorService::domains($this->site));
         $this->assertSame(['a.vn'], \App\Models\Competitor::pluck('domain')->all());
     }
 
-    /** Gói B #4: 0 mục thì nút "Thêm vào kế hoạch" bị vô hiệu; chưa có đối thủ thì mở sẵn tab Đối thủ. */
-    public function test_add_to_plan_disabled_when_zero_selected_and_default_tab_is_competitors_when_empty(): void
+    /** Chưa có đối thủ: chỉ một trạng thái trống với MỘT nút hành động (Thêm), không nhãn đỏ, không thẻ KPI rỗng. */
+    public function test_empty_competitors_is_single_neutral_empty_state(): void
     {
         $html = $this->page('approver', 'khong-doi-thu')->html();
-        $this->assertMatchesRegularExpression('/<button[^>]*disabled[^>]*>\s*(?:<[^>]+>\s*)*Thêm vào kế hoạch \(0\)/su', $html);
+        $this->assertStringContainsString('Chưa theo dõi đối thủ nào', $html);
+        $this->assertStringContainsString('data-co-section="empty"', $html);
+        $this->assertSame(1, substr_count($html, 'type="submit"'), 'Đúng một nút hành động chính');
+        $this->assertStringContainsString('Thêm đối thủ', $html);
+        $this->assertStringNotContainsString('data-co-blocked', $html);
+        $this->assertStringNotContainsString('ss-badge--danger', $html);
+        $this->assertStringNotContainsString('Chưa có đối thủ nào để lấy dữ liệu', $html);
+        $this->assertStringNotContainsString('ss-kpi', $html);
+        $this->assertStringNotContainsString('ss-tabs', $html);
+        $this->assertStringNotContainsString('Thêm vào kế hoạch (', $html);
+        $this->assertStringContainsString('data-testid="help"', $html, 'Hướng dẫn nằm trong (i)');
+    }
+
+    public function test_with_data_shows_kpis_and_add_to_plan_only_when_selected(): void
+    {
+        $p = $this->loaded();
+        $html = $p->html();
+        $this->assertStringContainsString('ss-kpi__l">Khoảng trống còn mở', $html);
+        $this->assertStringContainsString('ss-kpi__l">Đối thủ theo dõi', $html);
+        $this->assertStringNotContainsString('Thêm vào kế hoạch (0)', $html);
+        $open = collect($p->instance()->gaps())->first(fn ($g) => $g['existing'] === null);
+        $this->assertStringContainsString('Thêm vào kế hoạch (1)', $p->set('selected', [$open['norm']])->html());
+    }
+
+    public function test_competitors_without_data_hides_kpis_and_empty_tabs_without_red(): void
+    {
+        $html = $this->page()->set('newDomain', 'a.example')->call('addCompetitor')->html();
+        $this->assertStringNotContainsString('ss-kpi', $html);
+        $this->assertStringNotContainsString('Cụm gợi ý', $html);
+        $this->assertStringNotContainsString('ss-badge--danger', $html);
         $this->assertStringContainsString("studioTabs('competitors'", $html);
     }
 
-    public function test_default_tab_stays_gaps_when_competitors_exist(): void
+    public function test_default_tab_is_competitors_when_no_gap_data_yet(): void
     {
         $this->actingAs($this->user('approver'));
         $this->app['env'] = 'production';
         \App\Models\Competitor::create(['website_id' => $this->site->id, 'domain' => 'a.vn']);
         $html = Livewire::test(CompetitorsPage::class)->html();
-        $this->assertStringContainsString("studioTabs('gaps'", $html);
+        $this->assertStringContainsString("studioTabs('competitors'", $html);
+        $this->assertStringNotContainsString('data-key="gaps"', $html, 'Tab Khoảng trống ẩn khi chưa có dữ liệu');
     }
 
     public function test_ui_has_tabs_single_primary_and_no_noise(): void
     {
         $html = $this->loaded()->html();
-        foreach (['Khoảng trống', 'Đối thủ', 'Nguồn và chi phí', 'Cụm gợi ý', 'Quy tắc'] as $tab) {
+        foreach (['Khoảng trống', 'Đối thủ', 'Nguồn và chi phí', 'Cụm gợi ý'] as $tab) {
             $this->assertStringContainsString($tab, $html);
         }
-        $this->assertSame(1, substr_count($html, 'data-color="primary"') + substr_count($html, 'fi-color-primary'), 'Chỉ một nút primary');
+        $this->assertLessThanOrEqual(1, substr_count($html, 'data-color="primary"') + substr_count($html, 'fi-color-primary'), 'Không quá một nút primary');
+        $this->assertStringContainsString('data-testid="help"', $html);
         $this->assertStringNotContainsString('minh họa', $html);
         $this->assertStringNotContainsString('Luật nghiệp vụ của màn này', $html);
         $this->assertStringContainsString('ss-page', $html);

@@ -1,7 +1,7 @@
 <x-filament-widgets::widget>
-<x-filament::section heading="Giờ đăng kế tiếp">
+<x-filament::section>
+<x-slot name="heading">Giờ đăng kế tiếp <x-help title="Cách hiểu"><p>Mỗi website đang hoạt động: lượt đăng đã xếp lịch gần nhất. Hiển thị giờ Việt Nam (UTC+7) và UTC.</p></x-help></x-slot>
 <style>.ss-dash-row{display:flex;justify-content:space-between;gap:.75rem;padding:.5rem 0;border-bottom:1px solid rgba(128,128,128,.2)}.ss-dash-rule{font-size:.8rem;opacity:.7;margin-bottom:.5rem}.ss-dash-badge{font-size:.7rem;padding:.1rem .45rem;border-radius:999px;background:rgba(220,38,38,.15);color:#b91c1c;font-weight:600}.ss-dash-empty{opacity:.7;padding:.5rem 0}.ss-dash-sub{font-size:.8rem;opacity:.7}</style>
-<div class="ss-dash-rule">Mỗi website đang hoạt động: lượt đăng đã xếp lịch gần nhất. Hiển thị giờ Việt Nam (UTC+7) và UTC.</div>
 @forelse ($rows as $r)
 <div class="ss-dash-row">
 <span>{{ $r['website'] }}</span>

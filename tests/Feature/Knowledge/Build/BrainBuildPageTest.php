@@ -106,12 +106,12 @@ class BrainBuildPageTest extends TestCase
     public function test_muc_goi_y_cho_kho_hien_va_bo_qua_an_di(): void
     {
         $this->actingAs($this->user('approver'));
-        Livewire::test(BrainBuildPage::class)->assertSee('Gợi ý cho kho từ các bài gần đây')->assertSee('Chưa có gợi ý');
+        Livewire::test(BrainBuildPage::class)->assertDontSee('Gợi ý cho kho từ các bài gần đây'); // khối trống thì ẩn
         KnowledgeGap::create(['website_id' => $this->site->id, 'query' => 'học bổng Úc', 'count' => 2, 'status' => 'open']);
         $c = Livewire::test(BrainBuildPage::class);
-        $c->assertSee('Kho thiếu kiến thức về «học bổng Úc»')->assertSee('Bổ sung từ website')->assertSee('Bỏ qua');
+        $c->assertSee('Gợi ý cho kho từ các bài gần đây')->assertSee('Kho thiếu kiến thức về «học bổng Úc»')->assertSee('Bổ sung từ website')->assertSee('Bỏ qua');
         $key = $c->viewData('suggestions')[0]['key'];
-        $c->call('dismissSuggestion', $key)->assertDontSee('Kho thiếu kiến thức về «học bổng Úc»')->assertSee('Chưa có gợi ý');
+        $c->call('dismissSuggestion', $key)->assertDontSee('Kho thiếu kiến thức về «học bổng Úc»')->assertDontSee('Gợi ý cho kho từ các bài gần đây');
     }
 
     public function test_bo_sung_khoang_trong_khong_co_trang_lien_quan_thi_khong_chay(): void

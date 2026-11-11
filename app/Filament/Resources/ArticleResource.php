@@ -217,7 +217,7 @@ class ArticleResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Thông tin bài viết')
-                    ->description('Từ khóa và định hướng của bài. Nội dung, phiên bản, phiên chạy của đội AI và lịch đăng nằm ở trang của bài.')
+                    ->compact()
                     ->schema([
                         Forms\Components\Select::make('website_id')
                             ->label('Website đích')

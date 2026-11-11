@@ -44,7 +44,10 @@
         @endif
 
         @if (! $summary)
-            <div class="ss-alert ss-alert--info" data-ai="empty">Chưa có dữ liệu: không có phiên bản bài nào do AI sinh trong kỳ này{{ $websiteId ? ' ở website đã chọn' : '' }}. Bạn vẫn có thể đặt ngưỡng cảnh báo trước.</div>
+            <div class="ss-card" data-ai="empty"><div class="ss-card__b" style="display:flex;gap:1rem;align-items:center;justify-content:space-between;flex-wrap:wrap">
+                <span>Chưa có dữ liệu chi phí trong kỳ này{{ $websiteId ? ' ở website đã chọn' : '' }}. <x-help title="Chi phí AI hiện khi nào"><p>Chi phí hiện khi có phiên bản bài do AI sinh trong kỳ. Bạn vẫn có thể đặt ngưỡng cảnh báo trước.</p></x-help></span>
+                <button type="button" class="ss-dt__btn" wire:click="mountAction('setThreshold')">Đặt ngưỡng cảnh báo</button>
+            </div></div>
         @else
             <div class="ss-kpis" data-ai="summary">
                 <div class="ss-kpi"><div class="ss-kpi__l">Tổng chi phí</div>
@@ -53,23 +56,27 @@
                 <div class="ss-kpi"><div class="ss-kpi__l">Trung bình/bài</div>
                     <div class="ss-kpi__v" style="color:var(--ss-{{ $avg === null ? 'text' : ($avgExceeds ? 'danger-fg' : 'ok-fg') }})">{{ $avg === null ? '—' : Vnd::format($avg) }}</div>
                     <div class="ss-kpi__d">@if ($avg !== null)<x-studio.badge :tone="$avgExceeds ? 'danger' : 'ok'">{{ $avgExceeds ? '▲ vượt' : 'trong' }} ngưỡng {{ Vnd::format($th['article']) }}</x-studio.badge> @endif<x-studio.delta :value="$deltas['avg']" good="down" unit="%" /> <span class="ss-muted">trên {{ Vnd::int($summary['articles_with_cost']) }} bài có ghi chi phí</span></div></div>
+                @if ($summary['regen_articles'] > 0)
                 <div class="ss-kpi"><div class="ss-kpi__l">Bài sinh lại</div>
                     <div class="ss-kpi__v">{{ $summary['regen_articles'] }}</div>
                     <div class="ss-kpi__d"><x-studio.delta :value="$deltas['regen']" good="down" :decimals="0" /> <span class="ss-muted">{{ $summary['extra_versions'] }} phiên bản sinh lại</span></div></div>
-                <div class="ss-kpi"><div class="ss-kpi__l">Phiên bản chưa ghi chi phí</div>
+                @endif
+                @if ($summary['unrecorded'] > 0)
+                <div class="ss-kpi"><div class="ss-kpi__l">Phiên bản chưa ghi chi phí <x-help title="Vì sao tách riêng"><p>Phiên bản chưa ghi chi phí không được tính là 0 ₫.</p></x-help></div>
                     <div class="ss-kpi__v">{{ $summary['unrecorded'] }}</div>
-                    <div class="ss-kpi__d"><x-studio.delta :value="$deltas['unrecorded']" good="down" :decimals="0" /> <span class="ss-muted">không tính là 0 ₫</span></div></div>
+                    <div class="ss-kpi__d"><x-studio.delta :value="$deltas['unrecorded']" good="down" :decimals="0" /></div></div>
+                @endif
             </div>
         @endif
 
-        <x-studio.tabs persist="chi-phi-ai" :tabs="[
-            ['key' => 'overview', 'label' => 'Tổng quan'],
-            ['key' => 'model', 'label' => 'Theo model', 'count' => $summary ? count($modelRows) : null],
-            ['key' => 'prompt', 'label' => 'Theo prompt', 'count' => $summary ? count($promptRows) : null],
-            ['key' => 'top', 'label' => 'Bài tốn nhất', 'count' => $summary ? count($topRows) : null, 'tone' => count($overArticles) ? 'danger' : null],
+        <x-studio.tabs persist="chi-phi-ai" :default="$summary ? 'overview' : 'thresholds'" :tabs="array_values(array_filter([
+            $summary ? ['key' => 'overview', 'label' => 'Tổng quan'] : null,
+            $summary ? ['key' => 'model', 'label' => 'Theo model', 'count' => count($modelRows)] : null,
+            $summary ? ['key' => 'prompt', 'label' => 'Theo prompt', 'count' => count($promptRows)] : null,
+            $summary ? ['key' => 'top', 'label' => 'Bài tốn nhất', 'count' => count($topRows), 'tone' => count($overArticles) ? 'danger' : null] : null,
             ['key' => 'thresholds', 'label' => 'Ngưỡng', 'tone' => $monthExceeds ? 'danger' : null],
             ['key' => 'rules', 'label' => 'Quy tắc'],
-        ]">
+        ]))">
             <x-studio.panel key="overview">
                 @if ($summary)
                     @php
@@ -110,8 +117,6 @@
                         ]" :rows="$dayRows" :page-size="10" search="Tìm ngày" />
                         <x-studio.data-table id="ai-sites" :columns="$gcols('Website')" :rows="$siteRows" :page-size="10" search="Tìm website" />
                     </div>
-                @else
-                    <div class="ss-alert ss-alert--info">Chưa có số liệu để vẽ biểu đồ.</div>
                 @endif
             </x-studio.panel>
 
@@ -134,20 +139,12 @@
             </x-studio.panel>
 
             <x-studio.panel key="thresholds">
-                <div class="ss-split">
-                    <div class="ss-card" data-ai="thresholds"><div class="ss-card__h">Ngưỡng đang áp dụng</div><div class="ss-card__b ss-text-sm" style="display:grid;gap:.375rem">
+                <div>
+                    <div class="ss-card" data-ai="thresholds"><div class="ss-card__h">Ngưỡng đang áp dụng <x-help title="Về ngưỡng"><p>Khi vượt chỉ cảnh báo, không dừng sinh bài. Ngưỡng đang lưu tạm.</p></x-help></div><div class="ss-card__b ss-text-sm" style="display:grid;gap:.375rem">
                         <div>Theo bài: <strong>{{ Vnd::format($th['article']) }}</strong></div>
                         <div>Theo tháng: <strong>{{ $th['month'] === null ? 'Chưa đặt' : Vnd::format($th['month']) }}</strong>@if ($th['month'] !== null) <span class="ss-muted" data-ai="month-meter">đã dùng {{ Vnd::format($monthCost ?? 0) }} ({{ Vnd::percent(($monthCost ?? 0) / $th['month']) }}) {{ $monthLabel }}</span>@endif</div>
-                        <div class="ss-muted">Khi vượt chỉ cảnh báo, không dừng sinh bài. Ngưỡng đang lưu tạm.</div>
                         <div><button type="button" class="ss-dt__btn" wire:click="mountAction('setThreshold')">Sửa ngưỡng</button></div>
                     </div></div>
-                    <div class="ss-card" data-ai="na"><div class="ss-card__h">Chưa có số liệu</div><div class="ss-card__b"><ul class="ss-text-sm" style="list-style:disc;padding-left:1.25rem;display:grid;gap:.25rem">
-                        <li>Token vào / ra tách riêng (chỉ có tổng tokens_used)</li>
-                        <li>Cache hit</li>
-                        <li>Chi phí ảnh AI và alt ảnh</li>
-                        <li>Lượt sinh lỗi hoặc thử lại</li>
-                        <li>Theo chiến dịch</li>
-                    </ul></div></div>
                 </div>
             </x-studio.panel>
 

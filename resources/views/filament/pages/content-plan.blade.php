@@ -31,6 +31,18 @@
                     @foreach ($sites as $s)<option value="{{ $s->id }}" @selected($s->id === $site->id)>{{ $s->name }}</option>@endforeach
                 </select>
                 <span class="ss-muted ss-text-sm">{{ $total }} bài · tối đa {{ $limit }} bài/ngày · giờ VN</span>
+                <x-help title="Quy tắc của kế hoạch">
+<ul>
+                        <li>Biên tập viên trở lên (đang hoạt động) mới xem/tạo bài; máy chủ kiểm lại ở mọi thao tác.</li>
+                        <li>Mỗi từ khóa chính chỉ một bài trên mỗi website (không phân biệt hoa/thường). Từ khóa đã có bài bị chặn và báo riêng; tạo thành công một phần được phép.</li>
+                        <li>Hai bài cùng từ khóa chính tồn tại từ trước hiện cảnh báo "ăn thịt từ khóa".</li>
+                        <li>Độ phủ = từ khóa của cụm đã có bài / tổng từ khóa của cụm: dưới 34% là thấp, 100% là đủ.</li>
+                        <li>Tối đa {{ $limit }} bài/ngày; ngày đủ bài thì không đặt thêm.</li>
+                        <li>Đổi ngày chỉ cho bài "Đã lên kế hoạch", sang ngày tương lai chưa đủ bài. Bài đã duyệt/xếp lịch/đã đăng xếp lịch ở màn Lịch xuất bản.</li>
+                        <li>Giờ hiển thị theo Việt Nam (UTC+7); lịch đăng thật lưu UTC.</li>
+                        <li>AI chỉ đề xuất; chỉ khi bạn bấm tạo mới có bài (chưa viết nội dung, chưa tốn token).</li>
+                    </ul>
+                </x-help>
                 <span style="flex:1"></span>
                 <span @if (! $canCreate) title="Cụm đã có bài cho mọi từ khóa hoặc chưa chọn cụm." @endif>{{ $this->createFromClusterAction }}</span>
             @else
@@ -39,8 +51,7 @@
         </div>
 
         <div class="ss-card" style="margin-bottom:.75rem" data-plan-proposals><div class="ss-card__b">
-            <div class="ss-card__h">Đề xuất kế hoạch (theo luật)</div>
-            <p class="ss-muted ss-text-sm">Xếp theo luật, không dùng AI: lượt tìm (nếu có), độ phủ cụm, khoảng trống đối thủ. Bạn duyệt kế hoạch trước khi đội AI viết.</p>
+            <div class="ss-card__h">Đề xuất kế hoạch <x-help title="Đề xuất theo luật" text="Xếp theo luật, không dùng AI: lượt tìm (nếu có), độ phủ cụm, khoảng trống đối thủ. Bạn duyệt kế hoạch trước khi đội AI viết." /></div>
             @forelse ($proposals as $p)
                 <label class="ss-text-sm" style="display:block;padding:.3rem 0;border-bottom:1px solid rgba(128,128,128,.2)" wire:key="pp-{{ $p['keyword_id'] }}">
                     <input type="checkbox" value="{{ $p['keyword_id'] }}" wire:model="planPick">
@@ -68,13 +79,15 @@
             </div></div>
         @endif
 
-        <x-studio.tabs persist="ke-hoach-noi-dung" :tabs="[
-            ['key' => 'week', 'label' => 'Lịch tuần', 'count' => $weekCount],
-            ['key' => 'clusters', 'label' => 'Cụm chủ đề', 'count' => count($rows)],
-            ['key' => 'undated', 'label' => 'Chưa có ngày', 'count' => count($undated) ?: null],
-            ['key' => 'warn', 'label' => 'Cảnh báo', 'count' => count($allConflicts) ?: null, 'tone' => $allConflicts ? 'danger' : null],
-            ['key' => 'rules', 'label' => 'Quy tắc'],
-        ]">
+        @php
+            $tabs = [
+                ['key' => 'week', 'label' => 'Lịch tuần', 'count' => $weekCount],
+                ['key' => 'clusters', 'label' => 'Cụm chủ đề', 'count' => count($rows)],
+            ];
+            if (count($undated) > 0) { $tabs[] = ['key' => 'undated', 'label' => 'Chưa có ngày', 'count' => count($undated)]; }
+            if (count($allConflicts) > 0) { $tabs[] = ['key' => 'warn', 'label' => 'Cảnh báo', 'count' => count($allConflicts), 'tone' => 'danger']; }
+        @endphp
+        <x-studio.tabs persist="ke-hoach-noi-dung" :tabs="$tabs">
             <x-studio.panel key="week">
                 <div class="cp-bar">
                     <x-filament::button color="gray" size="sm" wire:click="previousWeek">Tuần trước</x-filament::button>
@@ -105,7 +118,7 @@
 
             <x-studio.panel key="clusters">
                 @if (count($rows) === 0)
-                    <div class="ss-alert ss-alert--info" role="status">Chưa có cụm chủ đề. Tạo cụm ở trang <a href="{{ \App\Filament\Pages\KeywordsPage::getUrl() }}" style="text-decoration:underline">Từ khóa</a>.</div>
+                    <div class="ss-text-sm ss-muted" role="status">Chưa có cụm chủ đề. Tạo cụm ở trang <a href="{{ \App\Filament\Pages\KeywordsPage::getUrl() }}" style="text-decoration:underline">Từ khóa</a>.</div>
                 @else
                     <div class="ss-split">
                         <x-studio.data-table id="plan-clusters" :columns="$clusterColumns" :rows="$clusterRows" :page-size="10" search="Tìm cụm"
@@ -156,16 +169,17 @@
                 @endif
             </x-studio.panel>
 
+            @if (count($undated) > 0)
             <x-studio.panel key="undated">
-                @if (count($undated) === 0)
-                    <div class="ss-alert ss-alert--ok" role="status">Mọi bài đều đã có ngày.</div>
-                @else
+                @if (true)
                     <x-studio.data-table id="plan-undated" :columns="$undatedColumns" :rows="$undatedRows" :page-size="25" search="Tìm bài" />
                 @endif
             </x-studio.panel>
+            @endif
 
+            @if (count($allConflicts) > 0)
             <x-studio.panel key="warn">
-                @forelse ($allConflicts as $kwNorm => $ids)
+                @foreach ($allConflicts as $kwNorm => $ids)
                     <div class="ss-alert ss-alert--danger" role="status" style="margin-bottom:.5rem">
                         <strong>⚠ Ăn thịt từ khóa "{{ $kwNorm }}": {{ count($ids) }} bài</strong>
                         <ul class="cp-list ss-text-sm">
@@ -175,25 +189,9 @@
                             @endforeach
                         </ul>
                     </div>
-                @empty
-                    <div class="ss-alert ss-alert--ok">Không có từ khóa nào bị trùng bài.</div>
-                @endforelse
+                @endforeach
             </x-studio.panel>
-
-            <x-studio.panel key="rules">
-                <div class="ss-card"><div class="ss-card__b">
-                    <ul class="ss-text-sm" style="list-style:disc;padding-left:1.2rem">
-                        <li>Biên tập viên trở lên (đang hoạt động) mới xem/tạo bài; máy chủ kiểm lại ở mọi thao tác.</li>
-                        <li>Mỗi từ khóa chính chỉ một bài trên mỗi website (không phân biệt hoa/thường). Từ khóa đã có bài bị chặn và báo riêng; tạo thành công một phần được phép.</li>
-                        <li>Hai bài cùng từ khóa chính tồn tại từ trước hiện cảnh báo "ăn thịt từ khóa".</li>
-                        <li>Độ phủ = từ khóa của cụm đã có bài / tổng từ khóa của cụm: dưới 34% là thấp, 100% là đủ.</li>
-                        <li>Tối đa {{ $limit }} bài/ngày; ngày đủ bài thì không đặt thêm.</li>
-                        <li>Đổi ngày chỉ cho bài "Đã lên kế hoạch", sang ngày tương lai chưa đủ bài. Bài đã duyệt/xếp lịch/đã đăng xếp lịch ở màn Lịch xuất bản.</li>
-                        <li>Giờ hiển thị theo Việt Nam (UTC+7); lịch đăng thật lưu UTC.</li>
-                        <li>AI chỉ đề xuất; chỉ khi bạn bấm tạo mới có bài (chưa viết nội dung, chưa tốn token).</li>
-                    </ul>
-                </div></div>
-            </x-studio.panel>
+            @endif
         </x-studio.tabs>
     </div>
 

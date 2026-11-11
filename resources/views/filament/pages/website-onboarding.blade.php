@@ -5,8 +5,9 @@
         :outputs="[['label' => 'Kho kiến thức', 'url' => $links['kb']], ['label' => 'Từ khóa', 'url' => $links['keywords']], ['label' => 'Kế hoạch nội dung', 'url' => $links['plan']]]" />
     <div class="ss-page">
         <div class="ss-card"><div class="ss-card__b">
-            <div class="ss-card__h">Khởi tạo website bằng một nút</div>
-            <p class="ss-muted ss-text-sm">Cần kết nối AI để đọc website và khảo sát từ khóa; bước nào chưa làm được sẽ được bỏ qua và nói rõ lý do, các bước còn lại vẫn chạy. Chạy ngay trong trang, có thể mất vài chục giây đến vài phút.</p>
+            <div class="ss-card__h">Khởi tạo website bằng một nút
+                <x-help title="Khi chạy"><p>Cần kết nối AI để đọc website và khảo sát từ khóa; bước nào chưa làm được sẽ được bỏ qua và nói rõ lý do, các bước còn lại vẫn chạy. Chạy ngay trong trang, có thể mất vài chục giây đến vài phút.</p></x-help>
+            </div>
             <div style="display:flex;gap:.75rem;align-items:flex-end;flex-wrap:wrap">
                 <label style="display:flex;flex-direction:column;gap:.2rem;font-size:.85rem">Website
                     <select wire:model="websiteId" style="border:1px solid rgba(128,128,128,.5);border-radius:.4rem;padding:.35rem .55rem;background:transparent" data-testid="ob-site">
@@ -14,7 +15,7 @@
                     </select>
                 </label>
                 <x-filament::button wire:click="start" wire:loading.attr="disabled" data-testid="ob-start">Bắt đầu khởi tạo</x-filament::button>
-                <span wire:loading wire:target="start" class="ss-muted ss-text-sm">Đang chạy…</span>
+                <span wire:loading wire:target="start" class="ss-muted ss-text-sm">Đang chạy, có thể mất vài phút…</span>
             </div>
         </div></div>
         @if ($result)

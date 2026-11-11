@@ -1,5 +1,5 @@
 <div data-testid="pipeline-runs">
-    @if (! $live)<div class="text-xs" style="opacity:.8;margin-bottom:.5rem">Không có phiên nào đang chạy. Dưới đây là các phiên trong 24 giờ qua.</div>@endif
+    @if (! $live && $runs !== [])<div class="text-xs" style="opacity:.7;margin-bottom:.5rem">Không có phiên nào đang chạy. Các phiên 24 giờ qua:</div>@endif
     @forelse ($runs as $r)
         <div class="pv-run" data-run="{{ $r['run']->id }}" data-live="{{ $r['live'] ? 1 : 0 }}">
             <div style="flex:1 1 14rem">
@@ -17,8 +17,8 @@
             </div>
         </div>
     @empty
-        <div class="text-sm" style="opacity:.7" data-testid="pipeline-runs-empty">Chưa có phiên nào trong 24 giờ qua.</div>
+        <div class="text-sm" style="opacity:.65" data-testid="pipeline-runs-empty">Chưa có phiên nào trong 24 giờ qua.</div>
     @endforelse
     @php($auto = \App\Services\Agent\Pipeline\PipelineVisual::autoPrepareCount())
-    @if ($auto > 0)<div class="text-xs" style="opacity:.7;margin-top:.5rem" data-testid="pipeline-auto-prepare">Đã ẩn {{ $auto }} lượt chuẩn bị kiến thức tự động (đội AI tự đọc website trước khi viết bài). Xem ở tab Phiên chạy.</div>@endif
+    @if ($auto > 0)<div class="text-xs" style="opacity:.7;margin-top:.5rem" data-testid="pipeline-auto-prepare">Đã ẩn {{ $auto }} lượt chuẩn bị kiến thức tự động <x-help text="Đội AI tự đọc website trước khi viết bài. Xem ở tab Phiên chạy." /></div>@endif
 </div>

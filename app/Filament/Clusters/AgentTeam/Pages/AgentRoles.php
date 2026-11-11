@@ -5,9 +5,11 @@ namespace App\Filament\Clusters\AgentTeam\Pages;
 use App\Filament\Clusters\AgentTeam;
 use App\Filament\Pages\AgentConnection;
 use App\Filament\Resources\AgentRunResource;
+use App\Models\AgentRunStep;
 use App\Models\AiProvider;
 use App\Models\Brain;
 use App\Models\User;
+use App\Services\Agent\Pipeline\PipelineVisual;
 use App\Services\Agent\Roles\AgentProfiles;
 use App\Services\Agent\Roles\AgentStudioData;
 use App\Services\Agent\Roles\RoleAssignments;
@@ -85,15 +87,15 @@ class AgentRoles extends Page
 
     public const STUDIO_TABS = [
         'overview' => ['Tổng quan', null],
-        'persona' => ['Vai trò & chỉ dẫn', 'BUILD · XÂY DỰNG'],
-        'model' => ['Mô hình & ngữ cảnh', null],
-        'knowledge' => ['Kiến thức & bài học', 'TRAIN · HUẤN LUYỆN'],
+        'persona' => ['Vai trò & chỉ dẫn', 'XÂY DỰNG'],
+        'model' => ['Mô hình', null],
+        'knowledge' => ['Kiến thức & bài học', 'HUẤN LUYỆN'],
         'brain' => ['Trí tuệ', null],
         'skills' => ['Kỹ năng', null],
         'lab' => ['Phòng huấn luyện', null],
-        'connect' => ['Kết nối & dữ liệu', 'CONNECT · KẾT NỐI'],
-        'position' => ['Vị trí & nhiệm vụ trong luồng', 'LUỒNG · PIPELINE'],
-        'activity' => ['Hoạt động', 'OPERATE · VẬN HÀNH'],
+        'connect' => ['Công cụ & dữ liệu', 'KẾT NỐI'],
+        'position' => ['Vị trí trong luồng', 'VẬN HÀNH'],
+        'activity' => ['Hoạt động', null],
     ];
 
     protected static ?string $cluster = AgentTeam::class;
@@ -328,6 +330,7 @@ class AgentRoles extends Page
             'runUrl' => fn (int $id) => AgentRunResource::getUrl('view', ['record' => $id])];
         $d['canUndo'] = AgentProfiles::previousVersion($key) !== null;
         match ($this->studioTab) {
+            'overview' => $d += $this->overviewData($key, $role, $d['profile'], $assign),
             'persona' => $d['history'] = $this->showHistory ? AgentProfiles::history($key) : [],
             'model' => $d += ['assigned' => $assign->summary($key), 'modelWired' => isset(RoleAssignments::ROLE_TASKS[$key]), 'tasks' => RoleAssignments::ROLE_TASKS[$key] ?? []],
             'knowledge' => $d += ['lessons' => AgentProfiles::lessons($key), 'docs' => AgentProfiles::documents($key, 'knowledge'), 'chars' => AgentProfiles::knowledgeChars($key), 'max' => AgentProfiles::PROMPT_MAX],
@@ -341,6 +344,43 @@ class AgentRoles extends Page
         };
 
         return $d;
+    }
+
+    /**
+     * Bảng điều hành của một nhân sự: đang làm gì, checklist sẵn sàng (model, quy tắc, kỹ năng, bài học) và 3 số thật 7 ngày.
+     *
+     * @return array<string, mixed>
+     */
+    private function overviewData(string $key, array $role, array $profile, RoleAssignments $assign): array
+    {
+        $reg = new RoleRegistry;
+        $working = [];
+        foreach (PipelineVisual::office() as $d) {
+            if ($d['profile']['key'] === $key) {
+                $working = $d['working'];
+            }
+        }
+        $skillsHave = count(array_filter($reg->skills($role), fn ($s) => $s['exists'])) + count(AgentProfiles::documents($key, 'skill'));
+        $lessons = count(array_filter(AgentProfiles::lessons($key), fn ($l) => $l->active));
+        $wired = isset(RoleAssignments::ROLE_TASKS[$key]);
+        $week = ['runs' => 0, 'steps' => 0, 'ok_rate' => null, 'cost' => 0.0];
+        try {
+            $q = AgentRunStep::query()->where('role', $key)->where('created_at', '>=', now()->subDays(7));
+            $agg = (clone $q)->selectRaw("count(*) as n, count(distinct agent_run_id) as runs, sum(case when status in ('ok','skipped') then 1 else 0 end) as ok, coalesce(sum(cost_vnd),0) as cost")->first();
+            $n = (int) ($agg->n ?? 0);
+            $week = ['runs' => (int) ($agg->runs ?? 0), 'steps' => $n, 'ok_rate' => $n > 0 ? (int) round(100 * (int) $agg->ok / $n) : null, 'cost' => (float) ($agg->cost ?? 0)];
+        } catch (\Throwable) {
+        }
+
+        return [
+            'working' => $working, 'week' => $week,
+            'checks' => [
+                ['label' => 'Có model', 'ok' => (bool) $assign->summary($key), 'na' => ! $wired, 'tab' => 'model', 'note' => $wired ? null : 'Chưa nối luồng'],
+                ['label' => 'Có quy tắc', 'ok' => trim((string) $profile['instructions']) !== '', 'na' => false, 'tab' => 'persona', 'note' => null],
+                ['label' => 'Có kỹ năng', 'ok' => $skillsHave > 0, 'na' => false, 'tab' => 'skills', 'note' => $skillsHave > 0 ? $skillsHave.' kỹ năng' : null],
+                ['label' => 'Có bài học', 'ok' => $lessons > 0, 'na' => false, 'tab' => 'knowledge', 'note' => $lessons > 0 ? $lessons.' bài' : null],
+            ],
+        ];
     }
 
     /** @return list<array{id: int, name: string}> */
@@ -380,7 +420,7 @@ class AgentRoles extends Page
     {
         return Action::make('assign')
             ->visible(fn () => $this->isAdmin())
-            ->modalHeading(fn (array $arguments) => 'Gán: '.((new RoleRegistry)->find((string) ($arguments['role'] ?? ''))['name'] ?? 'Vai trò'))
+            ->modalHeading(fn (array $arguments) => 'Model và kỹ năng: '.((new RoleRegistry)->find((string) ($arguments['role'] ?? ''))['name'] ?? 'Vai trò'))
             ->slideOver()->modalWidth('2xl')
             ->modalSubmitActionLabel('Lưu')
             ->fillForm(function (array $arguments): array {
@@ -534,9 +574,13 @@ class AgentRoles extends Page
 
         $assign = new RoleAssignments($reg);
         $hasProviders = AiProvider::query()->exists();
+        $office = [];
+        foreach (PipelineVisual::office() as $d) {
+            $office[$d['profile']['key']] = $d;
+        }
 
         return [
-            'cards' => array_map(function (array $r) use ($reg, $off, $assign) {
+            'cards' => array_map(function (array $r) use ($reg, $off, $assign, $office) {
                 $a = $assign->find($r['key']);
 
                 $prof = AgentProfiles::for($r['key']);
@@ -544,6 +588,7 @@ class AgentRoles extends Page
                 return array_merge($r, ['profile' => $prof, 'name' => $prof['display_name']]) + [
                     'skill_counts' => $reg->skillCounts($r), 'switchable' => $reg->isSwitchable($r['key']), 'is_off' => in_array($r['key'], $off, true),
                     'model_wired' => isset(RoleAssignments::ROLE_TASKS[$r['key']]), 'assigned' => $assign->summary($r['key']),
+                    'working' => $office[$r['key']]['working'] ?? [], 'joins' => $office[$r['key']]['joins'] ?? [],
                     'skill_changes' => count(array_filter($reg->skills($r), fn ($s) => ! $s['enabled'] || $s['pin'] !== null)),
                     'updated' => $a ? trim(($a->updater?->name ?? '').' · '.$a->updated_at?->format('d/m/Y H:i'), ' ·') : null,
                 ];

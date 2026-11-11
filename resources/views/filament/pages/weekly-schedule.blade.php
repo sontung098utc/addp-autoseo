@@ -79,31 +79,31 @@
                         @endif
                     </div>
                 @empty
-                    <div class="ss-sched-muted">Không có lượt đăng</div>
+                    <div class="ss-sched-muted" aria-label="Không có lượt đăng">—</div>
                 @endforelse
             </div>
         @endforeach
     </div>
     <x-filament-actions::modals />
 
-    <div class="ss-sched-box">
+    @if ($todayQueue->count() > 0)
+    <div class="ss-sched-box" data-testid="today-queue">
         <div class="ss-sched-h">Hàng đợi hôm nay ({{ $todayQueue->count() }})</div>
-        @forelse ($todayQueue as $p)
+        @foreach ($todayQueue as $p)
             <div><a href="{{ $articleUrl($p) }}">{{ VnTime::format($p->scheduled_at_utc ? VnTime::fromRaw($p, 'scheduled_at_utc') : null, 'H:i') }} · {{ $p->articleVersion?->article?->primary_keyword ?? '—' }}</a>
                 <span class="ss-sched-muted">{{ $p->website?->name }} · {{ StatusPresenter::label($p->status, 'publication') }}</span></div>
-        @empty
-            <div class="ss-sched-muted">Hôm nay chưa có lượt đăng nào.</div>
-        @endforelse
+        @endforeach
     </div>
+    @endif
 
-    <div class="ss-sched-box">
-        <div class="ss-sched-h">Cần đối soát ({{ $reconcile->count() }})</div>
-        <p class="ss-sched-muted">CMS không phản hồi sau khi gửi bài. Mở từng lượt để "Đối soát ngay" - hệ thống không tự đăng lại để tránh trùng bài.</p>
-        @forelse ($reconcile as $p)
+    @if ($reconcile->count() > 0)
+    <div class="ss-sched-box" style="border-color:rgb(var(--warning-600))" data-testid="reconcile">
+        <div class="ss-sched-h">Cần đối soát ({{ $reconcile->count() }})
+            <x-help tone="warning" title="Vì sao cần đối soát?" text="CMS không phản hồi sau khi gửi bài. Mở từng lượt để &quot;Đối soát ngay&quot; - hệ thống không tự đăng lại để tránh trùng bài." /></div>
+        @foreach ($reconcile as $p)
             <div><a href="{{ $articleUrl($p) }}">{{ $p->articleVersion?->article?->primary_keyword ?? '—' }}</a>
                 <span class="ss-sched-muted">{{ $p->website?->name }} · {{ VnTime::format(VnTime::fromRaw($p, 'scheduled_at_utc')) }} · <a href="{{ $viewUrl($p) }}">Đối soát lượt đăng</a></span></div>
-        @empty
-            <div class="ss-sched-muted">Không có lượt nào chờ đối soát.</div>
-        @endforelse
+        @endforeach
     </div>
+    @endif
 </x-filament-panels::page>

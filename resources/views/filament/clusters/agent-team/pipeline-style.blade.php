@@ -27,17 +27,9 @@
     .pv-who{display:flex;gap:.35rem;align-items:center;font-size:.68rem}
     .pv-chip{width:1.5rem;height:1.5rem;border-radius:50%;background:rgba(99,102,241,.22);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:.72rem;flex:none}
     .pv-tag{font-size:.62rem;padding:0 .35rem;border-radius:.3rem;background:rgba(128,128,128,.2)}
-    .pv-tag--warn{background:rgba(245,158,11,.25)}
     .pv-run{border:1px solid rgba(128,128,128,.3);border-radius:.7rem;padding:.6rem .8rem;margin-bottom:.5rem;display:flex;flex-wrap:wrap;gap:.6rem 1rem;align-items:center}
     .pv-bar{display:flex;gap:.2rem;flex-wrap:wrap}
     .pv-seg{font-size:.62rem;padding:.1rem .4rem;border-radius:.3rem;background:rgba(128,128,128,.15)}
     .pv-seg--done{background:rgba(16,185,129,.25)}
     .pv-seg--running{background:rgba(14,165,233,.3);font-weight:700}
-    .pv-desks{display:grid;grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));gap:.7rem}
-    .pv-desk{border:1px solid rgba(128,128,128,.3);border-radius:.8rem;padding:.7rem .8rem;font-size:.75rem;display:flex;flex-direction:column;gap:.4rem}
-    .pv-avatar{width:2.4rem;height:2.4rem;border-radius:50%;background:rgba(99,102,241,.22);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;flex:none}
-    .pv-dot{display:inline-block;width:.55rem;height:.55rem;border-radius:50%;background:rgb(16,185,129);animation:pv-blink 1.2s ease-in-out infinite}
-    .pv-dot--idle{background:rgba(128,128,128,.6);animation:none}
-    @keyframes pv-blink{50%{opacity:.25}}
-    @media (prefers-reduced-motion:reduce){.pv-dot{animation:none}}
 </style>

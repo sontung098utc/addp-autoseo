@@ -125,7 +125,7 @@ class ContentPlannerTest extends TestCase
         $k = $this->kw('du học úc', 300);
         $this->actingAs($this->user('writer'));
         Livewire::test(ContentPlanPage::class)
-            ->assertSee('Đề xuất kế hoạch (theo luật)')
+            ->assertSee('Đề xuất theo luật')
             ->assertSee('Xếp theo luật, không dùng AI')
             ->assertSee('du học úc')
             ->set('planPick', [$k->id])

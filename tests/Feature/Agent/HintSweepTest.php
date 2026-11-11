@@ -31,7 +31,7 @@ class HintSweepTest extends TestCase
     {
         $this->login();
         $html = $this->get(CampaignResource::getUrl('index'))->assertOk()->getContent();
-        $this->assertStringContainsString('data-hint="info"', $html);
+        $this->assertStringContainsString('data-testid="help"', $html);
         $this->assertStringContainsString('Chiến dịch không phải chuỗi phiên', $html);
         $this->assertStringNotContainsString('fi-header-subheading', $html);
     }
@@ -74,9 +74,9 @@ class HintSweepTest extends TestCase
     {
         $this->login();
         $p = $this->get('/admin/doi-ai/pipeline')->assertOk()->getContent();
-        $this->assertStringContainsString('data-hint="warning"', $p);
-        $this->assertStringNotContainsString('không tô tay. Giai đoạn chưa chạy</p>', $p);
+        $this->assertStringContainsString('data-testid="help"', $p);
+        $this->assertStringContainsString('Chạy lại / Tạm dừng pipeline: chưa nối', $p);
         $k = $this->get('/admin/doi-ai/ky-nang')->assertOk()->getContent();
-        $this->assertStringContainsString('data-hint="info"', $k);
+        $this->assertStringContainsString('data-testid="help"', $k);
     }
 }

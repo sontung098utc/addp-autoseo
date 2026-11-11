@@ -67,7 +67,7 @@ class AgentStudioPageTest extends TestCase
         $this->assertContains('write', array_column(array_filter($w['steps'], fn ($s) => $s['mine']), 'id'));
 
         Livewire::test(AgentRoles::class)->call('openStudio', 'strategist', 'position')
-            ->assertSee('studio-pos-article_write', false)->assertSee('Lập dàn ý')->assertSee('Mở tab Pipeline');
+            ->assertSee('studio-pos-article_write', false)->assertSee('Lập dàn ý')->assertSee('Mở Pipeline');
     }
 
     public function test_day_lai_tao_bai_hoc_tu_buoc_loi(): void

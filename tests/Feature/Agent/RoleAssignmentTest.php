@@ -20,6 +20,7 @@ use App\Services\Ai\Playbook\PlaybookLoader;
 use App\Services\Publishing\EmergencyStopService;
 use App\Services\Security\UrlSafetyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -34,7 +35,8 @@ class RoleAssignmentTest extends TestCase
     {
         parent::setUp();
         app(EmergencyStopService::class)->resetForTesting();
-        $this->app->instance(UrlSafetyService::class, new class extends UrlSafetyService {
+        $this->app->instance(UrlSafetyService::class, new class extends UrlSafetyService
+        {
             protected function resolveIps(string $host): array
             {
                 return filter_var($host, FILTER_VALIDATE_IP) ? [$host] : ['93.184.216.34'];
@@ -98,17 +100,18 @@ class RoleAssignmentTest extends TestCase
     public function test_approver_chi_xem_khong_gan_duoc(): void
     {
         $a = $this->provider();
-        (new RoleAssignments())->saveModel('writer', $a->id, 'claude-sonnet-5-5', null, null, true, $this->user('admin'));
+        (new RoleAssignments)->saveModel('writer', $a->id, 'claude-sonnet-5-5', null, null, true, $this->user('admin'));
         $this->actingAs($this->user('approver'));
-        $this->get('/admin/doi-ai/vai-tro')->assertOk()->assertSee('Anthropic · claude-sonnet-5-5')->assertDontSee('role-assign-btn-writer', false);
+        $this->get('/admin/doi-ai/vai-tro')->assertOk()->assertSee('Anthropic · claude-sonnet-5-5')->assertDontSee('role-assign-btn-writer', false)
+            ->assertDontSee('wire:click="mountAction(&#039;assign&#039;', false);
         Livewire::test(AgentRoles::class)->assertActionHidden('assign', ['role' => 'writer']);
         $this->expectException(\InvalidArgumentException::class);
-        (new RoleAssignments())->saveModel('writer', $a->id, 'x', null, null, true, $this->user('approver'));
+        (new RoleAssignments)->saveModel('writer', $a->id, 'x', null, null, true, $this->user('approver'));
     }
 
     public function test_gan_provider_khong_ton_tai_bi_tu_choi(): void
     {
-        $svc = new RoleAssignments();
+        $svc = new RoleAssignments;
         try {
             $svc->saveModel('writer', 9999, 'm', null, null, true, $this->user('admin'));
             $this->fail('phải từ chối');
@@ -126,7 +129,7 @@ class RoleAssignmentTest extends TestCase
     {
         $a = $this->provider();
         $this->expectException(\InvalidArgumentException::class);
-        (new RoleAssignments())->saveModel('auditor', $a->id, 'm', null, null, true, $this->user('admin'));
+        (new RoleAssignments)->saveModel('auditor', $a->id, 'm', null, null, true, $this->user('admin'));
     }
 
     public function test_router_uu_tien_ban_gan_theo_vai_tro_va_van_chay_khi_khong_co(): void
@@ -136,10 +139,10 @@ class RoleAssignmentTest extends TestCase
         foreach (['outline', 'write', 'repair'] as $t) {
             AiModelRoute::create(['task' => $t, 'tier' => 'standard', 'primary_provider_id' => $gem->id, 'primary_model' => 'gemini-1.5-flash', 'cost_cap_vnd_per_call' => 500]);
         }
-        $r = new AiModelRouter();
+        $r = new AiModelRouter;
         $this->assertSame('gemini-1.5-flash', $r->target('write')->model); // chưa gán: như cũ
 
-        (new RoleAssignments())->saveModel('writer', $ant->id, 'claude-sonnet-5-5', $gem->id, 'gemini-1.5-pro', true, $this->user('admin'));
+        (new RoleAssignments)->saveModel('writer', $ant->id, 'claude-sonnet-5-5', $gem->id, 'gemini-1.5-pro', true, $this->user('admin'));
         $this->assertSame('Anthropic', $r->target('write')->providerName);
         $this->assertSame('claude-sonnet-5-5', $r->target('repair')->model);
         $this->assertSame(500.0, $r->target('write')->costCapVnd);
@@ -154,10 +157,10 @@ class RoleAssignmentTest extends TestCase
     {
         $nokey = $this->provider('NoKey', 'anthropic', false);
         $this->assertFalse(AiModelRouter::isConfigured());
-        (new RoleAssignments())->saveModel('strategist', $nokey->id, 'claude-haiku-5-5', null, null, true, $this->user('admin'));
+        (new RoleAssignments)->saveModel('strategist', $nokey->id, 'claude-haiku-5-5', null, null, true, $this->user('admin'));
         $this->assertTrue(AiModelRouter::isConfigured());
-        $this->assertNull((new AiModelRouter())->target('outline'));
-        $this->assertStringContainsString('chưa có khóa API', (string) (new AiModelRouter())->why('outline'));
+        $this->assertNull((new AiModelRouter)->target('outline'));
+        $this->assertStringContainsString('chưa có khóa API', (string) (new AiModelRouter)->why('outline'));
     }
 
     private function playbooks(): string
@@ -198,7 +201,7 @@ class RoleAssignmentTest extends TestCase
 
         $svc->saveSkills('writer', ['writer/article-draft' => ['enabled' => false, 'pin' => 1]], $admin);
         $this->assertNull($loader->find('writer', 'article-draft'));
-        $row = collect((new RoleRegistry(null, $loader))->skills((new RoleRegistry())->find('writer')))->firstWhere('ref', 'writer/article-draft');
+        $row = collect((new RoleRegistry(null, $loader))->skills((new RoleRegistry)->find('writer')))->firstWhere('ref', 'writer/article-draft');
         $this->assertFalse($row['enabled']);
         $this->assertTrue($row['exists']);
     }
@@ -212,11 +215,11 @@ class RoleAssignmentTest extends TestCase
         $art = fn () => Article::create(['website_id' => $w->id, 'primary_keyword' => 'dịch vụ thiết kế website', 'workflow_status' => 'planned']);
 
         (new RoleAssignments(null, $loader))->saveSkills('writer', ['writer/article-draft' => ['enabled' => true, 'pin' => 1]], $admin);
-        $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider(), playbooks: $loader))->run($art(), null, 'manual');
+        $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider, playbooks: $loader))->run($art(), null, 'manual');
         $this->assertSame('writer/article-draft@1', $run->steps->firstWhere('stage', 'write')->data['skill']['ref']);
 
         (new RoleAssignments(null, $loader))->saveSkills('writer', ['writer/article-draft' => ['enabled' => false, 'pin' => null]], $admin);
-        $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider(), playbooks: $loader))->run($art(), null, 'manual');
+        $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider, playbooks: $loader))->run($art(), null, 'manual');
         $this->assertNull($run->steps->firstWhere('stage', 'write')->data['skill']);
     }
 
@@ -224,13 +227,13 @@ class RoleAssignmentTest extends TestCase
     {
         $a = $this->provider();
         $logged = [];
-        \Illuminate\Support\Facades\Log::shouldReceive('info')->withArgs(function ($m, $ctx = []) use (&$logged) {
+        Log::shouldReceive('info')->withArgs(function ($m, $ctx = []) use (&$logged) {
             $logged[] = [$m, $ctx];
 
             return true;
         })->atLeast()->once();
         $admin = $this->user('admin');
-        (new RoleAssignments())->saveModel('writer', $a->id, 'claude-sonnet-5-5', null, null, true, $admin);
+        (new RoleAssignments)->saveModel('writer', $a->id, 'claude-sonnet-5-5', null, null, true, $admin);
         $e = collect($logged)->first(fn ($l) => $l[0] === 'audit' && ($l[1]['action'] ?? '') === 'role_assignment')[1];
         $this->assertSame($admin->id, $e['actor_id']);
         $this->assertSame('writer', $e['role']);

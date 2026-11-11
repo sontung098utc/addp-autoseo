@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\CampaignResource\Pages;
 
 use App\Filament\Resources\CampaignResource;
+use App\Models\CampaignWait;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Contracts\Support\Htmlable;
@@ -20,7 +21,7 @@ class ListCampaigns extends ListRecords
 
     public function getHeading(): string|Htmlable
     {
-        return new HtmlString(e(static::$title).' '.Blade::render('<x-studio.hint :text="$t" />', ['t' => self::CONCEPT]));
+        return new HtmlString(e(static::$title).' '.Blade::render('<x-help :text="$t" />', ['t' => self::CONCEPT]));
     }
 
     protected function getHeaderActions(): array
@@ -41,6 +42,6 @@ class ListCampaigns extends ListRecords
     public function dismissWait(int $id): void
     {
         abort_unless(CampaignResource::canViewAny(), 403);
-        \App\Models\CampaignWait::query()->where('status', 'open')->whereKey($id)->update(['status' => 'dismissed']);
+        CampaignWait::query()->where('status', 'open')->whereKey($id)->update(['status' => 'dismissed']);
     }
 }

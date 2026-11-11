@@ -319,4 +319,71 @@ class ArticleWorkspaceTest extends TestCase
         $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()->assertSee('aw-stopped', false)->assertSee('DỪNG KHẨN CẤP')->assertSee('Sự cố kiểm thử');
         $svc->resetForTesting();
     }
+
+    /** Mọi đoạn có chứa $needle phải nằm trong một khối (i) x-help, không nằm sẵn trên trang. */
+    private function assertOnlyInHelp(string $html, string $needle): void
+    {
+        $dom = new \DOMDocument;
+        @$dom->loadHTML('<?xml encoding="utf-8"?><body>'.$html.'</body>');
+        $found = 0;
+        foreach ((new \DOMXPath($dom))->query('//text()[contains(., '.$this->xpathLiteral($needle).')]') as $node) {
+            $found++;
+            $inHelp = false;
+            for ($p = $node->parentNode; $p instanceof \DOMElement; $p = $p->parentNode) {
+                if ($p->getAttribute('data-testid') === 'help') {
+                    $inHelp = true;
+                    break;
+                }
+            }
+            $this->assertTrue($inHelp, "«{$needle}» đang nằm sẵn trên trang, phải cất vào (i).");
+        }
+        $this->assertGreaterThan(0, $found, "Không thấy «{$needle}» (kể cả trong (i)).");
+    }
+
+    private function xpathLiteral(string $s): string
+    {
+        return "'".str_replace("'", "', \"'\", '", $s)."'";
+    }
+
+    public function test_bai_chua_viet_co_mot_nut_chinh_va_tom_tat_chuan_bi_la_mot_hang_chip(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $a = $this->article('planned', false);
+
+        $html = $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()
+            ->assertSee('data-testid="aw-primary"', false)->assertSee('Giao đội AI')->getContent();
+
+        $this->assertSame(1, substr_count($html, 'data-testid="aw-primary"'));
+        $this->assertSame(1, substr_count($html, 'data-testid="pf-chips"'));
+        foreach (['pf-risk', 'pf-kb', 'pf-products', 'pf-brand', 'pf-brains', 'pf-cost'] as $chip) {
+            $this->assertSame(1, substr_count($html, 'data-testid="'.$chip.'"'), $chip);
+        }
+        $this->assertStringNotContainsString('data-testid="aw-stats"', $html); // chưa có phiên nào thì không có số liệu
+        $this->assertOnlyInHelp($html, 'Mỗi bước dùng kết quả của bước trước');
+        $this->assertOnlyInHelp($html, 'Ngân sách phiên tối đa');
+    }
+
+    public function test_bai_da_viet_cat_huong_dan_dai_vao_dau_i(): void
+    {
+        $this->actingAs($this->user('writer'));
+        $a = $this->article('needs_review');
+        AgentRun::create(['website_id' => $this->site->id, 'article_id' => $a->id, 'trigger' => 'manual', 'status' => 'ready_for_review', 'started_at' => now()->subHour(), 'finished_at' => now()->subHour()]);
+
+        $html = $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()->getContent();
+
+        $this->assertStringContainsString('data-testid="help"', $html);
+        $this->assertOnlyInHelp($html, ArticleResource::SCORE_NOTE);
+        $this->assertOnlyInHelp($html, 'Hệ thống hiện chưa tự tìm nguồn trên web');
+        $this->assertOnlyInHelp($html, 'Bấm Xem để đọc toàn bộ nội dung');
+    }
+
+    public function test_nguoi_duyet_thay_nut_chinh_doc_de_duyet(): void
+    {
+        $this->actingAs($this->user('approver'));
+        $a = $this->article('needs_review');
+
+        $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()
+            ->assertSee('Đọc để duyệt')
+            ->assertSee('data-testid="aw-primary"', false);
+    }
 }

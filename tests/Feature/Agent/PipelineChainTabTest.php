@@ -28,10 +28,11 @@ class PipelineChainTabTest extends TestCase
         $labels = array_values(JobTypeRegistry::CHAIN);
         $this->assertCount(7, $labels);
         $res = $this->get('/admin/doi-ai/pipeline')->assertOk()->assertSeeInOrder($labels)
-            ->assertSee('Viết bài')->assertSee('Dùng được')->assertSee('Việc bạn cần làm')->assertSee('Ai dùng kết quả tiếp')
+            ->assertSee('Viết bài')->assertSee('Dùng được')->assertSee('Việc bạn cần làm')
             ->assertSee('Bản đồ 9 giai đoạn (trạng thái bằng chứng)')
             ->assertDontSee('Chạy toàn bộ');
         $this->assertFalse(PipelineBlueprint::controlsWired());
+        $res->assertDontSee('Văn phòng AI')->assertSee('data-testid="help"', false);
         $this->assertCount(9, PipelineBlueprint::stages());
         $res->assertSee('data-stage="quality"', false);
     }
@@ -41,7 +42,7 @@ class PipelineChainTabTest extends TestCase
         $this->actingAs($this->user('approver'));
         Livewire::test(PipelineMap::class)
             ->call('mountAction', 'job', ['job' => 'article_write'])
-            ->assertSee('Lập dàn ý')->assertSee('Chưa chạy')->assertSee('Điểm người can thiệp')->assertSee('content.generate');
+            ->assertSee('Lập dàn ý')->assertSee('Chưa chạy')->assertSee('Ai dùng kết quả tiếp')->assertSee('Điểm người can thiệp')->assertSee('content.generate');
     }
 
     public function test_quyen_truy_cap_nhu_cu(): void

@@ -1,9 +1,9 @@
 <x-filament-panels::page>
     <x-filament::section>
-        <p class="text-sm">
+        <div class="text-sm">
             AI viết nháp, hệ thống chấm chất lượng, <strong>người duyệt</strong> quyết định, rồi hệ thống đăng lên CMS.
-            Mỗi tính năng bên dưới ghi rõ <strong>đang chạy thật hay chưa</strong>; nhãn lấy từ một sổ duy nhất và mục "Đang hoạt động" luôn kèm bằng chứng.
-        </p>
+            <x-help title="Đọc nhãn thế nào"><p>Mỗi tính năng bên dưới ghi rõ <strong>đang chạy thật hay chưa</strong>; nhãn lấy từ một sổ duy nhất và mục "Đang hoạt động" luôn kèm bằng chứng.</p></x-help>
+        </div>
         <div class="mt-3" style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
             @foreach (['active','demo','not_connected','in_development','idea'] as $r)
                 <x-studio.chip domain="readiness" :value="$r" /> <span class="text-xs" style="opacity:.7">{{ $counts[$r] }}</span>
@@ -29,7 +29,8 @@
         @endforeach
     </div>
 
-    <x-filament::section heading="Luồng của đội AI: đã có gì, Dev1 cần xây gì" description="Bản thiết kế sống của lát dọc đầu tiên (AG-S01). Mỗi chặng ghi phần đã làm và điểm nối còn thiếu.">
+    <x-filament::section collapsible collapsed>
+        <x-slot name="heading">Luồng của đội AI: đã có gì, Dev1 cần xây gì <x-help title="Về phần này"><p>Bản thiết kế sống của lát dọc đầu tiên (AG-S01). Mỗi chặng ghi phần đã làm và điểm nối còn thiếu.</p></x-help></x-slot>
         <div data-testid="flow-blueprint">
             @foreach ($flow as $i => $b)
                 <div style="display:grid;grid-template-columns:2rem 1fr;gap:.6rem;padding:.55rem 0;border-bottom:1px solid rgba(128,128,128,.18)">
@@ -44,10 +45,10 @@
                 </div>
             @endforeach
         </div>
-        <div class="mt-2 text-xs" style="opacity:.7">Xem một phiên chạy thật ở mục "Phiên chạy của đội AI" (menu Chiến dịch).</div>
     </x-filament::section>
 
-    <x-filament::section heading="Tự động hóa AI" description="Phần đang được đề xuất — chưa có trong hệ thống.">
+    <x-filament::section collapsible collapsed>
+        <x-slot name="heading">Tự động hóa AI (đề xuất) <x-help title="Về phần này"><p>Phần đang được đề xuất — chưa có trong hệ thống.</p></x-help></x-slot>
         @foreach ($automation as $f)
             <div style="margin:.4rem 0">
                 <x-studio.chip domain="readiness" :value="$f['readiness']" /> <strong class="text-sm">{{ $f['title'] }}</strong>
@@ -56,7 +57,8 @@
         @endforeach
     </x-filament::section>
 
-    <x-filament::section heading="Bằng chứng cho mục &quot;Đang hoạt động&quot;" description="Dựa trên test tự động và mã nguồn. Chưa nghiệm thu staging/người thật trừ khi ghi khác.">
+    <x-filament::section collapsible collapsed>
+        <x-slot name="heading">Bằng chứng cho mục "Đang hoạt động" <x-help title="Về phần này"><p>Dựa trên test tự động và mã nguồn. Chưa nghiệm thu staging/người thật trừ khi ghi khác.</p></x-help></x-slot>
         @foreach (\App\Filament\Support\Agent\FeatureRegistry::byReadiness('active') as $f)
             <div style="margin:.5rem 0">
                 <strong class="text-sm">{{ $f['title'] }}</strong> <span class="text-xs" style="opacity:.6">(task {{ $f['task'] }})</span>

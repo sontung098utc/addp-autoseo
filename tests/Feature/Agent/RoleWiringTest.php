@@ -5,6 +5,7 @@ namespace Tests\Feature\Agent;
 use App\Contracts\AiProviderInterface;
 use App\Filament\Clusters\AgentTeam\Pages\AgentRoles;
 use App\Filament\Resources\AgentRunResource;
+use App\Models\AgentSetting;
 use App\Models\Article;
 use App\Models\User;
 use App\Models\Website;
@@ -20,6 +21,7 @@ use App\Services\Publishing\EmergencyStopService;
 use App\Services\Security\UrlSafetyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -32,7 +34,8 @@ class RoleWiringTest extends TestCase
     {
         parent::setUp();
         app(EmergencyStopService::class)->resetForTesting();
-        $this->app->instance(UrlSafetyService::class, new class extends UrlSafetyService {
+        $this->app->instance(UrlSafetyService::class, new class extends UrlSafetyService
+        {
             protected function resolveIps(string $host): array
             {
                 return filter_var($host, FILTER_VALIDATE_IP) ? [$host] : ['93.184.216.34'];
@@ -54,7 +57,7 @@ class RoleWiringTest extends TestCase
 
     public function test_moi_buoc_ghi_role_key_dung_mapping_va_ky_nang(): void
     {
-        $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider()))->run($this->article(), null, 'manual');
+        $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider))->run($this->article(), null, 'manual');
         foreach ($run->steps as $s) {
             $this->assertSame($s->role, $s->data['role_key']);
             $this->assertSame(RoleRegistry::STEP_ROLE[$s->stage] ?? $s->role, $s->data['role_key'], "bước {$s->stage}");
@@ -75,7 +78,7 @@ class RoleWiringTest extends TestCase
 
     public function test_luot_lich_khong_dung_playbook_draft_va_ghi_ly_do(): void
     {
-        $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider()))->run($this->article(), null, 'schedule');
+        $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider))->run($this->article(), null, 'schedule');
         $w = $run->steps->firstWhere('stage', 'write');
         $this->assertNull($w->data['skill']);
         $this->assertSame('Chỉ dẫn mặc định', $w->data['skill_label']);
@@ -87,7 +90,7 @@ class RoleWiringTest extends TestCase
         $dir = sys_get_temp_dir().'/pb_'.uniqid();
         mkdir($dir.'/writer', 0777, true);
         file_put_contents($dir.'/writer/article-draft.v1.md', "---\nnot: valid\n---\nxx");
-        $o = new AgentRunOrchestrator(new DemoScriptedAiProvider(), playbooks: new PlaybookLoader($dir));
+        $o = new AgentRunOrchestrator(new DemoScriptedAiProvider, playbooks: new PlaybookLoader($dir));
         $run = $o->run($this->article(), null, 'manual');
         foreach (['write', 'brief', 'grade'] as $st) {
             $s = $run->steps->firstWhere('stage', $st);
@@ -101,10 +104,9 @@ class RoleWiringTest extends TestCase
     public function test_writer_nhan_playbook_ref_va_role_qua_options(): void
     {
         $seen = [];
-        $ai = new class($seen) implements AiProviderInterface {
-            public function __construct(public array &$seen)
-            {
-            }
+        $ai = new class($seen) implements AiProviderInterface
+        {
+            public function __construct(public array &$seen) {}
 
             public function calculateCostVnd(int $promptTokens, int $completionTokens, string $model): float
             {
@@ -162,8 +164,8 @@ class RoleWiringTest extends TestCase
     public function test_tat_strategist_bo_qua_dan_y_va_van_cham_luat(): void
     {
         $admin = $this->user('admin');
-        (new RoleSwitches())->set('strategist', false, $admin);
-        $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider()))->run($this->article(), null, 'manual');
+        (new RoleSwitches)->set('strategist', false, $admin);
+        $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider))->run($this->article(), null, 'manual');
         $brief = $run->steps->firstWhere('stage', 'brief');
         $this->assertSame('skipped', $brief->status);
         $this->assertSame('strategist', $brief->data['role_key']);
@@ -177,16 +179,16 @@ class RoleWiringTest extends TestCase
         $admin = $this->user('admin');
         foreach (['editor', 'writer'] as $k) {
             try {
-                (new RoleSwitches())->set($k, false, $admin);
+                (new RoleSwitches)->set($k, false, $admin);
                 $this->fail("tắt được {$k}");
             } catch (\InvalidArgumentException) {
                 $this->addToAssertionCount(1);
             }
         }
         // Dữ liệu bị sửa tay trong DB: vẫn không có hiệu lực, bước chấm luật vẫn chạy.
-        \App\Models\AgentSetting::current()->forceFill(['disabled_roles' => ['editor', 'writer', 'strategist']])->save();
-        $this->assertSame(['strategist'], (new RoleSwitches())->disabled());
-        $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider()))->run($this->article(), null, 'manual');
+        AgentSetting::current()->forceFill(['disabled_roles' => ['editor', 'writer', 'strategist']])->save();
+        $this->assertSame(['strategist'], (new RoleSwitches)->disabled());
+        $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider))->run($this->article(), null, 'manual');
         $this->assertNotNull($run->steps->firstWhere('stage', 'grade'));
         $this->assertNotNull($run->steps->firstWhere('stage', 'write'));
     }
@@ -195,23 +197,23 @@ class RoleWiringTest extends TestCase
     {
         foreach (['approver', 'writer'] as $r) {
             try {
-                (new RoleSwitches())->set('strategist', false, $this->user($r));
+                (new RoleSwitches)->set('strategist', false, $this->user($r));
                 $this->fail("{$r} đổi được");
             } catch (\InvalidArgumentException) {
                 $this->addToAssertionCount(1);
             }
         }
-        $this->assertTrue((new RoleSwitches())->isEnabled('strategist'));
+        $this->assertTrue((new RoleSwitches)->isEnabled('strategist'));
 
         $logged = [];
-        \Illuminate\Support\Facades\Log::shouldReceive('info')->withArgs(function ($m, $ctx = []) use (&$logged) {
+        Log::shouldReceive('info')->withArgs(function ($m, $ctx = []) use (&$logged) {
             $logged[] = [$m, $ctx];
 
             return true;
         })->atLeast()->once();
         $admin = $this->user('admin');
-        (new RoleSwitches())->set('strategist', false, $admin);
-        $this->assertFalse((new RoleSwitches())->isEnabled('strategist'));
+        (new RoleSwitches)->set('strategist', false, $admin);
+        $this->assertFalse((new RoleSwitches)->isEnabled('strategist'));
         $entry = collect($logged)->firstWhere(0, 'audit')[1];
         $this->assertSame($admin->id, $entry['actor_id']);
         $this->assertSame('strategist', $entry['role']);
@@ -221,19 +223,19 @@ class RoleWiringTest extends TestCase
     public function test_tab_vai_tro_hien_cong_tac_va_chi_admin_bam_duoc(): void
     {
         $this->actingAs($this->user('approver'));
-        Livewire::test(AgentRoles::class)->assertSee('Chỉ admin đổi')->call('toggleRole', 'strategist');
-        $this->assertTrue((new RoleSwitches())->isEnabled('strategist'));
+        Livewire::test(AgentRoles::class)->assertSee('Chỉ admin đổi')->assertDontSeeHtml('role="switch"')->call('toggleRole', 'strategist');
+        $this->assertTrue((new RoleSwitches)->isEnabled('strategist'));
         Livewire::test(AgentRoles::class)->call('toggleRole', 'editor');
-        $this->assertTrue((new RoleSwitches())->isEnabled('editor'));
+        $this->assertTrue((new RoleSwitches)->isEnabled('editor'));
 
         $this->actingAs($this->user('admin'));
-        Livewire::test(AgentRoles::class)->assertSee('Tắt vai trò')->call('toggleRole', 'strategist')->assertSee('Đang TẮT');
-        $this->assertFalse((new RoleSwitches())->isEnabled('strategist'));
+        Livewire::test(AgentRoles::class)->assertSeeHtml('role="switch"')->assertSeeHtml('aria-checked="true"')->call('toggleRole', 'strategist')->assertSee('Đang tắt: bước dàn ý bị bỏ qua')->assertSeeHtml('aria-checked="false"');
+        $this->assertFalse((new RoleSwitches)->isEnabled('strategist'));
     }
 
     public function test_run_view_hien_vai_tro_va_ky_nang_that(): void
     {
-        $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider()))->run($this->article(), null, 'manual');
+        $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider))->run($this->article(), null, 'manual');
         $this->actingAs($this->user('approver'));
         $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()
             ->assertSee('Vai trò: Người viết · Kỹ năng: writer/article-draft@1 (bản nháp)', false)
@@ -242,7 +244,7 @@ class RoleWiringTest extends TestCase
 
     public function test_readiness_van_dang_phat_trien_khi_writer_co_playbook(): void
     {
-        $reg = new RoleRegistry();
+        $reg = new RoleRegistry;
         $this->assertSame('in_development', $reg->find('writer')['readiness']);
         $this->assertTrue($reg->isSwitchable('strategist'));
         $this->assertFalse($reg->isSwitchable('editor'));

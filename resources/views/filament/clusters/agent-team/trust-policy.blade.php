@@ -41,7 +41,7 @@
         $measured = array_values(array_filter($rows, fn ($r) => $r[2]['value'] !== null));
     @endphp
     <x-filament::section heading="Mức tự động hiện tại">
-        <x-slot name="headerEnd"><x-studio.hint text="30 ngày gần nhất, tính từ các phiên chạy thật. Chỉ số nào chưa đo được thì không hiện, không điền 0." /></x-slot>
+        <x-slot name="headerEnd"><x-help text="30 ngày gần nhất, tính từ các phiên chạy thật. Chỉ số nào chưa đo được thì không hiện, không điền 0." /></x-slot>
         @if (count($measured) === 0)
             <div class="text-sm" data-testid="metrics-empty">
                 Chưa có dữ liệu để đo. <span style="opacity:.75">Cần ít nhất một phiên chạy xong trong 30 ngày gần nhất.</span>
@@ -57,7 +57,7 @@
         @endif
         <div class="text-sm" style="margin-top:.5rem" data-testid="unmeasured">
             Chưa đo được: {{ implode(', ', array_keys($unmeasured)) }}
-            <x-studio.hint :text="collect($unmeasured)->map(fn ($why, $label) => $label.': '.$why)->implode(' ')" />
+            <x-help :text="collect($unmeasured)->map(fn ($why, $label) => $label.': '.$why)->implode(' ')" />
         </div>
     </x-filament::section>
 

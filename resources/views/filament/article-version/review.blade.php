@@ -33,12 +33,12 @@
     $featuredAlt = $asset ? ($asset->pivot->custom_alt ?: $asset->alt_text) : null;
 
     $next = match (true) {
-        $record->review_status === 'needs_review' && $canApprove => 'Đọc bài và phần thay đổi, rồi bấm Duyệt hoặc Từ chối ở đầu trang.',
-        $record->review_status === 'needs_review' => 'Bản này đang chờ người có quyền duyệt xử lý.',
-        $record->review_status === 'approved' && $article?->workflow_status === 'approved' && $canApprove => 'Bài đã duyệt nhưng chưa có lịch. Bấm Xếp lịch ở đầu trang để chọn thời điểm xuất bản.',
-        $record->review_status === 'approved' => 'Bản đã duyệt. Trạng thái bài: ' . StatusPresenter::label($article?->workflow_status, 'article') . '.',
-        $record->review_status === 'rejected' => 'Bản này cần sửa. Chỉnh bản thảo rồi gửi duyệt lại.',
-        default => 'Chưa có bước tiếp theo cho trạng thái này.',
+        $record->review_status === 'needs_review' && $canApprove => 'Đọc bài và phần thay đổi, rồi Duyệt hoặc Từ chối.',
+        $record->review_status === 'needs_review' => 'Đang chờ người có quyền duyệt.',
+        $record->review_status === 'approved' && $article?->workflow_status === 'approved' && $canApprove => 'Đã duyệt, chưa có lịch: bấm Xếp lịch.',
+        $record->review_status === 'approved' => 'Bản đã duyệt. Bài: ' . StatusPresenter::label($article?->workflow_status, 'article') . '.',
+        $record->review_status === 'rejected' => 'Cần sửa rồi gửi duyệt lại.',
+        default => null,
     };
     // Kiểm chất lượng tính tại thời điểm xem, chưa lưu lịch sử (task 3.5).
     $quality = \App\Filament\Support\Review\ReviewActions::qualityFor($record);
@@ -50,7 +50,7 @@
     <div class="ss-review__side">
         <section class="ss-review-card" aria-labelledby="ss-review-decide">
             <h2 class="ss-review-card__title" id="ss-review-decide">Quyết định</h2>
-            <p class="ss-review-row"><span class="ss-review-badge ss-review-badge--{{ $statusColor }}">{{ $statusLabel }}</span></p>
+            <p class="ss-review-row"><span class="ss-review-badge ss-review-badge--{{ $statusColor }}">{{ $statusLabel }}</span>@if ($next) <span>{{ $next }}</span>@endif</p>
         </section>
 
         <section class="ss-review-card" aria-labelledby="ss-review-quality">
@@ -68,15 +68,14 @@
                 .ss-qual-excerpt{display:block;margin-top:.15rem;font-size:.8rem;font-family:ui-monospace,monospace;overflow-wrap:anywhere;opacity:.85}
                 .ss-qual-ok{margin-top:.6rem;font-size:.85rem}
             </style>
-            <h2 class="ss-review-card__title" id="ss-review-quality">Kiểm chất lượng</h2>
+            <h2 class="ss-review-card__title" id="ss-review-quality">Kiểm chất lượng <x-help title="Điểm hình thức"><p data-testid="vr-score-note"><strong>Điểm hình thức.</strong> {{ \App\Filament\Resources\ArticleResource::SCORE_NOTE }}</p></x-help></h2>
             @php
                 $rd = $article ? \App\Filament\Resources\ArticleResource::readiness($article) : null;
                 $noGround = $rd && (($rd['risk']['level'] === 'high' && $rd['knowledge']['count'] === 0));
             @endphp
-            <p class="ss-qual-measure" data-testid="vr-score-note"><strong>Điểm hình thức.</strong> {{ \App\Filament\Resources\ArticleResource::SCORE_NOTE }}</p>
-            @if ($noGround)<p class="ss-qual-blocked" data-testid="vr-gap" style="color:#b45309">{{ \App\Filament\Resources\ArticleResource::GAP_NOTE }}</p>@endif
+            @if ($noGround)<div class="ss-qual-blocked" data-testid="vr-gap" style="color:#b45309">Bài chưa có căn cứ từ kho kiến thức. <x-help tone="warning" title="Vì sao cần xem lại"><p>{{ \App\Filament\Resources\ArticleResource::GAP_NOTE }}</p></x-help></div>@endif
             @if ($quality->hasBlocking())
-                <p class="ss-qual-blocked"><strong>Còn {{ $qCounts['P0'] }} lỗi P0 — chặn duyệt.</strong> Sửa bài hoặc duyệt ngoại lệ với lý do (được ghi log).</p>
+                <div class="ss-qual-blocked"><strong>Còn {{ $qCounts['P0'] }} lỗi P0 — chặn duyệt.</strong> <x-help tone="warning" title="Cách xử lý"><p>Sửa bài hoặc duyệt ngoại lệ với lý do (được ghi log).</p></x-help></div>
             @endif
             <ul class="ss-qual-counts" aria-label="Số mục chưa đạt">
                 <li class="ss-qual-count ss-qual-count--P0">P0 chưa đạt: {{ $qCounts['P0'] }}</li>
@@ -115,8 +114,7 @@
 
         @php($bc = \App\Services\Brand\BrandCompliance::forVersion($record))
         <section class="ss-review-card" aria-labelledby="ss-review-brand" data-testid="brand-compliance">
-            <h2 class="ss-review-card__title" id="ss-review-brand">Bản sắc thương hiệu và quy tắc lĩnh vực</h2>
-            <p style="font-size:.8rem;opacity:.75;margin:0 0 .5rem">Kiểm bằng luật, không phán đoán văn phong: chỉ nói điều đối chiếu được với hồ sơ doanh nghiệp và Trí tuệ.</p>
+            <h2 class="ss-review-card__title" id="ss-review-brand">Bản sắc thương hiệu và quy tắc lĩnh vực <x-help title="Cách kiểm"><p>Kiểm bằng luật, không phán đoán văn phong: chỉ nói điều đối chiếu được với hồ sơ doanh nghiệp và Trí tuệ.</p></x-help></h2>
             @foreach ($bc['notes'] as $n)<p style="color:#b45309;margin:.2rem 0">⚠ {{ $n }}</p>@endforeach
             <dl class="ss-review-dl">
                 <dt>Hồ sơ doanh nghiệp</dt><dd>{{ $bc['brand']['profile_percent'] }}%@if ($bc['brand']['missing'] !== []) (thiếu: {{ implode(', ', $bc['brand']['missing']) }})@endif</dd>
@@ -156,8 +154,7 @@
         </section>
 
         <section class="ss-review-card" aria-labelledby="ss-review-ai">
-            <h2 class="ss-review-card__title" id="ss-review-ai">AI đã tạo</h2>
-            <p class="ss-review-muted"><strong>AI đề xuất</strong>, cần người kiểm chứng.</p>
+            <h2 class="ss-review-card__title" id="ss-review-ai">AI đã tạo <x-help tone="warning" title="AI đề xuất"><p>Nội dung và nguồn do AI đề xuất, cần người kiểm chứng.</p></x-help></h2>
             <dl class="ss-review-dl">
                 <dt>Nhà cung cấp</dt><dd>{{ $dash($record->ai_provider) }}</dd>
                 <dt>Model</dt><dd>{{ $dash($record->ai_model) }}</dd>

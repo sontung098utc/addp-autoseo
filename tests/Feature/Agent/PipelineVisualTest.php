@@ -18,7 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
 
-/** Tab Pipeline dạng sơ đồ: Các luồng, Đang chạy, Văn phòng AI. */
+/** Tab Pipeline dạng sơ đồ: Các luồng, Đang chạy. Trạng thái từng nhân sự nằm ở thẻ trang Vai trò. */
 class PipelineVisualTest extends TestCase
 {
     use RefreshDatabase;
@@ -128,24 +128,34 @@ class PipelineVisualTest extends TestCase
         $this->assertStringContainsString('Không có phiên nào đang chạy', $html);
     }
 
-    public function test_van_phong_ai_du_role_va_dang_lam(): void
+    public function test_pipeline_khong_con_tab_van_phong_ai_va_nhan_su_dang_lam_nam_o_the_vai_tro(): void
     {
         $this->actingAs($this->user('approver'));
         $this->makeRun('site_audit');
         $step = AgentRunStep::first();
         $step->update(['stage' => 'crawl', 'role' => 'auditor']);
         $this->makeRun('article_write')->steps()->update(['stage' => 'brief', 'role' => 'strategist']);
-        $html = $this->get('/admin/doi-ai/pipeline')->getContent();
-        foreach ((new RoleRegistry)->all() as $r) {
-            $this->assertStringContainsString('data-desk="'.$r['key'].'"', $html);
-        }
-        $this->assertStringContainsString('Đang làm', $html);
+
+        $pipeline = $this->get('/admin/doi-ai/pipeline')->assertOk()->getContent();
+        $this->assertStringNotContainsString('Văn phòng AI', $pipeline);
+        $this->assertStringNotContainsString('data-testid="pipeline-office"', $pipeline);
+        $this->assertStringNotContainsString('data-desk=', $pipeline);
+        $this->assertStringContainsString('Các luồng', $pipeline);
+        $this->assertStringContainsString('Đang chạy', $pipeline);
+
         $desks = collect(PipelineVisual::office());
         $this->assertSame(1, $desks->where('profile.key', 'auditor')->first()['runs_today']);
         $this->assertNotEmpty($desks->where('profile.key', 'writer')->first()['working']);
         $this->assertSame([], $desks->where('profile.key', 'editor')->first()['working']);
-        $this->assertStringContainsString('Rảnh', $html);
-        $this->assertStringContainsString('Mở hồ sơ', $html);
+
+        $roles = $this->get('/admin/doi-ai/vai-tro')->assertOk()->getContent();
+        foreach ((new RoleRegistry)->all() as $r) {
+            $this->assertStringContainsString('data-testid="role-card-'.$r['key'].'"', $roles);
+        }
+        $this->assertStringContainsString('data-status="working"', $roles);
+        $this->assertStringContainsString('Đang làm', $roles);
+        $this->assertStringContainsString('data-status="idle"', $roles);
+        $this->assertStringContainsString('Rảnh', $roles);
     }
 
     public function test_cua_so_truot_buoc_co_so_lieu_that_hoac_noi_chua_co(): void
