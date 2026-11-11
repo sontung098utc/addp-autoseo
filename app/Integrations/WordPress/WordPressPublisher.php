@@ -93,17 +93,38 @@ class WordPressPublisher implements PublisherInterface
         return ['id' => $id, 'source_url' => $src, 'alt_updated' => $altUpdated];
     }
 
-    public function createDraft(Website $website, ArticleVersion $version): array
+    public function createDraft(Website $website, ArticleVersion $version, ?string $publicationKey = null): array
     {
-        // Bản nháp xem trước: KHÔNG gắn dấu nhận dạng, để getByPublicationKey không nhầm với bài đăng chính.
         $payload = $this->basePayload($version, 'draft');
+
+        if ($publicationKey !== null && $publicationKey !== '') {
+            $key = $this->assertKey($publicationKey);
+            $existing = $this->getByPublicationKey($website, $key);
+            if ($existing !== null) {
+                return [
+                    'remote_id' => (string) $existing['remote_id'],
+                    'preview_url' => (string) ($existing['published_url'] ?? ''),
+                    'publication_key' => $key,
+                ];
+            }
+            $payload['content'] .= "\n" . $this->marker($key);
+        }
+
         $res = $this->client->request($website, 'POST', '/wp/v2/posts', ['json' => $payload], true);
         $id = $res['json']['id'] ?? null;
         if (! is_int($id)) {
             throw new WordPressAmbiguousException(E::ERR06, 'phản hồi tạo nháp thiếu id');
         }
 
-        return ['remote_id' => (string) $id, 'preview_url' => (string) ($res['json']['link'] ?? '')];
+        $result = [
+            'remote_id' => (string) $id,
+            'preview_url' => (string) ($res['json']['link'] ?? ''),
+        ];
+        if ($publicationKey !== null && $publicationKey !== '') {
+            $result['publication_key'] = $publicationKey;
+        }
+
+        return $result;
     }
 
     public function publish(Publication $publication): array

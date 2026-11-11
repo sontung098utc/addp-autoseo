@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Contracts\CmsErrorInterface;
 use App\Models\Publication;
 use App\Services\Publishing\PublisherManager;
 use Illuminate\Bus\Queueable;
@@ -66,6 +67,10 @@ class ReconcilePublicationJob implements ShouldQueue
 
                 Log::info("[ReconcilePublicationJob] Đối soát xác nhận bài #{$publication->id} chưa tồn tại trên CMS.");
             }
+        } catch (CmsErrorInterface $e) {
+            $publication->update(['last_error' => $e->getMessage()]);
+            Log::error("[ReconcilePublicationJob] Lỗi [{$e->errorCode()}] khi đối soát bài #{$publication->id}: {$e->getMessage()}");
+            throw $e; // Cho phép retry theo backoff mà vẫn giữ needs_reconcile & ghi chú lỗi đã che
         } catch (Throwable $e) {
             Log::error("[ReconcilePublicationJob] Thất bại khi đối soát bài #{$publication->id}: {$e->getMessage()}");
             throw $e; // Cho phép retry theo backoff nếu CMS vẫn chưa phản hồi
