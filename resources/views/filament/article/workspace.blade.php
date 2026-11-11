@@ -158,6 +158,9 @@
             {{-- Tổng quan: bài đang ở đâu trong chuỗi, việc tiếp theo, và sửa thông tin bài ngay tại đây. --}}
             <x-studio.panel key="overview">
                 <div class="aw-stack">
+                    @if (! empty($stopInfo))
+                        <p class="aw-note" data-testid="aw-stopped" style="color:#b91c1c;border:1px solid #b91c1c;border-radius:.5rem;padding:.5rem .75rem">⛔ Hệ thống đang DỪNG KHẨN CẤP ({{ $stopInfo['reason'] ?? 'không ghi lý do' }}): đội AI sẽ không chạy cho đến khi được khôi phục ở Lịch xuất bản.</p>
+                    @endif
                     <p class="aw-next" data-testid="aw-next"><strong>Việc tiếp theo:</strong> {{ $next }}</p>
                     @if (filled($article->guidance))
                         <p class="aw-muted" data-testid="aw-guidance"><strong>Chỉ dẫn cho đội AI:</strong> {{ \Illuminate\Support\Str::limit($article->guidance, 240) }} <span>(đổi bằng nút "Chỉ dẫn cho đội AI" ở đầu trang)</span></p>

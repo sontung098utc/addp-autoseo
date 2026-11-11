@@ -131,3 +131,19 @@ Migration: `2026_11_20_000001` (job_type), `2026_11_21_000001` (nguồn gốc/t�
 - ~~Bộ chọn ngày giờ xếp lịch~~: đã sửa (cả nút Xếp lịch và Đổi giờ đăng): hiển thị dd/mm/yyyy HH:mm, tuần bắt đầu thứ Hai, bước 5 phút, mặc định 9 giờ sáng ngày mai (giờ VN), không chọn được ngày đã qua. Sửa nằm trong `ReviewActions` và `RescheduleAction`, Dev1 cần biết khi rà.
 - Duyệt bài sức khỏe không có chỗ ghi "tôi là người có chuyên môn xác nhận": chỉ có ô ghi chú tự do.
 - Đã thử đọc website nhưng mạng của bản xem thử không ra ngoài nên không đánh giá được việc tự bổ sung kiến thức thật; nội dung bài do AI giả lập (mẫu 925 từ), **không đánh giá được văn chất lượng**.
+
+## 7. Chạy lại cả 8 kịch bản (11/11/2026, bản xem thử, AI giả lập, không có mạng ra ngoài)
+
+| # | Kịch bản | Kết quả | Phát hiện và xử lý |
+|---|---|---|---|
+| K1 | SEO mở website mới | Đi được từ website trống đến kế hoạch có thứ tự | Khởi tạo báo "Xong" dù đọc 0 trang, khảo sát thêm 0 từ khóa: **đã sửa** (nay "Bỏ qua" kèm lý do). Gom cụm theo luật gộp thô (cần AI thật). Thông báo "chờ bạn duyệt" nhưng không có nút duyệt kế hoạch |
+| K2 | Content nhận 2 bài | Giao hàng loạt ổn, ra bản nháp, nhãn chuyên gia, ảnh bị bỏ qua đúng lý do sức khỏe | Thông báo biến mất sau 6 giây: **đã nâng lên 12 giây**. Bài giáo dục lạc chủ đề nằm trong kế hoạch website dược, không cảnh báo |
+| K3 | Duyệt: từ chối, giao lại, duyệt | Chạy đủ vòng | **Góp ý của người duyệt không tự đi vào lần giao lại**: đã sửa (tự thành định hướng cho đội AI, có test) |
+| K4 | Quản lý bật Toàn quyền và theo dõi | Tạo chiến dịch (có hộp chính sách), chạy một nhịp, giao 1 bài, bài sức khỏe chờ người | Thời lượng "419 phút" cho phiên đã xong: **đã sửa**. Nhãn tiếng Anh "Autonomous policy": **đã sửa**. Còn mở: trường "Từ khóa cần viết" vẫn bắt buộc khi nguồn là Kế hoạch; tab "Đang chạy" bị lấn bởi các lượt "Xây kho" tự sinh theo từng bài |
+| K5 | Kho: tìm nguồn theo chủ đề | Danh sách nguồn có nhãn tin cậy và lý do, thêm một cú bấm; báo cáo lỗi trung thực | Không kiểm được nhập kiến thức thật (không có mạng, nguồn là mô phỏng) |
+| K6 | Làm mới từ Audit | Trang và hai nút quét rõ ràng; quét thật báo lỗi rõ khi không có mạng | Đoạn quét thật → đề xuất làm mới chưa kiểm được |
+| K7 | Sự cố: dừng khẩn cấp | Dừng, bị chặn có lý do (không tốn chi phí), khôi phục đều chạy | Trang bài không báo hệ thống đang dừng: **đã thêm banner**. Lời mô tả nút chỉ nói tới lượt đăng, thực tế đội AI cũng dừng: **đã sửa** |
+| K8 | Vai và quyền | Writer 9 mục menu, approver 25, admin 27; truy cập trang của admin bị 403 | Trang 403/404 chỉ là chữ tiếng Anh trống: **đã thay trang tiếng Việt có đường về** |
+
+Còn mở sau lượt này: gom cụm cần AI thật; không có nút duyệt kế hoạch tường minh; trường "Từ khóa cần viết" bắt buộc oan; tab "Đang chạy" nhiều lượt Xây kho tự sinh; **mọi chất lượng nội dung AI vẫn chưa được đánh giá** (AI giả lập, không có mạng).
+
