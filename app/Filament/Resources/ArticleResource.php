@@ -533,6 +533,7 @@ class ArticleResource extends Resource
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'schedule')
             ->authorize(fn () => ReviewActions::canApprove())
             ->form(ReviewActions::scheduleForm())
+            ->fillForm(fn (Article $r) => ['website_id' => $r->website_id])
             ->action(function (Article $r, array $data) {
                 abort_unless(ReviewActions::canApprove(), 403);
                 ReviewActions::run(function () use ($r, $data) {

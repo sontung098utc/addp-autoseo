@@ -313,6 +313,7 @@ class ViewArticle extends EditArticle
                 ->visible(fn () => $this->record->workflow_status === 'approved' && $this->latest() !== null)
                 ->authorize(fn () => ReviewActions::canApprove())
                 ->form(ReviewActions::scheduleForm())
+                ->fillForm(fn () => ['website_id' => $this->record->website_id])
                 ->action(function (array $data) {
                     abort_unless(ReviewActions::canApprove(), 403);
                     ReviewActions::run(function () use ($data) {

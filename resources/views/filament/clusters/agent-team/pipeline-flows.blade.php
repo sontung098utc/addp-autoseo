@@ -7,8 +7,9 @@
         open: null, step: null,
         show(id) { this.open = id; this.step = null; history.replaceState(null, '', '#luong-' + id); document.documentElement.style.overflow = 'hidden'; this.$nextTick(() => { const c = this.$refs['close-' + id]; if (c) c.focus() }) },
         close() { this.open = null; history.replaceState(null, '', location.pathname + location.search); document.documentElement.style.overflow = '' },
-        init() { if (location.hash.startsWith('#luong-')) { const id = location.hash.slice(7); if (@js(collect($flows)->pluck('id')->all()).includes(id)) this.show(id) } }
-    }" x-on:keydown.escape.window="open && close()">
+        fromHash() { if (location.hash.startsWith('#luong-')) { const id = location.hash.slice(7); if (@js(collect($flows)->pluck('id')->all()).includes(id) && id !== this.open) this.show(id) } },
+        init() { this.fromHash() }
+    }" x-on:keydown.escape.window="open && close()" x-on:hashchange.window="fromHash()">
 
     <div class="pc-grid">
         @foreach ($flows as $f)

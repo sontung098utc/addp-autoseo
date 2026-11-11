@@ -77,6 +77,7 @@ class ViewArticleVersion extends ViewRecord
                 ->visible(fn () => $this->record->review_status === 'approved' && $this->record->article?->workflow_status === 'approved')
                 ->authorize(fn () => ReviewActions::canApprove())
                 ->form(ReviewActions::scheduleForm())
+                ->fillForm(fn () => ['website_id' => $this->record->article?->website_id])
                 ->action(function (array $data) {
                     abort_unless(ReviewActions::canApprove(), 403);
                     ReviewActions::run(function () use ($data) {
