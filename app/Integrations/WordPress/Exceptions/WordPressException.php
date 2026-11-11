@@ -2,11 +2,12 @@
 
 namespace App\Integrations\WordPress\Exceptions;
 
+use App\Contracts\CmsErrorInterface;
 use RuntimeException;
 use Throwable;
 
 /** Lỗi XÁC ĐỊNH (chắc chắn chưa tạo bài): PublishArticleJob đánh dấu failed. */
-class WordPressException extends RuntimeException
+class WordPressException extends RuntimeException implements CmsErrorInterface
 {
     use HasWordPressErrorCode;
 
