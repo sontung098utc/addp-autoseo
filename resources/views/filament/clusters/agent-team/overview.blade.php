@@ -3,6 +3,7 @@
     $fmt = fn ($n) => number_format((float) $n, 0, ',', '.');
 @endphp
 <x-filament-panels::page>
+    <style>.ov-act{color:var(--c)}.dark .ov-act{color:color-mix(in srgb,var(--c) 45%,#fff)}</style>
     <div data-testid="agent-overview" class="space-y-4" wire:poll.{{ $pollSeconds }}s>
         {{-- 1. Trạng thái một dòng + số liệu hôm nay --}}
         <div data-testid="status-strip" style="display:flex;flex-wrap:wrap;gap:.75rem 1.5rem;align-items:center;justify-content:space-between;border:1px solid rgba(128,128,128,.3);border-radius:.7rem;padding:.7rem 1rem">
@@ -29,7 +30,7 @@
             @foreach ($attention as $a)
                 <a href="{{ $a['url'] }}" style="display:flex;justify-content:space-between;align-items:center;gap:1rem;text-decoration:none;color:inherit;border:1px solid {{ $tone[$a['tone']][0] }};background:{{ $tone[$a['tone']][1] }};border-radius:.6rem;padding:.6rem .9rem;margin-bottom:.4rem">
                     <span style="font-weight:600;font-size:.9rem">{{ $a['text'] }}</span>
-                    <span style="color:{{ $tone[$a['tone']][0] }};font-weight:600;font-size:.82rem;white-space:nowrap">{{ $a['action'] }} <x-filament::icon icon="heroicon-m-arrow-right" style="width:.95rem;height:.95rem;display:inline;vertical-align:-.15em" /></span>
+                    <span class="ov-act" style="--c:{{ $tone[$a['tone']][0] }};font-weight:600;font-size:.82rem;white-space:nowrap">{{ $a['action'] }} <x-filament::icon icon="heroicon-m-arrow-right" style="width:.95rem;height:.95rem;display:inline;vertical-align:-.15em" /></span>
                 </a>
             @endforeach
         </div>

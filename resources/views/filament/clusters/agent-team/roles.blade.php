@@ -16,6 +16,7 @@
         .rc-chip{display:inline-flex;align-items:center;gap:.3rem;max-width:100%;padding:.15rem .6rem;border-radius:999px;border:1px solid rgba(128,128,128,.4);font-size:.74rem;background:transparent;color:inherit;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         button.rc-chip,a.rc-chip{cursor:pointer}button.rc-chip:hover,a.rc-chip:hover{background:rgba(128,128,128,.14)}
         .rc-chip--empty{border-style:dashed;border-color:#0f6b5c;color:#0f6b5c}
+        .dark .rc-chip--empty{border-color:#5eead4;color:#5eead4}
         .rc-chip--live{border-color:rgba(14,165,233,.6);background:rgba(14,165,233,.1)}
         .rc-muted{font-size:.74rem;opacity:.6}
         .rc-sw{position:relative;width:2.3rem;height:1.3rem;border-radius:999px;border:0;background:rgba(128,128,128,.4);cursor:pointer;flex:none;transition:background .15s}

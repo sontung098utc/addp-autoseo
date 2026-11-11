@@ -17,6 +17,7 @@
         .kw-step.is-done .kw-step__n{background:rgb(var(--success-600));border-color:rgb(var(--success-600));color:#fff}
         .kw-step.is-next .kw-step__n{background:rgb(var(--primary-600));border-color:rgb(var(--primary-600));color:#fff}
         .kw-step__tag{margin-left:auto;font-size:.7rem;font-weight:600;color:rgb(var(--primary-600))}
+        .dark .kw-step__tag{color:rgb(var(--primary-300))}
         .kw-step__main{all:unset;cursor:pointer;display:block}
         .kw-step__main:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:.3rem}
         .kw-step__val{font-size:1.6rem;font-weight:700;line-height:1.1}
