@@ -31,9 +31,9 @@ Kiểm trên MariaDB 10.6 (container tạm): chạy lên cả 28 migration, roll
 | `2026_11_24_000001_add_guidance_to_articles` | `articles.guidance` (text, nullable) | Thấp | Up/down/up MariaDB |
 | `2026_11_25_000001_add_checkpoints_to_campaigns` | `campaigns.checkpoints` (json, nullable): điểm dừng chờ người `plan/outline/draft/publish` | Thấp | Up/down trên SQLite; chưa chạy lại MariaDB |
 | `2026_11_26_000001_add_models_to_ai_providers` | `ai_providers`: danh sách model bật cho từng tài khoản (hiển thị/chọn) | Thấp, không đổi định tuyến | Chưa chạy lại MariaDB |
-| `2026_11_27_000001_allow_paused_publication_status` | **`publications.status` từ enum sang chuỗi 20 ký tự** để thêm `paused` và `awaiting_confirm` | **CAO NHẤT: đổi kiểu cột bảng xuất bản.** `down()` chuyển lượt paused/chờ xác nhận sang `failed` rồi trả enum | Chỉ chạy SQLite; **bắt buộc thử up/down/up trên MariaDB** |
+| `2026_11_27_000001_allow_paused_publication_status` | **`publications.status` từ enum sang chuỗi 20 ký tự** để thêm `paused` và `awaiting_confirm` | **CAO NHẤT: đổi kiểu cột bảng xuất bản.** `down()` chuyển lượt paused/chờ xác nhận sang `failed` rồi trả enum | Up/down/up đã thử trên MariaDB; vẫn cần Dev1 xem lại kiểu cột |
 
-Đợt 11/11 (3 migration cuối) chưa được chạy trên MariaDB; rollback thêm: 27 → 26 → 25.
+Đợt 11/11: đã chạy up → rollback 8 → up trên MariaDB 10.6, đều thành công; cả bộ test MariaDB 1444 qua, chỉ 5 `PilotRunTest` đỏ (lỗi cũ của Dev1). Rollback thêm: 27 → 26 → 25.
 
 Thứ tự rollback: 24 → 23 → 22 → 21 → 20.
 
