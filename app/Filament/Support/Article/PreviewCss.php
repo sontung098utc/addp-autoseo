@@ -14,6 +14,6 @@ final class PreviewCss
         .'.autoseo-callout--warning{background:#fef2f2;border-color:#fecaca}.autoseo-callout--tip{background:#f0fdf4;border-color:#bbf7d0}'
         .'.autoseo-toc{margin:1em 0;padding:.8em 1.4em;background:#f9fafb;border-radius:8px}'
         .'details{margin:.6em 0;padding:.5em .9em;border:1px solid #e5e7eb;border-radius:8px}summary{cursor:pointer;font-weight:600}'
-        .'sup.autoseo-cite{color:#2563eb;font-size:.75em;margin-left:1px}'
+        .'sup.autoseo-cite{font-size:.75em;margin-left:1px;cursor:help}sup.autoseo-cite a{color:#2563eb;text-decoration:none}.autoseo-refs li{margin:.3em 0}'
         .'.autoseo-refs{margin-top:2em;padding-top:.8em;border-top:1px solid #d1d5db;font-size:.9em;color:#4b5563}';
 }

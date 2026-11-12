@@ -26,20 +26,20 @@ final class CitationRenderer
         $items = KnowledgeItem::query()->with('source')->whereIn('id', array_keys($ids))->get()->keyBy('id');
         $number = [];
         $html = (string) preg_replace_callback(self::MARK, function (array $m) use ($items, &$number): string {
-            $kb = [];
-            $nums = [];
+            $out = '';
             foreach (preg_split('/[^\d]+/', $m[1], -1, PREG_SPLIT_NO_EMPTY) ?: [] as $n) {
                 $id = (int) $n;
                 if (! $items->has($id)) {
                     return $m[0];
                 }
                 $number[$id] ??= count($number) + 1;
-                $kb[] = $id;
-                $nums[] = $number[$id];
+                $it = $items[$id];
+                $tip = trim((string) $it->title.': '.mb_substr(trim(preg_replace('/\s+/u', ' ', strip_tags((string) $it->body)) ?? ''), 0, 240));
+                // Rê chuột vào số để xem nội dung mục được trích; bấm để nhảy tới dòng nguồn ở cuối bài. Mỗi số một thẻ để mỗi chú thích có nội dung riêng.
+                $out .= '<sup class="autoseo-cite" data-kb="'.$id.'" title="'.e($tip).'"><a href="#nguon-'.$number[$id].'">['.$number[$id].']</a></sup>';
             }
-            sort($nums);
 
-            return '<sup class="autoseo-cite" data-kb="'.implode(',', $kb).'">['.implode(', ', array_unique($nums)).']</sup>';
+            return $out;
         }, $html);
         if ($number === []) {
             return $html;
@@ -49,10 +49,11 @@ final class CitationRenderer
         foreach (array_keys($number) as $id) {
             $it = $items[$id];
             $src = $it->source;
-            $label = e((string) ($src?->title ?: $it->title));
             $url = (string) ($src?->final_url ?: $src?->url);
-            $link = preg_match('#^https?://#i', $url) ? ' — <a href="'.e($url).'" rel="nofollow noopener">'.e(parse_url($url, PHP_URL_HOST) ?: $url).'</a>' : '';
-            $li .= '<li data-kb="'.$id.'">'.$label.($src && $it->title !== $src->title ? ': '.e((string) $it->title) : '').$link.'</li>';
+            $host = preg_match('#^https?://#i', $url) ? (string) (parse_url($url, PHP_URL_HOST) ?: '') : '';
+            $from = trim(($src ? (string) $src->title : '').($host !== '' ? ' ('.preg_replace('/^www\./', '', $host).')' : ''));
+            $from = $host !== '' ? '<a href="'.e($url).'" rel="nofollow noopener">'.e($from).'</a>' : e($from);
+            $li .= '<li id="nguon-'.$number[$id].'" data-kb="'.$id.'"><strong>'.e((string) $it->title).'</strong>'.($from !== '' ? ' — '.$from : '').'</li>';
         }
 
         return $html."\n".'<div class="autoseo-refs"><p><strong>Nguồn tham khảo</strong></p><ol>'.$li.'</ol></div>';

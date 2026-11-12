@@ -23,8 +23,9 @@ class CitationRenderTest extends TestCase
         $out = CitationRenderer::render($html);
 
         $this->assertStringNotContainsString("[KB#{$a->id}]", $out);
-        $this->assertStringContainsString('<sup class="autoseo-cite" data-kb="'.$a->id.'">[1]</sup>', $out);
-        $this->assertStringContainsString('data-kb="'.$b->id.','.$a->id.'">[1, 2]</sup>', $out);
+        $this->assertStringContainsString('<sup class="autoseo-cite" data-kb="'.$a->id.'" title="HbA1c mục tiêu: x"><a href="#nguon-1">[1]</a></sup>', $out, 'rê chuột hiện nội dung mục');
+        $this->assertStringContainsString('data-kb="'.$b->id.'" title="Đường huyết đói: y"><a href="#nguon-2">[2]</a></sup><sup class="autoseo-cite" data-kb="'.$a->id.'"', $out, 'nhóm [KB#b, KB#a] tách thành từng chú thích riêng');
+        $this->assertStringContainsString('<li id="nguon-1"', $out);
         $this->assertStringContainsString('[KB#999999]', $out);
         $this->assertStringContainsString('Nguồn tham khảo', $out);
         $this->assertStringContainsString('HbA1c mục tiêu', $out);
