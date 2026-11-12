@@ -23,6 +23,8 @@ use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use App\Models\MediaAsset;
 use Tests\TestCase;
 
 /** Test GIẢ LẬP bằng MockHandler: không gọi WordPress thật (tích hợp staging: Chưa chạy). */
@@ -405,6 +407,101 @@ class WordPressConnectorTest extends TestCase
         $this->assertStringNotContainsString('autoseo:publication_key', $body['content']);
         $this->assertSame('55', $r['remote_id']);
         $this->assertSame('https://blog.example.com/?p=55', $r['preview_url']);
+    }
+
+    // ---------- ảnh bìa -> ảnh đại diện ----------
+
+    private const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+    private function coverAsset(): MediaAsset
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('media/2026/11/cover.png', base64_decode(self::PNG));
+        $a = MediaAsset::create(['website_id' => $this->website->id, 'disk' => 'public', 'file_path' => 'media/2026/11/cover.png', 'file_name' => 'cover.png',
+            'original_name' => 'cover.png', 'mime_type' => 'image/png', 'file_size' => 70, 'width' => 1, 'height' => 1, 'alt_text' => 'Ảnh bìa', 'sha256' => hash('sha256', 'cover')]);
+        $this->version->mediaAssets()->attach($a->id, ['is_featured' => true, 'position' => 0]);
+
+        return $a;
+    }
+
+    public function test_nhap_tai_anh_bia_len_va_gan_featured_media(): void
+    {
+        $a = $this->coverAsset();
+        $p = $this->publisher([
+            $this->jr(201, ['id' => 91, 'source_url' => 'https://blog.example.com/wp-content/cover.png']),
+            $this->jr(200, ['id' => 91]),
+            $this->jr(201, $this->wpPost(['status' => 'draft', 'link' => 'https://blog.example.com/?p=55'])),
+        ]);
+        $p->createDraft($this->website, $this->version);
+
+        $this->assertSame(['POST', 'POST', 'POST'], $this->methods());
+        $this->assertSame(91, json_decode((string) $this->history[2]['request']->getBody(), true)['featured_media']);
+        $this->assertSame(['id' => 91, 'url' => 'https://blog.example.com/wp-content/cover.png'], $a->fresh()->metadata['wp_media'][(string) $this->website->id], 'nhớ id và địa chỉ media để không tải trùng');
+    }
+
+    public function test_anh_bia_da_tai_roi_thi_dung_lai_khong_tai_trung(): void
+    {
+        $a = $this->coverAsset();
+        $a->update(['metadata' => ['wp_media' => [(string) $this->website->id => ['id' => 91, 'url' => 'https://blog.example.com/wp-content/cover.png']]]]);
+        $p = $this->publisher([$this->jr(201, $this->wpPost(['status' => 'draft']))]);
+        $p->createDraft($this->website, $this->version);
+
+        $this->assertCount(1, $this->history, 'chỉ một yêu cầu tạo bài, không tải ảnh lần nữa');
+        $this->assertSame(91, json_decode((string) $this->history[0]['request']->getBody(), true)['featured_media']);
+    }
+
+    public function test_tai_anh_bia_loi_thi_van_tao_nhap_khong_co_featured_media(): void
+    {
+        $this->coverAsset();
+        $p = $this->publisher([
+            $this->jr(500, ['code' => 'boom']),
+            $this->jr(201, $this->wpPost(['status' => 'draft'])),
+        ]);
+        $r = $p->createDraft($this->website, $this->version);
+
+        $this->assertSame('55', $r['remote_id']);
+        $this->assertArrayNotHasKey('featured_media', json_decode((string) $this->history[1]['request']->getBody(), true));
+    }
+
+    public function test_dang_bai_gan_featured_media_va_400_thi_thu_lai_khong_featured(): void
+    {
+        $a = $this->coverAsset();
+        $a->update(['metadata' => ['wp_media' => [(string) $this->website->id => ['id' => 91, 'url' => 'https://blog.example.com/wp-content/cover.png']]]]);
+        $p = $this->publisher([$this->jr(200, []), $this->jr(400, ['code' => 'rest_invalid_param']), $this->jr(201, $this->wpPost()), $this->jr(200, $this->wpPost())]);
+        $p->publish($this->publication->fresh());
+
+        $this->assertSame(['GET', 'POST', 'POST', 'GET'], $this->methods());
+        $this->assertSame(91, json_decode((string) $this->history[1]['request']->getBody(), true)['featured_media']);
+        $this->assertArrayNotHasKey('featured_media', json_decode((string) $this->history[2]['request']->getBody(), true));
+    }
+
+    public function test_anh_trong_than_bai_duoc_tai_len_va_doi_src_sang_wordpress(): void
+    {
+        config(['filesystems.disks.public.url' => 'http://app.test/storage']);
+        $cover = $this->coverAsset(); // cover.png vừa là ảnh bìa vừa nằm trong bài: chỉ tải một lần
+        $this->version->update(['html_content' => '<p>a</p><img src="http://app.test/storage/media/2026/11/cover.png" alt="x"><img src="https://cdn.other/z.png"><img src="http://app.test/storage/media/2026/11/khong-co.png">']);
+        $p = $this->publisher([
+            $this->jr(201, ['id' => 91, 'source_url' => 'https://blog.example.com/wp-content/cover.png']),
+            $this->jr(200, ['id' => 91]),
+            $this->jr(201, $this->wpPost(['status' => 'draft'])),
+        ]);
+        $p->createDraft($this->website, $this->version->fresh());
+
+        $this->assertCount(3, $this->history, 'một lần tải (kèm alt) + tạo bài; ảnh bìa dùng lại id đã nhớ');
+        $body = json_decode((string) $this->history[2]['request']->getBody(), true);
+        $this->assertStringContainsString('src="https://blog.example.com/wp-content/cover.png"', $body['content']);
+        $this->assertStringContainsString('https://cdn.other/z.png', $body['content'], 'ảnh ngoài kho giữ nguyên');
+        $this->assertStringContainsString('http://app.test/storage/media/2026/11/khong-co.png', $body['content'], 'ảnh không có trong thư viện giữ nguyên');
+        $this->assertSame(91, $body['featured_media']);
+    }
+
+    public function test_khong_co_anh_bia_thi_khong_them_yeu_cau_va_khong_co_featured_media(): void
+    {
+        $p = $this->publisher([$this->jr(201, $this->wpPost(['status' => 'draft']))]);
+        $p->createDraft($this->website, $this->version);
+
+        $this->assertCount(1, $this->history);
+        $this->assertArrayNotHasKey('featured_media', json_decode((string) $this->history[0]['request']->getBody(), true));
     }
 
     // ---------- provider ----------

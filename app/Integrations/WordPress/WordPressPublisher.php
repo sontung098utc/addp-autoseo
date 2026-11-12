@@ -12,12 +12,14 @@ use App\Integrations\WordPress\Seo\SeoMetaAdapter;
 use App\Integrations\WordPress\Seo\YoastAdapter;
 use App\Integrations\WordPress\Taxonomy\WordPressTaxonomyService;
 use App\Models\ArticleVersion;
+use App\Models\MediaAsset;
 use App\Models\Publication;
 use App\Models\Website;
 use App\Services\Content\HtmlSanitizer;
 use App\Services\Publishing\DraftCapable;
 use App\Services\Media\MediaSecurityValidator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Connector WordPress (REST API + Application Password).
@@ -96,7 +98,7 @@ class WordPressPublisher implements PublisherInterface, DraftCapable
 
     public function createDraft(Website $website, ArticleVersion $version, ?string $publicationKey = null): array
     {
-        $payload = $this->basePayload($version, 'draft');
+        $payload = $this->basePayload($version, 'draft', $website);
 
         if ($publicationKey !== null && $publicationKey !== '') {
             $key = $this->assertKey($publicationKey);
@@ -109,6 +111,10 @@ class WordPressPublisher implements PublisherInterface, DraftCapable
                 ];
             }
             $payload['content'] .= "\n" . $this->marker($key);
+        }
+
+        if (($featured = $this->featuredMediaId($website, $version)) !== null) {
+            $payload['featured_media'] = $featured;
         }
 
         $res = $this->client->request($website, 'POST', '/wp/v2/posts', ['json' => $payload], true);
@@ -148,13 +154,16 @@ class WordPressPublisher implements PublisherInterface, DraftCapable
 
         // (2) Chắc chắn chưa có: tạo mới.
         $adapter = $this->adapterFor($website);
-        $payload = $this->basePayload($version, 'publish');
+        $payload = $this->basePayload($version, 'publish', $website);
         $payload['content'] .= "\n" . $this->marker($key);
         $tax = $this->resolveTaxonomy($website, $payload);
 
         $meta = $adapter->metaFor($version);
         if ($meta !== []) {
             $payload['meta'] = $meta;
+        }
+        if (($featured = $this->featuredMediaId($website, $version)) !== null) {
+            $payload['featured_media'] = $featured;
         }
 
         // AG-S04 đăng từ nháp: nếu bản này đã có nháp CÒN HIỆU LỰC trên CMS thì cập nhật CHÍNH bài nháp đó
@@ -166,10 +175,11 @@ class WordPressPublisher implements PublisherInterface, DraftCapable
             try {
                 $res = $this->client->request($website, 'POST', $route, ['json' => $payload], true);
             } catch (WordPressException $e) {
-                // 400 do plugin SEO không đăng ký meta: bài CHƯA được tạo/sửa, thử lại một lần không có meta.
-                if ($meta !== [] && str_contains($e->getMessage(), 'HTTP 400')) {
-                    Log::warning("[WordPress] Website #{$website->id} từ chối trường meta SEO; đăng không kèm meta.");
-                    unset($payload['meta']);
+                // 400 do plugin SEO không đăng ký meta hoặc ảnh đại diện không còn trên WordPress: bài CHƯA được tạo/sửa,
+                // thử lại một lần không có meta và không có ảnh đại diện.
+                if (($meta !== [] || isset($payload['featured_media'])) && str_contains($e->getMessage(), 'HTTP 400')) {
+                    Log::warning("[WordPress] Website #{$website->id} từ chối trường meta SEO hoặc ảnh đại diện; đăng không kèm các trường đó.");
+                    unset($payload['meta'], $payload['featured_media']);
                     $res = $this->client->request($website, 'POST', $route, ['json' => $payload], true);
                 } else {
                     throw $e;
@@ -282,14 +292,92 @@ class WordPressPublisher implements PublisherInterface, DraftCapable
         ];
     }
 
-    protected function basePayload(ArticleVersion $version, string $status): array
+    /**
+     * Ảnh bìa của phiên bản (ảnh đánh dấu is_featured trong thư viện) -> ảnh đại diện (featured_media) của bài trên WordPress.
+     * Không có ảnh bìa, file mất hoặc tải lỗi: trả null và ghi log, bài vẫn đăng bình thường (ảnh đại diện chỉ là phần thêm).
+     */
+    protected function featuredMediaId(Website $website, ArticleVersion $version): ?int
     {
+        try {
+            $asset = $version->mediaAssets()->wherePivot('is_featured', true)->first();
+
+            return $asset === null ? null : ($this->wpMedia($website, $asset)['id'] ?? null);
+        } catch (\Throwable $e) {
+            Log::warning("[WordPress] Không tải được ảnh bìa lên website #{$website->id}: " . get_class($e) . '; đăng không kèm ảnh đại diện.');
+
+            return null;
+        }
+    }
+
+    /**
+     * Ảnh của thư viện -> media trên WordPress. Tải lên một lần cho mỗi website; id và địa chỉ được nhớ ở metadata.wp_media của ảnh
+     * nên nháp rồi đăng, hoặc ảnh vừa là ảnh bìa vừa nằm trong bài, không tải trùng. Lỗi thì trả null (nơi gọi quyết định bỏ qua).
+     *
+     * @return array{id:int,url:string}|null
+     */
+    protected function wpMedia(Website $website, MediaAsset $asset): ?array
+    {
+        $site = (string) $website->id;
+        $known = (array) ($asset->metadata['wp_media'] ?? []);
+        $hit = $known[$site] ?? null;
+        if (is_array($hit) && is_int($hit['id'] ?? null) && is_string($hit['url'] ?? null) && $hit['url'] !== '') {
+            return ['id' => $hit['id'], 'url' => $hit['url']];
+        }
+        $disk = Storage::disk($asset->disk ?: 'public');
+        if (! $disk->exists((string) $asset->file_path)) {
+            Log::warning("[WordPress] Ảnh #{$asset->id} không còn trên ổ lưu trữ; không tải lên WordPress.");
+
+            return null;
+        }
+        $up = $this->uploadMedia($website, $disk->path((string) $asset->file_path), (string) $asset->alt_text);
+        $entry = ['id' => $up['id'], 'url' => $up['source_url']];
+        $asset->update(['metadata' => array_merge((array) $asset->metadata, ['wp_media' => [$site => $entry] + $known])]);
+
+        return $entry;
+    }
+
+    /**
+     * Ảnh trong thân bài trỏ về kho của ứng dụng (config filesystems.disks.public.url): tải lên WordPress và đổi src sang địa chỉ WordPress,
+     * để bài hiển thị đúng trên website thật. Ảnh nào không tải được thì giữ nguyên src (không làm hỏng việc đăng).
+     */
+    protected function rewriteInlineImages(Website $website, string $html): string
+    {
+        $base = rtrim((string) config('filesystems.disks.public.url', ''), '/') . '/';
+        if ($base === '/' || ! str_contains($html, '<img')) {
+            return $html;
+        }
+
+        return (string) preg_replace_callback('#(<img\b[^>]*?\bsrc\s*=\s*)(["\'])(.*?)\2#i', function (array $m) use ($website, $base): string {
+            $src = html_entity_decode($m[3], ENT_QUOTES | ENT_HTML5);
+            if (! str_starts_with($src, $base)) {
+                return $m[0];
+            }
+            $path = rawurldecode(strtok(substr($src, strlen($base)), '?#') ?: '');
+            if (! str_starts_with($path, 'media/') || str_contains($path, '..')) {
+                return $m[0];
+            }
+            try {
+                $asset = MediaAsset::query()->where('file_path', $path)->first();
+                $wp = $asset ? $this->wpMedia($website, $asset) : null;
+            } catch (\Throwable $e) {
+                Log::warning("[WordPress] Không tải được ảnh trong bài lên website #{$website->id}: " . get_class($e) . '; giữ nguyên địa chỉ ảnh.');
+                $wp = null;
+            }
+
+            return $wp === null ? $m[0] : $m[1] . $m[2] . htmlspecialchars($wp['url'], ENT_QUOTES) . $m[2];
+        }, $html);
+    }
+
+    protected function basePayload(ArticleVersion $version, string $status, ?Website $website = null): array
+    {
+        $content = HtmlSanitizer::clean($version->html_content);
+
         return [
             'status' => $status,
             'title' => (string) $version->title,
             'slug' => (string) $version->slug,
             'excerpt' => (string) $version->meta_description,
-            'content' => HtmlSanitizer::clean($version->html_content),
+            'content' => $website !== null ? $this->rewriteInlineImages($website, $content) : $content,
         ];
     }
 
