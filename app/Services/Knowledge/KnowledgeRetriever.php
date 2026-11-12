@@ -21,7 +21,7 @@ final class KnowledgeRetriever
     private const SITE_BONUS = 0.25;
 
     /** @return list<array{id:int,version:int,title:string,body:string,source:?string,source_id:?int,score:float,scope:string}> */
-    public function search(Website $website, string $query, int $limit = 5, ?array $brainIds = null, ?string $onlyType = null): array
+    public function search(Website $website, string $query, int $limit = 5, ?array $brainIds = null, ?string $onlyType = null, ?float $minRelevance = null): array
     {
         $query = trim(mb_substr($query, 0, 600));
         $terms = $this->terms($query);
@@ -38,8 +38,69 @@ final class KnowledgeRetriever
             $rows = $this->like($website, $terms, $query, $brainIds, $onlyType, $en);
         }
         usort($rows, fn ($a, $b) => $b['score'] <=> $a['score'] ?: $a['id'] <=> $b['id']);
+        $min = $minRelevance ?? (float) config('knowledge.min_relevance', 0.0);
+        if ($min > 0 && $onlyType === null) {
+            $rows = array_values(array_filter($rows, fn ($r) => $this->relevance($website, $brainIds, $terms, $query, $r) >= $min));
+        }
 
         return $this->rerank($rows, $limit);
+    }
+
+    /** @var array<string,array<int,string>> kho chuẩn hóa theo phạm vi (website + Trí tuệ), nạp một lần mỗi đối tượng */
+    private array $corpus = [];
+
+    /**
+     * Độ liên quan TUYỆT ĐỐI của một mục với truy vấn (0..1), độc lập với engine tìm kiếm (điểm FULLTEXT của MariaDB chỉ là tương đối so với mục tốt nhất nên luôn có mục đạt 1).
+     * = tổng trọng số IDF (trên cả kho trong phạm vi) của các từ truy vấn có trong mục / tổng trọng số mọi từ truy vấn. Từ truy vấn không có trong kho mang trọng số cao nhất,
+     * nên truy vấn lạc đề (ví dụ "đi bộ" với kho tiểu đường) chỉ khớp được các từ chung chung có trọng số thấp và ra điểm thấp. Mục tiếng Anh: lấy cao hơn theo tỉ lệ khái niệm khớp (KnowledgeGlossary).
+     *
+     * @param  list<string>  $terms
+     * @param  array<string,mixed>  $row
+     */
+    private function relevance(Website $website, ?array $brainIds, array $terms, string $query, array $row): float
+    {
+        $key = $website->id.'|'.json_encode($brainIds);
+        if (! isset($this->corpus[$key])) {
+            $this->corpus[$key] = $this->searchable($website, $brainIds)->limit(5000)->get(['id', 'title', 'body'])
+                ->mapWithKeys(fn ($i) => [$i->id => KnowledgeDedupe::normalize($i->title.' '.$i->body)])->all();
+        }
+        $corpus = $this->corpus[$key];
+        $n = max(1, count($corpus));
+        $w = [];
+        $common = []; // từ có ở hơn 40% kho (tên bệnh, "mỗi ngày"...): không đủ để coi mục là liên quan
+        foreach ($terms as $t) {
+            $df = 0;
+            foreach ($corpus as $text) {
+                $df += str_contains($text, $t) ? 1 : 0;
+            }
+            $w[$t] = log(1 + $n / (1 + $df));
+            $common[$t] = $n >= 5 ? $df > 0.4 * $n : $df >= $n;
+        }
+        $total = array_sum($w);
+        if ($total <= 0) {
+            return 1.0;
+        }
+        $text = $corpus[$row['id']] ?? KnowledgeDedupe::normalize((string) ($row['title'] ?? '').' '.(string) ($row['body'] ?? ''));
+        $hit = 0.0;
+        $distinct = false;
+        foreach ($w as $t => $wt) {
+            if (str_contains($text, $t)) {
+                $hit += $wt;
+                $distinct = $distinct || ! $common[$t];
+            }
+        }
+        // Chỉ khớp từ chung chung thì không phải mục liên quan, dù điểm phủ có cao.
+        $cov = $distinct || count(array_filter($common)) === count($common) ? $hit / $total : 0.0;
+        $concepts = KnowledgeGlossary::concepts($query);
+        if ($concepts !== []) {
+            $m = 0;
+            foreach ($concepts as $alts) {
+                $m += count(array_filter($alts, fn ($a) => str_contains($text, $a))) > 0 ? 1 : 0;
+            }
+            $cov = max($cov, $m / count($concepts));
+        }
+
+        return $cov;
     }
 
     /**

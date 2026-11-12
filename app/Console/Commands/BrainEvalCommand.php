@@ -8,12 +8,15 @@ use Illuminate\Console\Command;
 
 class BrainEvalCommand extends Command
 {
-    protected $signature = 'brain:eval {brain : ID Trí tuệ} {--include-proposed : Tính cả mục chờ duyệt để đo tiềm năng (không ghi CSDL)} {--k=8 : Số mục lấy cho mỗi câu hỏi}';
+    protected $signature = 'brain:eval {brain : ID Trí tuệ} {--include-proposed : Tính cả mục chờ duyệt để đo tiềm năng (không ghi CSDL)} {--k=8 : Số mục lấy cho mỗi câu hỏi} {--min-relevance= : Ngưỡng liên quan (0..1) áp khi truy xuất, mặc định theo config knowledge.min_relevance}';
 
     protected $description = 'Đo độ phủ truy xuất của Trí tuệ bằng bộ câu hỏi vàng (không gọi AI, không ghi CSDL)';
 
     public function handle(): int
     {
+        if ($this->option('min-relevance') !== null) {
+            config(['knowledge.min_relevance' => (float) $this->option('min-relevance')]);
+        }
         $brain = Brain::query()->find($this->argument('brain'));
         $site = $brain?->websites()->first();
         if (! $brain || ! $site) {
