@@ -387,6 +387,7 @@ class ViewArticle extends EditArticle
             'runs' => $runs,
             'live' => $live,
             'liveStage' => $live ? RunActivity::currentStage($live->steps) : null,
+            'runFlow' => $this->runFlowOf($runs->first(), $live),
             'campaign' => $campaignId ? Campaign::find($campaignId) : null,
             'keyword' => $keyword,
             'keywordMatched' => $keywordMatched,
@@ -408,6 +409,28 @@ class ViewArticle extends EditArticle
             'totalCost' => (float) $runs->sum('cost_vnd'),
             'totalTokens' => (int) $runs->sum('tokens_used'),
             'pollSeconds' => RunActivity::POLL_LIVE,
+        ];
+    }
+
+    /** Luồng chi tiết của phiên gần nhất của bài (đang chạy thì là phiên đang chạy), cùng dữ liệu với trang phiên chạy. Null nếu bài chưa có phiên nào. */
+    private function runFlowOf(?AgentRun $run, ?AgentRun $live): ?array
+    {
+        if (! $run) {
+            return null;
+        }
+        $isLive = $live !== null && $live->is($run);
+        $stale = RunActivity::isStale($run);
+        $current = ($isLive || $stale) ? RunActivity::currentStageOf($run, $run->steps) : null;
+
+        return [
+            'run' => $run,
+            'live' => $isLive,
+            'stale' => $stale,
+            'current' => $isLive ? $current : null,
+            'flow' => \App\Filament\Support\Agent\RunFlow::build($run, $run->steps, $isLive, $stale, $current),
+            'blueprint' => \App\Filament\Support\Agent\AgentFlowBlueprint::byStage(),
+            'elapsed' => RunActivity::formatElapsed(RunActivity::elapsedSeconds($run)),
+            'url' => \App\Filament\Resources\AgentRunResource::getUrl('view', ['record' => $run]),
         ];
     }
 }

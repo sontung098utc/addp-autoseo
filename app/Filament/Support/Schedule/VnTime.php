@@ -41,7 +41,11 @@ final class VnTime
             return CarbonImmutable::instance($raw)->setTimezone('UTC');
         }
 
-        return $raw ? CarbonImmutable::parse($raw, 'UTC') : null;
+        // Cột *_utc lưu UTC theo tên; cột khác (started_at, created_at...) Eloquent ghi theo app.timezone nên đọc lại đúng múi giờ đó
+        // (trước đây đọc nhầm là UTC: giờ giao diện và thời lượng phiên lệch 7 giờ khi app.timezone = Asia/Ho_Chi_Minh).
+        $tz = str_ends_with($attribute, '_utc') ? 'UTC' : (string) config('app.timezone', 'UTC');
+
+        return $raw ? CarbonImmutable::parse($raw, $tz)->setTimezone('UTC') : null;
     }
 
     public static function format(CarbonInterface|string|null $time, string $format = 'd/m/Y H:i'): string

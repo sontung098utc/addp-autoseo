@@ -76,7 +76,7 @@ class ArticleWorkspaceTest extends TestCase
             ->assertSee('Chọn máy lọc nước')
             ->assertDontSee('data-testid="aw-next"', false)
             ->assertDontSee('Việc tiếp theo')
-            ->assertSee('data-testid="aw-chain"', false)
+            ->assertSee('data-testid="aw-flow"', false)
             ->assertSee('data-testid="aw-keyword"', false)
             ->assertSee('data-testid="aw-plan"', false)
             ->assertSee('data-testid="aw-knowledge"', false)
@@ -245,8 +245,8 @@ class ArticleWorkspaceTest extends TestCase
             ->assertSee('wire:poll', false)
             ->assertSee('data-testid="aw-live"', false)
             ->assertSee('data-live-stage="write"', false)
-            ->assertSee('ss-stage-live', false)
-            ->assertSee('data-link="write" data-state="run"', false)
+            ->assertSee('fl-node--running', false)
+            ->assertSee('data-stage="write" data-state="running"', false)
             ->assertSee('Lập dàn ý (3 mục)')
             ->assertSee('Cách chọn');
     }

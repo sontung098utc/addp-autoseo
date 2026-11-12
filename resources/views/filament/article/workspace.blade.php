@@ -148,6 +148,9 @@
                 @if (in_array($article->workflow_status, ['approved', 'scheduled', 'published'], true))
                     {{-- Đã duyệt rồi: không còn "chờ", nhưng nhắc đây là chủ đề cần chuyên môn để người sau đọc ghi chú duyệt. --}}
                     <x-filament::badge color="gray" data-testid="aw-expert">Chủ đề cần chuyên môn · xem ghi chú duyệt</x-filament::badge>
+                @elseif (! $latest)
+                    {{-- Chưa có bản nháp nào (chưa chạy, hoặc phiên lỗi): chưa có gì để chuyên gia xem, không ghi "chờ xem lại". --}}
+                    <x-filament::badge color="gray" data-testid="aw-expert">Chủ đề cần chuyên môn · chưa có bản nháp</x-filament::badge>
                 @else
                     <x-filament::badge color="warning" data-testid="aw-expert">{{ ArticleResource::EXPERT_LABEL }}</x-filament::badge>
                 @endif
@@ -253,6 +256,64 @@
                             @endforeach
                         </section>
                     @endif
+                    @if ($runFlow)
+                        @php
+                            $rf = $runFlow; $rRun = $rf['run']; $rNodes = $rf['flow']['nodes'];
+                            $rStage = $rf['current'] ? (collect($rNodes)->firstWhere('code', $rf['current'])['title'] ?? null) : null;
+                            $rStatus = $rf['stale'] ? 'Có thể bị treo' : (['running' => 'Đang chạy', 'ready_for_review' => 'Xong, đã có bản nháp', 'held' => 'Đang giữ', 'blocked' => 'Bị chặn', 'failed' => 'Lỗi, chưa có bản nháp'][$rRun->status] ?? $rRun->status);
+                            $rStart = VnTime::fromRaw($rRun, 'started_at') ?? VnTime::fromRaw($rRun, 'created_at');
+                        @endphp
+                        <x-flow.style />
+                        <style>
+                            .aw-flow{display:flex;flex-direction:column;gap:.8rem}
+                            .aw-flow__head{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;justify-content:space-between}
+                            .aw-flow__sub{display:flex;flex-wrap:wrap;gap:.3rem .9rem;align-items:center;font-size:.78rem;opacity:.9}
+                            .aw-flow__sub b{font-weight:700}
+                            .aw-flow--fail .aw-flow__st{color:var(--fl-fail)}
+                        </style>
+                        <section class="ss-review-card aw-flow fl @if (in_array($rRun->status, ['failed', 'blocked'], true)) aw-flow--fail @endif" data-testid="aw-flow" data-run="{{ $rRun->id }}">
+                            <div class="aw-flow__head">
+                                <div>
+                                    <h2 class="ss-review-card__title" style="margin:0">Luồng chạy của bài <x-help title="Luồng chạy"><p>Các bước đội AI thực hiện cho bài này ở phiên #{{ $rRun->id }}. Bước đang chạy được làm nổi bật; làm mới tự động khi phiên còn chạy.</p></x-help></h2>
+                                    <div class="aw-flow__sub">
+                                        @if ($rf['live'])
+                                            <x-studio.running size="sm" label="Đang chạy" />
+                                            <span>Đang ở: <b>{{ $rStage ?? 'hoàn tất, đang đóng phiên' }}</b></span>
+                                            <span>đã chạy {{ $rf['elapsed'] }}</span>
+                                        @else
+                                            <span class="aw-flow__st"><b>{{ $rStatus }}</b></span>
+                                            @if ($rStart)<span>{{ VnTime::format($rStart, 'd/m/Y H:i') }}</span>@endif
+                                        @endif
+                                        <span>{{ number_format($rf['flow']['cost'], 0, ',', '.') }} ₫</span>
+                                        <span>{{ number_format($rf['flow']['tokens'], 0, ',', '.') }} token</span>
+                                        @if ($rRun->repair_rounds > 0)<span>{{ $rRun->repair_rounds }} vòng sửa</span>@endif
+                                    </div>
+                                </div>
+                                <x-filament::button tag="a" :href="$rf['url']" icon="heroicon-m-arrow-right" icon-position="after" data-testid="aw-flow-open">Xem chi tiết luồng</x-filament::button>
+                            </div>
+                            <div class="fl-wrap">
+                                <div class="fl-grid">
+                                    @foreach ($rNodes as $n)
+                                        @php
+                                            [$stLabel, $stIcon] = \App\Filament\Support\Agent\RunFlow::STATE[$n['state']];
+                                            $next = $rNodes[$loop->index + 1] ?? null;
+                                            $isLoop = $n['code'] === 'grade' && $next && $next['code'] === 'repair' && $next['count'] > 0;
+                                            $link = $n['state'] === 'running' ? 'live' : ($n['state'] === 'done' ? 'done' : (($next && in_array($next['state'], ['idle', 'pending', 'skipped'], true)) ? 'dashed' : null));
+                                        @endphp
+                                        <x-flow.node tag="div" :n="$loop->iteration" :label="$n['title']" :desc="$rf['blueprint'][$n['code']]['what'] ?? null" :state="$n['state']" :kind="$n['kind']" :human="$n['code'] === 'checkpoint'" :avatar="$n['who']['avatar']" :who="$n['who']['title']"
+                                            :state-label="$stLabel" :state-icon="$stIcon" :last="$loop->last" :link="$link" :loop="$isLoop ? $next['count'].' vòng' : null" data-stage="{{ $n['code'] }}" data-state="{{ $n['state'] }}">
+                                            <span class="fl-state">
+                                                @if ($n['state'] === 'running')<x-studio.running size="sm" label="Đang chạy" />
+                                                @elseif ($n['state'] === 'waiting')<span class="fl-wait-pill"><x-filament::icon icon="heroicon-m-user" style="width:.9rem;height:.9rem" /> Chờ bạn</span>
+                                                @else<span>{{ $stLabel }}@if ($n['count'] > 1) ×{{ $n['count'] }}@endif</span>@endif
+                                            </span>
+                                            @if ($n['seconds'] !== null || $n['cost'] > 0)<span class="fl-meta">@if ($n['seconds'] !== null)<span>{{ $n['seconds'] }}s</span>@endif @if ($n['cost'] > 0)<span>{{ number_format($n['cost'], 0, ',', '.') }} ₫</span>@endif</span>@endif
+                                        </x-flow.node>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </section>
+                    @else
                     <section class="ss-review-card" data-testid="aw-chain">
                         <div class="aw-head" style="justify-content:flex-start;gap:.4rem">
                             <h2 class="ss-review-card__title">Tiến trình bài</h2>
@@ -269,6 +330,7 @@
                             @endforeach
                         </div>
                     </section>
+                    @endif
                     @if ($totalCost > 0)
                         <div class="aw-chips" data-testid="aw-stats">
                             <span class="aw-chip">Chi phí AI {{ V::formatVnd($totalCost) }}</span>

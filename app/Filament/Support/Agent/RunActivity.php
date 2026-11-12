@@ -73,6 +73,11 @@ final class RunActivity
             return 'guard';
         }
 
+        // 'research' ghi hai lần: bài rủi ro cao tự chuẩn bị kiến thức TRƯỚC dàn ý, và "Chuẩn bị tài liệu" SAU dàn ý. Chưa có dàn ý thì đang lập dàn ý, có rồi thì đang viết.
+        if ($last->stage === 'research') {
+            return $steps->contains('stage', 'brief') ? 'write' : 'brief';
+        }
+
         return match ($last->stage) {
             'guard' => 'risk',
             'risk' => 'brief',
