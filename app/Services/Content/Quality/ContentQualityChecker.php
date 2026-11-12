@@ -6,6 +6,7 @@ use App\Models\Article;
 use App\Models\ArticleVersion;
 use App\Services\Content\Quality\Rules\BannedTermsRule;
 use App\Services\Content\Quality\Rules\DuplicateRule;
+use App\Services\Content\Quality\Rules\CitationFigureRule;
 use App\Services\Content\Quality\Rules\CitationRule;
 use App\Services\Content\Quality\Rules\EvidenceRule;
 use App\Services\Content\Quality\Rules\MedicalSafetyRule;
@@ -65,7 +66,7 @@ class ContentQualityChecker
     {
         return [
             new LengthRule(), new HeadingRule(), new KeywordRule(), new MetaRule(), new DuplicateRule(),
-            new ImageRule(), new SafetyRule(), new FactRule(), new FaqRule(), new BannedTermsRule(), new KnowledgeFigureRule(), new LinkRule(), new EvidenceRule(), new CitationRule(), new MedicalSafetyRule(), new SourceRule(),
+            new ImageRule(), new SafetyRule(), new FactRule(), new FaqRule(), new BannedTermsRule(), new KnowledgeFigureRule(), new LinkRule(), new EvidenceRule(), new CitationRule(), new CitationFigureRule(), new MedicalSafetyRule(), new SourceRule(),
             new PaddingRule(), new TextGlitchRule(), new HeadingLeakRule(), new ImagePlaceholderRule(), new IntentSpecificityRule(), new LayoutRule(),
         ];
     }

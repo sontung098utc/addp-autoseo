@@ -23,7 +23,10 @@ use App\Services\Ai\Playbook\InvalidPlaybook;
 use App\Services\Ai\Playbook\Playbook;
 use App\Services\Ai\Playbook\PlaybookLoader;
 use App\Filament\Support\Schedule\ErrorMasker;
+use App\Contracts\StructuredAiInterface;
 use App\Services\Content\CitationRenderer;
+use App\Services\Content\CitationSupportJudge;
+use App\Services\Knowledge\AiJson;
 use App\Services\Content\MedicalDisclaimer;
 use App\Services\Content\HtmlSanitizer;
 use App\Models\BrandProfile;
@@ -388,7 +391,7 @@ final class AgentRunOrchestrator
         $reason = null;
         $round = 0;
         // Vòng sửa chạy khi còn lỗi CHẶN, hoặc (Trí tuệ bắt buộc nguồn) còn đoạn khẳng định chưa có dấu trích dẫn [KB#id] (CITE01, P1): lỗi sau không chặn bàn giao nhưng được sửa.
-        while (($report->hasBlocking() || $report->citationGaps() !== [] || $report->layoutGaps() !== []) && $round < $this->policy->maxRepairRounds) {
+        while (($report->hasBlocking() || $report->citationGaps() !== [] || $report->layoutGaps() !== [] || $report->supportGaps() !== []) && $round < $this->policy->maxRepairRounds) {
             if ($this->spent($run) >= $this->policy->budgetVnd) {
                 $reason = 'Hết ngân sách cho phiên chạy ('.number_format($this->policy->budgetVnd, 0, ',', '.').' ₫) nên dừng sửa.';
                 $this->decision($run, 'budget_exhausted', 'Dừng sửa vì hết ngân sách', $reason, ['spent_vnd' => $this->spent($run), 'budget_vnd' => $this->policy->budgetVnd, 'score' => $score]);
@@ -405,6 +408,9 @@ final class AgentRunOrchestrator
             foreach ($report->citationGaps() as $excerpt) {
                 $feedback[] = "CITE01: đoạn «{$excerpt}» có khẳng định nhưng chưa có dấu [KB#id]; thêm dấu của mục kho đã cung cấp hỗ trợ khẳng định đó, hoặc bỏ/nêu chung chung nếu kho không có căn cứ (không bịa mã).";
             }
+            foreach (array_slice($report->supportGaps(), 0, 6) as $gap) {
+                $feedback[] = 'CITE02: '.$gap.' (chỉ trích mục thật sự nói điều đó, hoặc bỏ/nêu chung chung; không bịa mã.)';
+            }
             foreach (array_slice($report->layoutGaps(), 0, 6) as $gap) {
                 $feedback[] = 'LAY01: '.$gap;
             }
@@ -412,7 +418,7 @@ final class AgentRunOrchestrator
             $report = $this->grade($run, $article, $attrs, "Chấm lại sau lần sửa {$round}", $round, $editorPb, '');
             $new = $this->penalty($report);
             $newScore = RunScorer::score($report);
-            if (($report->hasBlocking() || $report->citationGaps() !== [] || $report->layoutGaps() !== []) && $new >= $penalty) {
+            if (($report->hasBlocking() || $report->citationGaps() !== [] || $report->layoutGaps() !== [] || $report->supportGaps() !== []) && $new >= $penalty) {
                 $reason = 'Sửa không cải thiện điểm (từ '.$penalty.' xuống '.$new.') nên dừng, tránh tốn thêm chi phí.';
                 $this->decision($run, 'no_improvement', 'Dừng sửa vì không cải thiện', $reason." Điểm {$score} → {$newScore}.", ['penalty_before' => $penalty, 'penalty_after' => $new, 'score_before' => $score, 'score_after' => $newScore]);
                 $penalty = $new;
@@ -697,15 +703,60 @@ final class AgentRunOrchestrator
     private function grade(AgentRun $run, Article $article, array $attrs, string $title, int $round, ?Playbook $editorPb = null, string $note = ''): QualityReport
     {
         $report = $this->checker->check(new ArticleVersion($attrs), $article, $this->brainCtx->ids() ?: null);
+        [$report, $judge] = $this->judgeCitations($report, (string) ($attrs['html_content'] ?? ''));
         $c = $report->counts();
         $failed = array_map(fn ($r) => ['code' => $r->code, 'severity' => $r->severity, 'message' => $r->message], array_slice($report->failed(), 0, 8));
         $block = $report->blockingCodes();
         $score = RunScorer::score($report);
         $this->step($run, 'grade', 'editor', $block === [] ? 'ok' : 'warn', $title,
             "Điểm {$score}/100 (tham khảo, mốc ".RunScorer::REFERENCE_THRESHOLD.'). '.($block === [] ? "Đạt mọi luật bắt buộc (còn {$c['P1']} mục P1, {$c['P2']} mục P2 chỉ nên xem)." : 'Trượt luật bắt buộc: '.implode(', ', $block).'. Quyết định do luật, không do AI.').($note !== '' ? ' '.$note : ''),
-            ['blocking' => $block, 'counts' => $c, 'score' => $score, 'round' => $round, 'threshold' => RunScorer::REFERENCE_THRESHOLD, 'penalty' => $this->penalty($report), 'failed' => $failed, 'playbook' => $this->pbData($editorPb)]);
+            ['blocking' => $block, 'counts' => $c, 'score' => $score, 'round' => $round, 'threshold' => RunScorer::REFERENCE_THRESHOLD, 'penalty' => $this->penalty($report), 'failed' => $failed, 'playbook' => $this->pbData($editorPb)] + ($judge['data'] !== [] ? ['citation_support' => $judge['data']] : []),
+            $judge['model'], $judge['tokens'], $judge['cost']);
 
         return $report;
+    }
+
+    /**
+     * Lượt AI kiểm NGHĨA trích dẫn (kỹ năng editor/citation-support) cho Trí tuệ bắt buộc nguồn. Có giới hạn thời gian riêng (AiJson: tối đa 90 giây chờ), lỗi AI chỉ ghi "chưa chạy"
+     * (không giả là đạt, không làm hỏng phiên). Chỉ chạy khi bài có dấu [KB#id] và nhà cung cấp hỗ trợ JSON có cấu trúc.
+     *
+     * @return array{0:QualityReport,1:array{data:array<string,mixed>,model:?string,tokens:int,cost:float}}
+     */
+    private function judgeCitations(QualityReport $report, string $html): array
+    {
+        $none = ['data' => [], 'model' => null, 'tokens' => 0, 'cost' => 0.0];
+        if (! config('quality.citation_judge', true) || $this->brainCtx->reliance() !== 'must_cite' || CitationSupportJudge::pairs($html) === []) {
+            return [$report, $none];
+        }
+        $target = null;
+        foreach (['citation_check', 'summary', 'repair'] as $task) { // tuyến riêng, chưa có thì dùng tuyến rẻ/sửa bài đã cấu hình
+            if ($this->router && ($target = $this->router->target($task)) !== null) {
+                break;
+            }
+        }
+        $ai = $target?->ai ?? $this->ai;
+        if (! $ai instanceof StructuredAiInterface) {
+            return [$report, ['data' => ['status' => 'not_run', 'reason' => 'Nhà cung cấp AI của bước chấm không hỗ trợ JSON có cấu trúc.']] + $none];
+        }
+        try {
+            $pb = $this->usePlaybook('editor', 'citation-support')[0] ?? null;
+            $aiJson = new AiJson($ai);
+            $r = (new CitationSupportJudge($aiJson, (string) $pb?->body))->judge($html);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [$report, ['data' => ['status' => 'not_run', 'reason' => 'Lượt kiểm nghĩa trích dẫn lỗi: '.class_basename($e)]] + $none];
+        }
+        $meta = ['model' => $aiJson->model, 'tokens' => $aiJson->tokens, 'cost' => $aiJson->cost];
+        if ($r['error'] !== null) {
+            return [$report, ['data' => ['status' => 'not_run', 'reason' => 'Chưa kiểm được nghĩa trích dẫn: '.$r['error']]] + $meta];
+        }
+        if ($r['result'] === null) {
+            return [$report, ['data' => []] + $meta];
+        }
+        $data = ['status' => 'done', 'checked' => $r['checked'], 'supported' => $r['supported'], 'partial' => $r['partial'], 'unsupported' => $r['unsupported'], 'verdicts' => array_slice($r['verdicts'], 0, 24), 'skill' => $this->pbData($pb)];
+
+        return [new QualityReport([...$report->results, $r['result']]), ['data' => $data] + $meta];
     }
 
     private function persist(Article $article, array $attrs, bool $passed): ArticleVersion

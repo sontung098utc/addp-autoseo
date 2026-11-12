@@ -59,6 +59,23 @@ final class QualityReport
     }
 
     /**
+     * Chỗ trích dẫn chưa hỗ trợ đúng câu (CITE02, P1): số liệu không có trong mục được trích (tất định) hoặc lượt AI kiểm nghĩa kết luận mục không hỗ trợ câu. Đưa vào vòng sửa.
+     *
+     * @return list<string>
+     */
+    public function supportGaps(): array
+    {
+        $out = [];
+        foreach ($this->results as $r) {
+            if ($r->code === 'CITE02' && ! $r->passed && $r->details !== []) {
+                $out = array_merge($out, $r->details);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Chỗ dùng khối bố cục chưa hợp lý (LAY01, P1): cũng đưa vào vòng sửa, người viết gộp/bỏ khối thừa.
      *
      * @return list<string>

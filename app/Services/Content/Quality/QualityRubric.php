@@ -89,6 +89,10 @@ final class QualityRubric
                 'Heuristic theo độ dài âm tiết tiếng Việt (tối đa 7 chữ cái); có thể báo nhầm tên riêng nước ngoài có dấu. Không chặn.'),
             'LEAK01' => self::entry('LEAK01', 'Nhãn cấu trúc rò vào bài', 'Cờ P1 khi tiêu đề/đoạn bắt đầu bằng nhãn như "H2:" hay "Heading 2 -".', [], 'internal',
                 'Nhãn của dàn ý lọt ra bài hiển thị cho người đọc.', 'internal', [], 'Quy tắc nội bộ, tất định. Không chặn.'),
+            'CITE02' => self::entry('CITE02', 'Trích dẫn hỗ trợ đúng câu', 'Chỉ khi Trí tuệ của bài ở mức "Bắt buộc nguồn": (1) số liệu có đơn vị trong đoạn có trích dẫn phải có trong chính mục được trích (kiểm chữ, tất định); (2) lượt AI kiểm lại (kỹ năng editor/citation-support) kết luận mục được trích không nói điều đoạn khẳng định thì cờ P1. Không chặn nhưng đưa vào vòng sửa.', [],
+                'Quy tắc nội bộ của Kho trí tuệ chuyên ngành, chưa có chuẩn bên ngoài.',
+                'Dấu trích dẫn hợp lệ chưa chứng minh câu đúng với mục được trích; gắn nhãn trích dẫn cho câu chỉ gần chủ đề làm bài trông có căn cứ mà không có.', 'internal', [],
+                'Phần số liệu tất định (chỉ nhận số có đơn vị %, mg/dL, mmol/L, mmol, mg, g/dL, kg, mmHg). Phần nghĩa do AI độc lập kiểm nên có thể sai ở cả hai hướng và chưa có phép đo độ chính xác; kết luận chỉ để cảnh báo, không thay người duyệt.'),
             'LAY01' => self::entry('LAY01', 'Khối bố cục dùng có lý do', 'Cờ P1 khi lạm dụng khối trình bày: quá 2 khung lưu ý, khung đựng danh sách/bảng hoặc dài quá 60 từ, lặp khung miễn trừ, mục lục ở bài dưới 1.200 từ hoặc dưới 4 h2, tóm tắt ở bài dưới 800 từ, bảng dưới 2 cột hoặc 2 hàng dữ liệu.', [
                 'max_callouts' => 2, 'callout_max_words' => 60, 'toc_min_words' => 1200, 'toc_min_h2' => 4, 'summary_min_words' => 800,
             ], 'heuristic',
