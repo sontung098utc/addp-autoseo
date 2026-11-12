@@ -218,7 +218,7 @@ final class BrainService
             if ($nameT === '') {
                 continue;
             }
-            $types[] = ['key' => Str::slug($t['key'] ?? '') ?: (Str::slug($nameT) ?: 'loai-bai'), 'name' => $nameT, 'outline' => $this->list($t['outline'] ?? [], 20, 160)];
+            $types[] = ['key' => Str::slug($t['key'] ?? '') ?: (Str::slug($nameT) ?: 'loai-bai'), 'name' => $nameT, 'outline' => $this->list($t['outline'] ?? [], 20, 160), 'layout' => $this->list($t['layout'] ?? [], 10, 200)];
         }
         $pref = [];
         foreach (array_slice((array) (($data['terminology'] ?? [])['preferred'] ?? []), 0, 60) as $t) {

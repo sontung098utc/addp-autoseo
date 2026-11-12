@@ -191,7 +191,7 @@ final class BrainContext
     /**
      * Khung bài hợp loại bài: chọn loại có nhiều từ của TÊN trùng với từ khóa/ý định/cụm chủ đề nhất; không khớp thì lấy loại đầu tiên có dàn ý.
      *
-     * @return array{name:string,outline:list<string>,matched:bool}|null
+     * @return array{name:string,outline:list<string>,layout:list<string>,matched:bool}|null
      */
     private function articleType(Article $article): ?array
     {
@@ -205,7 +205,8 @@ final class BrainContext
                 if ($outline === []) {
                     continue;
                 }
-                $fallback ??= ['name' => (string) $t['name'], 'outline' => $outline, 'matched' => false];
+                $layout = array_values(array_filter(array_map('strval', (array) ($t['layout'] ?? [])), fn ($o) => trim($o) !== ''));
+                $fallback ??= ['name' => (string) $t['name'], 'outline' => $outline, 'layout' => $layout, 'matched' => false];
                 $score = 0;
                 foreach (explode(' ', KnowledgeDedupe::normalize((string) $t['name'])) as $w) {
                     if (mb_strlen($w) >= 3 && str_contains($hay, $w)) {
@@ -214,7 +215,7 @@ final class BrainContext
                 }
                 if ($score > $bestScore) {
                     $bestScore = $score;
-                    $best = ['name' => (string) $t['name'], 'outline' => $outline, 'matched' => true];
+                    $best = ['name' => (string) $t['name'], 'outline' => $outline, 'layout' => $layout, 'matched' => true];
                 }
             }
         }

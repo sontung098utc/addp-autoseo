@@ -370,7 +370,8 @@ final class DomainBrainBuilder
         foreach (array_slice((array) ($d['article_types'] ?? []), 0, 6) as $t) {
             $name = AiJson::clean($t['name'] ?? '', 120);
             if ($name !== '' && ! in_array(mb_strtolower($name), $have, true)) {
-                $types[] = ['key' => '', 'name' => $name, 'outline' => array_slice(array_values(array_filter(array_map(fn ($x) => AiJson::clean($x, 160), (array) ($t['outline'] ?? [])))), 0, 20)];
+                $types[] = ['key' => '', 'name' => $name, 'outline' => array_slice(array_values(array_filter(array_map(fn ($x) => AiJson::clean($x, 160), (array) ($t['outline'] ?? [])))), 0, 20),
+                    'layout' => array_slice(array_values(array_filter(array_map(fn ($x) => AiJson::clean($x, 200), (array) ($t['layout'] ?? [])))), 0, 10)];
                 $added++;
             }
         }

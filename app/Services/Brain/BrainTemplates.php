@@ -43,6 +43,17 @@ final class BrainTemplates
         'escardio.org' => 'Hiệp hội Tim mạch Châu Âu',
     ];
 
+    /**
+     * Bố cục khối mặc định cho bài sức khỏe (nháp, chờ chuyên gia). Là gợi ý "khối nào nên có" cho người viết, không phải nội dung y khoa.
+     * Quy tắc số lượng nằm ở kỹ năng writer/article-layout (tối đa 2 khung lưu ý).
+     */
+    public const HEALTH_LAYOUT = [
+        'Một khung lưu ý ngắn «Khi nào nên gặp bác sĩ» gần cuối bài; dấu hiệu chỉ lấy từ kiến thức đã duyệt',
+        'Bảng tham chiếu khi bài nêu nhiều mốc/chỉ số; số liệu chỉ từ kiến thức đã duyệt, kèm chú thích nguồn',
+        'Cảnh báo an toàn (biến chứng, thuốc, đối tượng cần thận trọng) trong tối đa một khung lưu ý loại warning',
+        'Câu lưu ý thông tin chỉ mang tính tham khảo ở cuối bài',
+    ];
+
     /** Quy tắc lập luận an toàn CHUNG cho mọi lĩnh vực sức khỏe/thuốc. Mẫu cộng thêm quy tắc riêng. */
     public const HEALTH_RULES = [
         'Không chẩn đoán bệnh cho người đọc và không kê đơn, không nêu liều lượng',
@@ -75,7 +86,7 @@ final class BrainTemplates
         }
         $types = [];
         foreach ((array) $o['types'] as $key => [$name, $outline]) {
-            $types[] = ['key' => $key, 'name' => $name, 'outline' => $outline];
+            $types[] = ['key' => $key, 'name' => $name, 'outline' => $outline, 'layout' => self::HEALTH_LAYOUT];
         }
 
         return [

@@ -141,7 +141,7 @@ class BrainPage extends KnowledgePage implements HasForms
 
         return [
             'voice' => ['tone' => $v['tone'] ?? '', 'formality' => $v['formality'] ?? '', 'pronouns' => $v['pronouns'] ?? '', 'do' => array_values((array) ($v['do'] ?? [])), 'dont' => array_values((array) ($v['dont'] ?? []))],
-            'article_types' => array_values(array_map(fn ($t) => ['key' => $t['key'] ?? '', 'name' => $t['name'] ?? '', 'outline' => array_values((array) ($t['outline'] ?? []))], (array) (($p?->structure ?? [])['article_types'] ?? []))),
+            'article_types' => array_values(array_map(fn ($t) => ['key' => $t['key'] ?? '', 'name' => $t['name'] ?? '', 'outline' => array_values((array) ($t['outline'] ?? [])), 'layout' => array_values((array) ($t['layout'] ?? []))], (array) (($p?->structure ?? [])['article_types'] ?? []))),
             'preferred' => array_values(array_map(fn ($t) => ['term' => $t['term'] ?? '', 'definition' => $t['definition'] ?? '', 'avoid' => array_values((array) ($t['avoid'] ?? []))], (array) (($p?->terminology ?? [])['preferred'] ?? []))),
             'abbreviations' => array_values((array) (($p?->terminology ?? [])['abbreviations'] ?? [])),
             'rules' => implode("\n", (array) (($p?->reasoning ?? [])['rules'] ?? [])),
@@ -168,6 +168,7 @@ class BrainPage extends KnowledgePage implements HasForms
                     ->schema([
                         Forms\Components\TextInput::make('name')->label('Tên loại bài')->required()->maxLength(120),
                         Forms\Components\TagsInput::make('outline')->label('Các đề mục theo thứ tự')->hintIcon('heroicon-o-information-circle', 'Nhấn Enter sau mỗi đề mục; thứ tự giữ nguyên.'),
+                        Forms\Components\TagsInput::make('layout')->label('Bố cục khối nên có')->hintIcon('heroicon-o-information-circle', 'Gợi ý khối trình bày hợp lĩnh vực này (bảng mốc tham chiếu, khung cảnh báo, khối "khi nào gặp bác sĩ"…). Số khối tối đa vẫn theo kỹ năng bố cục; đây chỉ là khối NÊN có.'),
                     ]),
             ]),
             Forms\Components\Section::make('Thuật ngữ')->collapsible()->collapsed()->schema([
