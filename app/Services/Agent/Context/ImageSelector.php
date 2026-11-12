@@ -49,6 +49,9 @@ final class ImageSelector
 
         $scored = [];
         foreach ($assets as $a) {
+            if (($a->metadata['ai_generated'] ?? false) === true) {
+                continue; // ảnh do AI tạo cho bài khác không phải ảnh thư viện của website: không tái dùng làm ảnh bìa bài này
+            }
             if ($a->width !== null && $a->width < self::MIN_WIDTH) {
                 continue;
             }

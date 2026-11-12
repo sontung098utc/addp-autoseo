@@ -78,6 +78,14 @@ class ImagesLinksTest extends TestCase
         $this->assertSame('Lễ trao học bổng toàn phần', $res[0]['alt_goi_y']);
     }
 
+    public function test_anh_do_ai_tao_cho_bai_khac_khong_duoc_tai_dung_lam_anh_thu_vien(): void
+    {
+        $this->media(['alt_text' => 'Lễ trao học bổng toàn phần', 'metadata' => ['ai_generated' => true]]);
+        $real = $this->media(['alt_text' => 'Sinh viên nhận học bổng toàn phần']);
+
+        $this->assertSame([$real->id], array_column((new ImageSelector())->select($this->article()), 'id'));
+    }
+
     public function test_khong_anh_phu_hop_thi_rong_khong_bia(): void
     {
         $this->media(['alt_text' => 'Văn phòng làm việc']);
