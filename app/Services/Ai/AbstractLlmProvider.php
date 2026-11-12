@@ -66,6 +66,7 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             'cost_vnd' => $this->calculateCostVnd($r['prompt_tokens'], $r['completion_tokens'], $this->model),
             'model' => $this->model,
             'prompt_version' => $this->promptVersion,
+            'exchange' => $this->exchange($system, "Hãy lập dàn ý chuẩn SEO cho từ khóa '{$article->primary_keyword}'.", (string) $r['text']),
         ];
     }
 
@@ -121,7 +122,19 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             'cost_vnd' => $this->calculateCostVnd($r['prompt_tokens'], $r['completion_tokens'], $this->model),
             'model' => $this->model,
             'prompt_version' => $this->promptVersion,
+            'exchange' => $this->exchange($system, "Hãy viết bài viết hoàn chỉnh chuẩn SEO cho từ khóa '{$article->primary_keyword}'.", (string) $r['text']),
         ];
+    }
+
+    /**
+     * Lời nhắc đã gửi và phản hồi nhận về của MỘT lần gọi, cắt độ dài, để ngăn chi tiết bước phiên chạy hiện đúng đầu vào và đầu ra.
+     * Không chứa khóa API (khóa chỉ nằm ở header yêu cầu, không nằm trong lời nhắc). Lưu cùng bước, có thể bị cắt cuối.
+     *
+     * @return array{system:string,user:string,response:string}
+     */
+    protected function exchange(string $system, string $user, string $text): array
+    {
+        return ['system' => mb_substr($system, 0, 14000), 'user' => mb_substr($user, 0, 1500), 'response' => mb_substr($text, 0, 30000)];
     }
 
     /** Cắt chuỗi theo ký tự (mb) tới $max; null giữ null. */

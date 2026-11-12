@@ -64,6 +64,20 @@
         .rvx-drawer__x{position:absolute;top:.9rem;right:.9rem;display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;border:0;border-radius:999px;background:transparent;color:inherit;cursor:pointer;opacity:.7}
         .rvx-drawer__x:hover{opacity:1;background:rgba(128,128,128,.18)}
         .rvx-drawer h3{padding-right:2.5rem;font-size:1rem}
+        .rvx-io{margin:.5rem 0 .25rem;font-size:.8rem}
+        .rvx-io__h{margin-top:.75rem;font-size:.7rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;opacity:.65}
+        .rvx-io__b{margin-top:.4rem}
+        .rvx-io__k{font-size:.72rem;opacity:.65}
+        .rvx-io__t{white-space:pre-line;overflow-wrap:anywhere}
+        .rvx-io__ul,.rvx-io__ol{margin:.15rem 0 0 1.1rem;padding:0}
+        .rvx-io__ul{list-style:disc}.rvx-io__ol{list-style:decimal}
+        .rvx-io__ul li,.rvx-io__ol li{margin:.15rem 0;overflow-wrap:anywhere}
+        .rvx-io__d summary{cursor:pointer;opacity:.75;font-size:.75rem}
+        .rvx-io__pre{margin:.3rem 0 0;max-height:16rem;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.72rem;line-height:1.45;padding:.5rem;border-radius:.4rem;background:rgba(128,128,128,.12)}
+        .rvx-io__slot{margin:.3rem 0;padding:.4rem .5rem;border-radius:.4rem;background:rgba(128,128,128,.08)}
+        .rvx-io__imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(8.5rem,1fr));gap:.5rem}
+        .rvx-io__imgs img{width:100%;height:auto;border-radius:.4rem;display:block}
+        .rvx-io__imgs figcaption{font-size:.72rem;margin-top:.2rem}
         .rvx-scrim{position:fixed;inset:0;z-index:59;background:rgba(15,23,42,.25)}
 
         .rvx-pane h3{margin:0 0 .5rem;font-size:.95rem;font-weight:700;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
@@ -189,6 +203,7 @@
                                             @foreach ($s->data['failed'] as $f)<li><code>{{ $f['code'] ?? '' }}</code> <span class="rv-sev rv-sev--{{ $f['severity'] ?? '' }}">{{ $f['severity'] ?? '' }}</span> {{ $f['message'] ?? '' }}</li>@endforeach
                                         </ul>
                                     @endif
+                                    @include('filament.agent.step-io', ['s' => $s, 'run' => $run])
                                     @if (isset($s->data['images']) || isset($s->data['internal_links']))@include('filament.agent.context-assets', ['data' => $s->data])@endif
                                     @if ($s->tokens_used || $s->cost_vnd > 0)<div class="rvx-note">{{ number_format($s->tokens_used) }} token{{ $s->prompt_tokens !== null && $s->completion_tokens !== null ? ' (vào '.number_format($s->prompt_tokens).' · ra '.number_format($s->completion_tokens).')' : '' }} · {{ number_format($s->cost_vnd, 0, ',', '.') }} ₫</div>@endif
                                 </div>
