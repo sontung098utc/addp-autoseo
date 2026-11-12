@@ -192,6 +192,18 @@ class AgentRunLogTest extends TestCase
         $this->assertSame('failed', $run->steps->last()->status);
     }
 
+    public function test_504_chi_thu_lai_mot_lan(): void
+    {
+        $e504 = new \GuzzleHttp\Exception\ServerException('http', new Request('POST', 'https://x.test'), new Response(504));
+        $ai = $this->provider([$e504]);
+        [$run, $slept] = $this->go($ai, null, $this->article());
+
+        $this->assertSame('failed', $run->status);
+        $this->assertSame(2, $ai->writeCalls, '1 lần gọi + 1 lần thử lại');
+        $this->assertSame([2], $slept);
+        $this->assertCount(1, $run->steps->where('stage', 'retry'));
+    }
+
     public function test_5xx_va_429_la_tam_thoi_con_401_thi_khong_thu_lai(): void
     {
         $mk = fn (int $code) => new \GuzzleHttp\Exception\ServerException('http', new Request('POST', 'https://x.test'), new Response($code));

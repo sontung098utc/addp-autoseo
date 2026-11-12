@@ -18,6 +18,11 @@ use App\Services\Content\Quality\Rules\LengthRule;
 use App\Services\Content\Quality\Rules\LinkRule;
 use App\Services\Content\Quality\Rules\MetaRule;
 use App\Services\Content\Quality\Rules\SafetyRule;
+use App\Services\Content\Quality\Rules\HeadingLeakRule;
+use App\Services\Content\Quality\Rules\ImagePlaceholderRule;
+use App\Services\Content\Quality\Rules\IntentSpecificityRule;
+use App\Services\Content\Quality\Rules\PaddingRule;
+use App\Services\Content\Quality\Rules\TextGlitchRule;
 
 /**
  * Kiểm tra chất lượng bài tại thời điểm gọi (chưa lưu lịch sử kết quả).
@@ -40,6 +45,7 @@ class ContentQualityChecker
         return [
             new LengthRule(), new HeadingRule(), new KeywordRule(), new MetaRule(), new DuplicateRule(),
             new ImageRule(), new SafetyRule(), new FactRule(), new FaqRule(), new BannedTermsRule(), new KnowledgeFigureRule(), new LinkRule(), new EvidenceRule(), new SourceRule(),
+            new PaddingRule(), new TextGlitchRule(), new HeadingLeakRule(), new ImagePlaceholderRule(), new IntentSpecificityRule(),
         ];
     }
 

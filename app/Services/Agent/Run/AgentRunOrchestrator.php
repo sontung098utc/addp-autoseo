@@ -137,16 +137,40 @@ final class AgentRunOrchestrator
             $article->update(['workflow_status' => $previousStatus]);
 
             return $this->finish($run, 'failed', $e->getMessage().' Phiên dừng; chưa có bản nháp nào được tạo.');
+        } catch (\App\Services\Ai\AiQuotaExceeded $e) {
+            $this->step($run, 'handoff', 'system', 'failed', 'Hết hạn mức ngày của nhà cung cấp AI', $e->getMessage().' Không thử lại vì chờ vài giây không giúp ích; không thay bằng AI giả lập, bài được trả về trạng thái cũ.', ['error' => 'AiQuotaExceeded']);
+            $article->update(['workflow_status' => $previousStatus]);
+
+            return $this->finish($run, 'failed', 'Hết hạn mức theo ngày của nhà cung cấp AI cho model này. Chưa có bản nháp nào được tạo; đổi model, chờ hạn mức đặt lại hoặc bật thanh toán.');
         } catch (AiProviderError $e) {
             $this->step($run, 'handoff', 'system', 'failed', 'Nhà cung cấp AI trả lỗi', ErrorMasker::short($e->getMessage(), 200).' Lỗi này thử lại không giúp ích nên phiên dừng; không thay bằng AI giả lập.', ['error' => class_basename($e)]);
             $article->update(['workflow_status' => $previousStatus]);
 
             return $this->finish($run, 'failed', 'Nhà cung cấp AI từ chối hoặc trả sai định dạng: '.ErrorMasker::short($e->getMessage(), 160));
         } catch (Throwable $e) {
+            $this->logUnexpected($e, $run, $article);
             $this->step($run, 'handoff', 'system', 'failed', 'Phiên chạy gặp lỗi', 'Lỗi không lường trước; bài được trả về trạng thái cũ, không có gì được đăng.', ['error' => class_basename($e)]);
             $article->update(['workflow_status' => $previousStatus]);
 
             return $this->finish($run, 'failed', 'Lỗi hệ thống: '.class_basename($e).'. Chưa có bản nháp nào được tạo.');
+        }
+    }
+
+
+    /**
+     * Ghi log lỗi không lường trước (trước đây bị nuốt, rất khó chẩn đoán, vd cột thiếu trong DB). Có ngữ cảnh phiên/bài; KHÔNG ghi nội dung bài,
+     * tham số SQL hay khóa: với lỗi SQL chỉ lấy thông điệp gốc của driver (không kèm câu SQL đầy đủ và giá trị bind), đã che bằng ErrorMasker.
+     */
+    private function logUnexpected(Throwable $e, AgentRun $run, Article $article): void
+    {
+        $msg = $e instanceof \Illuminate\Database\QueryException ? (string) ($e->getPrevious()?->getMessage() ?: 'lỗi truy vấn') : $e->getMessage();
+        try {
+            \Illuminate\Support\Facades\Log::error('Phiên chạy đội AI gặp lỗi không lường trước', [
+                'run_id' => $run->id, 'article_id' => $article->id, 'stage_seq' => $this->seq, 'exception' => get_class($e),
+                'message' => ErrorMasker::short($msg, 300), 'where' => basename($e->getFile()).':'.$e->getLine(),
+            ]);
+        } catch (Throwable) {
+            // ghi log lỗi thì không được làm hỏng việc đóng phiên
         }
     }
 
@@ -388,10 +412,15 @@ final class AgentRunOrchestrator
         if ($passed) {
             // Tạo ảnh (yêu cầu gốc: pipeline có "tạo ảnh"): bước luật, tự bỏ qua có lý do (chưa có nhà cung cấp, đã có ảnh thư viện, sức khỏe, hết trần); không làm hỏng phiên.
             try {
-                (new \App\Services\Images\ArticleImageStep)->run($run, $article, $version, ++$this->seq, $this->policy->budgetVnd);
+                if ($this->roleOff('designer')) {
+                    $this->skills['images'] = [null, 'Vai trò Họa viên đang tắt.'];
+                    $this->step($run, 'images', 'designer', 'skipped', 'Không tạo ảnh', 'Vai trò Họa viên hình ảnh đang bị tắt trên tab Vai trò nên bước tạo ảnh được bỏ qua; bài và các bước khác không đổi.', ['skip_code' => 'role_off', 'generated' => 0]);
+                } else {
+                    (new \App\Services\Images\ArticleImageStep)->run($run, $article, $version, ++$this->seq, $this->policy->budgetVnd);
                 // Cùng quy ước với step(): mọi bước ghi vai trò và kỹ năng.
                 if ($imgStep = $run->steps()->where('stage', 'images')->latest('id')->first()) {
                     $imgStep->update(['data' => ($imgStep->data ?? []) + ['role_key' => $imgStep->role, 'role_name' => $this->roles->roleName($imgStep->role), 'skill' => $this->pbData(null), 'skill_label' => 'Chỉ dẫn mặc định']]);
+                }
                 }
             } catch (Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Bước tạo ảnh lỗi, bỏ qua: '.class_basename($e));
@@ -489,7 +518,7 @@ final class AgentRunOrchestrator
         $this->step($run, $stage, 'writer', $silentMock || $mustCite ? 'warn' : 'ok', $title, ($silentMock ? 'Nhà cung cấp AI đã rơi về bản giả lập (thiếu khóa hoặc phản hồi hỏng); nội dung không phải AI thật. ' : '').($feedback === []
             ? 'Viết theo dàn ý'.(($options['guidance'] ?? '') !== '' ? ' và chỉ dẫn thêm của người phụ trách bài' : '').'; HTML được làm sạch trước khi chấm.'.$this->brandNote().$this->brainCtx->note().($mustCite ? ' Lĩnh vực bắt buộc nguồn: cần người có chuyên môn duyệt (luật EVID01 kiểm bằng chứng theo Sổ nguồn ở mức cả bài, chưa nối từng khẳng định với từng nguồn; hiện có '.$citable->count().' nguồn đã xác nhận).' : '').$kbNote.$assetNote
             : 'Gửi lại cho AI '.count($feedback).' lỗi chặn cần sửa: '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
-            ['words' => str_word_count(strip_tags($html)) ?: mb_strlen(strip_tags($html)), 'playbook' => $this->pbData($pb)] + $this->brandData() + $this->brainCtx->stepData() + ($mustCite ? ['needs_expert_review' => true] : []) + $kbData + $assetData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
+            ['words' => \App\Services\Content\VietnameseText::wordCountHtml($html), 'playbook' => $this->pbData($pb)] + $this->brandData() + $this->brainCtx->stepData() + ($mustCite ? ['needs_expert_review' => true] : []) + $kbData + $assetData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
 
         return [
             'article_id' => $article->id, 'title' => $r['title'] ?? $article->primary_keyword, 'slug' => $r['slug'] ?? 'bai-viet', 'outline' => $outline,
@@ -688,7 +717,9 @@ final class AgentRunOrchestrator
     /** @return array{provider_id?: int} nhãn nhà cung cấp để thống kê chi tiêu theo provider */
     private function providerData(array $r): array
     {
-        return isset($r['_provider_id']) ? ['provider_id' => $r['_provider_id']] : [];
+        // prompt_tokens/completion_tokens đi cùng dữ kiện bước; step() tách chúng ra cột riêng (không lưu trùng trong JSON).
+        return (isset($r['_provider_id']) ? ['provider_id' => $r['_provider_id']] : [])
+            + (isset($r['prompt_tokens'], $r['completion_tokens']) ? ['prompt_tokens' => (int) $r['prompt_tokens'], 'completion_tokens' => (int) $r['completion_tokens']] : []);
     }
 
     /**
@@ -702,6 +733,7 @@ final class AgentRunOrchestrator
     private function withRetry(AgentRun $run, string $what, \Closure $call): mixed
     {
         $attempt = 0;
+        $waited = 0;
         while (true) {
             try {
                 return $call();
@@ -710,17 +742,46 @@ final class AgentRunOrchestrator
                     throw $e;
                 }
                 $attempt++;
-                if ($attempt > $this->policy->maxRetries) {
+                $hint = TransientAiError::retryAfterOf($e);
+                // Nhà cung cấp nói rõ cần chờ bao lâu thì được thử nhiều lần hơn (trong trần thời gian); lỗi không có gợi ý giữ số lần cũ.
+                $limit = $hint !== null ? max($this->policy->maxRetries, $this->policy->maxRateLimitRetries) : $this->policy->maxRetries;
+                // 504 = cổng (vd cầu nối CLI) đã chờ trọn timeout mà không có kết quả; thử lại tốn thêm cả timeout nữa nên chỉ thử 1 lần.
+                if (TransientAiError::statusOf($e) === 504) {
+                    $limit = min($limit, 1);
+                }
+                $wait = $this->retryWait($attempt, $hint);
+                if ($attempt > $limit || ($hint !== null && $waited + $wait > $this->policy->retryBudgetSeconds)) {
                     throw new AiRetriesExhausted($what, $attempt, $e);
                 }
-                $delays = $this->policy->backoffSeconds;
-                $wait = (int) ($delays[$attempt - 1] ?? ($delays === [] ? 1 : end($delays)));
-                $this->step($run, 'retry', 'system', 'warn', "Thử lại lần {$attempt}/{$this->policy->maxRetries}: {$what}",
+                $waited += $wait;
+                $this->step($run, 'retry', 'system', 'warn', "Thử lại lần {$attempt}/{$limit}: {$what}",
                     'Nhà cung cấp AI lỗi tạm thời ('.TransientAiError::describe($e).'; '.ErrorMasker::short($e->getMessage(), 120)."). Chờ {$wait} giây rồi thử lại, không đổi sang AI giả lập.",
-                    ['attempt' => $attempt, 'max' => $this->policy->maxRetries, 'wait_seconds' => $wait, 'error' => TransientAiError::describe($e)]);
+                    ['attempt' => $attempt, 'max' => $limit, 'wait_seconds' => $wait, 'retry_after' => $hint, 'error' => TransientAiError::describe($e)]);
                 ($this->sleep)($wait);
             }
         }
+    }
+
+    /**
+     * Số giây chờ trước lần thử $attempt: bậc thang cấu hình trước, quá bậc thì nhân đôi theo cấp số mũ có nhiễu ±20% (tránh nhiều tiến trình cùng thử lại một lúc),
+     * và không bao giờ ngắn hơn Retry-After của nhà cung cấp (cộng 0–2 giây nhiễu). Trần mỗi lần chờ: policy->maxRetryWaitSeconds.
+     */
+    private function retryWait(int $attempt, ?int $hint): int
+    {
+        $delays = $this->policy->backoffSeconds;
+        if ($delays === []) {
+            $wait = 1.0;
+        } elseif ($attempt <= count($delays)) {
+            $wait = (float) $delays[$attempt - 1];
+        } else {
+            $wait = (float) end($delays) * (2 ** ($attempt - count($delays)));
+            $wait *= 0.8 + mt_rand(0, 400) / 1000;
+        }
+        if ($hint !== null) {
+            $wait = max($wait, $hint + mt_rand(0, 2));
+        }
+
+        return (int) max(0, min(ceil($wait), $this->policy->maxRetryWaitSeconds));
     }
 
     /** Ghi một quyết định hệ thống tự đưa ra kèm dữ kiện trước/sau. */
@@ -753,6 +814,10 @@ final class AgentRunOrchestrator
     private function step(AgentRun $run, string $stage, string $role, string $status, string $title, string $detail, array $data = [], ?string $model = null, int $tokens = 0, float $cost = 0.0): AgentRunStep
     {
         $now = now();
+        // Token vào/ra tách riêng (null = nhà cung cấp không báo, vd AI giả lập); cộng dồn lại bằng tokens_used khi có đủ cả hai.
+        $tokensIn = isset($data['prompt_tokens']) ? (int) $data['prompt_tokens'] : null;
+        $tokensOut = isset($data['completion_tokens']) ? (int) $data['completion_tokens'] : null;
+        unset($data['prompt_tokens'], $data['completion_tokens']);
         // AG-S14: mọi bước ghi vai trò (khóa + tên) và kỹ năng; bước không dùng playbook ghi rõ "Chỉ dẫn mặc định" kèm lý do nếu có.
         [$pb, $skillNote] = $this->skills[$stage] ?? [null, ''];
         $data += [
@@ -760,10 +825,27 @@ final class AgentRunOrchestrator
             'skill' => $this->pbData($pb), 'skill_label' => $pb ? $pb->ref().($pb->isRunnable() ? '' : ' (bản nháp)') : 'Chỉ dẫn mặc định',
         ] + ($pb === null && $skillNote !== '' ? ['skill_note' => $skillNote] : []);
 
-        return AgentRunStep::create([
+        $attrs = [
             'agent_run_id' => $run->id, 'seq' => ++$this->seq, 'stage' => $stage, 'role' => $role, 'status' => $status, 'title' => $title,
             'detail' => $detail, 'data' => $data ?: null, 'model' => $model, 'tokens_used' => $tokens, 'cost_vnd' => $cost, 'started_at' => $now, 'finished_at' => $now,
-        ]);
+        ];
+        // Môi trường chưa chạy migration 2026_11_12_000002 (thiếu cột token vào/ra) vẫn phải chạy được: không ghi hai cột đó thay vì làm hỏng cả phiên.
+        if (self::hasTokenSplitColumns()) {
+            $attrs += ['prompt_tokens' => $tokensIn, 'completion_tokens' => $tokensOut];
+        }
+
+        return AgentRunStep::create($attrs);
+    }
+
+    private static ?bool $tokenSplit = null;
+
+    private static function hasTokenSplitColumns(): bool
+    {
+        if (self::$tokenSplit !== true) { // chỉ nhớ kết quả "có"; "chưa có" kiểm lại để nhận ra ngay khi migration vừa chạy
+            self::$tokenSplit = \Illuminate\Support\Facades\Schema::hasColumns('agent_run_steps', ['prompt_tokens', 'completion_tokens']);
+        }
+
+        return self::$tokenSplit;
     }
 
     private function finish(AgentRun $run, string $status, ?string $reason): AgentRun

@@ -13,6 +13,10 @@ final class RunPolicy
         public readonly int $maxRetries = 3,
         /** @var list<int> giây chờ trước mỗi lần thử lại; thiếu phần tử thì dùng phần tử cuối */
         public readonly array $backoffSeconds = [2, 5, 12],
+        /** Khi nhà cung cấp nói rõ cần chờ bao lâu (Retry-After) thì được thử lại nhiều lần hơn, nhưng mỗi lần chờ không quá và tổng chờ không quá các trần sau. */
+        public readonly int $maxRateLimitRetries = 6,
+        public readonly int $maxRetryWaitSeconds = 90,
+        public readonly int $retryBudgetSeconds = 240,
     ) {
     }
 }

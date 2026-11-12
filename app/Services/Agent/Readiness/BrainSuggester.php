@@ -13,6 +13,16 @@ use Illuminate\Support\Str;
  */
 final class BrainSuggester
 {
+    /**
+     * Cụm 2 từ chung chung (không mang chủ đề): trùng một cụm như vậy với mô tả của Trí tuệ không nói gì về chủ đề. Trước đây "hướng dẫn", "chăm sóc"
+     * (có trong mô tả của Trí tuệ Dược/Sức khỏe trẻ em) khiến bài "hướng dẫn thiết lập email tự động chăm sóc khách hàng" bị tự gắn Trí tuệ y tế,
+     * nâng hạng rủi ro lên cao và ép bài về chuyên gia. Không dấu, chữ thường.
+     */
+    public const GENERIC_BIGRAMS = [
+        'huong dan', 'cham soc', 'khach hang', 'so sanh', 'la gi', 'cach lam', 'cach chon', 'tai nha', 'tot nhat', 'bao gia', 'dich vu', 'cong ty', 'phan mem',
+        'doanh nghiep', 'thiet lap', 'quy trinh', 'cho nguoi', 'nen chon', 'kinh nghiem', 'moi nhat', 'hieu qua', 'tu van', 'chi tiet', 'tu dong',
+    ];
+
     /** @param  list<int>  $excludeIds Trí tuệ đã gắn. @return list<array{id:int,name:string,reason:string,score:int,bigram:bool}> */
     public static function forArticle(Article $article, array $excludeIds = [], int $limit = 3): array
     {
@@ -25,7 +35,7 @@ final class BrainSuggester
         for ($i = 0; $i < count($raw) - 1; $i++) {
             $shown[$raw[$i]['k'].' '.$raw[$i + 1]['k']] = $raw[$i]['o'].' '.$raw[$i + 1]['o'];
         }
-        $kwBigrams = array_keys($shown);
+        $kwBigrams = array_values(array_diff(array_keys($shown), self::GENERIC_BIGRAMS));
 
         $brains = Brain::query()->where('status', 'active')->whereNotIn('id', $excludeIds)->get();
         $perBrain = [];

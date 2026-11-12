@@ -62,7 +62,7 @@ class QualityContext
     /** @return list<string> */
     public function words(): array
     {
-        return $this->text() === '' ? [] : explode(' ', $this->text());
+        return \App\Services\Content\VietnameseText::words($this->text());
     }
 
     /** @return list<array{level:int,text:string}> theo thứ tự xuất hiện */
