@@ -58,6 +58,22 @@ final class QualityReport
         return [];
     }
 
+    /**
+     * Chỗ dùng khối bố cục chưa hợp lý (LAY01, P1): cũng đưa vào vòng sửa, người viết gộp/bỏ khối thừa.
+     *
+     * @return list<string>
+     */
+    public function layoutGaps(): array
+    {
+        foreach ($this->results as $r) {
+            if ($r->code === 'LAY01' && ! $r->passed && $r->details !== []) {
+                return $r->details;
+            }
+        }
+
+        return [];
+    }
+
     /** @return list<string> mã luật P0 chưa đạt (duy nhất) */
     public function blockingCodes(): array
     {

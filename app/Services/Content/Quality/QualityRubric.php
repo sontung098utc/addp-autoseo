@@ -89,6 +89,10 @@ final class QualityRubric
                 'Heuristic theo độ dài âm tiết tiếng Việt (tối đa 7 chữ cái); có thể báo nhầm tên riêng nước ngoài có dấu. Không chặn.'),
             'LEAK01' => self::entry('LEAK01', 'Nhãn cấu trúc rò vào bài', 'Cờ P1 khi tiêu đề/đoạn bắt đầu bằng nhãn như "H2:" hay "Heading 2 -".', [], 'internal',
                 'Nhãn của dàn ý lọt ra bài hiển thị cho người đọc.', 'internal', [], 'Quy tắc nội bộ, tất định. Không chặn.'),
+            'LAY01' => self::entry('LAY01', 'Khối bố cục dùng có lý do', 'Cờ P1 khi lạm dụng khối trình bày: quá 2 khung lưu ý, khung đựng danh sách/bảng hoặc dài quá 60 từ, lặp khung miễn trừ, mục lục ở bài dưới 1.200 từ hoặc dưới 4 h2, tóm tắt ở bài dưới 800 từ, bảng dưới 2 cột hoặc 2 hàng dữ liệu.', [
+                'max_callouts' => 2, 'callout_max_words' => 60, 'toc_min_words' => 1200, 'toc_min_h2' => 4, 'summary_min_words' => 800,
+            ], 'heuristic',
+                'Hộp trang trí đặt bừa làm bài rối và loãng ý chính; mỗi khối phải có lý do nội dung.', 'internal', [], 'Ngưỡng là heuristic của hệ thống (kỹ năng writer/article-layout), chưa có nghiên cứu chứng minh. Không chặn nhưng đưa vào vòng sửa.'),
             'IMG02' => self::entry('IMG02', 'Ô ảnh giữ chỗ không có ảnh', 'Cờ P1 khi khối ảnh (figure) chỉ có chú thích mà không có ảnh, hoặc thẻ img không có src.', [], 'internal',
                 'Ô trống/chú thích mồ côi làm bài trông dở dang.', 'internal', [], 'Quy tắc nội bộ, tất định; không kiểm ảnh có tải được hay không. Không chặn.'),
             'INT01' => self::entry('INT01', 'Độ cụ thể theo ý định (giá / so sánh)', 'Cờ P1 "thiếu cụ thể" khi từ khóa là báo giá mà bài không có mức giá, hoặc là so sánh mà bài không có bảng (≥ 3 hàng) hay tên cụ thể của ≥ 3 đối tượng.', [

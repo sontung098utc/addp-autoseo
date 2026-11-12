@@ -16,6 +16,7 @@ use App\Services\Content\Quality\Rules\HeadingRule;
 use App\Services\Content\Quality\Rules\ImageRule;
 use App\Services\Content\Quality\Rules\KeywordRule;
 use App\Services\Content\Quality\Rules\KnowledgeFigureRule;
+use App\Services\Content\Quality\Rules\LayoutRule;
 use App\Services\Content\Quality\Rules\LengthRule;
 use App\Services\Content\Quality\Rules\LinkRule;
 use App\Services\Content\Quality\Rules\MetaRule;
@@ -65,7 +66,7 @@ class ContentQualityChecker
         return [
             new LengthRule(), new HeadingRule(), new KeywordRule(), new MetaRule(), new DuplicateRule(),
             new ImageRule(), new SafetyRule(), new FactRule(), new FaqRule(), new BannedTermsRule(), new KnowledgeFigureRule(), new LinkRule(), new EvidenceRule(), new CitationRule(), new MedicalSafetyRule(), new SourceRule(),
-            new PaddingRule(), new TextGlitchRule(), new HeadingLeakRule(), new ImagePlaceholderRule(), new IntentSpecificityRule(),
+            new PaddingRule(), new TextGlitchRule(), new HeadingLeakRule(), new ImagePlaceholderRule(), new IntentSpecificityRule(), new LayoutRule(),
         ];
     }
 
