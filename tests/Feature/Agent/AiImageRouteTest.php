@@ -83,6 +83,15 @@ class AiImageRouteTest extends TestCase
         $this->assertContains(['id' => 'tinh-ve-a', 'kind' => 'image'], $raw);
     }
 
+    public function test_buoc_anh_ghi_ten_model_that_khong_ghi_chung_image(): void
+    {
+        $m = new \ReflectionMethod(\App\Services\Images\ArticleImageStep::class, 'modelName');
+        $m->setAccessible(true);
+        $this->assertSame('agy-image', $m->invoke(null, 'OpenAI-tương thích tùy chỉnh / agy-image'));
+        $this->assertSame('gemini-3.1-flash-image', $m->invoke(null, 'Gemini / gemini-3.1-flash-image (dự phòng CLI / agy-image)'));
+        $this->assertSame('image', $m->invoke(null, null));
+    }
+
     public function test_danh_sach_model_theo_loai_vai_tro(): void
     {
         $this->provider('openai_compat', 'CLI', ['agy-image', 'agy-flash-low']);

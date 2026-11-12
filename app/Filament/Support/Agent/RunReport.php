@@ -27,7 +27,7 @@ final class RunReport
         $links = [];
 
         $cost = number_format((float) $run->cost_vnd, 0, ',', '.').' ₫';
-        $dur = $run->started_at && $run->finished_at ? max(0, $run->finished_at->diffInSeconds($run->started_at)).' giây' : null;
+        $dur = $run->started_at && $run->finished_at ? RunActivity::formatElapsed((int) abs($run->finished_at->diffInSeconds($run->started_at))) : null;
 
         if ($type === 'market_research') {
             $added = $out['added'] ?? (isset($out['keyword_ids']) ? count((array) $out['keyword_ids']) : null);

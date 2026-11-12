@@ -37,6 +37,17 @@ class RunReportAndTodayTest extends TestCase
         $this->assertStringContainsString('đã có bản nháp chờ duyệt', $text);
     }
 
+    public function test_bao_cao_ghi_dung_thoi_gian_chay_cua_phien(): void
+    {
+        $w = $this->site();
+        $a = Article::create(['website_id' => $w->id, 'primary_keyword' => 'abc', 'workflow_status' => 'needs_review']);
+        $run = AgentRun::create(['website_id' => $w->id, 'article_id' => $a->id, 'status' => 'ready_for_review', 'cost_vnd' => 10,
+            'started_at' => now()->subSeconds(419), 'finished_at' => now()]);
+
+        $text = implode(' ', RunReport::for($run)['lines']);
+        $this->assertStringContainsString('thời gian 6 phút 59 giây', $text);
+    }
+
     public function test_bao_cao_khao_sat_noi_that_ve_luot_tim_va_co_lien_ket(): void
     {
         $w = $this->site();

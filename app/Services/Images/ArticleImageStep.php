@@ -55,9 +55,17 @@ final class ArticleImageStep
             'stage' => 'images', 'role' => 'designer', 'status' => $status, 'title' => $title, 'detail' => $detail,
             'data' => ['version_id' => $version->id, 'generated' => $gen, 'skipped_reason' => $r['skipped'], 'skip_code' => $r['skip_code'] ?? null,
                 'items' => $r['items'], 'cost' => $r['cost_vnd'], 'errors' => $errors, 'generator' => $r['generator_label'] ?? null, 'role_key' => 'designer'],
-            'model' => $r['items'] !== [] ? 'image' : null, 'tokens_used' => 0, 'cost_vnd' => $r['cost_vnd'], 'started_at' => now(), 'finished_at' => now(),
+            'model' => $r['items'] !== [] ? self::modelName($r['generator_label'] ?? null) : null, 'tokens_used' => 0, 'cost_vnd' => $r['cost_vnd'], 'started_at' => now(), 'finished_at' => now(),
         ]);
 
         return ['status' => $status, 'generated' => $gen, 'cost_vnd' => (float) $r['cost_vnd'], 'skipped' => $r['skipped'], 'items' => $r['items']];
+    }
+
+    /** Tên model ảnh từ nhãn "Nhà cung cấp / model (dự phòng …)"; không đọc được thì ghi chung "image". */
+    private static function modelName(?string $label): string
+    {
+        $m = $label !== null && str_contains($label, ' / ') ? trim(explode(' (', explode(' / ', $label, 2)[1])[0]) : '';
+
+        return $m !== '' ? $m : 'image';
     }
 }
