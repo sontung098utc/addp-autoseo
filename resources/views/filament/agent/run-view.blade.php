@@ -59,6 +59,12 @@
         .rvx-kpi--running{border-color:rgba(2,132,199,.5)}.rvx-kpi--running .rvx-kpi__ic{background:rgba(2,132,199,.14);color:var(--fl-run)}.rvx-kpi--running b{color:var(--fl-run)}
         .rvx-flowpane{padding:1rem 1.1rem 1.2rem;background:var(--fl-card);box-shadow:var(--fl-shadow)}
         .rvx-pane{border:1px solid var(--fl-line);border-radius:.75rem;padding:.9rem 1rem}
+        /* Chi tiết bước: khung nổi cố định bên phải, không đẩy lưu đồ; đóng bằng X hoặc Esc. */
+        .rvx-drawer{position:fixed;top:5rem;right:1rem;z-index:40;width:min(26rem,calc(100vw - 2rem));max-height:calc(100vh - 6.5rem);overflow:auto;background:var(--fl-card,#fff);box-shadow:0 18px 48px rgba(15,23,42,.28);padding-top:2.4rem}
+        .rvx-drawer__x{position:absolute;top:.5rem;right:.5rem;display:inline-flex;align-items:center;justify-content:center;width:1.75rem;height:1.75rem;border:0;border-radius:999px;background:transparent;color:inherit;cursor:pointer;opacity:.7}
+        .rvx-drawer__x:hover{opacity:1;background:rgba(128,128,128,.18)}
+        .rvx-drawer h3{padding-right:2rem}
+
         .rvx-pane h3{margin:0 0 .5rem;font-size:.95rem;font-weight:700;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
         .rvx-step{border-top:1px solid var(--fl-line);padding:.55rem 0;font-size:.8rem}.rvx-step:first-of-type{border-top:0}
         .rvx-step .t{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
@@ -107,7 +113,7 @@
         <x-studio.tabs :default="$tab" :tabs="$tabs" label="Các phần của phiên chạy">
             {{-- ===== Diễn biến ===== --}}
             <x-studio.panel key="dien-bien">
-                <div class="rvx" x-data="{ sel: @js($focus) }">
+                <div class="rvx" x-data="{ sel: @js($verdict ? $focus : null) }" x-on:keydown.escape.window="sel = null">
                     <div class="rvx-kpis" data-testid="run-stats">
                         <div class="rvx-kpi rvx-kpi--{{ $tone }}" data-kpi="duration"><span class="rvx-kpi__ic"><x-filament::icon icon="heroicon-o-clock" style="width:1.3rem;height:1.3rem" /></span><b>{{ \App\Filament\Support\Agent\RunActivity::formatElapsed($flow['seconds']) }}</b><small>Thời lượng</small></div>
                         <div class="rvx-kpi rvx-kpi--{{ $flow['budgetPct'] >= 90 ? 'warn' : 'idle' }}" data-kpi="cost"><span class="rvx-kpi__ic"><x-filament::icon icon="heroicon-o-banknotes" style="width:1.3rem;height:1.3rem" /></span><b>{{ number_format($flow['cost'], 0, ',', '.') }} ₫</b><small>Chi phí · ngân sách {{ number_format($flow['budget'], 0, ',', '.') }} ₫</small></div>
@@ -145,7 +151,8 @@
                     {{-- MỘT khung chi tiết cho chặng đang chọn --}}
                     @foreach ($nodes as $n)
                         @php [$stLabel, $stIcon] = RunFlow::STATE[$n['state']]; @endphp
-                        <div class="rvx-pane" data-testid="stage-detail" data-detail="{{ $n['code'] }}" x-show="sel === '{{ $n['code'] }}'" x-cloak>
+                        <div class="rvx-pane rvx-drawer" role="dialog" aria-label="Chi tiết bước: {{ $n['title'] }}" data-testid="stage-detail" data-detail="{{ $n['code'] }}" x-show="sel === '{{ $n['code'] }}'" x-cloak x-transition.opacity.duration.120ms>
+                            <button type="button" class="rvx-drawer__x" x-on:click="sel = null" aria-label="Đóng chi tiết bước" data-testid="stage-detail-close"><x-filament::icon icon="heroicon-m-x-mark" style="width:1.1rem;height:1.1rem" /></button>
                             <h3>
                                 <x-filament::icon :icon="$stIcon" style="width:1.1rem;height:1.1rem" /> {{ $n['title'] }}
                                 <span class="rvx-note">{{ $stLabel }}@if ($n['count'] > 1) ×{{ $n['count'] }}@endif · {{ $n['who']['title'] }}@if ($n['skill']) · {{ $n['skill'] }}@endif</span>
