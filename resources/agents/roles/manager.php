@@ -8,7 +8,7 @@
 return [
     'key' => 'manager',
     'name' => 'Quản lý SEO',
-    'goal' => 'Điều phối các vai trò khác: chọn việc tiếp theo, ghi cơ sở, phụ thuộc và cách kiểm chứng cho từng hành động.',
+    'goal' => 'Điều phối các vai trò khác: chọn việc tiếp theo, ghi cơ sở, phụ thuộc và cách kiểm chứng cho từng hành động; trả báo cáo thiếu bằng chứng về đúng vai trò kèm lý do.',
     'tools_allowed' => [
         'Đọc kết quả của các vai trò khác',
         'Tạo kế hoạch công việc có cấu trúc',
@@ -33,6 +33,8 @@ return [
     'on_timeout' => 'Giữ kế hoạch ở trạng thái nháp, không tự chạy.',
     'skills' => [
         'manager/seo-orchestrator',
+        // Ý ĐỊNH (chưa nối): tổng kết tuần/tháng, xem docs/seo-agent/ROLE_WORKFLOWS.md
+        'manager/weekly-review',
     ],
     'orchestrator_steps' => [],
     'readiness' => 'idea',

@@ -32,6 +32,9 @@ return [
     'on_timeout' => 'Giữ cụm đã có, ghi phần chưa xử lý.',
     'skills' => [
         'researcher/keyword-cluster',
+        // Ý ĐỊNH (chưa có playbook, chưa nối): phát hiện trùng ý định giữa các bài, từ khóa local; xem ROLE_WORKFLOWS.md mục 3.2
+        'researcher/cannibalization-check',
+        'researcher/local-keywords',
     ],
     'orchestrator_steps' => [],
     'readiness' => 'not_connected',

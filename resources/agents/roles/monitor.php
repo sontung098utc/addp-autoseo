@@ -32,6 +32,8 @@ return [
     'on_timeout' => 'Bỏ qua lượt này, ghi lý do.',
     'skills' => [
         'monitor/drift-baseline',
+        // Ý ĐỊNH (chưa có playbook, chưa nối): đề xuất làm lại bài từ dữ liệu hiệu suất; xem ROLE_WORKFLOWS.md mục 3.8
+        'monitor/refresh-trigger',
     ],
     'orchestrator_steps' => [],
     'readiness' => 'not_connected',

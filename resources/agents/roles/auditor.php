@@ -40,10 +40,13 @@ return [
         'auditor/audit-onpage',
         'auditor/audit-technical',
         'auditor/audit-summary',
+        // Ý ĐỊNH (chưa có playbook, chưa nối): audit theo site, nguyên nhân gốc, dữ liệu có cấu trúc; xem ROLE_WORKFLOWS.md mục 3.7
+        'auditor/audit-site-rootcause',
+        'auditor/audit-schema',
     ],
     'orchestrator_steps' => [],
     'readiness' => 'not_connected',
-    'readiness_note' => 'Màn Audit hiện chạy trên dữ liệu minh họa và chưa được đội AI gọi trong phiên chạy.',
+    'readiness_note' => 'Màn Audit hiện chạy trên dữ liệu minh họa và chưa được đội AI gọi trong phiên chạy. Thiết kế báo cáo theo nguyên nhân gốc ở ROLE_WORKFLOWS.md; chưa có mã.',
     'origin' => [
         'claude-seo/seo-audit',
         'claude-seo/seo-technical',

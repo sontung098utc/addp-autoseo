@@ -40,7 +40,7 @@ return [
         'Rào chắn nội dung AI hàng loạt: giới hạn số bài mỗi ngày mỗi website.',
     ],
     'pass_condition' => 'Không còn lỗi chặn (P0) trong báo cáo luật.',
-    'on_fail' => 'Gửi phản hồi có cấu trúc cho Người viết sửa; hết vòng thì giữ nháp cho người xem.',
+    'on_fail' => 'Gửi phản hồi có cấu trúc (hiện là mã luật; thiết kế: thêm mã lý do và danh sách cần sửa, dàn ý lệch ý định thì trả cho Chiến lược) cho Người viết sửa; hết vòng thì giữ nháp cho người xem.',
     'topic_class' => 'Theo hạng rủi ro của chủ đề (do RiskClassifier quyết định)',
     'on_timeout' => 'Giữ nháp, không vào hàng chờ duyệt.',
     'skills' => [

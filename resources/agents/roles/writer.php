@@ -36,7 +36,7 @@ return [
         'HTML đầu ra được lọc trước khi hiển thị và trước khi gửi CMS.',
     ],
     'pass_condition' => 'Không còn lỗi chặn (P0) từ bộ kiểm tra chất lượng.',
-    'on_fail' => 'Viết lại theo phản hồi của luật, tối đa số vòng đặt ở Kết nối AI; hết vòng thì giữ nháp cho người xem.',
+    'on_fail' => 'Viết lại theo phản hồi của luật (thiết kế: kèm lý do và danh sách cần sửa bằng lời từ Biên tập, được phép phản đối có lý do), tối đa số vòng đặt ở Kết nối AI; hết vòng thì giữ nháp cho người xem.',
     'topic_class' => 'Theo hạng rủi ro của chủ đề (do RiskClassifier quyết định)',
     'on_timeout' => 'Giữ bản nháp tốt nhất, không vào hàng chờ duyệt.',
     'skills' => [

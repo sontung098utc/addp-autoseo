@@ -18,6 +18,8 @@ return [
         ['id' => 'guard', 'role' => 'system', 'label' => 'An toàn', 'kind' => 'rule'],
         ['id' => 'crawl', 'role' => 'auditor', 'label' => 'Quét', 'kind' => 'rule'],
         ['id' => 'score', 'role' => 'auditor', 'label' => 'Nhóm lỗi, chấm điểm', 'kind' => 'rule'],
+        ['id' => 'rootcause', 'role' => 'auditor', 'label' => 'Gom lỗi theo nguyên nhân gốc và mẫu trang', 'kind' => 'rule', 'planned' => true, 'when' => 'THIẾT KẾ (playbook auditor/audit-site-rootcause); chưa có mã'],
+        ['id' => 'action_plan', 'role' => 'manager', 'label' => 'Kế hoạch hành động có thứ tự', 'kind' => 'rule', 'planned' => true, 'when' => 'THIẾT KẾ (manager/seo-orchestrator); chưa có bộ điều phối'],
         ['id' => 'suggest', 'human' => true, 'role' => 'auditor', 'label' => 'Sinh đề xuất làm mới', 'kind' => 'rule', 'when' => 'Khớp URL với bài'],
     ],
     'budget' => 'Token tương đối 0',

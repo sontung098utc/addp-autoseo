@@ -32,7 +32,7 @@ return [
         'Kết quả chỉ là dữ liệu có cấu trúc (JSON), không điều khiển công cụ.',
     ],
     'pass_condition' => 'Dàn ý có tiêu đề, các mục H2 theo ý định tìm kiếm.',
-    'on_fail' => 'Hiện chưa có vòng sửa riêng cho dàn ý; lỗi AI tạm thời được thử lại theo chính sách phiên chạy.',
+    'on_fail' => 'Hiện chưa có vòng sửa riêng cho dàn ý; lỗi AI tạm thời được thử lại theo chính sách phiên chạy. Thiết kế (chưa có mã): nhận dàn ý bị trả có lý do từ Người viết hoặc Biên tập, sửa tối đa 2 vòng rồi chuyển người xem.',
     'topic_class' => 'Theo hạng rủi ro của chủ đề (do RiskClassifier quyết định)',
     'on_timeout' => 'Phiên chạy dừng và trả bài về trạng thái cũ.',
     // AG-S14: được phép TẮT từ tab Vai trò (bước dàn ý bị bỏ qua, người viết tự bố cục). Vai trò không có khóa này là bắt buộc.
@@ -40,11 +40,14 @@ return [
     'skills' => [
         'brief/content-brief',
         'strategist/content-plan',
+        // Ý ĐỊNH (chưa có playbook, chưa nối): xem docs/seo-agent/ROLE_WORKFLOWS.md mục 3.4 và 3.9
+        'strategist/internal-linking',
+        'strategist/schema-plan',
     ],
     'orchestrator_steps' => [
         'brief' => 'strategist',
     ],
-    'readiness_note' => 'Đã chạy được trong phiên chạy. Mới kiểm bằng AI giả lập, chưa thử với model thật và chưa có người nghiệm thu.',
+    'readiness_note' => 'Đã chạy được trong phiên chạy. Mới kiểm bằng AI giả lập, chưa thử với model thật và chưa có người nghiệm thu. Mới nối bước dàn ý; phân tích SERP, liên kết nội bộ theo cụm, schema chỉ là thiết kế.',
     'origin' => [
         'claude-seo/seo-plan',
         'claude-seo/seo-content-brief',

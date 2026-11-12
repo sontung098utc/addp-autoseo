@@ -32,6 +32,8 @@ return [
     'on_timeout' => 'Trả phần đã có, ghi giới hạn.',
     'skills' => [
         'analyst/serp-gap',
+        // Ý ĐỊNH (chưa có playbook, chưa nối): khoảng trống liên kết/backlink; xem ROLE_WORKFLOWS.md mục 3.9
+        'analyst/backlink-gap',
     ],
     'orchestrator_steps' => [],
     'readiness' => 'not_connected',

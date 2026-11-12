@@ -17,6 +17,7 @@ return [
     'used_by' => ['human'],
     'steps' => [
         ['id' => 'guard', 'role' => 'system', 'label' => 'An toàn', 'kind' => 'rule'],
+        ['id' => 'trigger', 'role' => 'monitor', 'label' => 'Phát hiện bài suy giảm hoặc cơ hội', 'kind' => 'rule', 'planned' => true, 'when' => 'THIẾT KẾ: từ Search Console (chưa kết nối); hiện đầu vào duy nhất là đề xuất từ audit'],
         ['id' => 'grade_old', 'role' => 'editor', 'label' => 'Chấm bản hiện tại', 'kind' => 'rule'],
         ['id' => 'scope', 'role' => 'strategist', 'label' => 'Phân loại phạm vi sửa', 'kind' => 'rule', 'when' => '(a) tiêu đề và meta, (b) một số mục, (c) viết lại'],
         ['id' => 'meta', 'role' => 'writer', 'label' => 'Sinh lại siêu dữ liệu', 'kind' => 'llm', 'task' => 'meta_regen', 'when' => 'Nhánh 4a; bậc rẻ'],

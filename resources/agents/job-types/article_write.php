@@ -21,7 +21,7 @@ return [
         ['id' => 'brief', 'role' => 'strategist', 'label' => 'Lập dàn ý', 'kind' => 'llm', 'task' => 'outline', 'when' => 'Bỏ qua nếu vai trò Chiến lược tắt'],
         ['id' => 'research', 'role' => 'writer', 'label' => 'Nghiên cứu', 'kind' => 'rule', 'when' => 'Chạy sau dàn ý, trước bước viết; nạp kiến thức, ảnh, liên kết nội bộ, nguồn được trích. Rủi ro cao mà kho trống: trước đó tự đọc tối đa 5 trang website'],
         ['id' => 'write', 'role' => 'writer', 'label' => 'Viết', 'kind' => 'llm', 'task' => 'write'],
-        ['id' => 'images', 'role' => 'system', 'label' => 'Tạo ảnh', 'kind' => 'rule', 'when' => 'Sau khi lưu phiên bản; bỏ qua nếu đã có ảnh bìa từ thư viện, chưa có nhà cung cấp ảnh, lĩnh vực sức khỏe hoặc hết trần chi phí ảnh'],
+        ['id' => 'images', 'role' => 'designer', 'label' => 'Tạo ảnh', 'kind' => 'rule', 'when' => 'Sau khi lưu phiên bản; bỏ qua nếu đã có ảnh bìa từ thư viện, chưa có nhà cung cấp ảnh, lĩnh vực sức khỏe hoặc hết trần chi phí ảnh'],
         ['id' => 'grade', 'role' => 'editor', 'label' => 'Chấm điểm', 'kind' => 'rule'],
         ['id' => 'repair', 'role' => 'writer', 'label' => 'Sửa', 'kind' => 'llm', 'task' => 'repair', 'when' => 'Chỉ khi còn lỗi chặn; tối đa 3 vòng'],
         ['id' => 'handoff', 'human' => true, 'role' => 'system', 'label' => 'Bàn giao', 'kind' => 'rule'],
