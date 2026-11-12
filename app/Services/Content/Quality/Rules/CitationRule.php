@@ -44,9 +44,15 @@ class CitationRule implements QualityRule
         $cited = [];
         $uncited = [];
         $claimBlocks = 0;
-        foreach ($ctx->xpath()->query('//p|//li|//td|//blockquote') ?: [] as $node) {
+        $xp = $ctx->xpath();
+        $skip = "[not(ancestor-or-self::*[contains(concat(' ', normalize-space(@class), ' '), ' autoseo-refs ')])]";
+        foreach ($xp->query('//p'.$skip.'|//li'.$skip.'|//td'.$skip.'|//blockquote'.$skip) ?: [] as $node) {
             $text = trim(preg_replace('/\s+/u', ' ', $node->textContent) ?? '');
             if ($text === '') {
+                continue;
+            }
+            // Câu lưu ý "thông tin tham khảo, không thay thế bác sĩ" là miễn trừ, không phải khẳng định y khoa cần nguồn.
+            if (preg_match((new \ReflectionClassConstant(MedicalSafetyRule::class, 'DISCLAIMER'))->getValue(), $text) === 1) {
                 continue;
             }
             $marks = [];
@@ -55,6 +61,12 @@ class CitationRule implements QualityRule
                     foreach (preg_split('/[^\d]+/', $grp, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $n) {
                         $marks[] = (int) $n;
                     }
+                }
+            }
+            // Chú thích đã được CitationRenderer đổi sang <sup data-kb="12,14">[1, 2]</sup>.
+            foreach ($xp->query('.//sup[@data-kb]', $node) ?: [] as $sup) {
+                foreach (preg_split('/[^\d]+/', (string) $sup->getAttribute('data-kb'), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $n) {
+                    $marks[] = (int) $n;
                 }
             }
             $cited = array_merge($cited, $marks);

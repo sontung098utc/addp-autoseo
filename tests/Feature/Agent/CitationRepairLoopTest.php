@@ -89,7 +89,11 @@ class CitationRepairLoopTest extends TestCase
         $this->assertTrue(collect($fb)->contains(fn ($f) => str_contains($f, 'CITE01') && str_contains($f, 'học bổng toàn phần miễn 100%')), 'phản hồi nêu đúng đoạn thiếu dấu');
         $this->assertTrue(collect($fb)->contains(fn ($f) => str_contains($f, 'không bịa mã')));
         $this->assertNull($this->cite01($run), 'sau sửa mọi đoạn khẳng định có dấu [KB#id] hợp lệ');
-        $this->assertStringContainsString('[KB#'.$this->kb->id.']', (string) $run->finalVersion->html_content);
+        $html = (string) $run->finalVersion->html_content;
+        // Bản lưu cho người đọc: chú thích số + khối Nguồn tham khảo, không còn dấu thô [KB#id]; data-kb vẫn trỏ đúng mục để chấm lại.
+        $this->assertStringNotContainsString('[KB#', $html);
+        $this->assertStringContainsString('data-kb="'.$this->kb->id.'"', $html);
+        $this->assertStringContainsString('Nguồn tham khảo', $html);
     }
 
     public function test_viet_mai_khong_sua_thi_dung_vi_khong_cai_thien_va_khong_chan_ban_giao(): void

@@ -23,6 +23,8 @@ use App\Services\Ai\Playbook\InvalidPlaybook;
 use App\Services\Ai\Playbook\Playbook;
 use App\Services\Ai\Playbook\PlaybookLoader;
 use App\Filament\Support\Schedule\ErrorMasker;
+use App\Services\Content\CitationRenderer;
+use App\Services\Content\MedicalDisclaimer;
 use App\Services\Content\HtmlSanitizer;
 use App\Models\BrandProfile;
 use App\Services\Brand\BrandProfileData;
@@ -423,6 +425,10 @@ final class AgentRunOrchestrator
 
         // 7. Bàn giao: chỉ tạo BẢN NHÁP. Không bao giờ xuất bản ở bậc T1.
         $passed = ! $report->hasBlocking();
+        // Dấu [KB#id] chỉ để máy kiểm tra: bản lưu cho người đọc dùng chú thích số + khối Nguồn tham khảo (vẫn mang data-kb để chấm lại được).
+        if (isset($attrs['html_content']) && is_string($attrs['html_content'])) {
+            $attrs['html_content'] = CitationRenderer::render($attrs['html_content']);
+        }
         $version = $this->persist($article, $attrs, $passed);
         $run->update(['final_version_id' => $version->id]);
         $this->kb?->recordUsage($version);
@@ -636,6 +642,9 @@ final class AgentRunOrchestrator
             $options['playbook'] = $pb->body;
             $options['playbook_ref'] = $pb->ref();
         }
+        if ($run->risk_level === 'high' || $this->brainCtx->reliance() === 'must_cite') {
+            $options['medical'] = true; // bài sức khỏe/rủi ro cao: bắt buộc có đoạn đi khám và câu lưu ý (luật MED01)
+        }
         $options += $this->guidanceOptions($article) + $this->roleOptions('writer') + $this->brandOptions() + $this->brainCtx->options($article);
         $this->kb ??= new KnowledgeContext();
         $this->kb->load($article, $outline); // AG-S20: kiến thức đã duyệt, truy xuất một lần mỗi lượt chạy
@@ -651,6 +660,10 @@ final class AgentRunOrchestrator
         [$kbData, $kbNote] = $this->kb->stepInfo();
         $r = $this->callAi($run, $stage, $title, fn (AiProviderInterface $ai) => $ai->generateArticle($article, $outline, $options));
         $html = HtmlSanitizer::clean($r['html_content'] ?? '');
+        $disclaimerAdded = false;
+        if (! empty($options['medical'])) {
+            [$html, $disclaimerAdded] = MedicalDisclaimer::ensure($html); // AI quên câu lưu ý y tế thì hệ thống tự thêm (MED01)
+        }
         [$assetData, $assetNote] = $this->assets->stepInfo($html);
         // Nhà cung cấp thật có thể rơi về bản giả lập một cách im lặng (thiếu khóa, JSON hỏng). Không được gọi đó là AI thật.
         $fellBack = str_starts_with((string) ($r['model'] ?? ''), 'mock');
@@ -660,7 +673,7 @@ final class AgentRunOrchestrator
         $silentMock = $fellBack && ! $this->ai instanceof MockAiProvider;
         $mustCite = $this->brainCtx->reliance() === 'must_cite' && $feedback === [];
         $this->step($run, $stage, 'writer', $silentMock || $mustCite ? 'warn' : 'ok', $title, ($silentMock ? 'Nhà cung cấp AI đã rơi về bản giả lập (thiếu khóa hoặc phản hồi hỏng); nội dung không phải AI thật. ' : '').($feedback === []
-            ? 'Viết theo dàn ý'.(($options['guidance'] ?? '') !== '' ? ' và chỉ dẫn thêm của người phụ trách bài' : '').'; HTML được làm sạch trước khi chấm.'.$this->brandNote().$this->brainCtx->note().($mustCite ? ' Lĩnh vực bắt buộc nguồn: cần người có chuyên môn duyệt (luật EVID01 kiểm bằng chứng theo Sổ nguồn ở mức cả bài, chưa nối từng khẳng định với từng nguồn; hiện có '.$citable->count().' nguồn đã xác nhận).' : '').$kbNote.$assetNote
+            ? 'Viết theo dàn ý'.(($options['guidance'] ?? '') !== '' ? ' và chỉ dẫn thêm của người phụ trách bài' : '').'; HTML được làm sạch trước khi chấm.'.$this->brandNote().$this->brainCtx->note().($mustCite ? ' Lĩnh vực bắt buộc nguồn: cần người có chuyên môn duyệt (luật EVID01 kiểm bằng chứng theo Sổ nguồn ở mức cả bài, chưa nối từng khẳng định với từng nguồn; hiện có '.$citable->count().' nguồn đã xác nhận).' : '').$kbNote.$assetNote.($disclaimerAdded ? ' AI quên câu lưu ý y tế nên hệ thống đã tự thêm khung lưu ý cố định cuối bài.' : '')
             : 'Gửi lại cho AI '.count($feedback).' lỗi cần sửa (lỗi chặn hoặc đoạn thiếu trích dẫn): '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
             ['words' => \App\Services\Content\VietnameseText::wordCountHtml($html), 'playbook' => $this->pbData($pb)] + $this->brandData() + $this->brainCtx->stepData() + ($mustCite ? ['needs_expert_review' => true] : []) + $kbData + $assetData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
 
