@@ -52,9 +52,9 @@ final class ArticleImageStep
         }
         AgentRunStep::create([
             'agent_run_id' => $run->id, 'seq' => $seq ?? ((int) AgentRunStep::query()->where('agent_run_id', $run->id)->max('seq') + 1),
-            'stage' => 'images', 'role' => 'system', 'status' => $status, 'title' => $title, 'detail' => $detail,
+            'stage' => 'images', 'role' => 'designer', 'status' => $status, 'title' => $title, 'detail' => $detail,
             'data' => ['version_id' => $version->id, 'generated' => $gen, 'skipped_reason' => $r['skipped'], 'skip_code' => $r['skip_code'] ?? null,
-                'items' => $r['items'], 'cost' => $r['cost_vnd'], 'errors' => $errors, 'generator' => $r['generator_label'] ?? null, 'role_key' => 'system'],
+                'items' => $r['items'], 'cost' => $r['cost_vnd'], 'errors' => $errors, 'generator' => $r['generator_label'] ?? null, 'role_key' => 'designer'],
             'model' => $r['items'] !== [] ? 'image' : null, 'tokens_used' => 0, 'cost_vnd' => $r['cost_vnd'], 'started_at' => now(), 'finished_at' => now(),
         ]);
 

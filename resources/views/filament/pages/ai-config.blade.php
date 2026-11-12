@@ -38,6 +38,8 @@
         @endif
     </div>
 
+    <div class="text-sm" style="opacity:.8" data-testid="image-status">{{ $imageStatus['text'] }}. Đổi ở Đội AI → Vai trò → Họa viên hình ảnh → Mô hình &amp; kỹ thuật.</div>
+
     @if ($legacy)
         <div class="text-sm" style="padding:.7rem .9rem;border:1px solid rgba(217,119,6,.5);border-radius:.6rem">Đang dùng cấu hình cũ: một Gemini ({{ $legacy['source'] === 'db' ? 'khóa lưu trong hệ thống' : 'khóa từ biến môi trường' }}, model {{ $legacy['model'] }}). Thêm tài khoản để chuyển sang cấu hình mới.</div>
     @endif

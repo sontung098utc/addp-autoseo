@@ -6,6 +6,7 @@ use App\Filament\Support\Audit\LogAuditSink;
 use App\Models\AgentRoleAssignment;
 use App\Models\AiProvider;
 use App\Models\User;
+use App\Services\Agent\Ai\AiModelCatalog;
 use App\Services\Ai\Playbook\InvalidPlaybook;
 use App\Services\Ai\Playbook\PlaybookLoader;
 use Illuminate\Support\Facades\Schema;
@@ -21,6 +22,21 @@ final class RoleAssignments
 {
     /** Vai trò → loại việc của AiModelRouter. Vai trò không có ở đây thì chưa nối vào luồng gọi AI. */
     public const ROLE_TASKS = ['strategist' => ['outline'], 'writer' => ['write', 'repair'], 'editor' => ['summary']];
+
+    /** Vai trò dùng model ẢNH (kind=image) thay vì model chữ. Gán sai loại bị từ chối ở máy chủ. */
+    public const IMAGE_ROLES = ['designer'];
+
+    /** Vai trò có dùng model đã gán ở luồng chạy thật không: loại việc chữ trong ROLE_TASKS, hoặc vai trò hình ảnh (bước ảnh đọc bản gán). */
+    public static function isModelWired(string $role): bool
+    {
+        return isset(self::ROLE_TASKS[$role]) || in_array($role, self::IMAGE_ROLES, true);
+    }
+
+    /** Loại model mà vai trò được dùng: 'image' cho vai trò hình ảnh, còn lại 'text'. */
+    public static function modelKindFor(string $role): string
+    {
+        return in_array($role, self::IMAGE_ROLES, true) ? AiModelCatalog::KIND_IMAGE : AiModelCatalog::KIND_TEXT;
+    }
 
     public function __construct(private readonly ?RoleRegistry $registry = null, private readonly ?PlaybookLoader $playbooks = null) {}
 
@@ -109,6 +125,14 @@ final class RoleAssignments
         foreach ([$model, $fallbackModel] as $m) {
             if ($m !== null && (strlen($m) > 80 || ! preg_match('/^[A-Za-z0-9._:\/-]+$/', $m))) {
                 throw new InvalidArgumentException('Tên model không hợp lệ (chỉ chữ, số và . _ : / -, tối đa 80 ký tự).');
+            }
+        }
+        $want = self::modelKindFor($role);
+        foreach ([[$providerId, $model], [$fallbackProviderId, $fallbackModel]] as [$pid, $m]) {
+            if ($pid !== null && $m !== null && AiModelCatalog::kindOf(AiProvider::query()->findOrFail($pid), $m) !== $want) {
+                throw new InvalidArgumentException($want === AiModelCatalog::KIND_IMAGE
+                    ? "Model '{$m}' là model chữ; vai trò hình ảnh chỉ nhận model ảnh."
+                    : "Model '{$m}' là model ảnh; vai trò viết chữ chỉ nhận model chữ. Model ảnh gán cho vai trò Họa viên.");
             }
         }
         if ($providerId !== null && $providerId === $fallbackProviderId && $model === $fallbackModel) {

@@ -60,8 +60,11 @@ trait ManagesAiAccounts
             CheckboxList::make('models')->label('Model dùng được với tài khoản này')->options(fn (Get $get) => AiModelCatalog::options((string) ($get($brandExpr) ?: 'custom')))
                 ->columns(2)->bulkToggleable()->visible(fn (Get $get) => AiModelCatalog::options((string) ($get($brandExpr) ?: 'custom')) !== [])
                 ->helperText('Chỉ model được bật mới hiện ở danh sách chọn model cho nhân sự.'),
-            TagsInput::make('custom_models')->label('Thêm model theo tên')->placeholder('Gõ tên model rồi Enter')
-                ->helperText('Chữ, số và . _ : / - (tối đa 80 ký tự). Dùng khi hãng ra model mới chưa có trong danh sách.')
+            TagsInput::make('custom_models')->label('Thêm model chữ theo tên')->placeholder('Gõ tên model rồi Enter')
+                ->helperText('Chữ, số và . _ : / - (tối đa 80 ký tự). Dùng khi hãng ra model mới chưa có trong danh sách. Model ở đây luôn được coi là model chữ.')
+                ->nestedRecursiveRules(['regex:'.config('ai_models.custom_model_pattern')]),
+            TagsInput::make('custom_image_models')->label('Thêm model ảnh theo tên')->placeholder('Gõ tên model ảnh rồi Enter')
+                ->helperText('Chỉ dùng để tạo ảnh (vai trò Họa viên). Không hiện ở danh sách model của các vai trò viết chữ. Ví dụ: agy-image.')
                 ->nestedRecursiveRules(['regex:'.config('ai_models.custom_model_pattern')]),
         ];
     }
@@ -108,7 +111,7 @@ trait ManagesAiAccounts
                 $p = AiProvider::create([
                     'name' => $data['name'], 'kind' => $kind, 'base_url' => $baseUrl, 'api_key' => $data['api_key'],
                     'monthly_budget_vnd' => $data['monthly_budget_vnd'] ?? null, 'enabled' => true, 'updated_by' => Auth::id(),
-                    'models' => $this->mergeModels((array) ($data['models'] ?? []), (array) ($data['custom_models'] ?? [])),
+                    'models' => $this->mergeModels($brand, (array) ($data['models'] ?? []), (array) ($data['custom_models'] ?? []), (array) ($data['custom_image_models'] ?? [])),
                 ]);
                 $n = ! empty($data['suggest']) ? $this->suggestRoutes($p, $brand) : 0;
                 Notification::make()->title('Đã thêm tài khoản')->body('Khóa đã lưu mã hóa.'.($n ? " Đã gợi ý model cho {$n} loại việc." : '').' Bấm "Kiểm tra kết nối" để chắc chắn dùng được.')->success()->send();
@@ -122,7 +125,7 @@ trait ManagesAiAccounts
         $def = AiModelCatalog::presets()[$preset] ?? AiModelCatalog::presets()['custom'];
         $same = AiProvider::query()->get()->filter(fn (AiProvider $p) => AiModelCatalog::brandOf($p) === $preset)->count();
 
-        return ['preset' => $preset, 'name' => $same === 0 ? $def['label'] : $def['label'].' – tài khoản '.($same + 1), 'base_url' => $def['base_url'], 'models' => AiModelCatalog::defaults($preset), 'custom_models' => []];
+        return ['preset' => $preset, 'name' => $same === 0 ? $def['label'] : $def['label'].' – tài khoản '.($same + 1), 'base_url' => $def['base_url'], 'models' => AiModelCatalog::defaults($preset), 'custom_models' => [], 'custom_image_models' => []];
     }
 
     /** @return array{0: string, 1: ?string, 2: string} [kind, base_url, brand] */
@@ -141,10 +144,30 @@ trait ManagesAiAccounts
         return [$presets[$preset]['kind'], ($data['base_url'] ?? null) ?: ($presets[$preset]['base_url'] ?? null), $preset];
     }
 
-    /** @return list<string> */
-    private function mergeModels(array $picked, array $custom): array
+    /**
+     * Gộp model đã chọn trong danh mục (loại theo danh mục) với model nhập tay (ô "chữ" => text, ô "ảnh" => image).
+     * Mục lưu là chuỗi tên khi loại trùng suy đoán theo tên (giữ dạng cũ), hoặc {id, kind} khi khác.
+     *
+     * @return list<string|array{id: string, kind: string}>
+     */
+    private function mergeModels(string $brand, array $picked, array $customText, array $customImage = []): array
     {
-        return array_values(array_unique([...array_map('strval', $picked), ...$this->cleanCustom($custom)]));
+        $kinds = [];
+        foreach (AiModelCatalog::catalog($brand) as $m) {
+            $kinds[$m['id']] = $m['kind'];
+        }
+        $out = [];
+        foreach (array_map('strval', $picked) as $id) {
+            $out[$id] = AiModelCatalog::entryFor($id, $kinds[$id] ?? AiModelCatalog::inferKind($id));
+        }
+        foreach ($this->cleanCustom($customText) as $id) {
+            $out[$id] = AiModelCatalog::entryFor($id, AiModelCatalog::KIND_TEXT);
+        }
+        foreach ($this->cleanCustom($customImage) as $id) {
+            $out[$id] = AiModelCatalog::entryFor($id, AiModelCatalog::KIND_IMAGE);
+        }
+
+        return array_values($out);
     }
 
     public function editProviderAction(): Action
@@ -155,10 +178,14 @@ trait ManagesAiAccounts
                 $p = AiProvider::findOrFail($arguments['id']);
                 $brand = AiModelCatalog::brandOf($p);
                 $catalogIds = array_keys(AiModelCatalog::options($brand));
-                $enabled = array_column(AiModelCatalog::enabledModels($p), 'id');
+                $enabled = AiModelCatalog::enabledModels($p);
+                $ids = array_column($enabled, 'id');
+                $custom = array_filter($enabled, fn ($m) => ! in_array($m['id'], $catalogIds, true));
 
                 return ['name' => $p->name, 'base_url' => $p->base_url, 'monthly_budget_vnd' => $p->monthly_budget_vnd, 'enabled' => $p->enabled, 'preset' => $brand,
-                    'models' => array_values(array_intersect($enabled, $catalogIds)), 'custom_models' => array_values(array_diff($enabled, $catalogIds))];
+                    'models' => array_values(array_intersect($ids, $catalogIds)),
+                    'custom_models' => array_values(array_column(array_filter($custom, fn ($m) => $m['kind'] === 'text'), 'id')),
+                    'custom_image_models' => array_values(array_column(array_filter($custom, fn ($m) => $m['kind'] === 'image'), 'id'))];
             })
             ->form([
                 TextInput::make('name')->label('Tên tài khoản')->required()->maxLength(80),
@@ -176,7 +203,7 @@ trait ManagesAiAccounts
                     return;
                 }
                 $p->update(['name' => $data['name'], 'base_url' => $data['base_url'] ?: null, 'monthly_budget_vnd' => $data['monthly_budget_vnd'] ?? null, 'enabled' => (bool) $data['enabled'],
-                    'models' => $this->mergeModels((array) ($data['models'] ?? []), (array) ($data['custom_models'] ?? [])), 'updated_by' => Auth::id()]);
+                    'models' => $this->mergeModels(AiModelCatalog::brandOf($p), (array) ($data['models'] ?? []), (array) ($data['custom_models'] ?? []), (array) ($data['custom_image_models'] ?? [])), 'updated_by' => Auth::id()]);
                 Notification::make()->title('Đã lưu tài khoản')->success()->send();
             });
     }
@@ -217,7 +244,7 @@ trait ManagesAiAccounts
             ->action(function (array $arguments) {
                 $this->guardAdmin();
                 $p = AiProvider::findOrFail($arguments['id']);
-                $models = AiModelCatalog::enabledModels($p);
+                $models = array_values(array_filter(AiModelCatalog::enabledModels($p), fn ($m) => $m['kind'] === AiModelCatalog::KIND_TEXT)); // ping bằng model chữ, không dùng model ảnh
                 $pick = collect($models)->firstWhere('tier', 'cheap') ?? collect($models)->firstWhere('tier', 'standard') ?? ($models[0] ?? null);
                 $model = $pick['id'] ?? AiModelRoute::query()->where('primary_provider_id', $p->id)->value('primary_model');
                 if (! $p->hasKey() || ! $model) {
@@ -253,7 +280,7 @@ trait ManagesAiAccounts
     /** Route gợi ý cho các loại việc CHƯA có route, theo bậc và model gợi ý của loại tài khoản. @return int số route đã tạo */
     private function suggestRoutes(AiProvider $p, string $brand): int
     {
-        $enabled = AiModelCatalog::enabledModels($p);
+        $enabled = array_values(array_filter(AiModelCatalog::enabledModels($p), fn ($m) => $m['kind'] === AiModelCatalog::KIND_TEXT));
         $n = 0;
         foreach (AiModelRoute::TASKS as $task => [, $tier]) {
             $model = AiProvider::SUGGESTED_MODELS[$p->kind][$tier] ?? null;
@@ -276,7 +303,7 @@ trait ManagesAiAccounts
                 return;
             }
             try {
-                app(UrlSafetyService::class)->validateUrl((string) $value);
+                app(UrlSafetyService::class)->validateAiBaseUrl((string) $value);
             } catch (\InvalidArgumentException $e) {
                 $fail('Base URL không an toàn hoặc không hợp lệ.');
             }
@@ -302,6 +329,7 @@ trait ManagesAiAccounts
         return [
             'isAdmin' => $this->isAdmin(), 'providers' => $providers, 'presets' => AiModelCatalog::presets(),
             'legacy' => $legacy && $legacy['connected'] ? $legacy : null,
+            'imageStatus' => \App\Services\Images\ImageGeneratorResolver::status(),
             'limits' => ['budget' => AgentAi::policy()->budgetVnd, 'rounds' => AgentAi::policy()->maxRepairRounds],
             'tierLabels' => AiProvider::TIER_LABELS,
         ];

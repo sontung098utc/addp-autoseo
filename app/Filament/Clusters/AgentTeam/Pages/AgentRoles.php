@@ -390,8 +390,8 @@ class AgentRoles extends Page
         $a = $assign->find($key);
 
         return [
-            'assigned' => $assign->summary($key), 'modelWired' => isset(RoleAssignments::ROLE_TASKS[$key]), 'tasks' => RoleAssignments::ROLE_TASKS[$key] ?? [],
-            'groups' => AiModelCatalog::available(), 'configUrl' => AiUsagePage::configUrl(), 'tierLabels' => AiProvider::TIER_LABELS,
+            'assigned' => $assign->summary($key), 'modelWired' => RoleAssignments::isModelWired($key), 'tasks' => RoleAssignments::ROLE_TASKS[$key] ?? [],
+            'modelKind' => RoleAssignments::modelKindFor($key), 'groups' => AiModelCatalog::available(RoleAssignments::modelKindFor($key)), 'configUrl' => AiUsagePage::configUrl(), 'tierLabels' => AiProvider::TIER_LABELS,
             'primary' => $a && $a->provider_id && $a->model ? ['provider' => (int) $a->provider_id, 'model' => $a->model] : null,
             'fallback' => $a && $a->fallback_provider_id && $a->fallback_model ? ['provider' => (int) $a->fallback_provider_id, 'model' => $a->fallback_model] : null,
             'modelOn' => $a?->enabled ?? true,
@@ -415,7 +415,7 @@ class AgentRoles extends Page
     {
         $this->guarded(function (User $u) use ($slot, $providerId, $model) {
             abort_unless(in_array($slot, ['primary', 'fallback'], true), 422);
-            $ok = collect(AiModelCatalog::available())->firstWhere('id', $providerId);
+            $ok = collect(AiModelCatalog::available(RoleAssignments::modelKindFor((string) $this->studioRole)))->firstWhere('id', $providerId);
             if (! $ok || ! in_array($model, array_column($ok['models'], 'id'), true)) {
                 throw new \InvalidArgumentException('Model này chưa được bật ở Cấu hình AI.');
             }
@@ -458,7 +458,7 @@ class AgentRoles extends Page
                 $working = $d['working'];
             }
         }
-        $wired = isset(RoleAssignments::ROLE_TASKS[$key]);
+        $wired = RoleAssignments::isModelWired($key);
         $week = ['runs' => 0, 'steps' => 0, 'ok_rate' => null, 'cost' => 0.0];
         try {
             $q = AgentRunStep::query()->where('role', $key)->where('created_at', '>=', now()->subDays(7));
@@ -660,7 +660,7 @@ class AgentRoles extends Page
 
                 return array_merge($r, ['profile' => $prof, 'name' => $prof['display_name']]) + [
                     'skill_counts' => $reg->skillCounts($r), 'switchable' => $reg->isSwitchable($r['key']), 'is_off' => in_array($r['key'], $off, true),
-                    'model_wired' => isset(RoleAssignments::ROLE_TASKS[$r['key']]), 'assigned' => $assign->summary($r['key']),
+                    'model_wired' => RoleAssignments::isModelWired($r['key']), 'assigned' => $assign->summary($r['key']),
                     'working' => $office[$r['key']]['working'] ?? [], 'joins' => $office[$r['key']]['joins'] ?? [],
                     'skill_changes' => count(array_filter($reg->skills($r), fn ($s) => ! $s['enabled'] || $s['pin'] !== null)),
                     'updated' => $a ? trim(($a->updater?->name ?? '').' · '.$a->updated_at?->format('d/m/Y H:i'), ' ·') : null,

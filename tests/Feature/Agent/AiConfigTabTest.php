@@ -68,11 +68,11 @@ class AiConfigTabTest extends TestCase
         $this->assertSame('openai_compat', $or->kind);
         $this->assertSame('https://openrouter.ai/api/v1', $or->base_url);
         $m = AiProvider::where('name', 'Gemini – công ty')->value('models');
-        $this->assertContains('gemini-2.5-flash', $m);
+        $this->assertContains('gemini-3.6-flash', $m);
         $this->assertContains('gemini-exp-x', $m);
         $this->assertStringNotContainsString('COMPANYKEY', (string) \DB::table('ai_providers')->where('name', 'Gemini – công ty')->value('api_key'));
 
-        $html = $this->get('/admin/cau-hinh-ai')->assertOk()->assertSee('Gemini – công ty')->assertSee('Gemini – cá nhân')->assertSee('Gemini 2.5 Flash')->assertSee('gemini-exp-x')->getContent();
+        $html = $this->get('/admin/cau-hinh-ai')->assertOk()->assertSee('Gemini – công ty')->assertSee('Gemini – cá nhân')->assertSee('Gemini 3.6 Flash')->assertSee('gemini-exp-x')->getContent();
         $this->assertStringContainsString('data-logo="google"', $html);
         $this->assertStringContainsString('data-logo="openrouter"', $html);
         $this->assertStringNotContainsString('COMPANYKEY1111', $html);

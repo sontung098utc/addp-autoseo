@@ -23,7 +23,7 @@ final class OpenAiCompatImageGenerator implements ImageGeneratorInterface
             throw new ImageGenerationError('Thiếu base_url cho nhà cung cấp OpenAI-tương thích.');
         }
         try {
-            app(UrlSafetyService::class)->validateUrl($this->baseUrl);
+            app(UrlSafetyService::class)->validateAiBaseUrl($this->baseUrl);
         } catch (\InvalidArgumentException $e) {
             throw new ImageGenerationError('base_url không an toàn: '.ErrorMasker::mask($e->getMessage()));
         }

@@ -90,11 +90,11 @@ class RoleAssignmentTest extends TestCase
         $this->actingAs($this->user('admin'));
         Livewire::test(AgentRoles::class)
             ->call('openStudio', 'writer', 'model')
-            ->assertSee('Model khả dụng')->assertSee('claude-sonnet-5-5')->assertSee('gemini-1.5-flash')
+            ->assertSee('Model khả dụng')->assertSee('claude-sonnet-5-5')->assertSee('gemini-3.6-flash')
             ->call('pickModel', 'primary', $a->id, 'claude-sonnet-5-5')
-            ->call('pickModel', 'fallback', $g->id, 'gemini-1.5-flash')
+            ->call('pickModel', 'fallback', $g->id, 'gemini-3.6-flash')
             ->assertSee('Anthropic')->assertSee('Gemini');
-        $this->assertSame('Anthropic · claude-sonnet-5-5, dự phòng Gemini · gemini-1.5-flash', (new RoleAssignments)->summary('writer'));
+        $this->assertSame('Anthropic · claude-sonnet-5-5, dự phòng Gemini · gemini-3.6-flash', (new RoleAssignments)->summary('writer'));
         $row = AgentRoleAssignment::where('role_key', 'writer')->first();
         $this->assertSame($a->id, $row->provider_id);
         $this->assertSame('claude-sonnet-5-5', $row->model);

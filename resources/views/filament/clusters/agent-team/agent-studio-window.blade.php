@@ -323,7 +323,7 @@
                             </div>
                         @endforeach
                     </div>
-                    <div class="ags-sec">Model khả dụng</div>
+                    <div class="ags-sec">{{ ($s['modelKind'] ?? 'text') === 'image' ? 'Model ảnh khả dụng' : 'Model khả dụng' }}</div>
                     @forelse ($s['groups'] as $g)
                         <div class="ags-card" data-testid="studio-model-group" data-provider="{{ $g['id'] }}">
                             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem"><x-ai.logo :brand="$g['logo']" :size="1.8" /><strong class="text-sm">{{ $g['name'] }}</strong></div>

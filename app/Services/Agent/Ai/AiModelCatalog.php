@@ -12,6 +12,52 @@ use Throwable;
  */
 final class AiModelCatalog
 {
+    public const KIND_TEXT = 'text';
+
+    public const KIND_IMAGE = 'image';
+
+    public const KIND_LABELS = ['text' => 'Chữ', 'image' => 'Ảnh'];
+
+    /** Loại model suy từ tên khi chưa khai báo: chứa image, imagen hoặc nano-banana => ảnh, còn lại => chữ. */
+    public static function inferKind(string $id): string
+    {
+        return preg_match('/image|imagen|nano-banana/i', $id) ? self::KIND_IMAGE : self::KIND_TEXT;
+    }
+
+    /**
+     * Đọc một mục trong cột models: chuỗi tên (dữ liệu cũ, loại suy từ tên) hoặc mảng {id, kind}.
+     *
+     * @return array{id: string, kind: ?string} kind null = chưa khai báo
+     */
+    public static function parseEntry(mixed $e): array
+    {
+        if (is_array($e)) {
+            $k = $e['kind'] ?? null;
+
+            return ['id' => (string) ($e['id'] ?? ''), 'kind' => in_array($k, ['text', 'image'], true) ? $k : null];
+        }
+
+        return ['id' => (string) $e, 'kind' => null];
+    }
+
+    /** Mục để lưu: chuỗi khi loại trùng loại suy từ tên (giữ dạng cũ), mảng {id, kind} khi người dùng đã sửa khác suy đoán. */
+    public static function entryFor(string $id, string $kind): string|array
+    {
+        return $kind === self::inferKind($id) ? $id : ['id' => $id, 'kind' => $kind];
+    }
+
+    /** Loại model (text|image) của một model trong một tài khoản; model không có trong tài khoản thì suy từ tên. */
+    public static function kindOf(AiProvider $p, string $model): string
+    {
+        foreach (self::enabledModels($p) as $m) {
+            if ($m['id'] === $model) {
+                return $m['kind'];
+            }
+        }
+
+        return self::inferKind($model);
+    }
+
     /** @return array<string, array<string, mixed>> */
     public static function presets(): array
     {
@@ -47,7 +93,7 @@ final class AiModelCatalog
     /** @return list<array{id: string, name: string, tier: string, context: ?int, price: ?array, default: bool}> */
     public static function catalog(string $brand): array
     {
-        return array_map(fn (array $m) => $m + ['context' => null, 'price' => null, 'default' => false], (array) config("ai_models.models.{$brand}", []));
+        return array_map(fn (array $m) => $m + ['context' => null, 'price' => null, 'default' => false, 'kind' => self::inferKind((string) $m['id'])], (array) config("ai_models.models.{$brand}", []));
     }
 
     /** @return array<string, string> id => tên, cho CheckboxList */
@@ -55,7 +101,7 @@ final class AiModelCatalog
     {
         $o = [];
         foreach (self::catalog($brand) as $m) {
-            $o[$m['id']] = $m['name'].' · '.(AiProvider::TIER_LABELS[$m['tier']] ?? $m['tier']);
+            $o[$m['id']] = $m['name'].' · '.($m['kind'] === self::KIND_IMAGE ? 'Ảnh' : (AiProvider::TIER_LABELS[$m['tier']] ?? $m['tier']));
         }
 
         return $o;
@@ -84,11 +130,18 @@ final class AiModelCatalog
         foreach (self::catalog($brand) as $m) {
             $cat[$m['id']] = $m;
         }
-        $ids = is_array($p->models) ? $p->models : self::defaults($brand);
+        $entries = is_array($p->models) ? $p->models : self::defaults($brand);
         $out = [];
-        foreach (array_values(array_unique(array_map('strval', $ids))) as $id) {
+        $seen = [];
+        foreach ($entries as $e) {
+            ['id' => $id, 'kind' => $declared] = self::parseEntry($e);
+            if ($id === '' || isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
             $m = $cat[$id] ?? null;
-            $out[] = ['id' => $id, 'name' => $m['name'] ?? $id, 'tier' => $m['tier'] ?? null, 'context' => $m['context'] ?? null, 'price' => $m['price'] ?? null, 'custom' => $m === null];
+            $out[] = ['id' => $id, 'name' => $m['name'] ?? $id, 'tier' => $m['tier'] ?? null, 'context' => $m['context'] ?? null, 'price' => $m['price'] ?? null, 'custom' => $m === null,
+                'kind' => $declared ?? ($m['kind'] ?? self::inferKind($id))];
         }
 
         return $out;
@@ -99,7 +152,7 @@ final class AiModelCatalog
      *
      * @return list<array{id: int, name: string, brand: string, logo: string, models: list<array<string, mixed>>}>
      */
-    public static function available(): array
+    public static function available(?string $kind = null): array
     {
         try {
             if (! Schema::hasTable('ai_providers')) {
@@ -111,7 +164,11 @@ final class AiModelCatalog
                     continue;
                 }
                 $brand = self::brandOf($p);
-                $out[] = ['id' => $p->id, 'name' => $p->name, 'brand' => $brand, 'logo' => self::logoOf($brand), 'models' => self::enabledModels($p)];
+                $models = self::enabledModels($p);
+                if ($kind !== null) {
+                    $models = array_values(array_filter($models, fn ($m) => $m['kind'] === $kind));
+                }
+                $out[] = ['id' => $p->id, 'name' => $p->name, 'brand' => $brand, 'logo' => self::logoOf($brand), 'models' => $models];
             }
 
             return $out;
