@@ -80,17 +80,28 @@ class EvidenceRule implements QualityRule
         return $out;
     }
 
+    /** Câu có giống khẳng định kiểm chứng được không (số liệu có đơn vị hoặc từ khóa như "nghiên cứu", "khuyến cáo", "điều trị"...). */
+    public static function looksLikeClaim(string $sentence): bool
+    {
+        if (preg_match(self::FIGURE, $sentence) === 1) {
+            return true;
+        }
+        $l = mb_strtolower($sentence);
+        foreach (self::CUES as $cue) {
+            if (preg_match('/(?<![\p{L}\p{N}])'.preg_quote($cue, '/').'(?![\p{L}\p{N}])/u', $l) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** Số câu giống khẳng định kiểm chứng được. */
     private function claimCount(string $text): int
     {
         $n = 0;
         foreach (preg_split('/(?<=[.!?])\s+/u', $text) ?: [] as $s) {
-            $l = mb_strtolower($s);
-            $hit = preg_match(self::FIGURE, $s) === 1;
-            foreach (self::CUES as $cue) {
-                $hit = $hit || preg_match('/(?<![\p{L}\p{N}])'.preg_quote($cue, '/').'(?![\p{L}\p{N}])/u', $l) === 1;
-            }
-            $n += $hit ? 1 : 0;
+            $n += self::looksLikeClaim($s) ? 1 : 0;
         }
 
         return $n;

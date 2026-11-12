@@ -219,7 +219,7 @@ class BrainRunTest extends TestCase
         $this->assertStringNotContainsString(str_repeat('x', 801), $out);
         $this->assertStringNotContainsString(str_repeat('t', 81), $out);
         $this->assertStringNotContainsString('m3', $out, 'tối đa 2 bài mẫu');
-        $this->assertSame(12, substr_count($out, 'làm tốt'), 'tối đa 12 ý "Nên"');
+        $this->assertSame(15, substr_count($out, 'làm tốt'), 'tối đa 15 ý "Nên" (bằng giới hạn lưu của hồ sơ)');
         $this->assertStringContainsString('Tự do', $out);
         $this->assertSame('', $p->block([]));
         $this->assertSame('', $p->block(['domain' => 'bậy']));

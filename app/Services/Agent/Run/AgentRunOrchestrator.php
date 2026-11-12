@@ -384,7 +384,8 @@ final class AgentRunOrchestrator
         // 6. Vòng sửa có giới hạn.
         $reason = null;
         $round = 0;
-        while ($report->hasBlocking() && $round < $this->policy->maxRepairRounds) {
+        // Vòng sửa chạy khi còn lỗi CHẶN, hoặc (Trí tuệ bắt buộc nguồn) còn đoạn khẳng định chưa có dấu trích dẫn [KB#id] (CITE01, P1): lỗi sau không chặn bàn giao nhưng được sửa.
+        while (($report->hasBlocking() || $report->citationGaps() !== []) && $round < $this->policy->maxRepairRounds) {
             if ($this->spent($run) >= $this->policy->budgetVnd) {
                 $reason = 'Hết ngân sách cho phiên chạy ('.number_format($this->policy->budgetVnd, 0, ',', '.').' ₫) nên dừng sửa.';
                 $this->decision($run, 'budget_exhausted', 'Dừng sửa vì hết ngân sách', $reason, ['spent_vnd' => $this->spent($run), 'budget_vnd' => $this->policy->budgetVnd, 'score' => $score]);
@@ -398,11 +399,14 @@ final class AgentRunOrchestrator
                 break;
             }
             $feedback = array_map(fn ($r) => "{$r->code}: {$r->message}", $report->blocking());
+            foreach ($report->citationGaps() as $excerpt) {
+                $feedback[] = "CITE01: đoạn «{$excerpt}» có khẳng định nhưng chưa có dấu [KB#id]; thêm dấu của mục kho đã cung cấp hỗ trợ khẳng định đó, hoặc bỏ/nêu chung chung nếu kho không có căn cứ (không bịa mã).";
+            }
             $attrs = $this->write($run, $article, $outline['outline'] ?? [], $feedback, 'repair', "Sửa lần {$round}", $editorPb);
             $report = $this->grade($run, $article, $attrs, "Chấm lại sau lần sửa {$round}", $round, $editorPb, '');
             $new = $this->penalty($report);
             $newScore = RunScorer::score($report);
-            if ($report->hasBlocking() && $new >= $penalty) {
+            if (($report->hasBlocking() || $report->citationGaps() !== []) && $new >= $penalty) {
                 $reason = 'Sửa không cải thiện điểm (từ '.$penalty.' xuống '.$new.') nên dừng, tránh tốn thêm chi phí.';
                 $this->decision($run, 'no_improvement', 'Dừng sửa vì không cải thiện', $reason." Điểm {$score} → {$newScore}.", ['penalty_before' => $penalty, 'penalty_after' => $new, 'score_before' => $score, 'score_after' => $newScore]);
                 $penalty = $new;
@@ -657,7 +661,7 @@ final class AgentRunOrchestrator
         $mustCite = $this->brainCtx->reliance() === 'must_cite' && $feedback === [];
         $this->step($run, $stage, 'writer', $silentMock || $mustCite ? 'warn' : 'ok', $title, ($silentMock ? 'Nhà cung cấp AI đã rơi về bản giả lập (thiếu khóa hoặc phản hồi hỏng); nội dung không phải AI thật. ' : '').($feedback === []
             ? 'Viết theo dàn ý'.(($options['guidance'] ?? '') !== '' ? ' và chỉ dẫn thêm của người phụ trách bài' : '').'; HTML được làm sạch trước khi chấm.'.$this->brandNote().$this->brainCtx->note().($mustCite ? ' Lĩnh vực bắt buộc nguồn: cần người có chuyên môn duyệt (luật EVID01 kiểm bằng chứng theo Sổ nguồn ở mức cả bài, chưa nối từng khẳng định với từng nguồn; hiện có '.$citable->count().' nguồn đã xác nhận).' : '').$kbNote.$assetNote
-            : 'Gửi lại cho AI '.count($feedback).' lỗi chặn cần sửa: '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
+            : 'Gửi lại cho AI '.count($feedback).' lỗi cần sửa (lỗi chặn hoặc đoạn thiếu trích dẫn): '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
             ['words' => \App\Services\Content\VietnameseText::wordCountHtml($html), 'playbook' => $this->pbData($pb)] + $this->brandData() + $this->brainCtx->stepData() + ($mustCite ? ['needs_expert_review' => true] : []) + $kbData + $assetData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
 
         return [

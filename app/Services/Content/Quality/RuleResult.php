@@ -18,6 +18,8 @@ final class RuleResult
         public readonly ?string $measured = null,
         public readonly ?string $threshold = null,
         public readonly ?string $excerpt = null,
+        /** Chi tiết có cấu trúc cho vòng sửa (ví dụ các đoạn chưa trích dẫn); luật nào không cần thì để trống. @var list<string> */
+        public readonly array $details = [],
     ) {
     }
 

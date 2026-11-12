@@ -41,6 +41,23 @@ final class QualityReport
         return array_values(array_filter($this->results, fn (RuleResult $r) => $r->isBlocking()));
     }
 
+    /**
+     * Các đoạn khẳng định chưa có dấu trích dẫn [KB#id] (luật CITE01, mức P1) của Trí tuệ bắt buộc nguồn. Không chặn bàn giao nhưng ĐƯA VÀO VÒNG SỬA:
+     * người viết được yêu cầu thêm trích dẫn từ mục kho đã cung cấp hoặc bỏ khẳng định.
+     *
+     * @return list<string> đoạn mẫu (đã rút gọn), rỗng nếu không có chỗ nào cần sửa
+     */
+    public function citationGaps(): array
+    {
+        foreach ($this->results as $r) {
+            if ($r->code === 'CITE01' && ! $r->passed && $r->severity === RuleResult::P1 && $r->details !== []) {
+                return $r->details;
+            }
+        }
+
+        return [];
+    }
+
     /** @return list<string> mã luật P0 chưa đạt (duy nhất) */
     public function blockingCodes(): array
     {

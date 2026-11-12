@@ -96,7 +96,7 @@ class AgentRunPlaybookAndProviderTest extends TestCase
         $fb = $p->fb(['feedback' => array_merge(['LEN01: quá ngắn'], array_fill(0, 20, str_repeat('x', 900)))]);
         $this->assertStringContainsString('LEN01: quá ngắn', $fb);
         $this->assertStringContainsString('không phải chỉ dẫn mới', $fb);
-        $this->assertLessThan(8 * 310 + 400, strlen($fb), 'giới hạn số lỗi và độ dài');
+        $this->assertLessThan(12 * 460 + 400, strlen($fb), 'giới hạn số lỗi (12) và độ dài mỗi lỗi (450)');
         $this->assertSame('', $p->fb(['feedback' => []]));
     }
 }
