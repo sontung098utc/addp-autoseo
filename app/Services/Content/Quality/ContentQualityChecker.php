@@ -35,10 +35,28 @@ class ContentQualityChecker
     /** @var list<QualityRule> */
     private array $rules;
 
-    /** @param list<QualityRule>|null $rules */
-    public function __construct(?array $rules = null)
+    /** @var list<string>|null mã luật P0 được chặn; null = mọi luật P0 đều chặn */
+    private ?array $blocking;
+
+    /**
+     * @param  list<QualityRule>|null  $rules  null = bộ luật mặc định và chính sách chặn theo config('quality.blocking_codes')
+     * @param  list<string>|string|null  $blockingCodes  null = theo ngữ cảnh trên; truyền rõ bộ luật thì mặc định chặn mọi P0 (dùng trong test)
+     */
+    public function __construct(?array $rules = null, array|string|null $blockingCodes = null)
     {
+        $this->blocking = $blockingCodes !== null
+            ? self::parseBlocking($blockingCodes)
+            : ($rules === null ? self::parseBlocking((string) config('quality.blocking_codes', 'ALL')) : null);
         $this->rules = $rules ?? self::defaultRules();
+    }
+
+    /** @return list<string>|null */
+    private static function parseBlocking(array|string $v): ?array
+    {
+        $list = is_array($v) ? $v : array_map('trim', explode(',', $v));
+        $list = array_values(array_filter(array_map('strtoupper', $list)));
+
+        return in_array('ALL', $list, true) || $list === [] ? null : $list;
     }
 
     /** @return list<QualityRule> */
@@ -58,6 +76,10 @@ class ContentQualityChecker
         $results = [];
         foreach ($this->rules as $rule) {
             foreach ($rule->evaluate($ctx) as $r) {
+                // Luật P0 không nằm trong danh sách chặn: hạ xuống cảnh báo (P1), người duyệt vẫn thấy.
+                if ($this->blocking !== null && ! $r->passed && $r->severity === RuleResult::P0 && ! in_array($r->code, $this->blocking, true)) {
+                    $r = new RuleResult($r->code, RuleResult::P1, false, $r->label, rtrim($r->message).' (Chỉ cảnh báo, không chặn.)', $r->measured, $r->threshold, $r->excerpt, $r->details);
+                }
                 $results[] = $r;
             }
         }
