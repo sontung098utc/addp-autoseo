@@ -16,6 +16,7 @@ class AgentTickCommand extends Command
 
     public function handle(): int
     {
+        \App\Services\Agent\Run\StaleRunReaper::reap(); // đóng phiên treo trước khi giao việc mới
         $demo = (bool) $this->option('demo');
         $runner = new CampaignRunner(function () use ($demo) {
             if ($demo) {
