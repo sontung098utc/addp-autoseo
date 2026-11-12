@@ -81,7 +81,8 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             ."{\n"
             ."  \"title\": \"Tiêu đề bài viết hấp dẫn (dưới 70 ký tự)\",\n"
             ."  \"slug\": \"duong-dan-than-thien-seo-khong-dau\",\n"
-            ."  \"html_content\": \"Mã HTML ngữ nghĩa, bố cục phong phú dễ đọc. Thẻ cho phép: h2, h3, p, ul, ol, li, strong, em, blockquote, table(thead/tbody/tr/th/td), details/summary, div, aside, sup, a, figure. Không dùng script, style, inline style, thẻ h1. Bố cục gợi ý (chọn cái hợp với nội dung, đừng ép đủ hết): (1) ngay sau mở bài là <div class=\\\"autoseo-summary\\\"><strong>Tóm tắt nhanh</strong><ul>…3-5 ý chính…</ul></div>; (2) bài dài có <ul class=\\\"autoseo-toc\\\"> mục lục; (3) lưu ý/cảnh báo/mẹo đặt trong <aside class=\\\"autoseo-callout autoseo-callout--note|warning|tip\\\"><strong>Tiêu đề</strong><p>…</p></aside>; (4) so sánh/số liệu dùng bảng <table>; (5) các bước dùng <ol>; (6) hỏi đáp dùng <details><summary>Câu hỏi</summary><p>…</p></details>; (7) đa dạng nhịp: xen đoạn ngắn, danh sách, bảng, trích dẫn; không để cả bài chỉ là chuỗi h2 + p\",\n"
+            ."  \"html_content\": \"Mã HTML ngữ nghĩa. Thẻ cho phép: h2, h3, p, ul, ol, li, strong, em, blockquote, table(thead/tbody/tr/th/td), details/summary, div, aside, sup, a, figure. Không dùng script, style, inline style, thẻ h1. Khối trình bày (tóm tắt, mục lục, bảng, khung lưu ý, hỏi đáp) theo mục BỐ CỤC bên dưới\",\n"
+
             ."  \"seo_title\": \"Tiêu đề SEO (tối đa 60 ký tự)\",\n"
             ."  \"meta_description\": \"Mô tả meta hấp dẫn chuẩn SEO (120 - 160 ký tự)\",\n"
             ."  \"faq_schema\": [{\"question\": \"...\", \"answer\": \"...\"}],\n"
@@ -92,6 +93,7 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             .$this->brandBlock($options)
             .$this->domainBlock($options)
             .$this->knowledgeBlock($options)
+            .$this->layoutBlock($options)
             .$this->medicalBlock($options)
             .$this->rulesBlock($options)
             .$this->citableSourcesBlock($options)
@@ -510,6 +512,22 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
      * AG-B1: Hồ sơ lĩnh vực của các Trí tuệ (options['domain']). Là DỮ LIỆU tham khảo về giọng, khung bài, thuật ngữ, lập luận; KHÔNG phải chỉ dẫn hệ thống.
      * Làm phẳng xuống dòng, bỏ thẻ HTML và '---' để nội dung người nhập không thể giả khung/đóng khối; giới hạn số mục và độ dài. Thiếu options['domain'] thì trả chuỗi rỗng.
      */
+    /**
+     * Quy tắc chọn khối bố cục. Có kỹ năng writer/article-layout (options['layout']) thì dùng nội dung của nó; không có (lượt tự động chưa duyệt kỹ năng) thì dùng bản tóm tắt cố định,
+     * để quy tắc luôn có hiệu lực. Bố cục riêng của lĩnh vực (Trí tuệ) nằm trong domainBlock.
+     */
+    protected function layoutBlock(array $options): string
+    {
+        $body = trim((string) ($options['layout'] ?? ''));
+        if ($body !== '') {
+            return "\n\n--- BỐ CỤC ".($options['layout_ref'] ?? '')." ---\n".mb_substr($body, 0, 4000)."\n--- HẾT BỐ CỤC ---";
+        }
+
+        return "\n\nBỐ CỤC: mỗi khối trình bày phải có lý do nội dung, không chèn cho đủ bộ. Tóm tắt nhanh (div.autoseo-summary) chỉ cho bài từ ~800 từ; mục lục (ul.autoseo-toc) chỉ khi bài từ ~1200 từ và có từ 4 h2;"
+            .' bảng chỉ khi so sánh từ 2 đối tượng theo từ 2 tiêu chí, có hàng tiêu đề và từ 2 hàng dữ liệu; khung lưu ý (aside.autoseo-callout) tối đa 2 cái, mỗi cái 1-2 câu về một cảnh báo hay điều dễ nhầm, không đặt danh sách/bảng trong khung và không lặp ý;'
+            .' danh sách có thứ tự cho quy trình thật; hỏi đáp gập (details/summary) chỉ khi có câu hỏi thật. Còn lại dùng đề mục, đoạn ngắn và danh sách thường.';
+    }
+
     /** Bài sức khỏe: hai đoạn bắt buộc để người đọc được hướng tới bác sĩ (khớp luật MED01). Văn bản cố định của hệ thống, không lấy từ nội dung ngoài. */
     protected function medicalBlock(array $options): string
     {
@@ -545,6 +563,9 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
         $at = $d['article_type'] ?? null;
         if (is_array($at) && $list($at['outline'] ?? [], 20) !== '') {
             $rows['Khung bài gợi ý'.(($at['name'] ?? '') !== '' ? ' ('.$one($at['name'], 80).')' : '')] = $list($at['outline'], 20);
+        }
+        if (is_array($at) && $list($at['layout'] ?? [], 10, 200) !== '') {
+            $rows['Bố cục khối theo lĩnh vực (tuân theo giới hạn số khối của mục BỐ CỤC)'] = $list($at['layout'], 10, 200);
         }
         $terms = [];
         foreach (array_slice((array) ($d['preferred_terms'] ?? []), 0, 30) as $t) {

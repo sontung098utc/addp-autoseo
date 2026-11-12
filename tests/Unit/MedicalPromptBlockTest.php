@@ -23,4 +23,19 @@ class MedicalPromptBlockTest extends TestCase
         $this->assertSame(1, preg_match($ctx->getConstant('SEE_DOCTOR'), $text));
         $this->assertSame(1, preg_match($ctx->getConstant('DISCLAIMER'), $text));
     }
+
+    public function test_layout_block_uses_skill_body_else_builtin_rules_and_brain_layout_reaches_prompt(): void
+    {
+        $p = (new \ReflectionClass(OpenAiCompatibleProvider::class))->newInstanceWithoutConstructor();
+        $lay = new \ReflectionMethod(\App\Services\Ai\AbstractLlmProvider::class, 'layoutBlock');
+        $lay->setAccessible(true);
+        $this->assertStringContainsString('tối đa 2 cái', $lay->invoke($p, []), 'không có kỹ năng: quy tắc cố định vẫn có hiệu lực');
+        $this->assertStringContainsString('QUY TẮC RIÊNG', $lay->invoke($p, ['layout' => 'QUY TẮC RIÊNG', 'layout_ref' => 'writer/article-layout@1']));
+
+        $dom = new \ReflectionMethod(\App\Services\Ai\AbstractLlmProvider::class, 'domainBlock');
+        $dom->setAccessible(true);
+        $out = $dom->invoke($p, ['domain' => ['article_type' => ['name' => 'Giải thích', 'outline' => ['A'], 'layout' => ['Bảng mốc tham chiếu']]]]);
+        $this->assertStringContainsString('Bố cục khối theo lĩnh vực', $out);
+        $this->assertStringContainsString('Bảng mốc tham chiếu', $out);
+    }
 }

@@ -336,6 +336,7 @@ final class AgentRunOrchestrator
 
         // 3. Dàn ý (vai trò Chiến lược; tắt được: bỏ bước này, người viết tự bố cục, các bước sau không phụ thuộc).
         $this->skills['write'] = $this->usePlaybook('writer', 'article-draft');
+        $this->skills['layout'] = $this->usePlaybook('writer', 'article-layout'); // quy tắc chọn khối bố cục, nạp kèm vào prompt viết bài
         if ($this->presetOutline !== null) {
             $outline = ['outline' => $this->presetOutline];
             $this->skills['brief'] = [null, 'Dàn ý có sẵn.'];
@@ -387,7 +388,7 @@ final class AgentRunOrchestrator
         $reason = null;
         $round = 0;
         // Vòng sửa chạy khi còn lỗi CHẶN, hoặc (Trí tuệ bắt buộc nguồn) còn đoạn khẳng định chưa có dấu trích dẫn [KB#id] (CITE01, P1): lỗi sau không chặn bàn giao nhưng được sửa.
-        while (($report->hasBlocking() || $report->citationGaps() !== []) && $round < $this->policy->maxRepairRounds) {
+        while (($report->hasBlocking() || $report->citationGaps() !== [] || $report->layoutGaps() !== []) && $round < $this->policy->maxRepairRounds) {
             if ($this->spent($run) >= $this->policy->budgetVnd) {
                 $reason = 'Hết ngân sách cho phiên chạy ('.number_format($this->policy->budgetVnd, 0, ',', '.').' ₫) nên dừng sửa.';
                 $this->decision($run, 'budget_exhausted', 'Dừng sửa vì hết ngân sách', $reason, ['spent_vnd' => $this->spent($run), 'budget_vnd' => $this->policy->budgetVnd, 'score' => $score]);
@@ -404,11 +405,14 @@ final class AgentRunOrchestrator
             foreach ($report->citationGaps() as $excerpt) {
                 $feedback[] = "CITE01: đoạn «{$excerpt}» có khẳng định nhưng chưa có dấu [KB#id]; thêm dấu của mục kho đã cung cấp hỗ trợ khẳng định đó, hoặc bỏ/nêu chung chung nếu kho không có căn cứ (không bịa mã).";
             }
+            foreach (array_slice($report->layoutGaps(), 0, 6) as $gap) {
+                $feedback[] = 'LAY01: '.$gap;
+            }
             $attrs = $this->write($run, $article, $outline['outline'] ?? [], $feedback, 'repair', "Sửa lần {$round}", $editorPb);
             $report = $this->grade($run, $article, $attrs, "Chấm lại sau lần sửa {$round}", $round, $editorPb, '');
             $new = $this->penalty($report);
             $newScore = RunScorer::score($report);
-            if (($report->hasBlocking() || $report->citationGaps() !== []) && $new >= $penalty) {
+            if (($report->hasBlocking() || $report->citationGaps() !== [] || $report->layoutGaps() !== []) && $new >= $penalty) {
                 $reason = 'Sửa không cải thiện điểm (từ '.$penalty.' xuống '.$new.') nên dừng, tránh tốn thêm chi phí.';
                 $this->decision($run, 'no_improvement', 'Dừng sửa vì không cải thiện', $reason." Điểm {$score} → {$newScore}.", ['penalty_before' => $penalty, 'penalty_after' => $new, 'score_before' => $score, 'score_after' => $newScore]);
                 $penalty = $new;
@@ -645,6 +649,10 @@ final class AgentRunOrchestrator
         if ($run->risk_level === 'high' || $this->brainCtx->reliance() === 'must_cite') {
             $options['medical'] = true; // bài sức khỏe/rủi ro cao: bắt buộc có đoạn đi khám và câu lưu ý (luật MED01)
         }
+        if (($lay = $this->skills['layout'][0] ?? null) !== null) {
+            $options['layout'] = $lay->body;
+            $options['layout_ref'] = $lay->ref();
+        }
         $options += $this->guidanceOptions($article) + $this->roleOptions('writer') + $this->brandOptions() + $this->brainCtx->options($article);
         $this->kb ??= new KnowledgeContext();
         $this->kb->load($article, $outline); // AG-S20: kiến thức đã duyệt, truy xuất một lần mỗi lượt chạy
@@ -675,7 +683,7 @@ final class AgentRunOrchestrator
         $this->step($run, $stage, 'writer', $silentMock || $mustCite ? 'warn' : 'ok', $title, ($silentMock ? 'Nhà cung cấp AI đã rơi về bản giả lập (thiếu khóa hoặc phản hồi hỏng); nội dung không phải AI thật. ' : '').($feedback === []
             ? 'Viết theo dàn ý'.(($options['guidance'] ?? '') !== '' ? ' và chỉ dẫn thêm của người phụ trách bài' : '').'; HTML được làm sạch trước khi chấm.'.$this->brandNote().$this->brainCtx->note().($mustCite ? ' Lĩnh vực bắt buộc nguồn: cần người có chuyên môn duyệt (luật EVID01 kiểm bằng chứng theo Sổ nguồn ở mức cả bài, chưa nối từng khẳng định với từng nguồn; hiện có '.$citable->count().' nguồn đã xác nhận).' : '').$kbNote.$assetNote.($disclaimerAdded ? ' AI quên câu lưu ý y tế nên hệ thống đã tự thêm khung lưu ý cố định cuối bài.' : '')
             : 'Gửi lại cho AI '.count($feedback).' lỗi cần sửa (lỗi chặn hoặc đoạn thiếu trích dẫn): '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
-            ['words' => \App\Services\Content\VietnameseText::wordCountHtml($html), 'playbook' => $this->pbData($pb)] + $this->brandData() + $this->brainCtx->stepData() + ($mustCite ? ['needs_expert_review' => true] : []) + $kbData + $assetData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
+            ['words' => \App\Services\Content\VietnameseText::wordCountHtml($html), 'playbook' => $this->pbData($pb), 'layout_skill' => $this->pbData($this->skills['layout'][0] ?? null)] + $this->brandData() + $this->brainCtx->stepData() + ($mustCite ? ['needs_expert_review' => true] : []) + $kbData + $assetData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
 
         return [
             'article_id' => $article->id, 'title' => $r['title'] ?? $article->primary_keyword, 'slug' => $r['slug'] ?? 'bai-viet', 'outline' => $outline,
