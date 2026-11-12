@@ -22,8 +22,7 @@
 
     $dash = fn ($v) => filled($v) ? $v : '—';
     $num = fn ($v) => $v === null ? '—' : number_format((int) $v, 0, ',', '.');
-    $statusLabel = StatusPresenter::label($article->workflow_status, 'article');
-    $statusColor = StatusPresenter::color($article->workflow_status, 'article');
+    [$statusLabel, $statusColor] = \App\Filament\Support\Review\ArticleRows::statusBadge($article, false);
     $qCounts = $quality?->counts();
     $canApprove = \App\Filament\Support\Review\ReviewActions::canApprove();
     $sources = array_values((array) ($latest?->sources_cited ?? []));

@@ -348,12 +348,9 @@ class ArticleResource extends Resource
                     ->label('Trạng thái')
                     ->badge()
                     ->formatStateUsing(function (?string $state, Article $r) {
-                        $label = StatusPresenter::label($state, 'article');
-                        $live = ArticleRows::liveRun($r);
-
-                        return $live ? ($state === 'drafting' ? 'Đang viết' : $label).' · '.(ArticleRows::stageLabel($live) ?? 'AI') : $label;
+                        return ArticleRows::statusBadge($r)[0];
                     })
-                    ->color(fn (?string $state) => StatusPresenter::color($state, 'article'))
+                    ->color(fn (?string $state, Article $r) => ArticleRows::statusBadge($r)[1])
                     ->icon(fn (?string $state, Article $r) => ArticleRows::liveRun($r) ? 'heroicon-o-arrow-path' : StatusPresenter::icon($state, 'article'))
                     ->extraAttributes(fn (Article $r) => ArticleRows::liveRun($r) ? ['class' => 'ss-badge-live', 'data-running' => '1'] : [])),
                 // Khung hẹp (< xl): cột Chiến dịch đầy đủ bị ẩn nên giữ một huy hiệu ngắn để vẫn thấy bài thuộc chiến dịch hay là bài lẻ.
@@ -506,7 +503,8 @@ class ArticleResource extends Resource
         return Tables\Actions\Action::make('approve')->size('sm')->label('Duyệt')->icon('heroicon-o-check')->color('success')
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'approve')
             ->authorize(fn () => ReviewActions::canApprove())
-            ->tooltip(fn (Article $r) => ReviewActions::blockedHint(static::qualityOf($r)))
+            ->disabled(fn (Article $r) => ArticleRows::liveRun($r) !== null)
+            ->tooltip(fn (Article $r) => ArticleRows::liveRun($r) ? 'Đội AI đang viết lại bài, chờ xong rồi duyệt bản mới.' : ReviewActions::blockedHint(static::qualityOf($r)))
             ->modalHeading(fn (Article $r) => static::qualityOf($r)?->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi P0' : 'Duyệt nội dung')
             ->form(fn (Article $r) => ReviewActions::approveForm((int) $r->created_by === (int) ReviewActions::user()?->id, static::qualityOf($r)))
             ->action(function (Article $r, array $data) {
@@ -520,6 +518,7 @@ class ArticleResource extends Resource
         return Tables\Actions\Action::make('reject')->label('Từ chối')->icon('heroicon-o-x-mark')->color('danger')
             ->visible(fn (Article $r) => $r->workflow_status === 'needs_review')
             ->authorize(fn () => ReviewActions::canApprove())
+            ->disabled(fn (Article $r) => ArticleRows::liveRun($r) !== null)
             ->form(ReviewActions::rejectForm())
             ->action(function (Article $r, array $data) {
                 abort_unless(ReviewActions::canApprove(), 403);

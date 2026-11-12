@@ -292,7 +292,8 @@ class ViewArticle extends EditArticle
             Actions\Action::make('approve')->label('Duyệt')->icon('heroicon-o-check')->color('primary')
                 ->visible(fn () => $this->record->workflow_status === 'needs_review' && $this->latest() !== null)
                 ->authorize(fn () => ReviewActions::canApprove())
-                ->tooltip(fn () => ReviewActions::blockedHint(ReviewActions::qualityFor($this->latest())))
+                ->disabled(fn () => \App\Filament\Support\Review\ArticleRows::liveRun($this->record) !== null)
+                ->tooltip(fn () => \App\Filament\Support\Review\ArticleRows::liveRun($this->record) ? 'Đội AI đang viết lại bài, chờ xong rồi duyệt bản mới.' : ReviewActions::blockedHint(ReviewActions::qualityFor($this->latest())))
                 ->modalHeading(fn () => ReviewActions::qualityFor($this->latest())->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi P0' : 'Duyệt nội dung')
                 ->form(fn () => ReviewActions::approveForm((int) $this->record->created_by === (int) ReviewActions::user()?->id, ReviewActions::qualityFor($this->latest())))
                 ->action(function (array $data) {
@@ -303,6 +304,7 @@ class ViewArticle extends EditArticle
             Actions\Action::make('reject')->label('Từ chối')->icon('heroicon-o-x-mark')->color('danger')->outlined()
                 ->visible(fn () => $this->record->workflow_status === 'needs_review' && $this->latest() !== null)
                 ->authorize(fn () => ReviewActions::canApprove())
+                ->disabled(fn () => \App\Filament\Support\Review\ArticleRows::liveRun($this->record) !== null)
                 ->form(ReviewActions::rejectForm())
                 ->action(function (array $data) {
                     abort_unless(ReviewActions::canApprove(), 403);

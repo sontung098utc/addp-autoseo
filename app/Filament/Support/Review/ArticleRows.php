@@ -42,6 +42,32 @@ final class ArticleRows
         return $r && RunActivity::isLive($r) ? $r : null;
     }
 
+    /**
+     * Nhãn trạng thái MỘT nơi cho danh sách và trang chi tiết, để hai chỗ không nói khác nhau.
+     * Phiên đang chạy thắng trạng thái bài (bài chờ duyệt mà đội AI đang viết lại thì là "Đang viết lại", bản cũ vẫn chờ duyệt);
+     * phiên quá hạn không có bước mới là "Có thể bị treo"; bài còn "Đang viết" mà phiên cuối lỗi/bị chặn và chưa có bản nháp là "Phiên lỗi".
+     *
+     * @return array{0:string,1:string} [nhãn, màu]
+     */
+    public static function statusBadge(Article $a, bool $withStage = true): array
+    {
+        $state = (string) $a->workflow_status;
+        $run = self::lastRun($a);
+        if ($run && RunActivity::isLive($run)) {
+            $stage = $withStage ? self::stageLabel($run) : null;
+
+            return [($state === 'drafting' ? 'Đang viết' : 'Đang viết lại').($withStage ? ' · '.($stage ?? 'AI') : ''), 'info'];
+        }
+        if ($run && RunActivity::isStale($run)) {
+            return ['Có thể bị treo', 'warning'];
+        }
+        if ($state === 'drafting' && $run && in_array($run->status, ['failed', 'blocked'], true)) {
+            return ['Phiên lỗi, chưa có bản nháp', 'danger'];
+        }
+
+        return [\App\Filament\Support\StatusPresenter::label($state, 'article'), \App\Filament\Support\StatusPresenter::color($state, 'article')];
+    }
+
     public static function stageLabel(AgentRun $run): ?string
     {
         $s = RunActivity::currentStage($run->steps);

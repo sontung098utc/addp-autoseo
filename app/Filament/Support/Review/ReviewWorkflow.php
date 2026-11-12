@@ -72,6 +72,7 @@ class ReviewWorkflow
             if ($version->review_status !== 'needs_review' || $article->workflow_status !== 'needs_review') {
                 throw new InvalidArgumentException('Chỉ duyệt được bản đang ở trạng thái Chờ duyệt.');
             }
+            $this->assertNoLiveRun($article);
             $this->assertLatest($article, $version);
 
             $blocking = $this->quality->check($version, $article)->blockingCodes();
@@ -109,6 +110,7 @@ class ReviewWorkflow
             if ($version->review_status !== 'needs_review' || $article->workflow_status !== 'needs_review') {
                 throw new InvalidArgumentException('Chỉ từ chối được bản đang ở trạng thái Chờ duyệt.');
             }
+            $this->assertNoLiveRun($article);
             $this->assertLatest($article, $version);
 
             $reason = $this->clean($reason);
@@ -181,6 +183,15 @@ class ReviewWorkflow
         $fresh = ArticleVersion::query()->lockForUpdate()->findOrFail($version->id);
 
         return [$article, $fresh];
+    }
+
+    /** Đội AI đang viết lại bài thì bản trong tay người duyệt sắp bị thay: chờ phiên xong rồi duyệt bản mới. */
+    private function assertNoLiveRun(Article $article): void
+    {
+        $run = \App\Models\AgentRun::query()->where('article_id', $article->id)->where('status', 'running')->latest('id')->first();
+        if ($run && \App\Filament\Support\Agent\RunActivity::isLive($run)) {
+            throw new InvalidArgumentException('Đội AI đang viết lại bài này (phiên #'.$run->id.'). Chờ phiên xong rồi duyệt bản mới.');
+        }
     }
 
     private function assertLatest(Article $article, ArticleVersion $version): void
