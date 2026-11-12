@@ -59,11 +59,12 @@
         .rvx-kpi--running{border-color:rgba(2,132,199,.5)}.rvx-kpi--running .rvx-kpi__ic{background:rgba(2,132,199,.14);color:var(--fl-run)}.rvx-kpi--running b{color:var(--fl-run)}
         .rvx-flowpane{padding:1rem 1.1rem 1.2rem;background:var(--fl-card);box-shadow:var(--fl-shadow)}
         .rvx-pane{border:1px solid var(--fl-line);border-radius:.75rem;padding:.9rem 1rem}
-        /* Chi tiết bước: khung nổi cố định bên phải, không đẩy lưu đồ; đóng bằng X hoặc Esc. */
-        .rvx-drawer{position:fixed;top:5rem;right:1rem;z-index:40;width:min(26rem,calc(100vw - 2rem));max-height:calc(100vh - 6.5rem);overflow:auto;background:var(--fl-card,#fff);box-shadow:0 18px 48px rgba(15,23,42,.28);padding-top:2.4rem}
-        .rvx-drawer__x{position:absolute;top:.5rem;right:.5rem;display:inline-flex;align-items:center;justify-content:center;width:1.75rem;height:1.75rem;border:0;border-radius:999px;background:transparent;color:inherit;cursor:pointer;opacity:.7}
+        /* Chi tiết bước: một trang dính sát mép phải, cao hết màn hình (ngăn trượt); không đẩy lưu đồ; đóng bằng X, Esc hoặc bấm nền mờ. */
+        .rvx-drawer{position:fixed;top:0;right:0;bottom:0;z-index:60;width:min(30rem,100vw);height:100vh;max-height:none;overflow:auto;border-radius:0;border-width:0 0 0 1px;background:var(--fl-card,#fff);box-shadow:-12px 0 40px rgba(15,23,42,.22);padding:3.2rem 1.25rem 1.5rem}
+        .rvx-drawer__x{position:absolute;top:.9rem;right:.9rem;display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;border:0;border-radius:999px;background:transparent;color:inherit;cursor:pointer;opacity:.7}
         .rvx-drawer__x:hover{opacity:1;background:rgba(128,128,128,.18)}
-        .rvx-drawer h3{padding-right:2rem}
+        .rvx-drawer h3{padding-right:2.5rem;font-size:1rem}
+        .rvx-scrim{position:fixed;inset:0;z-index:59;background:rgba(15,23,42,.25)}
 
         .rvx-pane h3{margin:0 0 .5rem;font-size:.95rem;font-weight:700;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
         .rvx-step{border-top:1px solid var(--fl-line);padding:.55rem 0;font-size:.8rem}.rvx-step:first-of-type{border-top:0}
@@ -149,6 +150,7 @@
                     </div>
 
                     {{-- MỘT khung chi tiết cho chặng đang chọn --}}
+                    <div class="rvx-scrim" x-show="sel !== null" x-cloak x-transition.opacity.duration.150ms x-on:click="sel = null" aria-hidden="true" data-testid="stage-detail-scrim"></div>
                     @foreach ($nodes as $n)
                         @php [$stLabel, $stIcon] = RunFlow::STATE[$n['state']]; @endphp
                         <div class="rvx-pane rvx-drawer" role="dialog" aria-label="Chi tiết bước: {{ $n['title'] }}" data-testid="stage-detail" data-detail="{{ $n['code'] }}" x-show="sel === '{{ $n['code'] }}'" x-cloak x-transition.opacity.duration.120ms>
