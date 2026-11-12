@@ -29,11 +29,13 @@ final class KnowledgeRetriever
             return [];
         }
         $rows = [];
+        // Mục còn là tiếng Anh vẫn phải tìm được bằng truy vấn tiếng Việt: thêm từ khóa tiếng Anh tương đương (KnowledgeGlossary).
+        $en = KnowledgeGlossary::expand($query);
         if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
-            $rows = $this->fulltext($website, $query, $brainIds, $onlyType);
+            $rows = $this->fulltext($website, $en === [] ? $query : $query.' '.implode(' ', $en), $brainIds, $onlyType);
         }
         if ($rows === []) {
-            $rows = $this->like($website, $terms, $query, $brainIds, $onlyType);
+            $rows = $this->like($website, $terms, $query, $brainIds, $onlyType, $en);
         }
         usort($rows, fn ($a, $b) => $b['score'] <=> $a['score'] ?: $a['id'] <=> $b['id']);
 
@@ -127,16 +129,17 @@ final class KnowledgeRetriever
         return $items->map(fn ($i) => $this->row($i, (float) $i->ft_score / $max, $website, $brainIds))->all();
     }
 
-    private function like(Website $website, array $terms, string $query, ?array $brainIds, ?string $onlyType = null): array
+    private function like(Website $website, array $terms, string $query, ?array $brainIds, ?string $onlyType = null, array $en = []): array
     {
         // Ký tự thoát là '!' (không phải '\'): trong MariaDB/MySQL '\' là ký tự thoát của chuỗi SQL nên `escape '\'` là lỗi cú pháp.
         $esc = fn (string $t) => preg_replace('/([!%_])/', '!$1', $t);
-        $items = $this->base($website, $brainIds, $onlyType)->where(function ($q) use ($terms, $esc) {
-            foreach ($terms as $t) {
+        $items = $this->base($website, $brainIds, $onlyType)->where(function ($q) use ($terms, $esc, $en) {
+            foreach (array_merge($terms, $en) as $t) {
                 $q->orWhereRaw("lower(title) like ? escape '!'", ['%'.$esc($t).'%'])->orWhereRaw("lower(body) like ? escape '!'", ['%'.$esc($t).'%']);
             }
         })->limit(200)->get();
         $phrase = KnowledgeDedupe::normalize($query);
+        $concepts = KnowledgeGlossary::concepts($query);
         $out = [];
         foreach ($items as $i) {
             $title = KnowledgeDedupe::normalize($i->title);
@@ -146,6 +149,13 @@ final class KnowledgeRetriever
                 $hit += (str_contains($title, $t) ? 2 : 0) + (str_contains($body, $t) ? 1 : 0);
             }
             $score = $hit / (3 * count($terms));
+            if ($concepts !== []) { // mục tiếng Anh: điểm theo số khái niệm được phủ, lấy cao hơn (không phạt mục tiếng Việt vì có thêm từ)
+                $hitEn = 0.0;
+                foreach ($concepts as $alts) {
+                    $hitEn += (count(array_filter($alts, fn ($t) => str_contains($title, $t))) > 0 ? 2 : 0) + (count(array_filter($alts, fn ($t) => str_contains($body, $t))) > 0 ? 1 : 0);
+                }
+                $score = max($score, min(1.0, $hitEn / (3 * count($concepts))));
+            }
             if ($phrase !== '' && (str_contains($title, $phrase) || str_contains($body, $phrase))) {
                 $score = min(1.0, $score + 0.3);
             }

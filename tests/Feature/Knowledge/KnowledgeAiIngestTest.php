@@ -54,6 +54,91 @@ class KnowledgeAiIngestTest extends TestCase
         };
     }
 
+    /** Lỗi tạm thời của nhà cung cấp (như HTTP 503) đúng kiểu mà TransientAiError nhận ra. */
+    private function transient(?int $retryAfter = null): \Throwable
+    {
+        return \App\Services\Agent\Run\TransientAiError::withHint('tạm lỗi (HTTP 503)', 503, $retryAfter);
+    }
+
+    private function retrySvc(array &$slept): KnowledgeAiIngest
+    {
+        return new KnowledgeAiIngest(sleep: function (int $s) use (&$slept) {
+            $slept[] = $s;
+        });
+    }
+
+    public function test_loi_tam_thoi_503_duoc_thu_lai_roi_van_ra_muc_de_xuat(): void
+    {
+        $slept = [];
+        $src = $this->source('Gói Cơ bản có giá 8.000.000 đồng mỗi năm.');
+        $ai = $this->fake([$this->transient(), $this->transient(), ['items' => [$this->item()]]]);
+
+        $log = $this->retrySvc($slept)->run($src, $this->user(), $ai);
+
+        $this->assertSame([4, 12], $slept, 'chờ tăng dần giữa các lần thử lại');
+        $this->assertSame(2, $log['retries']);
+        $this->assertNull($log['stopped']);
+        $this->assertSame(1, $log['proposed']);
+        $this->assertCount(3, $ai->calls);
+    }
+
+    public function test_loi_tam_thoi_keo_dai_het_bac_thang_thi_dung_co_ghi_so_lan_thu(): void
+    {
+        $slept = [];
+        $ai = $this->fake([$this->transient(), $this->transient(), $this->transient(), $this->transient(), ['items' => [$this->item()]]]);
+
+        $log = $this->retrySvc($slept)->run($this->source('Gói Cơ bản có giá 8.000.000 đồng mỗi năm.'), $this->user(), $ai);
+
+        $this->assertSame('error', $log['stopped']);
+        $this->assertSame(3, $log['retries']);
+        $this->assertSame(0, $log['proposed']);
+        $this->assertCount(4, $ai->calls, '1 lần gọi + 3 lần thử lại, không đập tiếp');
+    }
+
+    public function test_ton_trong_retry_after_cua_nha_cung_cap(): void
+    {
+        $slept = [];
+        $ai = $this->fake([$this->transient(20), ['items' => [$this->item()]]]);
+
+        $this->retrySvc($slept)->run($this->source('Gói Cơ bản có giá 8.000.000 đồng mỗi năm.'), $this->user(), $ai);
+
+        $this->assertSame([20], $slept);
+    }
+
+    public function test_het_han_muc_ngay_va_loi_khong_tam_thoi_thi_khong_thu_lai(): void
+    {
+        foreach ([new \App\Services\Ai\AiQuotaExceeded('hết hạn mức ngày'), new \RuntimeException('khóa sai')] as $e) {
+            $slept = [];
+            $ai = $this->fake([$e, ['items' => [$this->item()]]]);
+            $log = $this->retrySvc($slept)->run($this->source('Gói Cơ bản có giá 8.000.000 đồng mỗi năm.'), $this->user(), $ai);
+
+            $this->assertSame([], $slept);
+            $this->assertSame('error', $log['stopped']);
+            $this->assertCount(1, $ai->calls);
+        }
+    }
+
+    public function test_chi_dan_ep_tieng_viet_va_chep_nguyen_van_span_goc(): void
+    {
+        $p = KnowledgeAiIngest::systemPrompt('abc');
+
+        $this->assertStringContainsString('TIẾNG VIỆT', $p);
+        $this->assertStringContainsString('NGUYÊN VĂN theo ngôn ngữ gốc', $p);
+    }
+
+    public function test_muc_ai_van_tra_tieng_anh_duoc_gan_the_can_dich(): void
+    {
+        $src = $this->source('Insulin is a hormone made by the pancreas that helps glucose get into your cells.');
+        $en = $this->item(['type' => 'fact', 'title' => 'Insulin', 'body' => 'Insulin is a hormone made by the pancreas that helps glucose get into your cells.', 'value' => null, 'value_unit' => null, 'entity' => null, 'field' => null,
+            'source_span' => 'Insulin is a hormone made by the pancreas that helps glucose get into your cells.']);
+        $log = (new KnowledgeAiIngest)->run($src, $this->user(), $this->fake([['items' => [$en]]]));
+
+        $this->assertSame(1, $log['not_vietnamese']);
+        $this->assertContains('cần dịch', KnowledgeItem::first()->tags);
+        $this->assertTrue(KnowledgeAiIngest::isVietnamese('Đái tháo đường là bệnh mạn tính'));
+        $this->assertFalse(KnowledgeAiIngest::isVietnamese('Diabetes is a chronic disease'));
+    }
+
     private function item(array $o = []): array
     {
         return $o + ['title' => 'Giá gói Cơ bản', 'body' => 'Gói Cơ bản có giá 8.000.000 đồng mỗi năm.', 'type' => 'price', 'topic' => 'Bảng giá', 'tags' => ['giá'],
