@@ -26,7 +26,7 @@
     /* ===== Popup ===== */
     .pm{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:1.25rem}
     .pm__back{position:absolute;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(2px)}
-    .pm__box{position:relative;display:flex;flex-direction:column;width:min(1100px,100%);max-height:85vh;background:var(--fl-card);border-radius:1.1rem;border:1px solid var(--fl-line);box-shadow:0 24px 60px rgba(15,23,42,.35);overflow:hidden;border-top:4px solid var(--tone)}
+    .pm__box{position:relative;display:flex;flex-direction:column;width:min(1100px,100%);max-height:85vh;background:var(--fl-card);border-radius:1.1rem;border:1px solid var(--fl-line);box-shadow:0 24px 60px rgba(15,23,42,.35);overflow:hidden}
     .pm__head{display:flex;flex-wrap:wrap;gap:.6rem 1rem;align-items:center;justify-content:space-between;padding:.85rem 1.1rem;border-bottom:1px solid var(--fl-line)}
     .pm__titles{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;min-width:0}
     .pm__titles h3{margin:0;font-size:1.25rem;font-weight:800}
