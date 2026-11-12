@@ -265,7 +265,9 @@ final class SourceDiscoveryService
             foreach (KnowledgeItem::query()->where('source_id', $source->id)->where('status', 'proposed')->orderBy('id')->get() as $item) {
                 $t = $this->tiering->tier($item, $brain, false);
                 $item->update(['risk_tier' => $t['tier']]);
+                // Tầng C (y tế, pháp lý, tài chính, hạng rủi ro cao...) LUÔN chờ người duyệt, kể cả từ nguồn tin cậy (RiskTiering, như đường xây kho từ website).
                 $ok = $trust['level'] === 'trusted' && trim((string) $item->source_span) !== '' && ! in_array($item->type, RiskTiering::C_TYPES, true)
+                    && $t['tier'] !== RiskTiering::C
                     && $builder->autoApprove($item, $by, 'Tự nhận từ nguồn tin cậy '.$domain.' (tải '.now()->format('d/m/Y').')');
                 if ($ok) {
                     $auto++;

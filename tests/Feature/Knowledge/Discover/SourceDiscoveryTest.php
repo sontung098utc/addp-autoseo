@@ -201,6 +201,30 @@ class SourceDiscoveryTest extends TestCase
         $this->assertEqualsWithDelta(220.0, $r['cost_vnd'], 0.01);
     }
 
+    public function test_muc_tang_c_y_te_tu_nguon_tin_cay_van_cho_nguoi_duyet_con_muc_thuong_van_tu_nhan(): void
+    {
+        Http::fake([
+            'who.int/robots.txt' => Http::response('', 404),
+            'who.int/tt' => Http::response($this->page('Tài liệu', 'Người tiểu đường cần theo dõi đường huyết thường xuyên cùng bác sĩ. Thư viện mở cửa từ 8 giờ sáng mỗi ngày.'), 200, ['Content-Type' => 'text/html']),
+        ]);
+        $ai = $this->ai([['items' => [
+            $this->item('fact', 'Theo dõi đường huyết', 'Người tiểu đường cần theo dõi đường huyết thường xuyên cùng bác sĩ.', 'Người tiểu đường cần theo dõi đường huyết thường xuyên cùng bác sĩ'),
+            $this->item('fact', 'Giờ mở cửa thư viện', 'Thư viện mở cửa từ 8 giờ sáng mỗi ngày.', 'Thư viện mở cửa từ 8 giờ sáng mỗi ngày'),
+        ]]]);
+        $r = $this->svc($ai)->import($this->site, [['url' => 'https://www.who.int/tt']], $this->user());
+
+        $health = KnowledgeItem::where('title', 'Theo dõi đường huyết')->first();
+        $this->assertSame('C', $health->risk_tier);
+        $this->assertSame('proposed', $health->status, 'tầng C luôn chờ người duyệt, kể cả nguồn tin cậy có đoạn nguyên văn');
+        $this->assertNull($health->review_mode);
+        $plain = KnowledgeItem::where('title', 'Giờ mở cửa thư viện')->first();
+        $this->assertNotSame('C', $plain->risk_tier);
+        $this->assertSame('approved', $plain->status);
+        $this->assertSame('auto', $plain->review_mode);
+        $this->assertSame(1, $r['items_auto']);
+        $this->assertSame(1, $r['items_proposed']);
+    }
+
     public function test_import_tin_cay_lai_tu_luat_khong_tin_du_lieu_gui_len_va_trung_bam_bo_qua(): void
     {
         $body = $this->page('Trang', 'Nội dung giống hệt để kiểm trùng băm.');
