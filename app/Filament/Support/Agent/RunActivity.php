@@ -61,13 +61,16 @@ final class RunActivity
     }
 
     /**
-     * Chặng đang chạy suy từ bước cuối: guard→risk→brief→write→grade→(repair→grade | handoff); retry→write.
+     * Chặng đang chạy suy từ bước cuối: guard→risk→brief→write→grade→(repair→grade | handoff); retry/failover không đổi chặng.
      * Sau bước chấm: đạt (ok) thì bàn giao, chưa đạt thì sửa. Bàn giao xong thì phiên sắp đóng (null).
      *
      * @param  Collection<int, AgentRunStep>  $steps  đã sắp theo seq
      */
     public static function currentStage(Collection $steps): ?string
     {
+        // 'retry'/'failover' là lần thử lại CÙNG chặng kế tiếp (không phải một chặng mới): bỏ ra, chặng hiện tại suy từ bước thật cuối cùng.
+        // Trước đây retry luôn được coi là "Viết", nên AI đang thử lại lúc lập dàn ý mà giao diện vẫn báo "Đang ở: Viết".
+        $steps = $steps->reject(fn ($s) => in_array($s->stage, ['retry', 'failover'], true))->values();
         $last = $steps->last();
         if (! $last) {
             return 'guard';
@@ -83,7 +86,6 @@ final class RunActivity
             'risk' => 'brief',
             'brief' => 'write',
             'write' => 'grade',
-            'retry' => 'write',
             'grade' => $last->status === 'ok' ? 'handoff' : 'repair',
             'repair' => 'grade',
             'decision' => 'handoff',

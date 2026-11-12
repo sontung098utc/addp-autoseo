@@ -62,6 +62,10 @@ class LiveMotionTest extends TestCase
             [['guard', 'risk', 'brief', 'write', ['grade', 'blocked']], 'repair'],
             [['guard', 'risk', 'brief', 'write', ['grade', 'blocked'], 'repair'], 'grade'],
             [['guard', 'risk', 'brief', ['retry', 'warn']], 'write'],
+            // AI thử lại/chuyển model lúc LẬP DÀN Ý: vẫn là chặng dàn ý, không phải Viết.
+            [['guard', 'risk', ['retry', 'warn'], ['retry', 'warn'], ['failover', 'warn']], 'brief'],
+            [['guard', 'risk', 'brief', 'research', ['retry', 'warn']], 'write'],
+            [['guard', 'risk', 'brief', 'write', ['grade', 'blocked'], ['retry', 'warn']], 'repair'],
             [['guard', 'risk', 'brief', 'write', 'grade', 'handoff'], null],
         ];
         foreach ($cases as [$stages, $expect]) {
