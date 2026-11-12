@@ -20,11 +20,11 @@ class OpenAiCompatibleProvider extends AbstractLlmProvider
             throw new AiProviderError('Thiếu base_url cho nhà cung cấp OpenAI-tương thích.');
         }
         try {
-            app(UrlSafetyService::class)->validateUrl($this->baseUrl);
+            app(UrlSafetyService::class)->validateAiBaseUrl($this->baseUrl);
         } catch (\InvalidArgumentException $e) {
             throw new AiProviderError('base_url không an toàn: '.$e->getMessage());
         }
-        $res = $this->send(fn () => Http::baseUrl(rtrim($this->baseUrl, '/'))->timeout(90)->connectTimeout(10)
+        $res = $this->send(fn () => Http::baseUrl(rtrim($this->baseUrl, '/'))->timeout((int) config('ai_rate.http_timeout', 90))->connectTimeout(10)
             ->withToken($this->apiKey)->acceptJson()
             ->post('/chat/completions', [
                 'model' => $this->model, 'temperature' => 0.4, 'response_format' => ['type' => 'json_object'],

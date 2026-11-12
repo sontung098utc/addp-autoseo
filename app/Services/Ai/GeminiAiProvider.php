@@ -16,7 +16,7 @@ class GeminiAiProvider extends AbstractLlmProvider
     {
         parent::__construct(
             $apiKey ?? config('services.google_ai.api_key', env('GOOGLE_AI_API_KEY')),
-            $model ?? config('services.google_ai.model', 'gemini-1.5-flash'),
+            $model ?? config('services.google_ai.model', 'gemini-3.6-flash'),
             $pricing,
         );
     }
@@ -30,7 +30,7 @@ class GeminiAiProvider extends AbstractLlmProvider
 
     protected function callGeminiApi(string $systemInstruction, string $userContent): array
     {
-        $res = $this->send(fn () => Http::baseUrl(self::BASE_URL)->timeout(90)->connectTimeout(10)
+        $res = $this->send(fn () => Http::baseUrl(self::BASE_URL)->timeout((int) config('ai_rate.http_timeout', 90))->connectTimeout(10)
             ->withHeaders(['x-goog-api-key' => $this->apiKey])->acceptJson()
             ->post("models/{$this->model}:generateContent", [
                 'system_instruction' => ['parts' => [['text' => $systemInstruction]]],
@@ -44,7 +44,7 @@ class GeminiAiProvider extends AbstractLlmProvider
         }
         $u = $body['usageMetadata'] ?? [];
         $in = (int) ($u['promptTokenCount'] ?? 0);
-        $out = (int) ($u['candidatesTokenCount'] ?? 0);
+        $out = (int) ($u['candidatesTokenCount'] ?? 0) + (int) ($u['thoughtsTokenCount'] ?? 0); // token suy luận tính tiền như đầu ra
 
         return ['text' => $text, 'prompt_tokens' => $in, 'completion_tokens' => $out, 'total_tokens' => (int) ($u['totalTokenCount'] ?? ($in + $out))];
     }

@@ -61,6 +61,8 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
         return [
             'outline' => array_values($data['outline']),
             'tokens_used' => $r['total_tokens'],
+            'prompt_tokens' => $r['prompt_tokens'],
+            'completion_tokens' => $r['completion_tokens'],
             'cost_vnd' => $this->calculateCostVnd($r['prompt_tokens'], $r['completion_tokens'], $this->model),
             'model' => $this->model,
             'prompt_version' => $this->promptVersion,
@@ -114,6 +116,8 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             'faq_schema' => is_array($data['faq_schema'] ?? null) ? $data['faq_schema'] : [],
             'sources_cited' => is_array($data['sources_cited'] ?? null) ? $data['sources_cited'] : [],
             'tokens_used' => $r['total_tokens'],
+            'prompt_tokens' => $r['prompt_tokens'],
+            'completion_tokens' => $r['completion_tokens'],
             'cost_vnd' => $this->calculateCostVnd($r['prompt_tokens'], $r['completion_tokens'], $this->model),
             'model' => $this->model,
             'prompt_version' => $this->promptVersion,
@@ -170,6 +174,8 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             'seo_title' => $cut($title, T::MAX_SEO_TITLE_CHARS),
             'meta_description' => $cut($meta, T::MAX_META_CHARS),
             'tokens_used' => $r['total_tokens'],
+            'prompt_tokens' => $r['prompt_tokens'],
+            'completion_tokens' => $r['completion_tokens'],
             'cost_vnd' => $this->calculateCostVnd($r['prompt_tokens'], $r['completion_tokens'], $this->model),
             'model' => $this->model,
             'prompt_version' => 'v1.0-refresh-meta',
@@ -234,6 +240,8 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
         return [
             'sections' => $out,
             'tokens_used' => $r['total_tokens'],
+            'prompt_tokens' => $r['prompt_tokens'],
+            'completion_tokens' => $r['completion_tokens'],
             'cost_vnd' => $this->calculateCostVnd($r['prompt_tokens'], $r['completion_tokens'], $this->model),
             'model' => $this->model,
             'prompt_version' => 'v1.0-refresh-section',
@@ -249,6 +257,8 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
         return [
             'data' => $this->decode($r['text']),
             'tokens_used' => $r['total_tokens'],
+            'prompt_tokens' => $r['prompt_tokens'],
+            'completion_tokens' => $r['completion_tokens'],
             'cost_vnd' => $this->calculateCostVnd($r['prompt_tokens'], $r['completion_tokens'], $this->model),
             'model' => $this->model,
         ];
@@ -296,6 +306,43 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
         }
     }
 
+    /** Số giây nhà cung cấp yêu cầu chờ: header Retry-After (giây hoặc ngày giờ HTTP) hoặc RetryInfo.retryDelay ("34s") của Google; trần 1 giờ. */
+    public static function retryAfterSeconds(Response $response): ?int
+    {
+        $h = trim((string) $response->header('Retry-After'));
+        if ($h !== '') {
+            if (ctype_digit($h)) {
+                return min((int) $h, 3600);
+            }
+            $t = strtotime($h);
+            if ($t !== false) {
+                return max(0, min($t - time(), 3600));
+            }
+        }
+        foreach ((array) $response->json('error.details', []) as $d) {
+            if (is_array($d) && is_string($d['retryDelay'] ?? null) && preg_match('/^(\d+(?:\.\d+)?)s$/', $d['retryDelay'], $m)) {
+                return min((int) ceil((float) $m[1]), 3600);
+            }
+        }
+
+        return null;
+    }
+
+    /** 429 do hạn mức theo ngày: Google ghi quotaId có "PerDay" trong QuotaFailure; nhà khác thường nêu "per day"/"daily" trong thông điệp. */
+    public static function isDailyQuota(Response $response): bool
+    {
+        foreach ((array) $response->json('error.details', []) as $d) {
+            foreach ((array) ($d['violations'] ?? []) as $v) {
+                if (is_array($v) && is_string($v['quotaId'] ?? null) && stripos($v['quotaId'], 'PerDay') !== false) {
+                    return true;
+                }
+            }
+        }
+        $msg = $response->json('error.message');
+
+        return is_string($msg) && (bool) preg_match('/\b(per day|daily|requests per day|RPD)\b/i', $msg);
+    }
+
     /** Đổi phản hồi HTTP thành dữ liệu hoặc lỗi đã phân loại. Không đưa nội dung phản hồi vào thông điệp lỗi. */
     protected function body(Response $response): array
     {
@@ -308,19 +355,33 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
 
             return $body;
         }
+        if ($status === 429 && self::isDailyQuota($response)) {
+            // Hạn mức NGÀY: chờ vài giây vô ích. Không thử lại; báo rõ nguyên nhân và cách xử lý.
+            throw new AiQuotaExceeded('Hết hạn mức theo NGÀY của nhà cung cấp AI cho model này (HTTP 429). Thử lại sau khi hạn mức đặt lại, đổi sang model khác, hoặc bật thanh toán cho khóa API.');
+        }
         if ($status === 408 || $status === 429 || $status >= 500) {
-            throw new TransientAiError("Nhà cung cấp AI báo lỗi tạm thời (HTTP {$status}).");
+            $after = self::retryAfterSeconds($response);
+            if ($after !== null) {
+                AiRateGate::cooldown(static::class, $this->model, $after); // mọi tiến trình cùng model chờ theo
+            }
+
+            throw TransientAiError::withHint("Nhà cung cấp AI báo lỗi tạm thời (HTTP {$status})".($after !== null ? ", yêu cầu chờ {$after} giây" : '').'.', $status, $after);
         }
         if ($status === 401 || $status === 403) {
             throw new AiProviderError("Khóa API bị từ chối (HTTP {$status}). Kiểm tra lại khóa hoặc quyền của khóa.");
         }
 
-        throw new AiProviderError("Nhà cung cấp AI từ chối yêu cầu (HTTP {$status}). Kiểm tra tên model và cấu hình.");
+        // Chỉ lấy MÃ lý do dạng CHỮ_HOA_GẠCH_DƯỚI (vd API_KEY_INVALID, INVALID_ARGUMENT) để chẩn đoán; không đưa văn bản phản hồi vào lỗi.
+        $codes = array_filter([$response->json('error.status'), $response->json('error.details.0.reason')], fn ($c) => is_string($c) && preg_match('/^[A-Z][A-Z0-9_]{2,60}$/', $c));
+        $hint = $codes ? ' Mã lý do: '.implode(', ', array_unique($codes)).'.' : '';
+
+        throw new AiProviderError("Nhà cung cấp AI từ chối yêu cầu (HTTP {$status}). Kiểm tra tên model và cấu hình.".$hint);
     }
 
     /** Gửi request; lỗi mạng/timeout thành TransientAiError (không kèm thông điệp gốc vì có thể chứa URL/khóa). */
     protected function send(\Closure $request): Response
     {
+        AiRateGate::wait(static::class, $this->model);
         try {
             return $request();
         } catch (ConnectionException $e) {

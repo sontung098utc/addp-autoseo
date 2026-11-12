@@ -19,7 +19,7 @@ class AnthropicAiProvider extends AbstractLlmProvider
     protected function complete(string $system, string $user): array
     {
         $this->requireKey();
-        $res = $this->send(fn () => Http::baseUrl(rtrim($this->baseUrl ?: self::DEFAULT_BASE_URL, '/'))->timeout(90)->connectTimeout(10)
+        $res = $this->send(fn () => Http::baseUrl(rtrim($this->baseUrl ?: self::DEFAULT_BASE_URL, '/'))->timeout((int) config('ai_rate.http_timeout', 90))->connectTimeout(10)
             ->withHeaders(['x-api-key' => $this->apiKey, 'anthropic-version' => self::API_VERSION])->acceptJson()
             ->post('/v1/messages', [
                 'model' => $this->model, 'max_tokens' => $this->maxTokens, 'temperature' => 0.4,

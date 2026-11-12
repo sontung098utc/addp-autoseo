@@ -14,7 +14,7 @@ class AiProvider extends Model
      * openai_compat không có gợi ý vì tên model tùy máy chủ.
      */
     public const SUGGESTED_MODELS = [
-        'gemini' => ['cheap' => 'gemini-1.5-flash', 'standard' => 'gemini-1.5-flash', 'reasoning' => 'gemini-1.5-pro'],
+        'gemini' => ['cheap' => 'gemini-3.5-flash-lite', 'standard' => 'gemini-3.6-flash', 'reasoning' => 'gemini-3.8-flash'],
         'anthropic' => ['cheap' => 'claude-haiku-5-5', 'standard' => 'claude-sonnet-5-5', 'reasoning' => 'claude-opus-5-5'],
         'openai_compat' => [],
     ];

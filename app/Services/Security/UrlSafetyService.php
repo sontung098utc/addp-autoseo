@@ -95,6 +95,27 @@ class UrlSafetyService
     }
 
     /**
+     * Base URL của nhà cung cấp AI: như validateUrl, nhưng cho phép ĐÚNG các địa chỉ "host:cổng" nằm trong danh sách cho phép
+     * (config ai_models.private_base_url_allowlist, đặt qua AI_PRIVATE_BASE_URL_ALLOWLIST; mặc định rỗng). Dùng cho cầu nối nội bộ khi thử nghiệm.
+     * Khớp nguyên văn host (IP hoặc tên) và cổng; không khớp thì áp luật chặn nội bộ như thường lệ.
+     *
+     * @throws InvalidArgumentException
+     */
+    public function validateAiBaseUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+        if ($parts && isset($parts['scheme'], $parts['host'], $parts['port']) && in_array(strtolower($parts['scheme']), ['http', 'https'], true)) {
+            $hostPort = strtolower($parts['host']).':'.$parts['port'];
+            $allowed = array_map(fn ($v) => strtolower(trim((string) $v)), (array) config('ai_models.private_base_url_allowlist', []));
+            if (in_array($hostPort, $allowed, true)) {
+                return true;
+            }
+        }
+
+        return $this->validateUrl($url);
+    }
+
+    /**
      * Phân giải danh sách IP từ hostname
      *
      * @param string $host

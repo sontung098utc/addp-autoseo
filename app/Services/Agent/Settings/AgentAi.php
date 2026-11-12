@@ -19,7 +19,7 @@ use App\Services\Ai\GeminiAiProvider;
  */
 final class AgentAi
 {
-    public const DEFAULT_MODEL = 'gemini-1.5-flash';
+    public const DEFAULT_MODEL = 'gemini-3.6-flash';
 
     private static function key(): ?array
     {
