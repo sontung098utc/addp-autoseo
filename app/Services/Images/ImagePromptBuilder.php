@@ -12,9 +12,9 @@ use Illuminate\Support\Str;
  */
 final class ImagePromptBuilder
 {
-    public const RULES = 'No real people, no celebrities, no faces of identifiable persons, no logos, no brand names, no text, letters or numbers in the image, no watermark. No before-and-after comparison, no medical devices, pills or clinical scenes, no implied guarantee of results.';
+    public const RULES = 'No real people, no celebrities, no faces of identifiable persons, no logos, no brand names, no text, letters or numbers in the image, no watermark. No before-and-after comparison, no implied guarantee of results, no graphic, bloody or distressing imagery.';
 
-    private const SAFE_HEALTH = ' Lifestyle or food or nature illustration style only, calm and generic.';
+    private const SAFE_HEALTH = ' Friendly, calm, stylized illustration. Health themes (for example a glucose meter, a heart icon, healthy food, a walking person silhouette) are fine, kept non-graphic and without readable text.';
 
     private const BEFORE_AFTER = '/(tr[uư][oơ]́?c\s*(và|va|&|-)\s*sau|before\s*(and|&|-)\s*after)/iu';
 

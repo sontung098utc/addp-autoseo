@@ -193,6 +193,7 @@ class ArticleImageTest extends TestCase
 
     public function test_thuat_ngu_y_te_moi_va_tri_tue_rui_ro_cao_deu_bi_coi_la_suc_khoe(): void
     {
+        config(['agent.images.medical' => false]); // nhận diện lĩnh vực sức khỏe chỉ có tác dụng khi tắt ảnh cho lĩnh vực này
         // "đường huyết" không còn lọt: nằm trong danh sách rủi ro cao của RiskClassifier.
         [$a, $v] = $this->make('chỉ số đường huyết bình thường');
         $this->assertSame('medical', $this->svc()->generateFor($a, $v)['skip_code']);
@@ -204,18 +205,20 @@ class ArticleImageTest extends TestCase
         $this->assertSame('medical', $this->svc()->generateFor($b, $w)['skip_code']);
     }
 
-    public function test_health_topic_skipped_by_default_and_prompt_is_safe(): void
+    public function test_health_topic_gets_illustrations_by_default_and_can_be_turned_off(): void
     {
         [$a, $v] = $this->make('cách điều trị bệnh tiểu đường');
         $r = $this->svc()->generateFor($a, $v);
-        $this->assertSame('medical', $r['skip_code']);
-        $this->assertSame('Lĩnh vực sức khỏe: không tự tạo ảnh.', $r['skipped']);
+        $this->assertGreaterThan(0, $r['generated'], 'lĩnh vực sức khỏe mặc định vẫn được tạo ảnh minh họa');
+        $this->assertStringContainsString('Friendly, calm, stylized illustration', $r['items'][0]['prompt']);
+        $this->assertStringContainsString('no text, letters or numbers', $r['items'][0]['prompt']);
+        $this->assertStringNotContainsString('no medical devices', $r['items'][0]['prompt']);
 
-        config(['agent.images.medical' => true]);
-        $r = $this->svc()->generateFor($a, $v);
-        $this->assertGreaterThan(0, $r['generated']);
-        $this->assertStringContainsString('no medical devices, pills', $r['items'][0]['prompt']);
-        $this->assertStringContainsString('Lifestyle or food', $r['items'][0]['prompt']);
+        config(['agent.images.medical' => false]);
+        [$b, $w] = $this->make('cách điều trị bệnh tiểu đường');
+        $off = $this->svc()->generateFor($b, $w);
+        $this->assertSame('medical', $off['skip_code']);
+        $this->assertSame('Lĩnh vực sức khỏe: không tự tạo ảnh.', $off['skipped']);
     }
 
     public function test_prompt_strips_brand_terms_competitors_and_before_after(): void

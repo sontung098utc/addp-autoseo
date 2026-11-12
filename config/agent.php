@@ -7,8 +7,8 @@ return [
         // Số ảnh minh họa trong thân bài (mỗi ảnh một mục H2). Trần cứng 4 ảnh cho cả bài (kể cả ảnh bìa).
         'max_inline' => (int) env('AGENT_IMAGES_MAX_INLINE', 2),
         'hard_cap' => 4,
-        // Lĩnh vực sức khỏe: mặc định KHÔNG tự tạo ảnh (tránh ảnh minh họa sai sự thật).
-        'medical' => (bool) env('AGENT_IMAGES_MEDICAL', false),
+        // Lĩnh vực sức khỏe: mặc định CÓ tạo ảnh minh họa (phong cách vẽ, không chữ, không hình gây sốc). Đặt false để tắt hẳn cho lĩnh vực này.
+        'medical' => (bool) env('AGENT_IMAGES_MEDICAL', true),
         // Trần chi phí ảnh = tỉ lệ này của ngân sách phiên.
         'budget_share' => 0.10,
         'default_budget_vnd' => 50000.0,
