@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class AgentRunStep extends Model
 {
     protected $fillable = [
-        'agent_run_id', 'seq', 'stage', 'role', 'status', 'title', 'detail', 'data', 'model', 'tokens_used', 'cost_vnd', 'started_at', 'finished_at',
+        'agent_run_id', 'seq', 'stage', 'role', 'status', 'title', 'detail', 'data', 'model', 'tokens_used', 'prompt_tokens', 'completion_tokens', 'cost_vnd', 'started_at', 'finished_at',
     ];
 
     protected function casts(): array

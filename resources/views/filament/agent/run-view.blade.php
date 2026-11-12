@@ -190,7 +190,7 @@
                                         </ul>
                                     @endif
                                     @if (isset($s->data['images']) || isset($s->data['internal_links']))@include('filament.agent.context-assets', ['data' => $s->data])@endif
-                                    @if ($s->tokens_used || $s->cost_vnd > 0)<div class="rvx-note">{{ number_format($s->tokens_used) }} token · {{ number_format($s->cost_vnd, 0, ',', '.') }} ₫</div>@endif
+                                    @if ($s->tokens_used || $s->cost_vnd > 0)<div class="rvx-note">{{ number_format($s->tokens_used) }} token{{ $s->prompt_tokens !== null && $s->completion_tokens !== null ? ' (vào '.number_format($s->prompt_tokens).' · ra '.number_format($s->completion_tokens).')' : '' }} · {{ number_format($s->cost_vnd, 0, ',', '.') }} ₫</div>@endif
                                 </div>
                             @empty
                                 <p class="rvx-note">{{ $n['state'] === 'pending' ? 'Chưa tới chặng này.' : 'Chặng này không chạy trong phiên.' }}</p>
