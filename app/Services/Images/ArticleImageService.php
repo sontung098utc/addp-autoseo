@@ -76,7 +76,8 @@ final class ArticleImageService
             $version->refresh();
         }
 
-        $media = $this->media ?? app(MediaService::class);
+        $w = max(320, (int) config('agent.images.max_width', 1200));
+        $media = $this->media ?? app()->makeWith(MediaService::class, ['imageOptimizer' => new \App\Services\Media\ImageOptimizer($w, $w, max(40, min(95, (int) config('agent.images.quality', 76))))]);
         $inlineHtml = [];
         $position = (int) ($version->mediaAssets()->max('position') ?? -1) + 1;
         foreach ($plan as $slot) {
@@ -116,6 +117,134 @@ final class ArticleImageService
         return $out;
     }
 
+    /**
+     * Tạo ảnh theo KẾ HOẠCH (ImagePlanner) cho tới khi hết ô hoặc chạm trần chi phí. Không cần phiên bản bài: ảnh vào thư viện, việc gắn vào bài
+     * làm ở assemble(). Mỗi ô lỗi được thử lại tối đa $retries lần (điều phối: chỉ làm lại ô lỗi, không làm lại cả bước).
+     *
+     * @param  list<array<string,mixed>>  $slots
+     * @return array{items:array<string,array<string,mixed>>, generated:int, cost_vnd:float, stopped:?string, errors:list<string>}
+     */
+    public function generateSlots(Article $article, array $slots, ImageGeneratorInterface $generator, float $capVnd, int $retries = 1): array
+    {
+        $out = ['items' => [], 'generated' => 0, 'cost_vnd' => 0.0, 'stopped' => null, 'errors' => []];
+        $w = max(320, (int) config('agent.images.max_width', 1200));
+        $media = $this->media ?? app()->makeWith(MediaService::class, ['imageOptimizer' => new \App\Services\Media\ImageOptimizer($w, $w, max(40, min(95, (int) config('agent.images.quality', 76))))]);
+        foreach ($slots as $slot) {
+            $est = $generator->estimatedCostVnd();
+            if ($capVnd + 1e-9 < $out['cost_vnd'] + $est) {
+                $out['stopped'] = 'cost_cap';
+                $out['items'][$slot['id']] = ['status' => 'skipped', 'error' => 'Chạm trần chi phí ảnh ('.self::money($capVnd).').', 'attempts' => 0];
+                continue;
+            }
+            $item = ['status' => 'failed', 'attempts' => 0];
+            for ($try = 0; $try <= $retries; $try++) {
+                $item['attempts']++;
+                try {
+                    $res = $generator->generate((string) $slot['prompt'], ['aspect' => $slot['aspect'] ?? ($slot['role'] === 'featured' ? '16:9' : '4:3'), 'role' => $slot['role']]);
+                    $asset = $this->store($media, $article, null, $res, $slot);
+                    $out['cost_vnd'] += (float) $res['cost_vnd'];
+                    $item = ['status' => 'ok', 'asset_id' => $asset->id, 'prompt' => $res['prompt'], 'cost_vnd' => (float) $res['cost_vnd'], 'attempts' => $item['attempts']];
+                    break;
+                } catch (\Throwable $e) {
+                    $item['error'] = ErrorMasker::mask($e->getMessage());
+                }
+            }
+            if ($item['status'] === 'ok') {
+                $out['generated']++;
+            } else {
+                $out['errors'][] = (string) ($item['error'] ?? 'lỗi không rõ');
+            }
+            $out['items'][$slot['id']] = $item;
+        }
+
+        return $out;
+    }
+
+    /**
+     * LẮP RÁP: gắn ảnh đã tạo vào phiên bản bài. Ảnh bìa gắn dấu is_featured (nếu bản chưa có ảnh bìa từ thư viện); ảnh trong bài chèn <figure>
+     * sau đoạn mở đầu của mục H2 tương ứng. Mục được tìm theo tên (không dấu, không phân biệt hoa thường) rồi mới tới thứ tự H2, vì bài viết có
+     * thể đổi tên mục so với dàn ý. Ảnh không tìm được mục thì KHÔNG chèn và được báo rõ.
+     *
+     * @param  list<array<string,mixed>>  $slots
+     * @param  array<string,array<string,mixed>>  $items  kết quả của generateSlots()['items']
+     * @return array{attached:int, placements:list<array<string,mixed>>}
+     */
+    public function assemble(ArticleVersion $version, array $slots, array $items): array
+    {
+        $placements = [];
+        $bySection = [];
+        $sections = HtmlSections::split((string) $version->html_content)['sections'];
+        $hasLibraryCover = $version->mediaAssets()->get()->contains(fn (MediaAsset $a) => (bool) $a->pivot->is_featured && ($a->metadata['ai_generated'] ?? false) !== true);
+        $position = (int) ($version->mediaAssets()->max('position') ?? -1) + 1;
+        $attached = 0;
+        foreach ($slots as $slot) {
+            $it = $items[$slot['id']] ?? null;
+            if (! is_array($it) || ($it['status'] ?? '') !== 'ok') {
+                $placements[] = ['slot' => $slot['id'], 'role' => $slot['role'], 'status' => 'missing', 'note' => (string) ($it['error'] ?? 'chưa có ảnh')];
+
+                continue;
+            }
+            $asset = MediaAsset::query()->find($it['asset_id']);
+            if (! $asset) {
+                $placements[] = ['slot' => $slot['id'], 'role' => $slot['role'], 'status' => 'missing', 'note' => 'ảnh không còn trong thư viện'];
+
+                continue;
+            }
+            if ($slot['role'] === 'featured') {
+                if ($hasLibraryCover) {
+                    $placements[] = ['slot' => $slot['id'], 'role' => 'featured', 'asset_id' => $asset->id, 'status' => 'unused', 'note' => 'bản đã có ảnh bìa chọn từ thư viện'];
+
+                    continue;
+                }
+                $version->mediaAssets()->syncWithoutDetaching([$asset->id => ['is_featured' => true, 'position' => 0, 'custom_alt' => $asset->alt_text]]);
+                $placements[] = ['slot' => $slot['id'], 'role' => 'featured', 'asset_id' => $asset->id, 'status' => 'featured', 'note' => 'ảnh bìa (ảnh đại diện), không nằm trong nội dung'];
+                $attached++;
+
+                continue;
+            }
+            $idx = $this->sectionIndex($sections, (string) $slot['section_heading'], (int) $slot['section_order']);
+            $version->mediaAssets()->syncWithoutDetaching([$asset->id => ['is_featured' => false, 'position' => $position++, 'custom_alt' => $asset->alt_text]]);
+            $attached++;
+            if ($idx === null) {
+                $placements[] = ['slot' => $slot['id'], 'role' => 'inline', 'asset_id' => $asset->id, 'status' => 'unplaced', 'note' => 'không tìm thấy mục "'.$slot['section_heading'].'" trong bài; ảnh gắn vào bài nhưng chưa chèn vào nội dung'];
+
+                continue;
+            }
+            $bySection[$idx] = $asset;
+            $placements[] = ['slot' => $slot['id'], 'role' => 'inline', 'asset_id' => $asset->id, 'status' => 'inserted', 'note' => 'sau đoạn mở đầu của mục "'.($sections[$idx]['heading'] ?? '').'"'];
+        }
+        if ($bySection !== [] && config('agent.images.insert_inline', true)) {
+            $version->update(['html_content' => self::insertFigures((string) $version->html_content, $bySection)]);
+        }
+        foreach ($placements as $p) {
+            if (isset($p['asset_id'])) {
+                $a = MediaAsset::query()->find($p['asset_id']);
+                $a?->update(['metadata' => array_merge((array) $a->metadata, ['article_version_id' => $version->id])]);
+            }
+        }
+
+        return ['attached' => $attached, 'placements' => $placements];
+    }
+
+    /** @param list<array{index:int, heading:string, html:string}> $sections */
+    private function sectionIndex(array $sections, string $heading, int $order): ?int
+    {
+        $norm = fn (string $t) => Str::lower(Str::ascii(trim(preg_replace('/\s+/u', ' ', $t) ?? '')));
+        $want = $norm($heading);
+        foreach ($sections as $s) {
+            if ($want !== '' && $norm($s['heading']) === $want) {
+                return $s['index'];
+            }
+        }
+        foreach ($sections as $s) {
+            if ($want !== '' && ($norm($s['heading']) !== '' && (str_contains($norm($s['heading']), $want) || str_contains($want, $norm($s['heading']))))) {
+                return $s['index'];
+            }
+        }
+
+        return isset($sections[$order - 1]) ? $sections[$order - 1]['index'] : null;
+    }
+
     /** @return list<array{role:string, heading:?string, section:?int}> */
     private function plan(ArticleVersion $version, int $maxInline): array
     {
@@ -140,14 +269,14 @@ final class ArticleImageService
     }
 
     /** @param array{bytes:string,mime:string,model:string,cost_vnd:float,prompt:string,revised_prompt:?string} $res */
-    private function store(MediaService $media, Article $article, ArticleVersion $version, array $res, array $slot): MediaAsset
+    private function store(MediaService $media, Article $article, ?ArticleVersion $version, array $res, array $slot): MediaAsset
     {
         if (ImageBytes::mime($res['bytes']) === null) {
             throw new ImageGenerationError('Dữ liệu ảnh không hợp lệ (không phải PNG/JPEG/WebP).');
         }
         $kw = ImagePromptBuilder::clean((string) $article->primary_keyword, null);
-        $subject = $slot['role'] === 'featured' ? $kw : ImagePromptBuilder::clean((string) $slot['heading'], null);
-        $alt = $slot['role'] === 'featured' ? "Hình minh họa chủ đề {$subject}" : "Hình minh họa mục {$subject}";
+        $subject = $slot['role'] === 'featured' ? $kw : ImagePromptBuilder::clean((string) ($slot['heading'] ?? $slot['section_heading'] ?? ''), null);
+        $alt = is_string($slot['alt'] ?? null) && $slot['alt'] !== '' ? $slot['alt'] : ($slot['role'] === 'featured' ? "Hình minh họa chủ đề {$subject}" : "Hình minh họa mục {$subject}");
         $dir = sys_get_temp_dir().'/ai_img_'.Str::random(10);
         mkdir($dir, 0700, true);
         $path = $dir.'/ai-'.Str::slug($subject ?: 'anh').'.'.(['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp'][ImageBytes::mime($res['bytes'])]);
@@ -163,7 +292,7 @@ final class ArticleImageService
         }
         $asset->update(['metadata' => array_merge((array) $asset->metadata, [
             'ai_generated' => true, 'prompt' => $res['prompt'], 'revised_prompt' => $res['revised_prompt'], 'model' => $res['model'],
-            'role' => $slot['role'], 'cost_vnd' => $res['cost_vnd'], 'article_id' => $article->id, 'article_version_id' => $version->id,
+            'role' => $slot['role'], 'cost_vnd' => $res['cost_vnd'], 'article_id' => $article->id, 'article_version_id' => $version?->id,
         ])]);
 
         return $asset;

@@ -199,7 +199,7 @@ class AgentRunDetailTest extends TestCase
     {
         $r = $this->run_('failed', [['guard', 'ok'], ['risk', 'ok'], ['brief', 'failed']], ['outcome_reason' => 'Nhà cung cấp lỗi', 'cost_vnd' => 1500]);
         $html = $this->page($r);
-        preg_match_all('/data-stage="([a-z]+)" data-state="/', $html, $m);
+        preg_match_all('/data-stage="([a-z_]+)" data-state="/', $html, $m);
         $this->assertSame(RunFlow::main(), $m[1]);
         $this->assertSame('done', $this->state($html, 'guard'));
         $this->assertSame('failed', $this->state($html, 'brief'));

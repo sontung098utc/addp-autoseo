@@ -72,6 +72,39 @@ class ArticleImageTest extends TestCase
         $this->assertSame(1, MediaAsset::count());
     }
 
+    public function test_ai_images_are_optimized_to_webp_and_capped_in_width(): void
+    {
+        $im = imagecreatetruecolor(1920, 1080);
+        for ($i = 0; $i < 400; $i++) {
+            imagefilledrectangle($im, random_int(0, 1900), random_int(0, 1060), random_int(0, 1900), random_int(0, 1060), imagecolorallocate($im, random_int(0, 255), random_int(0, 255), random_int(0, 255)));
+        }
+        ob_start();
+        imagepng($im);
+        $png = (string) ob_get_clean();
+        $g = new class($png) implements ImageGeneratorInterface
+        {
+            public function __construct(private string $png) {}
+
+            public function generate(string $prompt, array $options = []): array
+            {
+                return ['bytes' => $this->png, 'mime' => 'image/png', 'model' => 'm', 'cost_vnd' => 1.0, 'prompt' => $prompt, 'revised_prompt' => null];
+            }
+
+            public function estimatedCostVnd(): float
+            {
+                return 1.0;
+            }
+        };
+        [$a, $v] = $this->make();
+        $this->svc($g)->generateFor($a, $v);
+
+        $asset = MediaAsset::query()->latest('id')->first();
+        $this->assertSame('image/webp', $asset->mime_type);
+        $this->assertLessThanOrEqual(1200, $asset->width);
+        $this->assertSame(1200, $asset->width, 'ảnh 1920 px bị thu về 1200 px');
+        $this->assertLessThan(150_000, $asset->file_size);
+    }
+
     public function test_generates_cover_plus_two_inline_by_default(): void
     {
         [$a, $v] = $this->make();

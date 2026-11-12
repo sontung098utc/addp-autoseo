@@ -16,6 +16,12 @@ return [
         'cost_vnd_per_image' => (float) env('AGENT_IMAGES_COST_VND', 1000),
         // Chèn <figure> vào thân bài sau mục H2 tương ứng. Tắt thì chỉ gắn vào phiên bản (ảnh bìa + danh sách ảnh).
         'insert_inline' => true,
+        // Tối ưu ảnh AI tạo trước khi lưu thư viện (WebP): chiều rộng tối đa (px) và chất lượng 1-100. 1200 px / 76 cho ảnh ~46 KB thay vì ~80 KB (1376 px / 82).
+        // Tạo ảnh chạy song song với bước viết bằng tiến trình con (agent:run-images). Cần CSDL dùng chung được giữa hai tiến trình; tắt thì tạo ảnh ngay sau khi lập kế hoạch.
+        'parallel' => (bool) env('AGENT_IMAGES_PARALLEL', false),
+        'parallel_timeout' => (int) env('AGENT_IMAGES_PARALLEL_TIMEOUT', 900),
+        'max_width' => (int) env('AGENT_IMAGES_MAX_WIDTH', 1200),
+        'quality' => (int) env('AGENT_IMAGES_QUALITY', 76),
     ],
     'usage' => [
         // Trang Chi phí AI: bật để tính cả bài chạy bằng model GIẢ (mock-*, demo-*). Mặc định tắt vì đó không phải chi phí thật.

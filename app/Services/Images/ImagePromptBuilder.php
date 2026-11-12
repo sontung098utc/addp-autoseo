@@ -18,7 +18,8 @@ final class ImagePromptBuilder
 
     private const BEFORE_AFTER = '/(tr[uư][oơ]́?c\s*(và|va|&|-)\s*sau|before\s*(and|&|-)\s*after)/iu';
 
-    public static function build(string $role, string $keyword, ?string $heading, ?BrandProfile $brand, bool $health = false): string
+    /** $hint: gợi ý cảnh từ dàn ý (mục đích mục, ý chính), đã làm sạch như chủ đề; bỏ trống thì như trước. */
+    public static function build(string $role, string $keyword, ?string $heading, ?BrandProfile $brand, bool $health = false, ?string $hint = null): string
     {
         $topic = self::clean($keyword, $brand);
         $theme = $heading !== null ? self::clean($heading, $brand) : '';
@@ -29,6 +30,10 @@ final class ImagePromptBuilder
             : "Editorial illustration for a section titled \"{$theme}\" in a Vietnamese blog article about \"{$topic}\".";
         if ($field !== '') {
             $p .= " Business domain: {$field}.";
+        }
+        $scene = $hint !== null ? self::clean($hint, $brand) : '';
+        if ($scene !== '') {
+            $p .= " Scene idea (from the article outline): {$scene}.";
         }
         $p .= ' Clean modern style, natural light, uncluttered composition.';
         if ($health) {

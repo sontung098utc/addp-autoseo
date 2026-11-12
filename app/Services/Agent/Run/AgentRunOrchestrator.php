@@ -51,6 +51,14 @@ final class AgentRunOrchestrator
 
     private ?ContextAssets $assets = null; // AG-S25: ảnh thư viện + liên kết nội bộ
 
+    /** Bước 'images' đang chạy song song với bước viết (kế hoạch ảnh đã lập) và tiến trình con của nó nếu có. */
+    private ?AgentRunStep $imageStep = null;
+
+    private mixed $imageProc = null;
+
+    /** Kế hoạch ảnh lập cùng dàn ý (xem imagePlanFor). */
+    private array $imageCtx = [];
+
     /** AG-B1: các Trí tuệ của bài đang chạy (theo chiến dịch hoặc website) và chiến dịch giao việc. */
     private ?BrainContext $brainCtx = null;
 
@@ -329,24 +337,30 @@ final class AgentRunOrchestrator
         if ($this->presetOutline !== null) {
             $outline = ['outline' => $this->presetOutline];
             $this->skills['brief'] = [null, 'Dàn ý có sẵn.'];
-            $this->step($run, 'brief', 'strategist', 'skipped', 'Dùng dàn ý có sẵn', 'Dàn ý do người gọi truyền vào ('.count($this->presetOutline).' mục) nên không gọi AI lập dàn ý.', ['outline' => $this->presetOutline, 'preset' => true]);
+            $this->imagePlanFor($article, $this->presetOutline);
+            $this->step($run, 'brief', 'strategist', 'skipped', 'Dùng dàn ý có sẵn', 'Dàn ý do người gọi truyền vào ('.count($this->presetOutline).' mục) nên không gọi AI lập dàn ý.', ['outline' => $this->presetOutline, 'preset' => true] + $this->imagePlanData());
         } elseif ($this->roleOff('strategist')) {
             $outline = ['outline' => []];
             $this->skills['brief'] = [null, 'Vai trò Chiến lược đang tắt.'];
-            $this->step($run, 'brief', 'strategist', 'skipped', 'Bỏ qua bước dàn ý', 'Vai trò Chiến lược đang bị tắt trên tab Vai trò nên không lập dàn ý riêng; người viết tự bố cục theo từ khóa. Cổng an toàn (chấm luật) vẫn chạy đủ.', ['outline' => []]);
+            $this->imagePlanFor($article, []);
+            $this->step($run, 'brief', 'strategist', 'skipped', 'Bỏ qua bước dàn ý', 'Vai trò Chiến lược đang bị tắt trên tab Vai trò nên không lập dàn ý riêng; người viết tự bố cục theo từ khóa. Cổng an toàn (chấm luật) vẫn chạy đủ.', ['outline' => []] + $this->imagePlanData());
         } else {
             $this->skills['brief'] = $this->usePlaybook('brief', 'content-brief');
             [$briefPb, $briefNote] = $this->skills['brief'];
             $briefOptions = ($briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : []) + $this->guidanceOptions($article) + $this->roleOptions('strategist') + $this->brandOptions() + $this->brainCtx->options($article);
             $outline = $this->callAi($run, 'outline', 'lập dàn ý', fn (AiProviderInterface $ai) => $ai->generateOutline($article, $briefOptions));
             $offTopic = BrandProfileData::looksOffTopic($this->brandProfile, (string) $article->primary_keyword);
+            $this->imagePlanFor($article, $outline['outline'] ?? []);
             $this->step($run, 'brief', 'strategist', $offTopic ? 'warn' : 'ok', 'Lập dàn ý ('.count($outline['outline'] ?? []).' mục)', 'Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. '.($this->guidanceOptions($article) !== [] ? 'Đã áp dụng chỉ dẫn thêm của người phụ trách bài. ' : '').$briefNote.$this->brandNote().$this->brainCtx->note()
                 .($offTopic ? ' Cảnh báo: chủ đề "'.mb_substr((string) $article->primary_keyword, 0, 80).'" có thể không phù hợp website (lĩnh vực trong hồ sơ: '.mb_substr((string) $this->brandProfile?->business_field, 0, 120).'). Chỉ cảnh báo, không chặn.' : ''),
-                ['outline' => $outline['outline'] ?? [], 'playbook' => $this->pbData($briefPb)] + $this->brandData() + $this->brainCtx->stepData() + ($offTopic ? ['off_topic' => true] : []) + $this->providerData($outline), $outline['model'] ?? null, (int) ($outline['tokens_used'] ?? 0), (float) ($outline['cost_vnd'] ?? 0));
+                ['outline' => $outline['outline'] ?? [], 'playbook' => $this->pbData($briefPb)] + $this->imagePlanData() + $this->brandData() + $this->brainCtx->stepData() + ($offTopic ? ['off_topic' => true] : []) + $this->providerData($outline), $outline['model'] ?? null, (int) ($outline['tokens_used'] ?? 0), (float) ($outline['cost_vnd'] ?? 0));
             if (in_array('outline', (array) $this->checkpoints, true)) {
                 return $this->holdAtOutline($run, $article, $outline['outline'] ?? []);
             }
         }
+        // Dàn ý xong (và không dừng chờ người): bắt đầu tạo ảnh theo kế hoạch ảnh trong dàn ý, song song với viết.
+        $this->startImages($run, $article);
+
         $this->skills['grade'] = $this->skills['repair'] = $this->usePlaybook('editor', 'qa-review');
         [$editorPb, $editorNote] = $this->skills['grade'];
 
@@ -409,23 +423,8 @@ final class AgentRunOrchestrator
         $run->update(['final_version_id' => $version->id]);
         $this->kb?->recordUsage($version);
         $this->assets?->attachFeatured($version); // AG-S25
-        if ($passed) {
-            // Tạo ảnh (yêu cầu gốc: pipeline có "tạo ảnh"): bước luật, tự bỏ qua có lý do (chưa có nhà cung cấp, đã có ảnh thư viện, sức khỏe, hết trần); không làm hỏng phiên.
-            try {
-                if ($this->roleOff('designer')) {
-                    $this->skills['images'] = [null, 'Vai trò Họa viên đang tắt.'];
-                    $this->step($run, 'images', 'designer', 'skipped', 'Không tạo ảnh', 'Vai trò Họa viên hình ảnh đang bị tắt trên tab Vai trò nên bước tạo ảnh được bỏ qua; bài và các bước khác không đổi.', ['skip_code' => 'role_off', 'generated' => 0]);
-                } else {
-                    (new \App\Services\Images\ArticleImageStep)->run($run, $article, $version, ++$this->seq, $this->policy->budgetVnd);
-                // Cùng quy ước với step(): mọi bước ghi vai trò và kỹ năng.
-                if ($imgStep = $run->steps()->where('stage', 'images')->latest('id')->first()) {
-                    $imgStep->update(['data' => ($imgStep->data ?? []) + ['role_key' => $imgStep->role, 'role_name' => $this->roles->roleName($imgStep->role), 'skill' => $this->pbData(null), 'skill_label' => 'Chỉ dẫn mặc định']]);
-                }
-                }
-            } catch (Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Bước tạo ảnh lỗi, bỏ qua: '.class_basename($e));
-            }
-        }
+        // 6b. Lắp ráp: đợi ảnh (chạy song song với bước viết), gắn vào phiên bản và chèn vào nội dung theo kế hoạch.
+        $this->assembleImages($run, $article, $version);
 
         if ($passed && $assess->level === 'high') {
             $this->decision($run, 'high_risk_expert_review', 'Giữ cho người có chuyên môn duyệt', 'Đạt luật nhưng chủ đề rủi ro cao nên hệ thống không coi là xong; cần người có chuyên môn duyệt trước khi dùng.'.($this->needsExpert ? ' Kho chưa có kiến thức đã duyệt khớp chủ đề nên cần xem kỹ các khẳng định.' : ''), ['risk_level' => 'high', 'score' => $score] + ($this->needsExpert ? ['needs_expert' => true, 'reason' => 'high_risk_no_knowledge'] : []));
@@ -457,6 +456,147 @@ final class AgentRunOrchestrator
         $this->step($run, 'handoff', 'system', 'warn', 'Giữ nháp, chờ người xem', $reason.' Bản nháp v'.$version->version.' được lưu để người xem, không vào hàng chờ duyệt.', ['blocking' => $report->blockingCodes()]);
 
         return $this->finish($run, 'held', $reason);
+    }
+
+    /**
+     * Kế hoạch ảnh là MỘT PHẦN của dàn ý (không phải bước riêng): từ dàn ý xác định cần ảnh nào, đặt sau mục nào, mô tả ảnh ra sao (luật, 0 token).
+     * Kết quả nằm trong dữ kiện của bước 'brief' (khóa image_plan) để ngăn chi tiết hiện cùng dàn ý; startImages() dùng nó để bắt đầu tạo ảnh.
+     *
+     * @return array{plan:?array, skip_code:?string, skipped_reason:?string, generator?:string}
+     */
+    private function imagePlanFor(Article $article, array $outline): array
+    {
+        $this->imageCtx = ['plan' => null, 'skip_code' => null, 'skipped_reason' => null];
+        $skip = function (string $code, string $why): array {
+            return $this->imageCtx = ['plan' => null, 'skip_code' => $code, 'skipped_reason' => $why];
+        };
+        try {
+            if ($this->roleOff('designer')) {
+                return $skip('role_off', 'Vai trò Họa viên hình ảnh đang bị tắt trên tab Vai trò nên bước tạo ảnh được bỏ qua; bài và các bước khác không đổi.');
+            }
+            if (! config('agent.images.enabled', true)) {
+                return $skip('disabled', 'Tính năng tự tạo ảnh đang tắt.');
+            }
+            $svc = new \App\Services\Images\ArticleImageService;
+            $brand = \App\Models\BrandProfile::query()->where('website_id', $article->website_id)->first();
+            $health = $svc->isHealth($article, $brand);
+            if (! config('agent.images.medical', false) && $health) {
+                return $skip('medical', 'Lĩnh vực sức khỏe: không tự tạo ảnh.');
+            }
+            try {
+                $resolved = \App\Services\Images\ImageGeneratorResolver::resolve();
+            } catch (\App\Services\Images\ImageGeneratorUnavailable $e) {
+                return $skip('no_provider', $e->getMessage());
+            }
+            $this->assets?->load($article, $outline); // truy xuất ảnh thư viện một lần (research() dùng lại): có ảnh khớp thì làm ảnh bìa, không tạo ảnh bìa AI
+            $libraryCover = ($this->assets?->options()['images'] ?? []) !== [];
+            $plan = \App\Services\Images\ImagePlanner::plan($article, $outline, ['health' => $health, 'brand' => $brand, 'library_cover' => $libraryCover]);
+            if ($plan['status'] !== 'ok') {
+                return $skip((string) $plan['skip_code'], (string) $plan['reason']);
+            }
+
+            return $this->imageCtx = ['plan' => $plan, 'skip_code' => null, 'skipped_reason' => null, 'generator' => $resolved['label'], 'resolved' => $resolved];
+        } catch (Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Lập kế hoạch ảnh lỗi, bỏ qua: '.class_basename($e));
+
+            return $skip('plan_error', 'Không lập được kế hoạch ảnh.');
+        }
+    }
+
+    /** Dữ kiện kế hoạch ảnh để ghi vào bước 'brief' (không chứa đối tượng). */
+    private function imagePlanData(): array
+    {
+        $c = $this->imageCtx;
+
+        return ['image_plan' => ['plan' => $c['plan'] ?? null, 'skip_code' => $c['skip_code'] ?? null, 'skipped_reason' => $c['skipped_reason'] ?? null, 'generator' => $c['generator'] ?? null]];
+    }
+
+    /**
+     * Sau dàn ý: bắt đầu tạo ảnh theo kế hoạch ảnh nằm trong dàn ý, SONG SONG với bước viết (tiến trình con khi config agent.images.parallel bật,
+     * nếu không thì chạy ngay tại đây). Mọi lý do không tạo ảnh ghi ở bước 'images'; lỗi ở đây không làm hỏng phiên.
+     */
+    private function startImages(AgentRun $run, Article $article): void
+    {
+        $this->imageStep = null;
+        $this->imageProc = null;
+        $c = $this->imageCtx;
+        try {
+            if (($c['plan'] ?? null) === null) {
+                if (($c['skip_code'] ?? null) !== null) {
+                    $this->skills['images'] = [null, ($c['skip_code'] === 'role_off') ? 'Vai trò Họa viên đang tắt.' : ''];
+                    $this->step($run, 'images', 'designer', 'skipped', 'Không tạo ảnh', (string) $c['skipped_reason'], ['skip_code' => $c['skip_code'], 'skipped_reason' => $c['skipped_reason'], 'generated' => 0, 'items' => [], 'cost' => 0.0, 'errors' => []]);
+                }
+
+                return;
+            }
+            $this->skills['images'] = [null, ''];
+            $plan = $c['plan'];
+            $n = count($plan['slots']);
+            $cap = $this->policy->budgetVnd * (float) config('agent.images.budget_share', 0.10);
+            $this->imageStep = $this->step($run, 'images', 'designer', 'ok', 'Đang tạo ảnh theo kế hoạch trong dàn ý', "Tạo {$n} ảnh bằng {$c['generator']}, trần chi phí ảnh ".number_format($cap, 0, ',', '.').' ₫.',
+                ['plan' => $plan, 'article_id' => $article->id, 'cap_vnd' => $cap, 'generator' => $c['generator'], 'gen' => ['done' => false], 'parallel' => \App\Services\Images\ImageJob::parallelEnabled()]);
+            if (\App\Services\Images\ImageJob::parallelEnabled() && ($this->imageProc = \App\Services\Images\ImageJob::spawn($this->imageStep)) !== null) {
+                return;
+            }
+            \App\Services\Images\ImageJob::execute($this->imageStep, $c['resolved']['generator'] ?? null, $article);
+        } catch (Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Bắt đầu tạo ảnh lỗi, bỏ qua: '.class_basename($e));
+        }
+    }
+
+    /** Đợi ảnh xong, lắp ráp vào phiên bản (ảnh bìa + ảnh trong bài), ghi kết quả vào bước 'images' và bước 'assemble'. Không làm hỏng phiên. */
+    private function assembleImages(AgentRun $run, Article $article, ArticleVersion $version): void
+    {
+        if ($this->imageStep === null) {
+            return;
+        }
+        $stepRow = $this->imageStep;
+        $this->imageStep = null;
+        try {
+            if ($this->imageProc !== null) {
+                try {
+                    $this->imageProc->wait();
+                } catch (Throwable) {
+                    // tiến trình con quá hạn hoặc chết: xem kết quả ghi được tới lúc này
+                }
+                $this->imageProc = null;
+            }
+            $stepRow->refresh();
+            $data = (array) $stepRow->data;
+            $plan = (array) ($data['plan'] ?? []);
+            $slots = (array) ($plan['slots'] ?? []);
+            $gen = (array) ($data['gen'] ?? []);
+            $done = (bool) ($gen['done'] ?? false);
+            $items = (array) ($gen['items'] ?? []);
+            $res = (new \App\Services\Images\ArticleImageService)->assemble($version, $slots, $items);
+            $made = count(array_filter($items, fn ($i) => ($i['status'] ?? '') === 'ok'));
+            $errors = (array) ($gen['errors'] ?? []);
+            $okItems = [];
+            foreach ($slots as $sl) {
+                $it = $items[$sl['id']] ?? null;
+                if (($it['status'] ?? '') === 'ok') {
+                    $okItems[] = ['asset_id' => $it['asset_id'], 'role' => $sl['role'], 'prompt' => $it['prompt'] ?? $sl['prompt'], 'slot' => $sl['id']];
+                }
+            }
+            $skipped = $made === 0 ? ($done ? ($errors !== [] ? 'Nhà cung cấp ảnh lỗi: '.$errors[0] : 'Không tạo được ảnh nào.') : 'Tạo ảnh chưa xong khi bài đã sẵn sàng; không chờ thêm.') : null;
+            $status = $made === count($slots) && $done ? 'ok' : 'warn';
+            $title = $made > 0 ? "Đã tạo {$made}/".count($slots).' ảnh minh họa (AI tạo)' : 'Không tạo ảnh';
+            $stepRow->update([
+                'status' => $made === 0 ? 'warn' : $status, 'title' => $title,
+                'detail' => $made > 0 ? "Chi phí ảnh: ".(int) ($gen['cost_vnd'] ?? 0).'đ. Ảnh gắn vào phiên bản, nhãn "AI tạo" ghi ở thư viện media.'.($errors !== [] ? ' Có ảnh lỗi: '.$errors[0] : '') : (string) $skipped,
+                'model' => $made > 0 ? (trim(explode(' (', (explode(' / ', (string) ($data['generator'] ?? ''), 2)[1] ?? ''))[0]) ?: 'image') : null,
+                'data' => array_merge($data, ['version_id' => $version->id, 'generated' => $made, 'skipped_reason' => $skipped, 'skip_code' => $made === 0 ? ($done ? 'provider_error' : 'not_finished') : null,
+                    'items' => $okItems, 'cost' => (float) ($gen['cost_vnd'] ?? 0), 'errors' => $errors, 'placements' => $res['placements']]),
+            ]);
+            $ins = count(array_filter($res['placements'], fn ($p) => $p['status'] === 'inserted'));
+            $this->skills['assemble'] = [null, ''];
+            $this->step($run, 'assemble', 'system', $made === 0 || collect($res['placements'])->contains(fn ($p) => in_array($p['status'], ['missing', 'unplaced'], true)) ? 'warn' : 'ok',
+                'Lắp ráp bài: '.$ins.' ảnh trong bài'.(collect($res['placements'])->contains('status', 'featured') ? ' + ảnh bìa' : ''),
+                'Ghép bài viết với ảnh theo kế hoạch: '.implode('; ', array_map(fn ($p) => ($p['role'] === 'featured' ? 'Ảnh bìa' : 'Ảnh '.$p['slot']).' — '.$p['note'], $res['placements'])).'.',
+                ['version_id' => $version->id, 'placements' => $res['placements']]);
+        } catch (Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Lắp ráp ảnh lỗi, bỏ qua: '.class_basename($e));
+        }
     }
 
     /** Bước 'research': chỉ nạp và ghi lại ngữ cảnh; write() dùng lại vì load() chỉ chạy một lần. */
@@ -719,7 +859,8 @@ final class AgentRunOrchestrator
     {
         // prompt_tokens/completion_tokens đi cùng dữ kiện bước; step() tách chúng ra cột riêng (không lưu trùng trong JSON).
         return (isset($r['_provider_id']) ? ['provider_id' => $r['_provider_id']] : [])
-            + (isset($r['prompt_tokens'], $r['completion_tokens']) ? ['prompt_tokens' => (int) $r['prompt_tokens'], 'completion_tokens' => (int) $r['completion_tokens']] : []);
+            + (isset($r['prompt_tokens'], $r['completion_tokens']) ? ['prompt_tokens' => (int) $r['prompt_tokens'], 'completion_tokens' => (int) $r['completion_tokens']] : [])
+            + (isset($r['exchange']) && is_array($r['exchange']) ? ['exchange' => $r['exchange']] : []);
     }
 
     /**
