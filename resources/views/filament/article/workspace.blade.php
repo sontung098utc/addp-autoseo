@@ -109,6 +109,7 @@
         .aw-muted{opacity:.75;font-size:.85rem}
         .aw-list{margin:0;padding-left:1.1rem;list-style:disc;display:grid;gap:.25rem}
         .aw-link{text-decoration:underline}
+        button.aw-link{min-height:1.5rem;padding-block:.15rem}
         .aw-btn{display:inline-block;font-size:.8rem;font-weight:600;padding:.25rem .8rem;border-radius:.5rem;border:1px solid currentColor;white-space:nowrap}
         .aw-split{display:grid;gap:1rem;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);align-items:start}
         @media (max-width:1024px){.aw-split{grid-template-columns:minmax(0,1fr)}}

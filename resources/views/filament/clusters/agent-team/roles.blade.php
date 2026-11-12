@@ -19,9 +19,9 @@
         .dark .rc-chip--empty{border-color:#5eead4;color:#5eead4}
         .rc-chip--live{border-color:rgba(14,165,233,.6);background:rgba(14,165,233,.1)}
         .rc-muted{font-size:.74rem;opacity:.6}
-        .rc-sw{position:relative;width:2.3rem;height:1.3rem;border-radius:999px;border:0;background:rgba(128,128,128,.4);cursor:pointer;flex:none;transition:background .15s}
-        .rc-sw i{position:absolute;top:.15rem;left:.15rem;width:1rem;height:1rem;border-radius:50%;background:#fff;transition:transform .15s}
-        .rc-sw[aria-checked=true]{background:#0f6b5c}.rc-sw[aria-checked=true] i{transform:translateX(1rem)}
+        .rc-sw{position:relative;width:2.6rem;height:1.5rem;border-radius:999px;border:0;background:rgba(128,128,128,.4);cursor:pointer;flex:none;transition:background .15s}
+        .rc-sw i{position:absolute;top:.2rem;left:.2rem;width:1.1rem;height:1.1rem;border-radius:50%;background:#fff;transition:transform .15s}
+        .rc-sw[aria-checked=true]{background:#0f6b5c}.rc-sw[aria-checked=true] i{transform:translateX(1.1rem)}
         .rc--off{opacity:.72}
         .rc-dot{width:.5rem;height:.5rem;border-radius:50%;background:rgb(14,165,233);flex:none;animation:rc-blink 1.2s ease-in-out infinite}
         @keyframes rc-blink{50%{opacity:.25}}
