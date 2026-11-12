@@ -17,6 +17,9 @@ final class KnowledgeContext
 {
     public const LIMIT = 5;
 
+    /** Số mục tối đa cho lĩnh vực rủi ro cao / bắt buộc nguồn. */
+    public const LIMIT_STRICT = 12;
+
     /** Chỗ riêng cho mục loại 'product', không chiếm 5 chỗ của mục thường. */
     public const PRODUCT_LIMIT = 2;
 
@@ -59,8 +62,8 @@ final class KnowledgeContext
                 return;
             }
             $this->rules = $this->retriever->rules($site, $this->brainIds);
-            $query = $article->primary_keyword.' '.implode(' ', array_map(fn ($o) => is_scalar($o) ? (string) $o : '', array_slice($outline, 0, 12)));
-            foreach ($this->retriever->search($site, $query, self::LIMIT, $this->brainIds) as $r) {
+            $query = $this->baseQuery($article);
+            foreach ($this->gather($site, $article, $outline, $query) as $r) {
                 $this->items[] = ['id' => $r['id'], 'version' => $r['version'], 'title' => $r['title'], 'body' => mb_substr($r['body'], 0, self::BODY_MAX), 'source' => $r['source']];
             }
             foreach ($this->retriever->products($site, $query, self::PRODUCT_LIMIT, $this->brainIds) as $r) {
@@ -74,6 +77,59 @@ final class KnowledgeContext
             Log::warning('Kho kiến thức: truy xuất lỗi, bỏ qua.', ['error' => get_class($e)]);
             $this->items = [];
         }
+    }
+
+    /** Từ khóa chính và từ khóa phụ của bài làm truy vấn gốc. */
+    private function baseQuery(Article $article): string
+    {
+        return trim($article->primary_keyword.' '.implode(' ', array_slice(array_map('strval', (array) $article->secondary_keywords), 0, 4)));
+    }
+
+    /** Lĩnh vực rủi ro cao hoặc bắt buộc nguồn: người viết cần nhiều mục hơn để mỗi đoạn có căn cứ, nên được nhận LIMIT_STRICT mục. */
+    private function limit(): int
+    {
+        if ($this->brainIds === null || $this->brainIds === []) {
+            return self::LIMIT;
+        }
+        $strict = \App\Models\Brain::query()->whereIn('id', $this->brainIds)->get()->contains(fn ($b) => $b->reliance() === 'must_cite' || $b->riskClass() === 'high');
+
+        return $strict ? self::LIMIT_STRICT : self::LIMIT;
+    }
+
+    /**
+     * Truy xuất theo TỪNG MỤC của dàn ý (không chỉ theo từ khóa chính): mỗi tiêu đề mục là một truy vấn, kết quả trộn bằng xếp hạng đối ứng (RRF) và lấy đủ giới hạn.
+     * Trước đây truy vấn chỉ có từ khóa chính (dàn ý là mảng nên không bao giờ được nối vào), nên các mục nhỏ của bài thiếu căn cứ.
+     *
+     * @param  list<mixed>  $outline
+     * @return list<array<string,mixed>>
+     */
+    private function gather(\App\Models\Website $site, Article $article, array $outline, string $query): array
+    {
+        $limit = $this->limit();
+        $lists = [$this->retriever->search($site, $query, $limit, $this->brainIds)];
+        $heads = [];
+        foreach ($outline as $o) {
+            $level = is_array($o) ? strtoupper((string) ($o['level'] ?? 'H2')) : 'H2';
+            $h = trim((string) (is_array($o) ? ($o['heading'] ?? $o['title'] ?? '') : (is_scalar($o) ? $o : '')));
+            if ($h === '' || $level === 'H1' || preg_match('/(câu hỏi thường gặp|faq|kết luận|tổng kết|nguồn tham khảo)/iu', $h)) {
+                continue;
+            }
+            $heads[] = $h;
+        }
+        foreach (array_slice(array_values(array_unique($heads)), 0, 8) as $h) {
+            $lists[] = $this->retriever->search($site, $h.' '.$article->primary_keyword, $limit, $this->brainIds);
+        }
+        $score = [];
+        $row = [];
+        foreach ($lists as $list) {
+            foreach ($list as $rank => $r) {
+                $score[$r['id']] = ($score[$r['id']] ?? 0.0) + 1 / (60 + $rank);
+                $row[$r['id']] ??= $r;
+            }
+        }
+        arsort($score);
+
+        return array_map(fn ($id) => $row[$id], array_slice(array_keys($score), 0, $limit));
     }
 
     /** @return array<string,mixed> options cho adapter AI (rỗng nếu không có atom) */

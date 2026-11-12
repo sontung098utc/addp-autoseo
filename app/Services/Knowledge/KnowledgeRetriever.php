@@ -39,6 +39,26 @@ final class KnowledgeRetriever
         }
         usort($rows, fn ($a, $b) => $b['score'] <=> $a['score'] ?: $a['id'] <=> $b['id']);
 
+        return $this->rerank($rows, $limit);
+    }
+
+    /**
+     * Xếp hạng lại: hạ điểm mục đã bị lượt kiểm lại nghĩa (quy trình Xây kho chuyên ngành) gắn "lệch nghĩa" (x0,5) hoặc "cần xem" (x0,9), để mục đáng tin lên trước.
+     * Đã thử và KHÔNG dùng (đo trên 80 câu hỏi của 4 kho): gộp mục gần trùng (trung tính, làm gộp nhầm mục khác phạm vi), đa dạng hóa theo chủ đề (MMR) và khớp cụm
+     * hai từ (đều không cải thiện). Phần cải thiện chính nằm ở trọng số IDF trong like().
+     *
+     * @param  list<array<string,mixed>>  $rows đã sắp theo điểm giảm dần
+     * @return list<array<string,mixed>>
+     */
+    private function rerank(array $rows, int $limit): array
+    {
+        foreach ($rows as &$r) {
+            $tags = (array) ($r['tags'] ?? []);
+            $r['score'] = round($r['score'] * (in_array('kiểm lại: lệch nghĩa', $tags, true) ? 0.5 : (in_array('kiểm lại: cần xem', $tags, true) ? 0.9 : 1.0)), 4);
+        }
+        unset($r);
+        usort($rows, fn ($a, $b) => $b['score'] <=> $a['score'] ?: $a['id'] <=> $b['id']);
+
         return array_slice($rows, 0, $limit);
     }
 
@@ -137,24 +157,50 @@ final class KnowledgeRetriever
             foreach (array_merge($terms, $en) as $t) {
                 $q->orWhereRaw("lower(title) like ? escape '!'", ['%'.$esc($t).'%'])->orWhereRaw("lower(body) like ? escape '!'", ['%'.$esc($t).'%']);
             }
-        })->limit(200)->get();
+        })->limit(600)->get();
         $phrase = KnowledgeDedupe::normalize($query);
         $concepts = KnowledgeGlossary::concepts($query);
         $out = [];
+        $norm = [];
         foreach ($items as $i) {
-            $title = KnowledgeDedupe::normalize($i->title);
-            $body = KnowledgeDedupe::normalize($i->body);
-            $hit = 0.0;
-            foreach ($terms as $t) {
-                $hit += (str_contains($title, $t) ? 2 : 0) + (str_contains($body, $t) ? 1 : 0);
+            $norm[$i->id] = [KnowledgeDedupe::normalize($i->title), KnowledgeDedupe::normalize($i->body)];
+        }
+        // Trọng số IDF trên tập ứng viên: từ có ở hầu hết mục (ví dụ tên bệnh) ít phân biệt hơn từ hiếm (ví dụ "đo tại nhà"), nên không để nó chi phối điểm.
+        // Đo trên 80 câu hỏi của 4 kho: số câu phủ đủ khi người viết nhận 5/8/12 mục tăng từ 53/63/65 lên 59/67/70.
+        $n = max(1, count($norm));
+        $w = function (callable $has) use ($norm, $n): float {
+            $df = 0;
+            foreach ($norm as [$t, $b]) {
+                $df += $has($t.' '.$b) ? 1 : 0;
             }
-            $score = $hit / (3 * count($terms));
+
+            return log(1 + $n / max(1, $df));
+        };
+        $wTerm = [];
+        foreach ($terms as $t) {
+            $wTerm[$t] = $w(fn ($text) => str_contains($text, $t));
+        }
+        $wConcept = [];
+        foreach ($concepts as $ci => $alts) {
+            $wConcept[$ci] = $w(fn ($text) => count(array_filter($alts, fn ($a) => str_contains($text, $a))) > 0);
+        }
+        foreach ($items as $i) {
+            [$title, $body] = $norm[$i->id];
+            $hit = 0.0;
+            $max = 0.0;
+            foreach ($terms as $t) {
+                $hit += $wTerm[$t] * ((str_contains($title, $t) ? 2 : 0) + (str_contains($body, $t) ? 1 : 0));
+                $max += $wTerm[$t] * 3;
+            }
+            $score = $max > 0 ? $hit / $max : 0.0;
             if ($concepts !== []) { // mục tiếng Anh: điểm theo số khái niệm được phủ, lấy cao hơn (không phạt mục tiếng Việt vì có thêm từ)
                 $hitEn = 0.0;
-                foreach ($concepts as $alts) {
-                    $hitEn += (count(array_filter($alts, fn ($t) => str_contains($title, $t))) > 0 ? 2 : 0) + (count(array_filter($alts, fn ($t) => str_contains($body, $t))) > 0 ? 1 : 0);
+                $maxEn = 0.0;
+                foreach ($concepts as $ci => $alts) {
+                    $hitEn += $wConcept[$ci] * ((count(array_filter($alts, fn ($t) => str_contains($title, $t))) > 0 ? 2 : 0) + (count(array_filter($alts, fn ($t) => str_contains($body, $t))) > 0 ? 1 : 0));
+                    $maxEn += $wConcept[$ci] * 3;
                 }
-                $score = max($score, min(1.0, $hitEn / (3 * count($concepts))));
+                $score = max($score, $maxEn > 0 ? min(1.0, $hitEn / $maxEn) : 0.0);
             }
             if ($phrase !== '' && (str_contains($title, $phrase) || str_contains($body, $phrase))) {
                 $score = min(1.0, $score + 0.3);
@@ -175,6 +221,7 @@ final class KnowledgeRetriever
             'id' => $i->id, 'version' => (int) $i->version, 'title' => $i->title, 'body' => $i->body,
             'source' => $i->source?->title, 'source_id' => $i->source_id,
             'score' => round($score + ($own ? self::SITE_BONUS : 0.0), 4), 'scope' => $own ? 'website' : 'general', 'brain_id' => $i->brain_id,
+            'topic_id' => $i->topic_id, 'tags' => (array) $i->tags,
         ];
     }
 }
