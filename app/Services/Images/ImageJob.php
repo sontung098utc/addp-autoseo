@@ -39,9 +39,12 @@ final class ImageJob
     /** Song song chỉ khi bật cấu hình VÀ CSDL dùng chung được giữa hai tiến trình (SQLite :memory: thì không). */
     public static function parallelEnabled(): bool
     {
-        if (! config('agent.images.parallel', false)) {
-            return false;
-        }
+        return (bool) config('agent.images.parallel', false) && self::dbShareable();
+    }
+
+    /** CSDL dùng chung được giữa hai tiến trình (không phải SQLite :memory:): điều kiện để chạy tiến trình con. */
+    public static function dbShareable(): bool
+    {
         try {
             $db = \Illuminate\Support\Facades\DB::connection();
 

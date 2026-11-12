@@ -38,6 +38,24 @@ final class RunReport
             if (class_exists(KeywordsPage::class)) {
                 $links[] = ['label' => 'Mở trang Từ khóa', 'url' => KeywordsPage::getUrl()];
             }
+        } elseif ($type === 'brain_build' && (($run->input_refs['mode'] ?? null) === 'domain')) {
+            // Xây kho chuyên ngành (DomainBrainBuilder): lấy số đo từ bước 'report' do chính quy trình ghi.
+            $m = (array) ($steps->where('stage', 'report')->sortByDesc('id')->first()?->data['metrics'] ?? []);
+            if ($m === []) {
+                $lines[] = 'Phiên xây kho chuyên ngành chưa có báo cáo (có thể dừng giữa chừng).';
+            } else {
+                $pct = fn ($v) => $v === null ? 'chưa đo' : (int) ($v * 100).'%';
+                $lines[] = "Kho có {$m['items']} mục: {$m['approved']} đã duyệt, {$m['proposed']} chờ duyệt.";
+                $lines[] = "Kiểm lại nghĩa: {$m['verified_faithful']} khớp, {$m['verified_partial']} cần xem, {$m['verified_unsupported']} lệch nghĩa.";
+                $lines[] = 'Độ phủ câu hỏi: tiềm năng '.$pct($m['coverage_potential'] ?? null).' (nếu duyệt hết), dùng được ngay '.$pct($m['coverage_usable'] ?? null).'.';
+                foreach (array_slice((array) ($steps->where('stage', 'report')->sortByDesc('id')->first()?->data['todo_for_experts'] ?? []), 0, 5) as $t) {
+                    $lines[] = 'Việc cho chuyên gia: '.$t;
+                }
+            }
+            $b = $run->input_refs['brain_id'] ?? null;
+            if ($b) {
+                $links[] = ['label' => 'Mở Trí tuệ', 'url' => \App\Filament\Pages\BrainPage::getUrl(['brain' => $b])];
+            }
         } elseif ($type === 'brain_build') {
             $lines[] = 'Đã nạp '.(int) ($out['auto_approved'] ?? 0).' mục tự nhận và '.(int) ($out['proposed'] ?? 0).' mục chờ duyệt'
                 .(isset($out['source_ids']) ? ' từ '.count((array) $out['source_ids']).' nguồn.' : '.');

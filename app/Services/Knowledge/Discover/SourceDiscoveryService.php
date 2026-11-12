@@ -151,7 +151,7 @@ final class SourceDiscoveryService
 
     /**
      * @param  list<array{url: string, title?: string}>  $candidates  chỉ cần url (độ tin cậy được tính lại ở đây, không tin dữ liệu gửi lên)
-     * @param  array{as_system?: bool, budget_cap_vnd?: float, field?: ?string, search?: array{query?: string, results?: int, cost_vnd?: float, provider?: string}, max_sources?: int, only_trusted?: bool, purpose?: string}  $options
+     * @param  array{as_system?: bool, run?: \App\Models\AgentRun, brain_id?: int, budget_cap_vnd?: float, field?: ?string, search?: array{query?: string, results?: int, cost_vnd?: float, provider?: string}, max_sources?: int, only_trusted?: bool, purpose?: string}  $options
      * @return array{run_id: ?int, imported: int, items_auto: int, items_proposed: int, pages: list<array<string,mixed>>, cost_vnd: float, stopped_reason: ?string, auto_item_ids: list<int>, proposed_item_ids: list<int>}
      *
      * @throws KnowledgeError không có quyền, dừng khẩn cấp, website không hoạt động, chưa kết nối AI
@@ -172,7 +172,7 @@ final class SourceDiscoveryService
             }
         }
         $budget = min(isset($options['budget_cap_vnd']) ? max(0.0, (float) $options['budget_cap_vnd']) : PHP_FLOAT_MAX, BrainBuildService::totalBudgetVnd());
-        $brain = $site->brains()->first();
+        $brain = isset($options['brain_id']) ? \App\Models\Brain::query()->find((int) $options['brain_id']) : $site->brains()->first(); // quy trình Xây kho chuyên ngành chỉ định đúng Trí tuệ
         $field = $options['field'] ?? null;
         $list = [];
         foreach ($candidates as $c) {
@@ -198,7 +198,8 @@ final class SourceDiscoveryService
             throw new KnowledgeError($why);
         }
 
-        $run = JobRunRecorder::start('brain_build', $site, $refs, $by, 'manual', $resolved['demo'] ? 'mock' : 'real');
+        $ownRun = ! (($options['run'] ?? null) instanceof \App\Models\AgentRun); // quy trình Xây kho chuyên ngành truyền phiên của nó vào để các bước nằm chung một phiên
+        $run = $ownRun ? JobRunRecorder::start('brain_build', $site, $refs, $by, 'manual', $resolved['demo'] ? 'mock' : 'real') : $options['run'];
         if (isset($options['search'])) {
             $s = $options['search'];
             JobRunRecorder::step($run, 'search', 'Tìm nguồn trên web', 'completed', ['query' => (string) ($s['query'] ?? ''), 'results' => (int) ($s['results'] ?? count($list)), 'provider' => (string) ($s['provider'] ?? '')], null, 0, $searchCost,
@@ -287,9 +288,11 @@ final class SourceDiscoveryService
                 break;
             }
         }
-        JobRunRecorder::finish($run, $out['stopped_reason'] === 'emergency_stop' ? 'blocked' : (($out['stopped_reason'] === 'ai_error' && $out['imported'] === 0) ? 'failed' : 'ready_for_review'),
-            ['source_ids' => array_values(array_filter(array_column($out['pages'], 'source_id'))), 'item_ids' => array_merge($out['auto_item_ids'], $out['proposed_item_ids']), 'auto_approved' => $out['items_auto'], 'proposed' => $out['items_proposed']],
-            $out['stopped_reason'] === 'budget' ? 'Chạm trần chi phí.' : null);
+        if ($ownRun) {
+            JobRunRecorder::finish($run, $out['stopped_reason'] === 'emergency_stop' ? 'blocked' : (($out['stopped_reason'] === 'ai_error' && $out['imported'] === 0) ? 'failed' : 'ready_for_review'),
+                ['source_ids' => array_values(array_filter(array_column($out['pages'], 'source_id'))), 'item_ids' => array_merge($out['auto_item_ids'], $out['proposed_item_ids']), 'auto_approved' => $out['items_auto'], 'proposed' => $out['items_proposed']],
+                $out['stopped_reason'] === 'budget' ? 'Chạm trần chi phí.' : null);
+        }
         $out['run_id'] = $run?->id;
 
         return $out;

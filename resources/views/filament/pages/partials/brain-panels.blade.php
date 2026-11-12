@@ -123,6 +123,25 @@
 </x-studio.panel>
 
 <x-studio.panel key="settings">
+    <div class="ss-card" data-testid="domain-build"><div class="ss-card__b">
+        <div class="ss-card__h">Xây kho chuyên ngành bằng AI <x-studio.hint text="Hệ thống tự chạy: AI lập kế hoạch nguồn theo bậc bằng chứng, nạp và rút mục, kiểm lại nghĩa bằng lượt AI độc lập, gán chủ đề, đo độ phủ bằng bộ câu hỏi, bổ sung chỗ thiếu, soạn nháp hồ sơ lĩnh vực. Mục rủi ro cao luôn chờ chuyên gia duyệt; hệ thống không xác nhận nguồn hay duyệt thay chuyên gia."/></div>
+        @php $m = $buildReport['metrics'] ?? null; @endphp
+        @if ($m)
+            <p class="ss-muted" style="margin:.3rem 0">Lần xây gần nhất ({{ \Illuminate\Support\Carbon::parse($buildReport['at'])->format('d/m/Y H:i') }}): {{ $m['items'] }} mục ({{ $m['approved'] }} đã duyệt, {{ $m['proposed'] }} chờ duyệt); kiểm lại: {{ $m['verified_faithful'] }} khớp, {{ $m['verified_partial'] }} cần xem, {{ $m['verified_unsupported'] }} lệch nghĩa; độ phủ tiềm năng {{ isset($m['coverage_potential']) ? (int) ($m['coverage_potential'] * 100).'%' : 'chưa đo' }}, dùng được ngay {{ isset($m['coverage_usable']) ? (int) ($m['coverage_usable'] * 100).'%' : 'chưa đo' }}.</p>
+            @if (! empty($buildReport['todo_for_experts']))
+                <div style="margin:.3rem 0"><strong>Việc cho chuyên gia</strong><ul style="list-style:disc;margin-left:1.2rem">@foreach ($buildReport['todo_for_experts'] as $t)<li>{{ $t }}</li>@endforeach</ul></div>
+            @endif
+        @endif
+        @if (($profileReview['status'] ?? '') === 'ai_draft')
+            <p class="ss-muted" style="margin:.3rem 0">Hồ sơ lĩnh vực là <strong>nháp do AI</strong>, chưa chuyên gia xác nhận.</p>
+        @endif
+        @if ($canEdit)
+            <div style="margin-top:.5rem;display:flex;gap:.5rem;flex-wrap:wrap">
+                <x-filament::button wire:click="buildDomain(false)" wire:confirm="Xây kho chuyên ngành bằng AI? Việc này gọi AI nhiều lần (có trần chi phí) và chạy nền.">Xây kho chuyên ngành</x-filament::button>
+                <x-filament::button color="gray" wire:click="buildDomain(true)" wire:confirm="Rà soát kho: kiểm lại, đo độ phủ và bổ sung chỗ thiếu?">Rà soát kho</x-filament::button>
+            </div>
+        @endif
+    </div></div>
     <div class="ss-card"><div class="ss-card__b">
         <div class="kb-grid">
             <label>Mức dựa vào AI <x-studio.hint text="Tự do: kho chỉ định hướng giọng và cấu trúc. Kiểm số liệu: số liệu phải khớp kho. Bắt buộc nguồn: cần người có chuyên môn duyệt và hạng rủi ro của bài tối thiểu mức vừa."/>

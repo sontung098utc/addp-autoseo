@@ -7,7 +7,8 @@ use App\Services\Knowledge\Build\BrainBuildService;
  * Đã có (G2): lượt xây từ website công ty, chạy tay trong trang "Tạo trí tuệ doanh nghiệp" hoặc lệnh `brain:build`.
  * Có thêm: cuối lượt tự điền nháp Hồ sơ doanh nghiệp (chỉ trường trống, có đoạn nguyên văn từ trang, hoàn tác được) và mục "Gợi ý cho kho" từ bài gần đây (luật 0 token, chỉ gợi ý).
  * Có thêm: khám phá nguồn trên web (Tavily, cần TAVILY_API_KEY): tìm, gắn nhãn tin cậy bằng luật cố định, nạp nguồn ngoài an toàn; nguồn tin cậy tự nhận, nguồn chưa rõ chỉ đề xuất.
- * Chưa có: chạy nền/lịch, đọc PDF, kiểm tra bản quyền, gọi Tavily thật, dựng từ khoảng trống kiến thức, chạy với AI thật và website thật.
+ * Có thêm (Xây kho chuyên ngành, lệnh `brain:build-domain`): hệ thống tự chạy kế hoạch nguồn, nạp, kiểm lại nghĩa, gán chủ đề, đo độ phủ, bổ sung chỗ thiếu, hồ sơ nháp và báo cáo cho chuyên gia; AI làm theo kỹ năng (playbook), chuyên gia duyệt.
+ * Chưa có: chạy nền/lịch, đọc PDF, kiểm tra bản quyền, gọi Tavily thật, chạy với website thật.
  */
 return [
     'id' => 'brain_build',
@@ -28,7 +29,16 @@ return [
         ['id' => 'page', 'role' => 'system', 'label' => 'Mỗi trang: tải an toàn, trích chữ, AI rút mục, xếp tầng', 'kind' => 'llm', 'task' => 'knowledge', 'when' => 'KnowledgeAiIngest'],
         ['id' => 'brand', 'role' => 'system', 'label' => 'Cuối lượt: AI tự điền nháp Hồ sơ doanh nghiệp (trường trống, có căn cứ trang)', 'kind' => 'llm', 'task' => 'knowledge', 'when' => 'hồ sơ trống từ 3 trường'],
         ['id' => 'suggest', 'human' => true, 'role' => 'manager', 'label' => 'Gợi ý cho kho từ bài gần đây (khoảng trống, số liệu, nguồn)', 'kind' => 'rule'],
-        ['id' => 'gaps', 'role' => 'editor', 'label' => 'Dựng từ khoảng trống kiến thức', 'kind' => 'rule', 'planned' => true],
+        // Xây kho chuyên ngành (DomainBrainBuilder): hệ thống tự chạy; vai trò AI làm theo kỹ năng của chúng; chuyên gia duyệt.
+        ['id' => 'scope', 'role' => 'system', 'label' => 'Chuyên ngành: phạm vi, mức rủi ro và cổng an toàn', 'kind' => 'rule', 'when' => 'Xây kho chuyên ngành'],
+        ['id' => 'sources', 'role' => 'strategist', 'label' => 'Chuyên ngành: AI lập kế hoạch nguồn theo bậc bằng chứng (kỹ năng brain-source-plan)', 'kind' => 'llm', 'task' => 'knowledge', 'when' => 'Xây kho chuyên ngành'],
+        ['id' => 'ingest', 'role' => 'editor', 'label' => 'Chuyên ngành: nạp nguồn, rút mục giữ điều kiện áp dụng, tiếng Việt (kỹ năng brain-claim-extract)', 'kind' => 'llm', 'task' => 'knowledge', 'when' => 'Xây kho chuyên ngành'],
+        ['id' => 'verify', 'role' => 'editor', 'label' => 'Chuyên ngành: lượt AI độc lập kiểm lại nghĩa từng mục (kỹ năng brain-verify-claim)', 'kind' => 'llm', 'task' => 'knowledge', 'when' => 'Xây kho chuyên ngành; mục tự nhận mà lệch nghĩa được hoàn về chờ duyệt'],
+        ['id' => 'topics', 'role' => 'system', 'label' => 'Chuyên ngành: gán mục vào chủ đề của Trí tuệ (AI chỉ chọn chủ đề có sẵn)', 'kind' => 'llm', 'task' => 'knowledge', 'when' => 'Xây kho chuyên ngành'],
+        ['id' => 'eval', 'role' => 'editor', 'label' => 'Chuyên ngành: AI soạn bộ câu hỏi và đo độ phủ truy xuất (kỹ năng brain-eval-questions)', 'kind' => 'llm', 'task' => 'knowledge', 'when' => 'Xây kho chuyên ngành'],
+        ['id' => 'gaps', 'role' => 'strategist', 'label' => 'Chuyên ngành: vòng bổ sung chỗ thiếu rồi đo lại (kỹ năng brain-gap-fill)', 'kind' => 'llm', 'task' => 'knowledge', 'when' => 'Xây kho chuyên ngành; tối đa vài vòng, trong ngân sách'],
+        ['id' => 'profile', 'role' => 'strategist', 'label' => 'Chuyên ngành: AI soạn nháp Hồ sơ lĩnh vực từ chính kho (kỹ năng brain-domain-spec)', 'kind' => 'llm', 'task' => 'knowledge', 'when' => 'Xây kho chuyên ngành; chỉ bổ sung trường trống, ghi nhãn ai_draft'],
+        ['id' => 'report', 'human' => true, 'role' => 'system', 'label' => 'Chuyên ngành: báo cáo chất lượng kho và việc cho chuyên gia (duyệt mục, xác nhận nguồn, gán nhãn bộ câu hỏi, bài mẫu)', 'kind' => 'rule', 'when' => 'Xây kho chuyên ngành'],
     ],
     'budget' => 'Tối đa 5.000 ₫ mỗi trang; mỗi lượt tối đa min(150.000 ₫, ngân sách chính sách)',
     'human' => ['Người duyệt mục chờ duyệt (tầng B, C: giá, chính sách, sản phẩm sức khỏe, nội dung y khoa)', 'Người duyệt hoàn tác mục tự nhận nếu sai'],

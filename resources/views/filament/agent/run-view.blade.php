@@ -198,7 +198,7 @@
                                     </div>
                                     <div>{{ $short }} @if ($isLong)<x-studio.hint :text="$s->detail" />@endif</div>
                                     @if (isset($s->data['score']))<div class="rvx-note">Điểm {{ $s->data['score'] }}/100 @if (isset($s->data['threshold'])) · ngưỡng {{ $s->data['threshold'] }}@endif</div>@endif
-                                    @if (! empty($s->data['failed']))
+                                    @if (is_array($s->data['failed'] ?? null) && $s->data['failed'] !== []) {{-- 'failed' của bước chấm là DANH SÁCH luật lỗi; bước khác có thể dùng khóa này cho một con số --}}
                                         <ul class="rv-fails">
                                             @foreach ($s->data['failed'] as $f)<li><code>{{ $f['code'] ?? '' }}</code> <span class="rv-sev rv-sev--{{ $f['severity'] ?? '' }}">{{ $f['severity'] ?? '' }}</span> {{ $f['message'] ?? '' }}</li>@endforeach
                                         </ul>

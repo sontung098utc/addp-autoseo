@@ -286,6 +286,43 @@ class BrainPage extends KnowledgePage implements HasForms
         Notification::make()->title('Đã xóa "'.$s->name.'" khỏi Căn cứ chuẩn mực')->success()->send();
     }
 
+    /**
+     * Xây kho chuyên ngành: hệ thống tự chạy quy trình (AI làm theo kỹ năng, chuyên gia duyệt) bằng tiến trình nền; kết quả ở trang Phiên chạy và báo cáo trên Trí tuệ.
+     * Không chạy được nền (CSDL không dùng chung được giữa hai tiến trình) thì chỉ đường dẫn lệnh, không chạy trong yêu cầu web.
+     */
+    public function buildDomain(bool $review = false): void
+    {
+        abort_unless(static::canManage(), 403);
+        $b = $this->brain();
+        $by = Auth::user();
+        $av = (new \App\Services\Knowledge\KnowledgeAiIngest)->availability();
+        if (! $av['ok']) {
+            Notification::make()->title('Chưa kết nối AI')->body((string) $av['reason'])->warning()->send();
+
+            return;
+        }
+        if (! $b->websites()->exists()) {
+            Notification::make()->title('Trí tuệ chưa gắn website')->body('Gắn một website ở Cài đặt rồi xây kho (nguồn và mục kiến thức thuộc về website).')->warning()->send();
+
+            return;
+        }
+        $cmd = ['brain:build-domain', (string) $b->id, '--user='.$by->id] + ($review ? [3 => '--review'] : []);
+        if (! \App\Services\Images\ImageJob::dbShareable()) {
+            Notification::make()->title('Chạy bằng lệnh')->body('Môi trường này không chạy nền được. Dùng: php artisan '.implode(' ', $cmd))->warning()->send();
+
+            return;
+        }
+        try {
+            $php = (new \Symfony\Component\Process\PhpExecutableFinder)->find(false) ?: PHP_BINARY;
+            \Illuminate\Support\Facades\Process::path(base_path())->timeout(7200)->start(array_merge([$php, 'artisan'], $cmd));
+        } catch (\Throwable) {
+            Notification::make()->title('Không khởi động được tiến trình nền')->body('Dùng lệnh: php artisan '.implode(' ', $cmd))->danger()->send();
+
+            return;
+        }
+        Notification::make()->title($review ? 'Đã bắt đầu rà soát kho' : 'Đã bắt đầu xây kho chuyên ngành')->body('AI làm theo kỹ năng của từng vai trò; xem tiến độ ở Đội AI → Phiên chạy (loại "Xây kho trí tuệ"). Mọi mục rủi ro cao đều chờ chuyên gia duyệt.')->success()->send();
+    }
+
     public function toggleArchive(): void
     {
         $this->guard();
@@ -315,6 +352,8 @@ class BrainPage extends KnowledgePage implements HasForms
             'allSites' => Website::query()->orderBy('name')->get(['id', 'name']),
             'reliances' => Brain::RELIANCE, 'risks' => Brain::RISK,
             'canEdit' => static::canManage(),
+            'buildReport' => (array) (((array) $b->settings)['build_report'] ?? []),
+            'profileReview' => (array) (((array) $b->settings)['profile_review'] ?? []),
         ]);
     }
 }
