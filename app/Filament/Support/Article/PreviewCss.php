@@ -15,5 +15,8 @@ final class PreviewCss
         .'.autoseo-toc{margin:1em 0;padding:.8em 1.4em;background:#f9fafb;border-radius:8px}'
         .'details{margin:.6em 0;padding:.5em .9em;border:1px solid #e5e7eb;border-radius:8px}summary{cursor:pointer;font-weight:600}'
         .'sup.autoseo-cite,sup.autoseo-note{font-size:.75em;margin-left:1px;cursor:help}sup.autoseo-note a{color:#b45309;text-decoration:none}.autoseo-notes{margin-top:1.6em;padding:.6em 1em;border-left:3px solid #fcd34d;background:#fffbeb;font-size:.9em}.autoseo-notes ol{margin:.3em 0 0 1.2em}sup.autoseo-cite a{color:#2563eb;text-decoration:none}.autoseo-refs li{margin:.3em 0}'
+        .'p,li,td,blockquote,figcaption{position:relative}sup[data-tip],.pv-link{position:static;outline:none}.pv-link{color:#2563eb;text-decoration:underline;cursor:pointer}'
+        // Hộp chú thích: hiện ngay dưới dòng chứa dấu, rộng bằng đoạn văn (không bị cắt mép khung), hiện khi rê chuột hoặc bấm (focus); CSS thuần, không script.
+        .'[data-tip]:hover::after,[data-tip]:focus::after{content:attr(data-tip);position:absolute;z-index:20;left:0;right:0;margin-top:1.5em;background:#111827;color:#fff;padding:.6em .85em;border-radius:8px;font-size:13px;font-weight:400;line-height:1.5;white-space:normal;text-align:left;box-shadow:0 4px 16px rgba(0,0,0,.3);cursor:default}'
         .'.autoseo-refs{margin-top:2em;padding-top:.8em;border-top:1px solid #d1d5db;font-size:.9em;color:#4b5563}';
 }
