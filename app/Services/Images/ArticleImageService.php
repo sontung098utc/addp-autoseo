@@ -124,12 +124,32 @@ final class ArticleImageService
      * @param  list<array<string,mixed>>  $slots
      * @return array{items:array<string,array<string,mixed>>, generated:int, cost_vnd:float, stopped:?string, errors:list<string>}
      */
+    /** Khóa cache: thời điểm (unix) nhà cung cấp ảnh được thử lại sau khi báo hết hạn ngạch. */
+    public const QUOTA_KEY = 'agent:images:quota_until';
+
+    /** Số ô ảnh lỗi liên tiếp thì dừng cả bước. */
+    public const MAX_FAILED_ROW = 2;
+
     public function generateSlots(Article $article, array $slots, ImageGeneratorInterface $generator, float $capVnd, int $retries = 1): array
     {
         $out = ['items' => [], 'generated' => 0, 'cost_vnd' => 0.0, 'stopped' => null, 'errors' => []];
         $w = max(320, (int) config('agent.images.max_width', 1200));
         $media = $this->media ?? app()->makeWith(MediaService::class, ['imageOptimizer' => new \App\Services\Media\ImageOptimizer($w, $w, max(40, min(95, (int) config('agent.images.quality', 76))))]);
+        // Cầu chì: nhà cung cấp đã báo hết hạn ngạch gần đây thì không gọi nữa (mỗi lần thử mất 25-30 giây vô ích); hết hạn ngạch thì dừng cả bước ngay, lỗi liên tiếp thì dừng sau 2 ô.
+        $quotaUntil = (int) \Illuminate\Support\Facades\Cache::get(self::QUOTA_KEY, 0);
+        $quota = $quotaUntil > time() ? 'Nhà cung cấp ảnh đang hết hạn ngạch, thử lại sau '.date('H:i', $quotaUntil).'; không gọi để khỏi tốn thời gian.' : null;
+        $failedRow = 0;
         foreach ($slots as $slot) {
+            if ($quota !== null || $failedRow >= self::MAX_FAILED_ROW) {
+                $why = $quota ?? 'Nhà cung cấp ảnh lỗi liên tiếp nên dừng tạo các ảnh còn lại.';
+                $out['stopped'] ??= $quota !== null ? 'quota' : 'provider_errors';
+                $out['items'][$slot['id']] = ['status' => 'skipped', 'error' => $why, 'attempts' => 0];
+                if ($out['errors'] === []) {
+                    $out['errors'][] = $why; // để giao diện nói rõ lý do thay vì "không tạo được ảnh nào"
+                }
+
+                continue;
+            }
             $est = $generator->estimatedCostVnd();
             if ($capVnd + 1e-9 < $out['cost_vnd'] + $est) {
                 $out['stopped'] = 'cost_cap';
@@ -147,12 +167,23 @@ final class ArticleImageService
                     break;
                 } catch (\Throwable $e) {
                     $item['error'] = ErrorMasker::mask($e->getMessage());
+                    if ($e instanceof \App\Services\Images\ImageGenerationError && $e->isQuota()) {
+                        $quota = $item['error'].' Dừng tạo ảnh, không thử lại.';
+                        \Illuminate\Support\Facades\Cache::put(self::QUOTA_KEY, time() + max(300, min(3600, (int) ($e->retryAfter ?: 900))), 3600);
+
+                        break; // hết hạn ngạch: thử lại ngay vô ích
+                    }
                 }
             }
             if ($item['status'] === 'ok') {
                 $out['generated']++;
+                $failedRow = 0;
             } else {
                 $out['errors'][] = (string) ($item['error'] ?? 'lỗi không rõ');
+                $failedRow++;
+                if ($quota !== null) {
+                    $out['stopped'] = 'quota';
+                }
             }
             $out['items'][$slot['id']] = $item;
         }

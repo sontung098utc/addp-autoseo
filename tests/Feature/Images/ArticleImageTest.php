@@ -331,4 +331,80 @@ class ArticleImageTest extends TestCase
         $this->app['env'] = 'local';
         $this->artisan('article:images', ['article' => $a->id])->expectsOutputToContain('Đã tạo 3 ảnh')->assertSuccessful();
     }
+
+    private function failingGenerator(ImageGenerationError $err): ImageGeneratorInterface
+    {
+        return new class($err) implements ImageGeneratorInterface
+        {
+            public int $calls = 0;
+
+            public function __construct(private ImageGenerationError $err) {}
+
+            public function generate(string $prompt, array $options = []): array
+            {
+                $this->calls++;
+                throw $this->err;
+            }
+
+            public function estimatedCostVnd(): float
+            {
+                return 0.0;
+            }
+        };
+    }
+
+    private function slots(int $n): array
+    {
+        $out = [['id' => 'cover', 'role' => 'featured', 'prompt' => 'p0', 'aspect' => '16:9']];
+        for ($i = 1; $i < $n; $i++) {
+            $out[] = ['id' => 's'.$i, 'role' => 'inline', 'prompt' => 'p'.$i, 'aspect' => '4:3'];
+        }
+
+        return $out;
+    }
+
+    public function test_het_han_ngach_dung_ngay_khong_thu_lai_va_nho_de_cac_phien_sau_khong_goi(): void
+    {
+        [$a] = $this->make();
+        $g = $this->failingGenerator(new ImageGenerationError('Nhà cung cấp ảnh trả lỗi HTTP 429 (hết hạn ngạch hoặc quá tải tạo ảnh, chờ khoảng 60 phút)', 429, 3600));
+        $r = $this->svc($g)->generateSlots($a, $this->slots(3), $g, 100.0);
+
+        $this->assertSame(1, $g->calls, 'hết hạn ngạch: không thử lại, không gọi các ô còn lại');
+        $this->assertSame('quota', $r['stopped']);
+        $this->assertSame(0, $r['generated']);
+        $this->assertSame('failed', $r['items']['cover']['status']);
+        $this->assertSame('skipped', $r['items']['s1']['status']);
+        $this->assertStringContainsString('hết hạn ngạch', $r['errors'][0]);
+
+        // Phiên sau: cờ còn hiệu lực nên không gọi nhà cung cấp, và lý do vẫn hiện.
+        $g2 = $this->failingGenerator(new ImageGenerationError('x', 502));
+        $r2 = $this->svc($g2)->generateSlots($a, $this->slots(3), $g2, 100.0);
+        $this->assertSame(0, $g2->calls);
+        $this->assertSame('quota', $r2['stopped']);
+        $this->assertStringContainsString('thử lại sau', $r2['errors'][0]);
+    }
+
+    public function test_loi_lien_tiep_dung_sau_hai_o_va_loi_don_le_van_chay_tiep(): void
+    {
+        [$a] = $this->make();
+        $g = $this->failingGenerator(new ImageGenerationError('Nhà cung cấp ảnh trả lỗi HTTP 502.', 502));
+        $r = $this->svc($g)->generateSlots($a, $this->slots(3), $g, 100.0);
+
+        $this->assertSame(4, $g->calls, '2 ô đầu mỗi ô thử 2 lần, ô thứ 3 bị bỏ qua');
+        $this->assertSame('provider_errors', $r['stopped']);
+        $this->assertSame('skipped', $r['items']['s2']['status']);
+        $this->assertNull(\Illuminate\Support\Facades\Cache::get(ArticleImageService::QUOTA_KEY), 'lỗi 502 không đặt cờ hết hạn ngạch');
+    }
+
+    public function test_image_generation_error_phan_biet_het_han_ngach(): void
+    {
+        $this->assertTrue((new ImageGenerationError('x', 429))->isQuota());
+        $this->assertTrue((new ImageGenerationError('báo RESOURCE_EXHAUSTED'))->isQuota());
+        $this->assertFalse((new ImageGenerationError('Nhà cung cấp ảnh trả lỗi HTTP 502.', 502))->isQuota());
+        Http::fake(['*' => Http::response(['error' => ['message' => 'x']], 429, ['Retry-After' => '3600'])]);
+        $e = ImageGenerationError::http(Http::get('https://x.test'));
+        $this->assertSame(429, $e->status);
+        $this->assertSame(3600, $e->retryAfter);
+        $this->assertStringContainsString('60 phút', $e->getMessage());
+    }
 }

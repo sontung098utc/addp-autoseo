@@ -34,7 +34,7 @@ final class OpenAiCompatImageGenerator implements ImageGeneratorInterface
             throw new ImageGenerationError('Không gọi được nhà cung cấp ảnh: '.ErrorMasker::mask($e->getMessage()));
         }
         if (! $res->successful()) {
-            throw new ImageGenerationError('Nhà cung cấp ảnh trả lỗi HTTP '.$res->status().'.');
+            throw ImageGenerationError::http($res);
         }
         $item = ($res->json() ?? [])['data'][0] ?? [];
         [$bytes, $mime] = ImageBytes::fromBase64($item['b64_json'] ?? null);

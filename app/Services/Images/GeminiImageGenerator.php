@@ -34,7 +34,7 @@ final class GeminiImageGenerator implements ImageGeneratorInterface
             throw new ImageGenerationError('Không gọi được nhà cung cấp ảnh: '.ErrorMasker::mask($e->getMessage()));
         }
         if (! $res->successful()) {
-            throw new ImageGenerationError('Nhà cung cấp ảnh trả lỗi HTTP '.$res->status().'.');
+            throw ImageGenerationError::http($res);
         }
         $body = $res->json() ?? [];
         $b64 = null;
