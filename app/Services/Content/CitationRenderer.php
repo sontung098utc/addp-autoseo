@@ -56,7 +56,7 @@ final class CitationRenderer
             $host = preg_match('#^https?://#i', $url) ? (string) (parse_url($url, PHP_URL_HOST) ?: '') : '';
             $from = trim(($src ? (string) $src->title : '').($host !== '' ? ' ('.preg_replace('/^www\./', '', $host).')' : ''));
             $from = $host !== '' ? '<a href="'.e($url).'" rel="nofollow noopener">'.e($from).'</a>' : e($from);
-            $li .= '<li id="nguon-'.$number[$id].'" data-kb="'.$id.'"><strong>'.e((string) $it->title).'</strong>'.($from !== '' ? ' — '.$from : '').'</li>';
+            $li .= '<li id="nguon-'.$number[$id].'" data-kb="'.$id.'">'.($src && trim((string) $src->title) !== '' ? $from : '<strong>'.e((string) $it->title).'</strong>'.($from !== '' ? ' — '.$from : '')).'</li>'; // tên trang nguồn (không phải câu trích do AI rút ra)
         }
 
         return $html."\n".'<div class="autoseo-refs"><p><strong>Nguồn tham khảo</strong></p><ol>'.$li.'</ol></div>';

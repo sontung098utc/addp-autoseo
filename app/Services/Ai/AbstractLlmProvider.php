@@ -521,7 +521,7 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
         return "\n\n--- ".mb_substr($t, 0, 9000)."\n---\n"
             .($forOutline
                 ? 'Dàn ý phải phục vụ hồ sơ này: mục đầu trả lời câu hỏi quan trọng nhất; mỗi mục trả lời một câu hỏi trong danh sách theo thứ tự hợp lý; theo góc tiếp cận và dạng trình bày đã chọn; không có mục cho luận điểm đã bị BỎ; không mục nào lặp lại ý của mục khác.'
-                : 'Viết theo hồ sơ này: trả lời đủ các câu hỏi, theo góc tiếp cận và dạng trình bày đã chọn, đúng độ dài mục tiêu. Luận điểm "DÙNG" viết chắc; "DÙNG THẬN TRỌNG" nói rõ mức chắc chắn hoặc điều kiện; "BỎ" thì không đưa vào. Gặp mâu thuẫn giữa nguồn thì xử lý như hồ sơ đã chốt. Không nhắc tới hồ sơ này hay quá trình tổng hợp trong bài.');
+                : 'Viết theo hồ sơ này: trả lời đủ các câu hỏi, theo góc tiếp cận và dạng trình bày đã chọn, đúng độ dài mục tiêu. Luận điểm "DÙNG" viết chắc; "DÙNG THẬN TRỌNG" nói rõ mức chắc chắn hoặc điều kiện; "BỎ" thì không đưa vào. Gặp mâu thuẫn giữa nguồn thì xử lý như hồ sơ đã chốt. Không nhắc tới hồ sơ này hay quá trình tìm/đối chiếu nguồn trong bài (không viết "tài liệu chúng tôi đối chiếu", "bài này không đưa vì chưa có căn cứ"...); bài phải TRẢ LỜI ĐẦY ĐỦ câu hỏi chính, phần nguồn không nói thì dùng kiến thức chuẩn của nghề theo mục "Nên bổ sung" với mức thận trọng đúng.');
     }
 
     /** Bản đang có khi SỬA: người viết thấy bài cũ để sửa trực tiếp thay vì viết lại mù chỉ từ danh sách lỗi. Là DỮ LIỆU, không phải lệnh. */

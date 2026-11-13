@@ -30,7 +30,10 @@ final class ContentPlanner
             ."Việc cần làm, theo thứ tự:\n"
             ."1. Xác định người đọc là ai, đang ở tình huống nào, và 5–9 câu hỏi họ cần được trả lời (câu quan trọng nhất trước).\n"
             ."2. Chắt lọc các LUẬN ĐIỂM/DỮ KIỆN đáng đưa vào bài. Với mỗi luận điểm: nêu nguồn nào hỗ trợ (basis), các nguồn đồng thuận hay khác nhau (agreement), và quyết định dùng thế nào (use): "
-            ."\"dung\" = chắc, viết thẳng; \"than_trong\" = chỉ có một nguồn, có khác biệt, hoặc phụ thuộc đối tượng nên phải nói rõ mức chắc chắn/điều kiện; \"bo\" = không đưa (lạc đề, chỉ đúng với bối cảnh nước ngoài, quá chuyên sâu, hoặc đáng ngờ). Ghi vì sao ở note.\n"
+            ."\"dung\" = chắc, viết thẳng; \"than_trong\" = chỉ có một nguồn, có khác biệt, hoặc phụ thuộc đối tượng nên phải nói rõ mức chắc chắn/điều kiện; \"bo\" = không đưa (lạc đề, chỉ đúng với bối cảnh nước ngoài, quá chuyên sâu, hoặc thật sự đáng ngờ). Ghi vì sao ở note. NGUỒN KHÔNG NÓI ĐẾN MỘT ĐIỀU KHÔNG CÓ NGHĨA LÀ ĐIỀU ĐÓ NÊN BỎ.\n"
+            ."2b. NGUYÊN TẮC GIÁ TRỊ: nguồn chỉ BẮT BUỘC cho khẳng định cần chính xác (số liệu, ngưỡng, liều, hiệu quả/an toàn y tế, quy định). Phần còn lại (nhóm thực phẩm và món ăn quen thuộc, thực đơn minh họa, thói quen, mẹo thực hành, giải thích cơ chế, ví dụ, cách hiểu cho người Việt) là việc của người làm nghề: "
+            ."bài vẫn phải TRẢ LỜI ĐẦY ĐỦ câu hỏi chính của người đọc bằng kiến thức chuẩn của nghề, không được né hay từ chối chỉ vì nguồn không nêu. Hãy liệt kê trong \"add\" những nội dung cụ thể, hữu ích nên đưa vào dù nguồn không nói (kèm mức thận trọng: kiến thức phổ biến, "
+            ."chưa có nghiên cứu mạnh...). Câu hỏi dạng \"là bao nhiêu / mốc nào\" (ngưỡng, định nghĩa chuẩn) PHẢI có câu trả lời cụ thể nếu bất kỳ nguồn nào nêu: chọn mốc phổ biến nhất, nêu khoảng hoặc điều kiện áp dụng nếu nguồn khác nhau, đừng bỏ vì ngại khác biệt. Không biến thiếu căn cứ thành lời xin lỗi: không bao giờ để bài viết những câu về quá trình tìm nguồn kiểu \"tài liệu chúng tôi đối chiếu không nêu...\".\n"
             ."3. Nếu các nguồn mâu thuẫn, nêu mâu thuẫn và cách bài nên xử lý (giải thích nguyên nhân khác biệt, chọn mốc nào cho người Việt và vì sao).\n"
             ."4. Điều nên TRÁNH (hiểu lầm phổ biến cần bác bỏ, khẳng định không có căn cứ, nội dung dễ gây hại nếu người đọc tự làm).\n"
             ."5. Chọn GÓC TIẾP CẬN riêng (điều khiến bài này có giá trị hơn bài tổng hợp thông thường) và DẠNG TRÌNH BÀY hợp nội dung nhất (ví dụ: bảng so sánh, các bước, hỏi–đáp, ví dụ một ngày, cây quyết định), ngắn gọn, đúng trọng tâm. Chọn độ dài (số từ) vừa đủ để trả lời tốt, không độn.\n"
@@ -38,7 +41,7 @@ final class ContentPlanner
             ."7. Thuật ngữ: liệt kê vài thuật ngữ nước ngoài người đọc sẽ gặp và cách gọi tiếng Việt thống nhất.\n\n"
             ."Quy tắc: không bịa dữ kiện hay nguồn; chỉ dùng mã nguồn có thật trong khung; không chép nguyên văn dài; mọi trường viết bằng tiếng Việt.\n"
             .'Chỉ trả về ĐÚNG một JSON: {"reader":"≤220 ký tự","questions":["..."],"findings":[{"point":"≤240 ký tự","basis":["T1","KB12"],"agreement":"dong_thuan|khac_nhau|mot_nguon","use":"dung|than_trong|bo","note":"≤180 ký tự"}],'
-            .'"conflicts":["≤240 ký tự"],"avoid":["≤200 ký tự"],"angle":"≤260 ký tự","format":"≤260 ký tự","length_words":1200,"terms":[{"foreign":"...","vi":"..."}],"gaps":["≤140 ký tự"]}. Tối đa 14 findings.';
+            .'"conflicts":["≤240 ký tự"],"avoid":["≤200 ký tự"],"add":["≤200 ký tự: nội dung hữu ích nên đưa vào từ kiến thức chuẩn của nghề, kèm mức thận trọng"],"angle":"≤260 ký tự","format":"≤260 ký tự","length_words":1200,"terms":[{"foreign":"...","vi":"..."}],"gaps":["≤140 ký tự"]}. Tối đa 14 findings.';
     }
 
     /**
@@ -121,7 +124,7 @@ final class ContentPlanner
 
         return [
             'reader' => AiJson::clean($d['reader'] ?? '', 240), 'questions' => $questions, 'findings' => $findings,
-            'conflicts' => $list($d['conflicts'] ?? [], 5, 260), 'avoid' => $list($d['avoid'] ?? [], 6, 220), 'angle' => $angle,
+            'conflicts' => $list($d['conflicts'] ?? [], 5, 260), 'avoid' => $list($d['avoid'] ?? [], 6, 220), 'add' => $list($d['add'] ?? [], 8, 220), 'angle' => $angle,
             'format' => AiJson::clean($d['format'] ?? '', 280), 'length_words' => max(600, min(2600, (int) ($d['length_words'] ?? 1400))),
             'terms' => $terms, 'gaps' => $list($d['gaps'] ?? [], 4, 160),
         ];
@@ -161,6 +164,12 @@ final class ContentPlanner
         if (! empty($plan['avoid'])) {
             $o .= "Tránh:\n";
             foreach ($plan['avoid'] as $a) {
+                $o .= '- '.$a."\n";
+            }
+        }
+        if (! empty($plan['add'])) {
+            $o .= "Nên bổ sung từ kiến thức chuẩn của người làm nghề (nguồn không nói nhưng người đọc cần; không thêm số liệu hay khẳng định y tế mới, nói đúng mức chắc chắn):\n";
+            foreach ($plan['add'] as $a) {
                 $o .= '- '.$a."\n";
             }
         }

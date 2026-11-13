@@ -437,7 +437,8 @@ final class AgentRunOrchestrator
         $reason = null;
         $round = $editRounds;
         // Vòng sửa chạy khi còn lỗi CHẶN, hoặc (Trí tuệ bắt buộc nguồn) còn đoạn khẳng định chưa có dấu trích dẫn [KB#id] (CITE01, P1): lỗi sau không chặn bàn giao nhưng được sửa.
-        while ($this->needsRepair($report) && $round < $maxRounds) {
+        // Lỗi MỀM (thiếu dấu trích, trích không hỗ trợ) chỉ được sửa tối đa 2 vòng sau biên tập: sửa mãi chỉ làm dấu trích rơi vào chỗ không hợp và bài kém đi.
+        while ($this->needsRepair($report) && $round < $maxRounds && ($report->hasBlocking() || $report->layoutGaps() !== [] || $round - $editRounds < 2)) {
             if ($this->spent($run) >= $this->policy->budgetVnd) {
                 $reason = 'Hết ngân sách cho phiên chạy ('.number_format($this->policy->budgetVnd, 0, ',', '.').' ₫) nên dừng sửa.';
                 $this->decision($run, 'budget_exhausted', 'Dừng sửa vì hết ngân sách', $reason, ['spent_vnd' => $this->spent($run), 'budget_vnd' => $this->policy->budgetVnd, 'score' => $score]);

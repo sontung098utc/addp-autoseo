@@ -60,12 +60,14 @@ class ContentPlannerTest extends TestCase
         $t = ContentPlanner::render(ContentPlanner::normalize([
             'reader' => 'Người hay choáng', 'questions' => ['Ăn gì?'], 'angle' => 'Tách thấp sinh lý và thấp cần khám', 'format' => 'bảng + ví dụ một ngày', 'length_words' => 1300,
             'findings' => [['point' => 'Nước là nền tảng', 'basis' => ['T1'], 'use' => 'dung', 'agreement' => 'mot_nguon']],
-            'avoid' => ['Khuyên ăn mặn'], 'terms' => [['foreign' => 'orthostatic hypotension', 'vi' => 'hạ huyết áp tư thế đứng']],
+            'avoid' => ['Khuyên ăn mặn'], 'add' => ['Nhóm thực phẩm giàu sắt quen thuộc, nói là kiến thức phổ biến'], 'terms' => [['foreign' => 'orthostatic hypotension', 'vi' => 'hạ huyết áp tư thế đứng']],
         ], ['T1']));
         $this->assertStringContainsString('HỒ SƠ NỘI DUNG', $t);
         $this->assertStringContainsString('DÙNG, viết chắc', $t);
         $this->assertStringContainsString('khoảng 1300 từ', $t);
         $this->assertStringContainsString('orthostatic hypotension = hạ huyết áp tư thế đứng', $t);
+        $this->assertStringContainsString('Nhóm thực phẩm giàu sắt', $t);
+        $this->assertStringContainsString('NGUỒN KHÔNG NÓI', ContentPlanner::systemPrompt('n', 'k', 'informational', 'low'));
         $this->assertStringNotContainsString('T1', $t);
     }
 
