@@ -35,3 +35,11 @@ Schedule::command('autopilot:tick')
     ->timezone('Asia/Ho_Chi_Minh')
     ->withoutOverlapping()
     ->runInBackground();
+
+// Dọn phiên đội AI bị bỏ dở (tiến trình chết giữa chừng nên phiên mãi "đang chạy", bài mãi kẹt "Đang viết"): đóng phiên quá 60 phút không có bước mới.
+// Chạy riêng, không phụ thuộc chiến dịch (agent:tick cũng gọi trước mỗi nhịp nhưng chỉ khi nhịp đó chạy được).
+Schedule::command('agent:reap-stale')
+    ->everyTenMinutes()
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->withoutOverlapping()
+    ->runInBackground();

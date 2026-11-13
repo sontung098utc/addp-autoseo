@@ -51,4 +51,13 @@ class StaleRunReaperTest extends TestCase
         $this->assertSame('running', $liveRun->fresh()->status);
         $this->assertSame('drafting', $alive->fresh()->workflow_status);
     }
+
+    public function test_lenh_duoc_gan_lich_moi_muoi_phut(): void
+    {
+        $e = collect(\Illuminate\Support\Facades\Schedule::events())->first(fn ($ev) => str_contains((string) $ev->command, 'agent:reap-stale'));
+        $this->assertNotNull($e, 'agent:reap-stale phải có trong lịch (routes/console.php)');
+        $this->assertSame('*/10 * * * *', $e->expression);
+        $this->assertTrue($e->withoutOverlapping);
+        $this->artisan('agent:reap-stale')->expectsOutputToContain('Đã đóng')->assertSuccessful();
+    }
 }
