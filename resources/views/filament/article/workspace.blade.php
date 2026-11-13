@@ -108,6 +108,20 @@
         .aw-muted{opacity:.75;font-size:.85rem}
         .aw-list{margin:0;padding-left:1.1rem;list-style:disc;display:grid;gap:.25rem}
         .aw-link{text-decoration:underline}
+        /* Chọn phiên: phiên ĐANG XEM tô màu + nhãn + mũi tên chỉ xuống chi tiết; phiên khác có nút "Xem phiên này" (cả dòng bấm được). */
+        .aw-runs-help{margin:.1rem 0 .6rem;font-size:.85rem;opacity:.8}
+        .aw-table tr.aw-row-pick{cursor:pointer}
+        .aw-table tr.aw-row-pick:hover td{background:rgba(15,107,92,.06)}
+        .aw-table tr.aw-row-sel td{background:rgba(15,107,92,.12);border-bottom-color:rgba(15,107,92,.35);font-weight:600}
+        .aw-table tr.aw-row-sel td:first-child{box-shadow:inset 4px 0 0 #0f6b5c}
+        .aw-viewing{display:inline-flex;align-items:center;gap:.3rem;padding:.15rem .55rem;border-radius:999px;background:#0f6b5c;color:#fff;font-size:.78rem;font-weight:600;white-space:nowrap}
+        .aw-pick-btn{display:inline-flex;align-items:center;padding:.2rem .65rem;border:1px solid rgba(15,107,92,.55);border-radius:.4rem;background:transparent;color:#0f6b5c;font-size:.8rem;font-weight:600;white-space:nowrap;cursor:pointer}
+        .aw-pick-btn:hover{background:rgba(15,107,92,.1)}
+        :root[data-theme=dark] .aw-pick-btn,.dark .aw-pick-btn{color:#5eead4;border-color:rgba(94,234,212,.5)}
+        .aw-run-detail{border:2px solid rgba(15,107,92,.45);border-radius:.75rem;overflow:hidden}
+        .aw-run-detail__title{display:flex;align-items:center;flex-wrap:wrap;gap:.6rem;margin:0;padding:.65rem 1rem;background:rgba(15,107,92,.12);font-size:1rem;font-weight:700}
+        .aw-run-detail__body{padding:.9rem 1rem}
+        .aw-run-arrow{display:flex;justify-content:center;margin:-.2rem 0;color:#0f6b5c;font-size:.8rem;font-weight:600}
         button.aw-link{min-height:1.5rem;padding-block:.15rem}
         .aw-btn{display:inline-block;font-size:.8rem;font-weight:600;padding:.25rem .8rem;border-radius:.5rem;border:1px solid currentColor;white-space:nowrap}
         .aw-split{display:grid;gap:1rem;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);align-items:start}
@@ -642,13 +656,14 @@
                         @if ($runs->isEmpty())
                             <p>Bài này chưa được giao cho đội AI.</p>
                         @else
+                            @if ($runView)<p class="aw-runs-help" data-testid="aw-runs-help">Bấm vào một phiên để xem chi tiết ở khung bên dưới. Phiên <strong>đang xem</strong> được tô màu và có nhãn "Đang xem".</p>@endif
                             <div class="aw-scroll">
                                 <table class="aw-table" data-testid="aw-runs">
                                     <thead><tr><th>Phiên</th><th>Kết quả</th><th class="aw-opt">Điểm hình thức</th><th class="aw-opt">Tạo ra bản</th><th class="aw-opt">AI</th><th class="aw-opt">Vòng sửa</th><th>Chi phí</th><th>Bắt đầu</th><th></th></tr></thead>
                                     <tbody>
                                         @foreach ($runs as $r)
                                             @php $isLive = $live && $r->id === $live->id; $fv = $r->final_version_id ? $versions->firstWhere('id', $r->final_version_id) : null; $isSel = $selectedRun && $selectedRun->id === $r->id; @endphp
-                                            <tr @class(['aw-row-sel' => $isSel]) wire:key="aw-run-{{ $r->id }}">
+                                            <tr @class(['aw-row-sel' => $isSel, 'aw-row-pick' => ! $isSel && AgentRunResource::canViewAny()]) wire:key="aw-run-{{ $r->id }}" @if (! $isSel && AgentRunResource::canViewAny()) wire:click="$set('phien', {{ $r->id }})" @endif @if ($isSel) aria-current="true" @endif>
                                                 <td>#{{ $r->id }}</td>
                                                 <td>
                                                     @if ($isLive)<span class="ss-running"><span class="ss-spin" aria-hidden="true"></span>Đang chạy · {{ W::runStages()[$liveStage] ?? 'sắp xong' }}</span>
@@ -662,7 +677,7 @@
                                                 <td class="aw-opt">{{ (int) $r->repair_rounds }}</td>
                                                 <td>{{ V::formatVnd($r->cost_vnd) }}</td>
                                                 <td>{{ VnTime::format($r->started_at ?? $r->created_at) }}</td>
-                                                <td>@if (AgentRunResource::canViewAny())@if ($isSel)<span class="aw-muted">Đang xem</span>@else<a class="aw-link" href="{{ AgentRunResource::viewUrl($r) }}" wire:click.prevent="$set('phien', {{ $r->id }})" data-testid="aw-run-open">Xem</a>@endif @endif</td>
+                                                <td>@if (AgentRunResource::canViewAny())@if ($isSel)<span class="aw-viewing" data-testid="aw-run-viewing">● Đang xem</span>@else<button type="button" class="aw-pick-btn" data-testid="aw-run-open">Xem phiên này</button>@endif @endif</td>
                                             </tr>
                                         @endforeach
                                     </tbody>
@@ -671,11 +686,12 @@
                         @endif
                     </section>
                     @if ($runView)
+                        <div class="aw-run-arrow" aria-hidden="true">▼ Chi tiết của phiên đang xem</div>
                         <section class="aw-run-detail" data-testid="aw-run-detail" wire:key="aw-run-detail-{{ $selectedRun->id }}">
-                            <h3 class="aw-run-detail__title">Phiên #{{ $selectedRun->id }}
-                                @if ($selectedRun->finalVersion)<a class="aw-link" href="{{ \App\Filament\Resources\ArticleVersionResource::getUrl('view', ['record' => $selectedRun->finalVersion]) }}" data-testid="aw-run-draft">Xem bản nháp v{{ $selectedRun->finalVersion->version }}</a>@endif
-                            </h3>
-                            @include('filament.agent.partials.run-detail', $runView)
+                            <h3 class="aw-run-detail__title"><span class="aw-viewing">● Đang xem</span> Phiên #{{ $selectedRun->id }} · {{ VnTime::format($selectedRun->started_at ?? $selectedRun->created_at) }}</h3>
+                            <div class="aw-run-detail__body">
+                                @include('filament.agent.partials.run-detail', $runView)
+                            </div>
                         </section>
                     @endif
                 </div>

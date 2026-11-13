@@ -68,11 +68,19 @@ class RunDetailInArticleTest extends TestCase
         $this->assertStringContainsString('Bước của phiên mới', $html);
 
         $sel = $this->get($base.'?phien='.$old->id)->assertOk()->getContent();
-        $this->assertStringContainsString('<h3 class="aw-run-detail__title">Phiên #'.$old->id, $sel);
+        $this->assertMatchesRegularExpression('/aw-run-detail__title">.*?Đang xem<\/span> Phiên #'.$old->id.' /s', $sel);
+        $this->assertSame(1, substr_count($sel, 'data-testid="aw-run-viewing"'), 'đúng MỘT phiên được đánh dấu Đang xem trong bảng chọn phiên');
+        $this->assertSame(1, substr_count($sel, 'data-testid="aw-run-open"'), 'phiên còn lại có nút Xem phiên này');
+        $this->assertStringContainsString('Chi tiết của phiên đang xem', $sel);
         $this->assertStringContainsString('Bước của phiên cũ', $sel);
-        // Đủ bốn phần của phiên trong tab lồng bên trong trang bài.
-        foreach (['Diễn biến', 'Báo cáo', 'Chi phí và model', 'Dữ liệu'] as $label) {
+        // Ba phần của phiên (Báo cáo và Dữ liệu đã gộp một tab), không còn nút mở bài/xem phiên đã tạo trong báo cáo.
+        foreach (['Diễn biến', 'Báo cáo và dữ liệu', 'Chi phí và model'] as $label) {
             $this->assertStringContainsString($label, $sel);
+        }
+        $detail = substr($sel, strpos($sel, 'data-testid="aw-run-detail"'));
+        $this->assertStringNotContainsString('data-key="du-lieu"', $detail);
+        foreach (['xem bài', 'Xem bản nháp', 'Mở bài viết', 'Xem phiên đã tạo'] as $gone) {
+            $this->assertStringNotContainsString($gone, $detail, $gone);
         }
     }
 

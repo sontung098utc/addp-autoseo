@@ -204,7 +204,7 @@ class AgentRunDetailTest extends TestCase
     {
         $done = $this->page($this->run_('ready_for_review', [['guard', 'ok']]));
         preg_match_all('/role="tab" class="ss-tab" data-key="([^"]+)"/', $done, $m);
-        $this->assertSame(['dien-bien', 'bao-cao', 'chi-phi', 'du-lieu'], $m[1]);
+        $this->assertSame(['dien-bien', 'bao-cao', 'chi-phi'], $m[1], 'Báo cáo và Dữ liệu đã gộp thành một tab');
         $this->assertMatchesRegularExpression('/studioTabs\\([\'"]bao-cao/', $done);
 
         foreach (['failed', 'held', 'blocked', 'running'] as $st) {

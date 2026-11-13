@@ -27,9 +27,8 @@
     $problem = in_array($run->status, ['failed', 'blocked', 'held'], true) || $stale || collect($nodes)->contains('state', 'waiting');
     $tabs = [
         ['key' => 'dien-bien', 'label' => 'Diễn biến', 'tone' => $live ? 'info' : ($problem ? ($run->status === 'failed' ? 'danger' : 'warn') : null)],
-        ['key' => 'bao-cao', 'label' => 'Báo cáo'],
+        ['key' => 'bao-cao', 'label' => 'Báo cáo và dữ liệu'],
         ['key' => 'chi-phi', 'label' => 'Chi phí và model'],
-        ['key' => 'du-lieu', 'label' => 'Dữ liệu'],
     ];
     $report = \App\Filament\Support\Agent\RunReport::for($run);
     $jobTitle = \App\Services\Agent\Pipeline\JobTypeRegistry::find((string) ($run->job_type ?: 'article_write'))['title'] ?? $run->job_type;
@@ -258,14 +257,13 @@
                     <section class="ss-review-card" data-testid="run-report">
                         <h2 class="ss-review-card__title">{{ $report['title'] }}</h2>
                         <ul style="margin:0 0 .5rem 1rem;list-style:disc">@foreach ($report['lines'] as $l)<li>{{ $l }}</li>@endforeach</ul>
-                        @foreach ($report['links'] as $lk)<a class="rv-chip rv-chip--link" href="{{ $lk['url'] }}">{{ $lk['label'] }}</a> @endforeach
                     </section>
                     <section class="rvx-pane" data-testid="run-result">
                         <h3>Kết quả</h3>
                         <div class="rv-result">
                             @if ($run->outcome_reason)<div class="rv-result__reason"><span class="rv-k">Lý do kết thúc</span> {{ $run->outcome_reason }}</div>@endif
                             @if ($run->finalVersion)
-                                <div>Bản nháp v{{ $run->finalVersion->version }}: <a class="underline" href="{{ \App\Filament\Resources\ArticleVersionResource::getUrl('view', ['record' => $run->finalVersion]) }}">xem bài</a></div>
+                                <div>Bản nháp v{{ $run->finalVersion->version }} đã tạo (xem ở tab Nội dung).</div>
                             @endif
                             @include('filament.agent.cms-draft-line', ['version' => $run->finalVersion])
                             @if ($run->ai_mode !== 'real')
@@ -274,37 +272,7 @@
                         </div>
                     </section>
                 </div>
-            </x-studio.panel>
-
-            {{-- ===== Chi phí và model ===== --}}
-            <x-studio.panel key="chi-phi">
-                <div class="rvx" data-testid="run-cost">
-                    <div class="rv-status">
-                        <div class="rv-tile" data-testid="run-budget">
-                            <div class="rv-k">Chi phí / ngân sách phiên <x-studio.hint text="Ngân sách phiên hiện là giá trị mặc định trong RunPolicy; chưa nối cài đặt ngân sách thật theo ngày/tháng (AG-B09)." tone="warning" /></div>
-                            <div class="rv-mid">{{ number_format($flow['cost'], 0, ',', '.') }} ₫ <span class="rv-small">/ {{ number_format($flow['budget'], 0, ',', '.') }} ₫</span></div>
-                            <div class="rv-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $flow['budgetPct'] }}"><i style="width:{{ $flow['budgetPct'] }}%" class="{{ $flow['budgetPct'] >= 90 ? 'is-hot' : '' }}"></i></div>
-                        </div>
-                        <div class="rv-tile"><div class="rv-k">Token</div><div class="rv-mid">{{ number_format($flow['tokens'], 0, ',', '.') }}</div></div>
-                        <div class="rv-tile"><div class="rv-k">Tổng thời gian</div><div class="rv-mid">{{ \App\Filament\Support\Agent\RunActivity::formatElapsed($flow['seconds']) }}</div>@if ($live)<div class="rv-small">đang chạy</div>@endif</div>
-                    </div>
-                    <div class="rvx-pane" style="overflow-x:auto">
-                        <h3>Chi phí từng chặng</h3>
-                        <table class="rvx-table" data-testid="cost-table">
-                            <thead><tr><th>Chặng</th><th>Người phụ trách</th><th>Model</th><th class="n">Token</th><th class="n">Chi phí</th><th class="n">Thời lượng</th></tr></thead>
-                            <tbody>
-                            @foreach ($nodes as $n)
-                                @continue($n['count'] === 0)
-                                <tr data-cost-stage="{{ $n['code'] }}"><td>{{ $n['title'] }}@if ($n['count'] > 1) ×{{ $n['count'] }}@endif</td><td>{{ $n['who']['title'] }}</td><td>{{ implode(', ', $n['models']) ?: '—' }}</td><td class="n">{{ number_format($n['tokens'], 0, ',', '.') }}</td><td class="n">{{ number_format($n['cost'], 0, ',', '.') }} ₫</td><td class="n">{{ $n['seconds'] !== null ? $fmtSec($n['seconds']) : '—' }}</td></tr>
-                            @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </x-studio.panel>
-
-            {{-- ===== Dữ liệu ===== --}}
-            <x-studio.panel key="du-lieu">
+                {{-- Dữ liệu thô và nhật ký từng bước (trước đây là tab riêng) nằm cùng báo cáo. --}}
                 <div class="rvx" data-testid="run-data">
                     <div class="rvx-pane">
                         <h3>Đầu vào và đầu ra <x-help text="Dữ liệu thô của phiên: thứ phiên đã nhận vào và thứ nó ghi ra. Chỉ quản trị xem được." /></h3>
@@ -351,5 +319,33 @@
                     </details>
                 </div>
             </x-studio.panel>
+
+            {{-- ===== Chi phí và model ===== --}}
+            <x-studio.panel key="chi-phi">
+                <div class="rvx" data-testid="run-cost">
+                    <div class="rv-status">
+                        <div class="rv-tile" data-testid="run-budget">
+                            <div class="rv-k">Chi phí / ngân sách phiên <x-studio.hint text="Ngân sách phiên hiện là giá trị mặc định trong RunPolicy; chưa nối cài đặt ngân sách thật theo ngày/tháng (AG-B09)." tone="warning" /></div>
+                            <div class="rv-mid">{{ number_format($flow['cost'], 0, ',', '.') }} ₫ <span class="rv-small">/ {{ number_format($flow['budget'], 0, ',', '.') }} ₫</span></div>
+                            <div class="rv-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $flow['budgetPct'] }}"><i style="width:{{ $flow['budgetPct'] }}%" class="{{ $flow['budgetPct'] >= 90 ? 'is-hot' : '' }}"></i></div>
+                        </div>
+                        <div class="rv-tile"><div class="rv-k">Token</div><div class="rv-mid">{{ number_format($flow['tokens'], 0, ',', '.') }}</div></div>
+                        <div class="rv-tile"><div class="rv-k">Tổng thời gian</div><div class="rv-mid">{{ \App\Filament\Support\Agent\RunActivity::formatElapsed($flow['seconds']) }}</div>@if ($live)<div class="rv-small">đang chạy</div>@endif</div>
+                    </div>
+                    <div class="rvx-pane" style="overflow-x:auto">
+                        <h3>Chi phí từng chặng</h3>
+                        <table class="rvx-table" data-testid="cost-table">
+                            <thead><tr><th>Chặng</th><th>Người phụ trách</th><th>Model</th><th class="n">Token</th><th class="n">Chi phí</th><th class="n">Thời lượng</th></tr></thead>
+                            <tbody>
+                            @foreach ($nodes as $n)
+                                @continue($n['count'] === 0)
+                                <tr data-cost-stage="{{ $n['code'] }}"><td>{{ $n['title'] }}@if ($n['count'] > 1) ×{{ $n['count'] }}@endif</td><td>{{ $n['who']['title'] }}</td><td>{{ implode(', ', $n['models']) ?: '—' }}</td><td class="n">{{ number_format($n['tokens'], 0, ',', '.') }}</td><td class="n">{{ number_format($n['cost'], 0, ',', '.') }} ₫</td><td class="n">{{ $n['seconds'] !== null ? $fmtSec($n['seconds']) : '—' }}</td></tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </x-studio.panel>
+
         </x-studio.tabs>
     </div>
