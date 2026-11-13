@@ -28,10 +28,17 @@ final class PreviewImages
 
         return (string) preg_replace_callback('#(<img\b[^>]*?\bsrc\s*=\s*)(["\'])(.*?)\2#i', function (array $m) use ($base, &$left): string {
             $src = html_entity_decode($m[3], ENT_QUOTES | ENT_HTML5);
-            if ($left <= 0 || ! str_starts_with($src, $base)) {
+            if ($left <= 0) {
                 return $m[0];
             }
-            $path = rawurldecode(strtok(substr($src, strlen($base)), '?#') ?: '');
+            if (str_starts_with($src, $base)) {
+                $rel = substr($src, strlen($base));
+            } elseif (preg_match('#^https?://[^/]+/storage/(media/.+)$#i', $src, $mm)) {
+                $rel = $mm[1]; // cùng ổ public nhưng địa chỉ gốc khác (bài tạo từ nơi có APP_URL khác): vẫn đọc từ thư mục media cục bộ, không tải gì từ ngoài
+            } else {
+                return $m[0];
+            }
+            $path = rawurldecode(strtok($rel, '?#') ?: '');
             $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
             if (! str_starts_with($path, 'media/') || str_contains($path, '..') || ! isset(self::MIME[$ext])) {
                 return $m[0];

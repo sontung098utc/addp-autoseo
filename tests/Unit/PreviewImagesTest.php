@@ -28,7 +28,7 @@ class PreviewImagesTest extends TestCase
     public function test_giu_nguyen_anh_ngoai_thu_vien_va_duong_dan_la(): void
     {
         foreach ([
-            'https://other.test/media/2026/11/a.webp',
+            'https://other.test/media/2026/11/a.webp', // không có /storage/ trong đường dẫn: ảnh ngoài thật sự
             'http://site.test/storage/media/2026/11/khong-co.webp',
             'http://site.test/storage/secret/a.webp',
             'http://site.test/storage/media/../.env',
@@ -43,5 +43,14 @@ class PreviewImagesTest extends TestCase
     {
         $html = str_repeat('<img src="http://site.test/storage/media/2026/11/a.webp">', PreviewImages::MAX_IMAGES + 2);
         $this->assertSame(PreviewImages::MAX_IMAGES, substr_count(PreviewImages::inline($html), 'data:image/webp'));
+    }
+
+    public function test_anh_cung_o_public_nhung_khac_dia_chi_goc_van_duoc_nhung(): void
+    {
+        // Bài tạo từ tiến trình có APP_URL khác (ví dụ http://localhost:8000): vẫn đọc từ thư mục media cục bộ, không tải gì từ ngoài.
+        $out = PreviewImages::inline('<img src="http://localhost:8000/storage/media/2026/11/a.webp">');
+        $this->assertStringContainsString('data:image/webp;base64,', $out);
+        $this->assertSame('<img src="http://localhost:8000/storage/media/2026/11/khong-co.webp">', PreviewImages::inline('<img src="http://localhost:8000/storage/media/2026/11/khong-co.webp">'));
+        $this->assertSame('<img src="http://x.test/storage/media/../.env">', PreviewImages::inline('<img src="http://x.test/storage/media/../.env">'));
     }
 }

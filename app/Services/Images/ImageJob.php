@@ -68,6 +68,9 @@ final class ImageJob
         $default = $connection ?? (string) config('database.default');
         $c = (array) config('database.connections.'.$default);
         $env = ['DB_CONNECTION' => $default, 'APP_ENV' => (string) app()->environment(), 'CACHE_STORE' => (string) config('cache.default')];
+        if ((string) config('app.url') !== '') {
+            $env['APP_URL'] = (string) config('app.url'); // địa chỉ gốc để tạo đường dẫn ảnh (/storage/...) đúng với nơi đang chạy; thiếu thì ảnh lưu với địa chỉ trong .env và không hiện
+        }
         if ((string) config('app.key') !== '') {
             $env['APP_KEY'] = (string) config('app.key'); // giải mã khóa nhà cung cấp AI/ảnh; cùng một cây tiến trình nên không lộ ra ngoài
         }

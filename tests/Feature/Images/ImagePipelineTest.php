@@ -213,6 +213,7 @@ class ImagePipelineTest extends TestCase
         $this->assertSame('/tmp/x-preview.sqlite', $env['DB_DATABASE']);
         $this->assertSame('array', $env['CACHE_STORE']);
         $this->assertArrayHasKey('APP_ENV', $env);
+        $this->assertSame((string) config('app.url'), $env['APP_URL'], 'con cần APP_URL để đường dẫn ảnh đúng nơi đang chạy');
         $this->assertSame((string) config('app.key'), $env['APP_KEY'], 'con cần APP_KEY để giải mã khóa nhà cung cấp');
 
         config(['database.connections.mysql.host' => 'dbhost', 'database.connections.mysql.database' => 'seo', 'database.connections.mysql.username' => 'u', 'database.connections.mysql.password' => 'p', 'database.connections.mysql.port' => '3306']);
