@@ -143,12 +143,16 @@ class ReferenceDossierTest extends TestCase
         $step = $run->steps->first(fn ($s) => ($s->data['purpose'] ?? null) === 'references');
         $this->assertSame('ok', $step->status);
         $this->assertSame('ready_for_review', $run->status);
+        $html = (string) $run->finalVersion->html_content;
+        $this->assertStringContainsString('<div class="autoseo-refs">', $html, 'Có tài liệu thật thì cuối bài phải có khối nguồn.');
+        $this->assertStringContainsString('href="https://who.int/a"', $html);
 
         FakeSearch::$throw = new WebSearchUnavailable('Chưa có khóa.');
         $run2 = (new AgentRunOrchestrator($ai, sleep: fn () => null))->run($article);
         $this->assertArrayNotHasKey('references', end($ai->options));
         $this->assertSame('warn', $run2->steps->first(fn ($s) => ($s->data['purpose'] ?? null) === 'references')->status);
         $this->assertSame('ready_for_review', $run2->status, 'Thiếu tài liệu không được làm hỏng hay chặn phiên.');
+        $this->assertStringNotContainsString('autoseo-refs', (string) $run2->finalVersion->html_content, 'Không có tài liệu thật thì không bịa khối nguồn.');
     }
 
     public function test_chu_de_thuong_khong_ton_luot_tim_web(): void

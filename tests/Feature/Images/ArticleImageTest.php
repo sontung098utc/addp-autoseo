@@ -113,7 +113,7 @@ class ArticleImageTest extends TestCase
         $this->assertSame(['featured', 'inline', 'inline'], array_column($r['items'], 'role'));
         $this->assertSame(3, $v->mediaAssets()->count());
         $this->assertSame(1, $v->mediaAssets()->wherePivot('is_featured', true)->count());
-        $this->assertSame(2, substr_count($v->fresh()->html_content, 'data-ai-image="1"'));
+        $this->assertSame(2, substr_count($v->fresh()->html_content, 'data-auto-image="1"'));
         $this->assertStringContainsString('alt="Hình minh họa mục', $v->fresh()->html_content);
     }
 
@@ -156,7 +156,7 @@ class ArticleImageTest extends TestCase
         $re = $this->svc()->generateFor($a, $v->fresh(), ['regenerate' => true]);
         $this->assertSame(3, $re['generated']);
         $this->assertSame(3, $v->mediaAssets()->count());
-        $this->assertSame(2, substr_count($v->fresh()->html_content, 'data-ai-image="1"'));
+        $this->assertSame(2, substr_count($v->fresh()->html_content, 'data-auto-image="1"'));
     }
 
     public function test_cost_cap_stops_midway(): void

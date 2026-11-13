@@ -193,7 +193,7 @@ class ImagePipelineTest extends TestCase
         $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider))->run($this->article('dịch vụ thiết kế website'), null, 'manual');
         $stages = $run->steps->pluck('stage')->all();
 
-        $this->assertSame(['guard', 'risk', 'brief', 'images', 'research', 'write', 'grade', 'assemble', 'handoff'], array_values(array_unique(array_diff($stages, ['retry', 'decision', 'repair']))));
+        $this->assertSame(['guard', 'risk', 'brief', 'images', 'research', 'write', 'grade', 'edit', 'assemble', 'handoff'], array_values(array_unique(array_diff($stages, ['retry', 'decision', 'repair']))));
         $brief = $run->steps->firstWhere('stage', 'brief');
         $this->assertNotEmpty($brief->data['image_plan']['plan']['slots'], 'kế hoạch ảnh nằm trong dữ kiện bước Dàn ý');
         $this->assertNull($run->steps->firstWhere('stage', 'image_plan'), 'không có bước kế hoạch ảnh riêng');
@@ -202,7 +202,7 @@ class ImagePipelineTest extends TestCase
         $this->assertSame('designer', $images->role);
         $asm = $run->steps->firstWhere('stage', 'assemble');
         $this->assertNotEmpty($asm->data['placements']);
-        $this->assertGreaterThan(0, substr_count((string) $run->finalVersion->html_content, 'data-ai-image'), 'ảnh đã được chèn vào nội dung bài');
+        $this->assertGreaterThan(0, substr_count((string) $run->finalVersion->html_content, 'data-auto-image'), 'ảnh đã được chèn vào nội dung bài');
     }
 
     public function test_tien_trinh_con_nhan_cau_hinh_csdl_cua_tien_trinh_cha(): void

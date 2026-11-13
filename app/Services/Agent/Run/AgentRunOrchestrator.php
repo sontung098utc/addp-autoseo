@@ -25,6 +25,7 @@ use App\Services\Ai\Playbook\PlaybookLoader;
 use App\Filament\Support\Schedule\ErrorMasker;
 use App\Contracts\StructuredAiInterface;
 use App\Services\Content\CitationRenderer;
+use App\Services\Content\ReferenceListRenderer;
 use App\Services\Content\CitationSupportJudge;
 use App\Services\Knowledge\AiJson;
 use App\Services\Content\MedicalDisclaimer;
@@ -474,7 +475,7 @@ final class AgentRunOrchestrator
         $passed = ! $report->hasBlocking();
         // Dấu [KB#id] chỉ để máy kiểm tra: bản lưu cho người đọc dùng chú thích số + khối Nguồn tham khảo (vẫn mang data-kb để chấm lại được).
         if (isset($attrs['html_content']) && is_string($attrs['html_content'])) {
-            $attrs['html_content'] = CitationRenderer::render($attrs['html_content']);
+            $attrs['html_content'] = ReferenceListRenderer::append(CitationRenderer::render($attrs['html_content']), $this->references);
         }
         $version = $this->persist($article, $attrs, $passed);
         $run->update(['final_version_id' => $version->id]);

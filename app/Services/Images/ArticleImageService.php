@@ -18,7 +18,7 @@ use Illuminate\Support\Str;
  * Tạo ảnh cho một phiên bản bài. Luật (0 token): thư viện đã có ảnh bìa thì không tạo gì; không thì 1 ảnh bìa + tối đa N ảnh minh họa
  * (N = min(options.max_inline hoặc config agent.images.max_inline, số mục H2 dùng được, trần cứng 4 trừ ảnh bìa)).
  * Trần chi phí: 10% ngân sách phiên cho mọi ảnh của bài; chạm trần thì dừng và báo. Chạy lại: bài đã có ảnh AI thì bỏ qua trừ khi regenerate.
- * Ảnh chèn vào thân bài là <figure> do mã này dựng (alt/URL đã escape, qua MediaService nên đã kiểm MIME/kích thước), kèm chú thích "Ảnh minh họa do AI tạo".
+ * Ảnh chèn vào thân bài là <figure> do mã này dựng (alt/URL đã escape, qua MediaService nên đã kiểm MIME/kích thước), KHÔNG kèm nhãn/chú thích nào nói về AI (nội dung xuất bản không được lộ nguồn gốc ảnh; nguồn gốc chỉ ghi nội bộ ở metadata).
  * Nguồn gốc ghi ở media_assets.metadata: ai_generated, prompt, model, role, cost_vnd... (không cần migration).
  */
 final class ArticleImageService
@@ -315,7 +315,7 @@ final class ArticleImageService
         try {
             $asset = $media->storeMedia($path, [
                 'website_id' => $article->website_id, 'title' => Str::limit($alt, 120, ''), 'alt_text' => Str::limit($alt, 125, ''),
-                'caption' => 'Ảnh minh họa do AI tạo', 'tags' => ['ai-generated'],
+                'tags' => [],
             ]);
         } finally {
             @unlink($path);
@@ -339,9 +339,9 @@ final class ArticleImageService
                 continue;
             }
             $e = fn (string $v) => htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
-            $fig = '<figure class="article-image-block ai-generated" data-ai-image="1"><img src="'.$e($asset->url).'" alt="'.$e((string) $asset->alt_text).'"'
+            $fig = '<figure class="article-image-block" data-auto-image="1"><img src="'.$e($asset->url).'" alt="'.$e((string) $asset->alt_text).'"'
                 .($asset->width ? ' width="'.(int) $asset->width.'"' : '').($asset->height ? ' height="'.(int) $asset->height.'"' : '')
-                .' loading="lazy" decoding="async" /><figcaption>Ảnh minh họa do AI tạo</figcaption></figure>';
+                .' loading="lazy" decoding="async" /></figure>';
             $pos = stripos($s['html'], '</p>');
             $rep[$s['index']] = $pos === false ? $s['html']."\n".$fig."\n" : substr($s['html'], 0, $pos + 4)."\n".$fig."\n".substr($s['html'], $pos + 4);
         }
@@ -351,7 +351,7 @@ final class ArticleImageService
 
     public static function stripAiFigures(string $html): string
     {
-        return preg_replace('#\s*<figure[^>]*data-ai-image="1"[^>]*>.*?</figure>\s*#isu', "\n", $html) ?? $html;
+        return preg_replace('#\s*<figure[^>]*data-(?:auto|ai)-image="1"[^>]*>.*?</figure>\s*#isu', "\n", $html) ?? $html;
     }
 
     public function isHealth(Article $article, ?BrandProfile $brand): bool
