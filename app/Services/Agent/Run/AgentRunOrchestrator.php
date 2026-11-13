@@ -582,15 +582,24 @@ final class AgentRunOrchestrator
         $stepRow = $this->imageStep;
         $this->imageStep = null;
         try {
+            $childResult = null;
             if ($this->imageProc !== null) {
                 try {
-                    $this->imageProc->wait();
+                    $childResult = $this->imageProc->wait();
                 } catch (Throwable) {
-                    // tiến trình con quá hạn hoặc chết: xem kết quả ghi được tới lúc này
+                    // tiến trình con quá hạn: xem kết quả ghi được tới lúc này
                 }
                 $this->imageProc = null;
             }
             $stepRow->refresh();
+            // Tiến trình nền đã THOÁT mà chưa ghi kết quả (chết khi khởi động, hỏng cấu hình...): tạo ảnh trực tiếp để bài không ra mắt thiếu ảnh. Quá hạn (còn chạy) thì không chạy trùng.
+            $inlineFallback = false;
+            if ($childResult !== null && ! (bool) (((array) ((array) $stepRow->data)['gen'] ?? [])['done'] ?? false)) {
+                \Illuminate\Support\Facades\Log::warning('Tiến trình tạo ảnh nền thoát mà chưa xong (mã '.$childResult->exitCode().'), tạo ảnh trực tiếp.');
+                \App\Services\Images\ImageJob::execute($stepRow, null, $article);
+                $stepRow->refresh();
+                $inlineFallback = true;
+            }
             $data = (array) $stepRow->data;
             $plan = (array) ($data['plan'] ?? []);
             $slots = (array) ($plan['slots'] ?? []);
@@ -612,7 +621,7 @@ final class AgentRunOrchestrator
             $title = $made > 0 ? "Đã tạo {$made}/".count($slots).' ảnh minh họa (AI tạo)' : 'Không tạo ảnh';
             $stepRow->update([
                 'status' => $made === 0 ? 'warn' : $status, 'title' => $title,
-                'detail' => $made > 0 ? "Chi phí ảnh: ".(int) ($gen['cost_vnd'] ?? 0).'đ. Ảnh gắn vào phiên bản, nhãn "AI tạo" ghi ở thư viện media.'.($errors !== [] ? ' Có ảnh lỗi: '.$errors[0] : '') : (string) $skipped,
+                'detail' => $made > 0 ? "Chi phí ảnh: ".(int) ($gen['cost_vnd'] ?? 0).'đ. Ảnh gắn vào phiên bản, nhãn "AI tạo" ghi ở thư viện media.'.($errors !== [] ? ' Có ảnh lỗi: '.$errors[0] : '').($inlineFallback ? ' Tiến trình tạo ảnh nền bị dừng nên ảnh được tạo trực tiếp.' : '') : (string) $skipped.($inlineFallback ? ' (Đã thử tạo trực tiếp sau khi tiến trình nền dừng.)' : ''),
                 'model' => $made > 0 ? (trim(explode(' (', (explode(' / ', (string) ($data['generator'] ?? ''), 2)[1] ?? ''))[0]) ?: 'image') : null,
                 'data' => array_merge($data, ['version_id' => $version->id, 'generated' => $made, 'skipped_reason' => $skipped, 'skip_code' => $made === 0 ? ($done ? 'provider_error' : 'not_finished') : null,
                     'items' => $okItems, 'cost' => (float) ($gen['cost_vnd'] ?? 0), 'errors' => $errors, 'placements' => $res['placements']]),

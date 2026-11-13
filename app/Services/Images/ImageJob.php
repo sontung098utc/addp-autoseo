@@ -56,13 +56,41 @@ final class ImageJob
         }
     }
 
+    /**
+     * Biến môi trường cho tiến trình con: CSDL, môi trường, cache và khóa ứng dụng của tiến trình ĐANG CHẠY.
+     * Tiến trình con (artisan) tự nạp .env; máy chủ web (artisan serve) lại bỏ biến môi trường của container nên con không nhận được cấu hình CSDL thật và rơi về .env (mysql, host không tồn tại),
+     * chết ngay và ảnh không bao giờ được tạo. Truyền tường minh từ cấu hình đang dùng thì con luôn dùng đúng CSDL với cha.
+     *
+     * @return array<string,string>
+     */
+    public static function childEnv(?string $connection = null): array
+    {
+        $default = $connection ?? (string) config('database.default');
+        $c = (array) config('database.connections.'.$default);
+        $env = ['DB_CONNECTION' => $default, 'APP_ENV' => (string) app()->environment(), 'CACHE_STORE' => (string) config('cache.default')];
+        if ((string) config('app.key') !== '') {
+            $env['APP_KEY'] = (string) config('app.key'); // giải mã khóa nhà cung cấp AI/ảnh; cùng một cây tiến trình nên không lộ ra ngoài
+        }
+        if ($default === 'sqlite') {
+            $env['DB_DATABASE'] = (string) ($c['database'] ?? '');
+        } else {
+            foreach (['host' => 'DB_HOST', 'port' => 'DB_PORT', 'database' => 'DB_DATABASE', 'username' => 'DB_USERNAME', 'password' => 'DB_PASSWORD'] as $k => $e) {
+                if (isset($c[$k]) && $c[$k] !== '') {
+                    $env[$e] = (string) $c[$k];
+                }
+            }
+        }
+
+        return $env;
+    }
+
     /** Bắt đầu tiến trình con; null nếu không khởi động được (nơi gọi chạy đồng bộ). */
     public static function spawn(AgentRunStep $step): ?InvokedProcess
     {
         try {
             $php = (new PhpExecutableFinder)->find(false) ?: PHP_BINARY;
 
-            return Process::path(base_path())->timeout((int) config('agent.images.parallel_timeout', 900))->start([$php, 'artisan', 'agent:run-images', (string) $step->id]);
+            return Process::path(base_path())->env(self::childEnv())->timeout((int) config('agent.images.parallel_timeout', 900))->start([$php, 'artisan', 'agent:run-images', (string) $step->id]);
         } catch (\Throwable) {
             return null;
         }

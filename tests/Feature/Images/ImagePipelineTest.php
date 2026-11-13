@@ -204,4 +204,22 @@ class ImagePipelineTest extends TestCase
         $this->assertNotEmpty($asm->data['placements']);
         $this->assertGreaterThan(0, substr_count((string) $run->finalVersion->html_content, 'data-ai-image'), 'ảnh đã được chèn vào nội dung bài');
     }
+
+    public function test_tien_trinh_con_nhan_cau_hinh_csdl_cua_tien_trinh_cha(): void
+    {
+        config(['database.connections.sqlite.database' => '/tmp/x-preview.sqlite', 'cache.default' => 'array']);
+        $env = \App\Services\Images\ImageJob::childEnv('sqlite');
+        $this->assertSame('sqlite', $env['DB_CONNECTION']);
+        $this->assertSame('/tmp/x-preview.sqlite', $env['DB_DATABASE']);
+        $this->assertSame('array', $env['CACHE_STORE']);
+        $this->assertArrayHasKey('APP_ENV', $env);
+        $this->assertSame((string) config('app.key'), $env['APP_KEY'], 'con cần APP_KEY để giải mã khóa nhà cung cấp');
+
+        config(['database.connections.mysql.host' => 'dbhost', 'database.connections.mysql.database' => 'seo', 'database.connections.mysql.username' => 'u', 'database.connections.mysql.password' => 'p', 'database.connections.mysql.port' => '3306']);
+        $m = \App\Services\Images\ImageJob::childEnv('mysql');
+        $this->assertSame('mysql', $m['DB_CONNECTION']);
+        $this->assertSame('dbhost', $m['DB_HOST']);
+        $this->assertSame('seo', $m['DB_DATABASE']);
+        $this->assertSame('u', $m['DB_USERNAME']);
+    }
 }
