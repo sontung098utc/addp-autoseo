@@ -39,7 +39,8 @@ final class RunViewData
             'run' => $run,
             'verdict' => RunFlow::verdict($run, $flow, $live, $stale),
             'focus' => RunFlow::focusStage($flow['nodes']),
-            'tab' => $problem ? 'dien-bien' : 'bao-cao',
+            // Mở phiên nào cũng vào tab Diễn biến trước (luồng, chỉ số); Báo cáo và Chi phí ở tab bên cạnh.
+            'tab' => 'dien-bien',
             'name' => self::articleName($run),
             'campaign' => $run->campaign_id ? Campaign::query()->find($run->campaign_id) : null,
             'blueprint' => AgentFlowBlueprint::byStage(),

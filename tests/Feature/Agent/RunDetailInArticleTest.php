@@ -126,4 +126,18 @@ class RunDetailInArticleTest extends TestCase
         $this->assertStringNotContainsString('data-testid="stage-detail"', $html);
         $this->assertStringNotContainsString('data-testid="agent-run-flow"', $html);
     }
+
+    public function test_chon_phien_nao_cung_mo_tab_dien_bien_truoc_va_buoc_dang_chay_co_hieu_ung(): void
+    {
+        $run = $this->run_($this->article, 'Được phép chạy');
+        $html = $this->get(ArticleResource::getUrl('view', ['record' => $this->article]).'?phien='.$run->id)->assertOk()->getContent();
+        $detail = substr($html, strpos($html, 'data-testid="aw-run-detail"'));
+        $this->assertMatchesRegularExpression('/studioTabs\\([\'"]dien-bien/', $detail, 'tab lồng trong phiên mặc định là Diễn biến, kể cả phiên đã xong');
+
+        // Bước đang chạy: vệt sáng xoẹt ngang (CSS) và tắt khi người dùng chọn giảm chuyển động.
+        $css = (string) file_get_contents(resource_path('views/components/flow/style.blade.php'));
+        $this->assertStringContainsString('@keyframes fl-sweep', $css);
+        $this->assertMatchesRegularExpression('/\.fl-node--running\{[^}]*animation:fl-sweep/', $css);
+        $this->assertMatchesRegularExpression('/prefers-reduced-motion:reduce\)\{\.fl-node--running\{animation:none\}/', $css);
+    }
 }

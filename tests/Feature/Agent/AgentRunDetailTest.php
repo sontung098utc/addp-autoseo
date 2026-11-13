@@ -200,12 +200,12 @@ class AgentRunDetailTest extends TestCase
         $this->get(AgentRunResource::viewUrl($r))->assertOk()->assertDontSee('data-testid="aw-run-detail"', false);
     }
 
-    public function test_trang_phien_co_bon_tab_ngang_dung_khoa_va_mac_dinh_theo_trang_thai(): void
+    public function test_trang_phien_co_ba_tab_ngang_dung_khoa_va_luon_mo_tab_dien_bien_truoc(): void
     {
         $done = $this->page($this->run_('ready_for_review', [['guard', 'ok']]));
         preg_match_all('/role="tab" class="ss-tab" data-key="([^"]+)"/', $done, $m);
         $this->assertSame(['dien-bien', 'bao-cao', 'chi-phi'], $m[1], 'Báo cáo và Dữ liệu đã gộp thành một tab');
-        $this->assertMatchesRegularExpression('/studioTabs\\([\'"]bao-cao/', $done);
+        $this->assertMatchesRegularExpression('/studioTabs\\([\'"]dien-bien/', $done, 'phiên xong cũng mở Diễn biến trước');
 
         foreach (['failed', 'held', 'blocked', 'running'] as $st) {
             $html = $this->page($this->run_($st, [['guard', 'ok']], $st === 'failed' ? ['outcome_reason' => 'Hết tiền'] : []));
