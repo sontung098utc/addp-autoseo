@@ -110,7 +110,7 @@
         <div class="rvx-head" data-testid="run-status-bar">
             <div class="rvx-id" data-testid="run-meta">
                 <span class="rv-outcome" data-testid="run-badge"><x-filament::badge :color="$sColor">{{ $sLabel }}</x-filament::badge></span>
-                <span class="rv-sub">#{{ $run->id }} · {{ $startedAt ? VnTime::format($startedAt, 'd/m/Y H:i') : '—' }}</span>
+                @if (empty($embedded))<span class="rv-sub">#{{ $run->id }} · {{ $startedAt ? VnTime::format($startedAt, 'd/m/Y H:i') : '—' }}</span>@endif
                 @if ($campaign)<a class="rv-chip rv-chip--link" href="{{ \App\Filament\Resources\CampaignResource::getUrl('view', ['record' => $campaign]) }}">{{ $campaign->name }}</a>@endif
                 <x-help title="Về phiên này">
                     <p>{{ $aiNote }}</p>

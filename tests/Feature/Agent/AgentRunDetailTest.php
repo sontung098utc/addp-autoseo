@@ -283,7 +283,8 @@ class AgentRunDetailTest extends TestCase
         $r = $this->run_('ready_for_review', [['guard', 'ok'], ['write', 'ok', []], ['grade', 'ok', ['score' => 90, 'round' => 0, 'threshold' => 80]], ['handoff', 'ok']], ['cost_vnd' => 2500, 'repair_rounds' => 0]);
         $html = $this->page($r);
         $head = substr($html, strpos($html, 'data-testid="run-status-bar"'), strpos($html, 'data-tabs=') - strpos($html, 'data-testid="run-status-bar"'));
-        $this->assertStringContainsString('#'.$r->id.' · ', $head);
+        // Phiên nằm trong trang bài: mã và giờ đã ở tiêu đề khung chi tiết nên đầu phần này KHÔNG nhắc lại (tránh lặp).
+        $this->assertStringNotContainsString('#'.$r->id.' · ', $head);
         $this->assertMatchesRegularExpression('/data-testid="run-badge".*?Xong/s', $head);
         // không còn thẻ Kết luận, không còn chip dài, không câu kết luận dưới bất kỳ dạng nào
         foreach (['data-testid="run-verdict"', 'data-testid="run-alert"', 'Đã có bản nháp chờ duyệt', 'Xong: có bản nháp', 'KẾT LUẬN', '>Kết luận<', 'rerun-unwired', 'Chưa nối'] as $gone) {

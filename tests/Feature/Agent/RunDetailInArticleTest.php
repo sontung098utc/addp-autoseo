@@ -140,4 +140,23 @@ class RunDetailInArticleTest extends TestCase
         $this->assertMatchesRegularExpression('/\.fl-node--running\{[^}]*animation:fl-sweep/', $css);
         $this->assertMatchesRegularExpression('/prefers-reduced-motion:reduce\)\{\.fl-node--running\{animation:none\}/', $css);
     }
+
+    public function test_khong_lap_noi_dung_trong_trang_bai(): void
+    {
+        $run = $this->run_($this->article, 'Được phép chạy');
+        $run->forceFill(['status' => 'ready_for_review', 'outcome_reason' => 'Đạt luật nhưng chủ đề rủi ro cao: cần người có chuyên môn duyệt.'])->save();
+        $html = $this->get(ArticleResource::getUrl('view', ['record' => $this->article]).'?phien='.$run->id)->assertOk()->getContent();
+
+        // Mã + giờ của phiên chỉ xuất hiện MỘT lần trong khung chi tiết (tiêu đề khung), không lặp ở dòng huy hiệu bên dưới.
+        $detail = substr($html, strpos($html, 'data-testid="aw-run-detail"'));
+        $this->assertSame(1, substr_count($detail, '#'.$run->id.' · '), 'mã phiên và giờ chỉ ở tiêu đề khung');
+        // Lý do kết thúc của phiên xong không lặp ở bảng chọn phiên (đã có ở báo cáo/quyết định của phiên).
+        $table = substr($html, strpos($html, 'data-testid="aw-runs"'), 2500);
+        $this->assertStringNotContainsString('chủ đề rủi ro cao', $table);
+
+        // Phiên lỗi vẫn ghi lý do ở bảng.
+        $run->forceFill(['status' => 'failed', 'outcome_reason' => 'Nhà cung cấp lỗi tạm thời'])->save();
+        $table2 = $this->get(ArticleResource::getUrl('view', ['record' => $this->article]))->getContent();
+        $this->assertStringContainsString('Nhà cung cấp lỗi tạm thời', substr($table2, strpos($table2, 'data-testid="aw-runs"'), 2500));
+    }
 }

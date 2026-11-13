@@ -49,7 +49,11 @@
                     <div class="rc-top">
                         <button type="button" class="rc-id" wire:click="openStudio('{{ $k }}')" aria-label="Mở hồ sơ {{ $c['name'] }}">
                             @include('filament.clusters.agent-team.agent-studio-avatar', ['role' => $k, 'size' => 2.4])
-                            <span class="rc-name"><strong>{{ $c['name'] }}</strong><span>{{ $c['profile']['title'] }}</span></span>
+                            @php
+                                $nm = \Illuminate\Support\Str::lower(trim((string) $c['name'])); $ti = \Illuminate\Support\Str::lower(trim((string) ($c['profile']['title'] ?? '')));
+                                $showTitle = $ti !== '' && $ti !== $nm && ! str_contains($ti, $nm) && ! str_contains($nm, $ti); // chức danh trùng/gần trùng tên vai trò thì không in lại
+                            @endphp
+                            <span class="rc-name"><strong>{{ $c['name'] }}</strong>@if ($showTitle)<span>{{ $c['profile']['title'] }}</span>@endif</span>
                         </button>
                         @if ($c['switchable'])
                             @if ($canSwitch)

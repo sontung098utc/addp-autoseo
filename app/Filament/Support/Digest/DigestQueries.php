@@ -201,7 +201,7 @@ final class DigestQueries
         $created = (int) $stats[0]['value'];
         $base = "Hôm qua: {$created} bản bài mới, {$published} bài đã đăng";
 
-        return $groups === [] ? $base : $base.' · '.count($groups).' nhóm việc đáng xem';
+        return $base; // số nhóm việc nằm ở tiêu đề khối bên dưới, không nhắc lại ở đây
     }
 
     private static function dateLabel(CarbonImmutable $vn): string

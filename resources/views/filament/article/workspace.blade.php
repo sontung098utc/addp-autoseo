@@ -297,9 +297,11 @@
                                             <span class="aw-flow__st"><b>{{ $rStatus }}</b></span>
                                             @if ($rStart)<span>{{ VnTime::format($rStart, 'd/m/Y H:i') }}</span>@endif
                                         @endif
-                                        <span>{{ number_format($rf['flow']['cost'], 0, ',', '.') }} ₫</span>
-                                        <span>{{ number_format($rf['flow']['tokens'], 0, ',', '.') }} token</span>
-                                        @if ($rRun->repair_rounds > 0)<span>{{ $rRun->repair_rounds }} vòng sửa</span>@endif
+                                        @unless ($latestRunView) {{-- có hàng chỉ số ngay bên dưới thì không nhắc lại chi phí/token/vòng sửa ở đây --}}
+                                            <span>{{ number_format($rf['flow']['cost'], 0, ',', '.') }} ₫</span>
+                                            <span>{{ number_format($rf['flow']['tokens'], 0, ',', '.') }} token</span>
+                                            @if ($rRun->repair_rounds > 0)<span>{{ $rRun->repair_rounds }} vòng sửa</span>@endif
+                                        @endunless
                                     </div>
                                 </div>
                                 @php $openJs = $latestRunView ? "set('activity'); \$wire.set('phien', ".(int) $rRun->id.')' : 'window.location = '.json_encode($rf['url']); @endphp
@@ -398,7 +400,10 @@
                             @endif
                             <dl class="ss-review-dl" style="margin-top:.6rem">
                                 <dt>Từ khóa phụ</dt><dd>{{ $dash(implode(', ', (array) $article->secondary_keywords)) }}</dd>
-                                <dt>Ý định ghi trên bài</dt><dd>{{ KeywordIntent::label($article->search_intent) }}</dd>
+                                {{-- Chỉ hiện khi KHÁC ý định của từ khóa trong kho (trùng thì đã có dòng "Ý định tìm kiếm" ở trên). --}}
+                                @if (! $keyword || KeywordIntent::label($article->search_intent) !== KeywordIntent::label($keyword->intent))
+                                    <dt>{{ $keyword ? 'Ý định ghi trên bài (khác từ khóa)' : 'Ý định ghi trên bài' }}</dt><dd>{{ KeywordIntent::label($article->search_intent) }}</dd>
+                                @endif
                             </dl>
                         </section>
                         <section class="ss-review-card" data-testid="aw-plan">
@@ -617,8 +622,9 @@
                             {{-- Bản mới nhất luôn hiện (kể cả khi chưa có ảnh, kèm lý do); bản cũ chỉ hiện nếu có ảnh. --}}
                             @foreach ($versions as $v)
                                 @if ($v->is($latest) || $v->mediaAssets->isNotEmpty())
-                                    @if (! $v->is($latest))<p class="aw-muted" style="margin-top:.75rem">Bản v{{ $v->version }}</p>@endif
-                                    @include('filament.article.images-gallery', ['version' => $v])
+                                    {{-- Mỗi bản một nhãn riêng (không lặp "Hình ảnh của phiên bản này" ở từng khối). --}}
+                                    <p class="aw-muted" style="margin-top:.75rem;font-weight:600">Bản v{{ $v->version }}@if ($v->is($latest)) (mới nhất)@endif</p>
+                                    @include('filament.article.images-gallery', ['version' => $v, 'hideTitle' => true])
                                 @endif
                             @endforeach
                             @if ($imageNote)<div class="aw-muted" style="margin-top:.5rem">Ảnh từ thư viện <x-help title="Lần chọn ảnh gần nhất"><p>{{ $imageNote }}.</p></x-help></div>@endif
@@ -675,7 +681,8 @@
                                                     @if ($isLive)<span class="ss-running"><span class="ss-spin" aria-hidden="true"></span>Đang chạy · {{ W::runStages()[$liveStage] ?? 'sắp xong' }}</span>
                                                     @else {{ AgentRunResource::STATUS[$r->status][0] ?? $r->status }}
                                                     @endif
-                                                    @if ($r->outcome_reason)<div class="aw-muted">{{ Str::limit($r->outcome_reason, 140) }}</div>@endif
+                                                    {{-- Lý do chỉ ghi ở phiên lỗi/bị chặn/giữ: phiên xong cùng một lý do ("cần người có chuyên môn duyệt") sẽ lặp ở mọi dòng và đã có ở khối Quyết định tự động của phiên. --}}
+                                                    @if ($r->outcome_reason && $r->status !== 'ready_for_review')<div class="aw-muted">{{ Str::limit($r->outcome_reason, 140) }}</div>@endif
                                                 </td>
                                                 <td class="aw-opt">{{ ArticleRows::score($r) ?? '—' }}</td>
                                                 <td class="aw-opt">{{ $fv ? 'v'.$fv->version : '—' }}</td>
@@ -696,7 +703,7 @@
                         <section class="aw-run-detail" data-testid="aw-run-detail" wire:key="aw-run-detail-{{ $selectedRun->id }}">
                             <h3 class="aw-run-detail__title"><span class="aw-viewing">● Đang xem</span> Phiên #{{ $selectedRun->id }} · {{ VnTime::format($selectedRun->started_at ?? $selectedRun->created_at) }}</h3>
                             <div class="aw-run-detail__body">
-                                @include('filament.agent.partials.run-detail', $runView)
+                                @include('filament.agent.partials.run-detail', $runView + ['embedded' => true])
                             </div>
                         </section>
                     @endif

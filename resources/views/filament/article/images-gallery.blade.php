@@ -12,7 +12,7 @@
         .img-gal-meta{font-size:12px;padding:6px 8px;opacity:.85}
         .img-gal-meta summary{cursor:pointer}
     </style>
-    <div style="font-weight:600;margin-bottom:6px">Hình ảnh của phiên bản này</div>
+    @if (empty($hideTitle))<div style="font-weight:600;margin-bottom:6px">Hình ảnh của phiên bản này</div>@endif
     @if ($imgs === [])
         <p style="font-size:13px;opacity:.8">Phiên bản này chưa có ảnh.{{ $why ? ' Lý do: '.$why : ' Chưa có bước tạo ảnh nào ghi lại lý do.' }}</p>
     @else

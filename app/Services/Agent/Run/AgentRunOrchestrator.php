@@ -444,8 +444,9 @@ final class AgentRunOrchestrator
             $new = $this->penalty($report);
             $newScore = RunScorer::score($report);
             if (($report->hasBlocking() || $report->citationGaps() !== [] || $report->layoutGaps() !== [] || $report->supportGaps() !== []) && $new >= $penalty) {
-                $reason = 'Sửa không cải thiện điểm (từ '.$penalty.' xuống '.$new.') nên dừng, tránh tốn thêm chi phí.';
-                $this->decision($run, 'no_improvement', 'Dừng sửa vì không cải thiện', $reason." Điểm {$score} → {$newScore}.", ['penalty_before' => $penalty, 'penalty_after' => $new, 'score_before' => $score, 'score_after' => $newScore]);
+                // Các con số (điểm, điểm phạt trước → sau) hiện ở khối cặp số của quyết định; lời giải thích không nhắc lại để khỏi lặp.
+                $reason = 'Sửa không cải thiện (điểm phạt không giảm) nên dừng, tránh tốn thêm chi phí.';
+                $this->decision($run, 'no_improvement', 'Dừng sửa vì không cải thiện', $reason, ['penalty_before' => $penalty, 'penalty_after' => $new, 'score_before' => $score, 'score_after' => $newScore]);
                 $penalty = $new;
                 $score = $newScore;
                 break;
