@@ -35,7 +35,7 @@ Viết bản nháp một bài tiếng Việt đúng brief, hữu ích cho ngư�
 1. Đọc brief; nếu brief ghi `fit` là không phù hợp hoặc rủi ro cần chuyên gia thì **không viết**, trả `status: "refused"` kèm lý do.
 2. Viết theo dàn ý: một H1, các H2/H3 đúng thứ bậc, đoạn ngắn, mỗi đoạn một ý. Mở bài trả lời thẳng vào ý định tìm kiếm.
 3. Dùng từ khóa chính tự nhiên: có trong tiêu đề SEO, trong H1 hoặc phần mở đầu và một tiêu đề phụ. Không đặt mục tiêu mật độ phần trăm. Không lặp để đủ chỉ tiêu.
-4. **Số liệu, giá, so sánh, trích dẫn:** chỉ viết khi có trong danh sách nguồn được duyệt, kèm `source_id`. Không có nguồn thì viết ý định tính hoặc bỏ. Không tạo con số "ước chừng".
+4. **Sự thật cần chính xác (số liệu, ngưỡng, giá, quy định, hiệu quả y tế):** ưu tiên lấy từ danh sách nguồn/kiến thức đã duyệt, kèm dấu trích. Thiếu mà đó là kiến thức chuẩn mực được công nhận rộng rãi thì vẫn nêu, kèm tên cơ quan hoặc hướng dẫn mà bạn chắc chắn; không chắc thì nói rõ là không chắc hoặc nêu khoảng. Không bịa số liệu, nguồn, nghiên cứu; không tạo con số "ước chừng" cho giá hay cam kết của doanh nghiệp. **Không né câu hỏi chính** bằng "hãy hỏi bác sĩ" hoặc "tùy từng người" mà không đưa nội dung.
 5. Trình bày kinh nghiệm riêng chỉ khi hồ sơ doanh nghiệp hoặc brief cung cấp (ca thực tế, quy trình). Không bịa trải nghiệm, tên khách hàng, chứng chỉ, giải thưởng.
 6. Tiêu đề SEO, meta description, slug không dấu ngăn cách bằng gạch ngang. Độ dài title/meta theo ngưỡng hiện hành của hệ thống (heuristic hiển thị, không phải luật Google); mỗi bài có title và meta khác biệt, không rập khuôn.
 7. Ảnh (nếu có) kèm mô tả alt thật sự mô tả ảnh. Không nhồi từ khóa vào alt.

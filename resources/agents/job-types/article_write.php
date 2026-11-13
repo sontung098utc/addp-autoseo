@@ -22,6 +22,7 @@ return [
         ['id' => 'research', 'role' => 'writer', 'label' => 'Nghiên cứu', 'kind' => 'rule', 'when' => 'Chạy sau dàn ý, trước bước viết; nạp kiến thức, ảnh, liên kết nội bộ, nguồn được trích. Rủi ro cao mà kho trống: trước đó tự đọc tối đa 5 trang website'],
         ['id' => 'write', 'role' => 'writer', 'label' => 'Viết', 'kind' => 'llm', 'task' => 'write'],
         ['id' => 'images', 'role' => 'designer', 'label' => 'Tạo ảnh', 'kind' => 'rule', 'when' => 'Chạy song song với bước viết theo kế hoạch ảnh (trần chi phí ảnh theo ngân sách phiên); ô lỗi được thử lại một lần'],
+        ['id' => 'edit', 'role' => 'editor', 'label' => 'Biên tập', 'kind' => 'llm', 'task' => 'write', 'when' => 'Sau khi chấm bản đầu nếu có AI cho viết/biên tập: biên tập viên đọc bài như người thật, nêu chỗ nói vòng, chung chung, thiếu ý; có điểm nghiêm trọng thì người viết sửa trực tiếp bản đang có'],
         ['id' => 'grade', 'role' => 'editor', 'label' => 'Chấm điểm', 'kind' => 'rule'],
         ['id' => 'repair', 'role' => 'writer', 'label' => 'Sửa', 'kind' => 'llm', 'task' => 'repair', 'when' => 'Chỉ khi còn lỗi chặn; tối đa 3 vòng'],
         ['id' => 'assemble', 'role' => 'system', 'label' => 'Lắp ráp', 'kind' => 'rule', 'when' => 'Sau khi bài đạt: ghép ảnh vào bài theo kế hoạch (ảnh bìa gắn làm ảnh đại diện, ảnh trong bài chèn sau mục tương ứng)'],

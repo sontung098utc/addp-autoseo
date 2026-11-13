@@ -1,0 +1,116 @@
+RUN 180 status=ready_for_review rounds=2 cost=5314.51 final_version=71
+#1 [guard/ok] Được phép chạy |  tok=0
+    Không có lệnh dừng, website hoạt động, bậc tin cậy T1 (chỉ tạo bản nháp).
+#2 [risk/warn] Hạng rủi ro: cao |  tok=0
+    Chủ đề sức khỏe (có cụm "tiểu đường") Bài cần người có chuyên môn duyệt.
+#3 [research/warn] Tự đọc website để bổ sung kiến thức |  tok=0
+    Chủ đề rủi ro cao, kho chưa có kiến thức khớp nên AI tự đọc 0/1 trang trên website công ty: 0 mục tự nhận (tầng A, hoàn tác được), 0 mục chờ người duyệt.
+#4 [brief/ok] Lập dàn ý (7 mục) | agy-flash-low tok=2613
+    Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. Dùng playbook brief/content-brief@1 (bản nháp, chỉ cho lượt thủ công). Dùng Trí tuệ Đái tháo đường (thử quy trình 2) (hồ sơ 10/11 trường, mức dựa vào AI: Bắt buộc nguồn); Tiêu hóa và gan mật (hồ sơ 6/11 trường, mức dựa vào AI: Bắt buộc nguồn);
+#5 [images/skipped] Không tạo ảnh |  tok=0
+    Tính năng tự tạo ảnh đang tắt.
+#6 [research/warn] Chuẩn bị tài liệu |  tok=0
+    Đã nạp 0 mục kiến thức đã duyệt, 0 ảnh gợi ý, 0 liên kết nội bộ gợi ý, 0 nguồn được phép trích, chưa có hồ sơ doanh nghiệp. Kho kiến thức chưa có mục đã duyệt phù hợp; đã ghi khoảng trống kiến thức.
+#7 [write/warn] Viết bản đầu | agy-flash-medium tok=7800
+    Viết theo dàn ý; HTML được làm sạch trước khi chấm. Dùng Trí tuệ Đái tháo đường (thử quy trình 2) (hồ sơ 10/11 trường, mức dựa vào AI: Bắt buộc nguồn); Tiêu hóa và gan mật (hồ sơ 6/11 trường, mức dựa vào AI: Bắt buộc nguồn); Đái tháo đường (tiểu đường) (hồ sơ 10/11 trường, mức dựa vào AI: Bắt buộc n
+#8 [grade/ok] Chấm bản đầu |  tok=0
+    Điểm 80/100 (tham khảo, mốc 80). Đạt mọi luật bắt buộc (còn 4 mục P1, 0 mục P2 chỉ nên xem). Dùng playbook editor/qa-review@1 (bản nháp, chỉ cho lượt thủ công).
+#9 [edit/warn] Biên tập viên yêu cầu sửa (5 điểm) | agy-flash-medium tok=3263
+    Bài chuẩn y khoa, cấu trúc gọn gàng nhưng còn thiên về lý thuyết dịch thuật; thiếu tính thực chiến cho mâm cơm Việt, thiếu định lượng cụ thể và thứ tự ăn để kiểm soát đường huyết tối ưu. Người viết sửa trực tiếp bản đang có.
+#10 [repair/ok] Sửa theo biên tập viên | agy-flash-medium tok=11224
+    Gửi lại cho AI 5 lỗi cần sửa (lỗi chặn hoặc đoạn thiếu trích dẫn): BIÊN TẬP — Nhóm carbohydrate lành mạnh: Cách chọn tinh bột có chỉ số đ | BIÊN TẬP — Rau củ và trái cây ít ngọt: Bổ sung chất xơ và vi chất an t | BIÊN TẬP — THIẾU: Thứ tự ăn trong bữa (rau củ trước -> đạm/chất béo ->
+#11 [grade/ok] Chấm lại sau khi biên tập |  tok=0
+    Điểm 75/100 (tham khảo, mốc 80). Đạt mọi luật bắt buộc (còn 5 mục P1, 0 mục P2 chỉ nên xem).
+#12 [repair/ok] Sửa lần 2 | agy-flash-medium tok=12310
+    Gửi lại cho AI 1 lỗi cần sửa (lỗi chặn hoặc đoạn thiếu trích dẫn): LAY01: Khung lưu ý «Thời điểm và định lượng ăn hoa quả chuẩn: Nên ăn h
+#13 [grade/ok] Chấm lại sau lần sửa 2 |  tok=0
+    Điểm 80/100 (tham khảo, mốc 80). Đạt mọi luật bắt buộc (còn 4 mục P1, 0 mục P2 chỉ nên xem).
+#14 [decision/ok] Giữ cho người có chuyên môn duyệt |  tok=0
+    Đạt luật nhưng chủ đề rủi ro cao nên hệ thống không coi là xong; cần người có chuyên môn duyệt trước khi dùng. Kho chưa có kiến thức đã duyệt khớp chủ đề nên cần xem kỹ các khẳng định.
+#15 [handoff/ok] Chuyển người duyệt |  tok=0
+    Đạt mọi luật bắt buộc. Bản nháp v1 đã vào hàng chờ duyệt; chưa xuất bản vì bậc tin cậy T1.
+
+--- BIÊN TẬP VIÊN ---
+verdict=can_sua
+- [minor] mở bài: Phần tóm tắt và mở bài bị lặp ý đĩa ăn ADA, thiếu quy đổi trực quan 1/4 tinh bột sang khẩu phần quen thuộc của người Việt dẫn đến việc khó áp dụng ngay. => Quy đổi cụ thể 1/4 đĩa tinh bột tương đương khoảng 1/2 đến 2/3 bát con cơm; nêu ngay thông điệp cốt lõi là ăn đủ chất và đúng giờ chứ không kiêng khem mù quáng.
+- [major] Nhóm carbohydrate lành mạnh: Cách chọn tinh bột có chỉ số đường huyết (GI) thấp: Chưa làm rõ ranh giới giữa GI thấp và tổng lượng carbohydrate: người đọc dễ lầm tưởng ăn gạo lứt hay khoai lang thoải mái không lo tăng đường huyết. => Bổ sung cảnh báo: thực phẩm GI thấp nếu ăn quá lượng (trên 1 bát con) vẫn gây tăng vọt glucose máu do tải lượng đường (GL) cao; kiểm soát số lượng quan trọng ngang chất lượng.
+- [major] Rau củ và trái cây ít ngọt: Bổ sung chất xơ và vi chất an toàn: Chưa chỉ rõ thời điểm ăn và định lượng mỗi lần ăn hoa quả, khiến người bệnh dễ mắc sai lầm ăn ngay sau bữa chính gây quá tải đường huyết. => Chỉ rõ: ăn trái cây vào bữa phụ cách bữa chính 1.5–2 tiếng; định lượng mỗi lần chỉ khoảng 1 nắm tay (100–150g, ví dụ 2 múi bưởi, 1/2 quả táo hoặc 1 miếng đu đủ nhỏ).
+- [minor] Khi nào nên đi khám và tham vấn chuyên gia dinh dưỡng?: Hướng dẫn quy tắc 15-15 ghi chung chung '15g đường nhanh', người bệnh lúc tụt đường huyết hoa mắt sẽ không biết cần lấy món gì trong bếp để ăn/uống. => Chỉ rõ 15g đường nhanh tương đương: 1/2 lon nước ngọt thường, 1 hộp sữa tươi có đường 110ml, 3 viên kẹo ngọt hoặc 3 thìa cà phê đường cát pha vào 100ml nước ấm.
+- THIẾU: Thứ tự ăn trong bữa (rau củ trước -> đạm/chất béo -> tinh bột cuối cùng) giúp giảm đỉnh đường huyết sau ăn 20-30%.
+- THIẾU: Mục tiêu đường huyết chuẩn theo ADA: lúc đói 4.4–7.2 mmol/L (80–130 mg/dL), sau ăn 1–2 giờ dưới 10.0 mmol/L (< 180 mg/dL).
+- THIẾU: Gợi ý 1 thực đơn mẫu 1 ngày cụ thể theo các món ăn truyền thống của người Việt kèm định lượng chi tiết.
+
+=== BÀI ===
+TITLE: Người tiểu đường nên ăn gì: Đĩa ăn chuẩn giúp ổn định đường huyết
+SEO: Người tiểu đường nên ăn gì để ổn định đường? | Chuẩn ADA
+META: Người tiểu đường nên ăn gì? Hướng dẫn đĩa ăn chuẩn ADA: 1/2 rau xanh, 1/4 đạm nạc, 1/4 tinh bột GI thấp giúp kiểm soát đường huyết sau ăn ổn định dài lâu.
+SOURCES: ["Hi\u1ec7p h\u1ed9i \u0110\u00e1i th\u00e1o \u0111\u01b0\u1eddng Hoa K\u1ef3 (ADA) - Ti\u00eau chu\u1ea9n ch\u0103m s\u00f3c y t\u1ebf cho ng\u01b0\u1eddi \u0111\u00e1i th\u00e1o \u0111\u01b0\u1eddng (Standards of Care in Diabetes)","B\u1ed9 Y t\u1ebf Vi\u1ec7t Nam - H\u01b0\u1edbng d\u1eabn ch\u1ea9n \u0111o\u00e1n v\u00e0 \u0111i\u1ec1u tr\u1ecb \u0111\u00e1i th\u00e1o \u0111\u01b0\u1eddng t\u00edp 2"]
+WORDS: 3759
+
+Tóm tắt cốt lõi:
+Người sống chung với đái tháo đường nên áp dụng mô hình đĩa ăn (Plate Method) chuẩn ADA: 1/2 đĩa rau không tinh bột, 1/4 đĩa protein nạc và 1/4 đĩa carbohydrate phức hợp GI thấp.
+Thứ tự ăn trong bữa (rau củ trước -> đạm và chất béo -> tinh bột sau cùng) giúp giảm đỉnh đường huyết sau ăn từ 20–30%.
+Ăn thực phẩm GI thấp nhưng vẫn phải khống chế khẩu phần dưới 1 bát con cơm/bữa để kiểm soát tổng tải lượng đường (GL).
+Trái cây nên ăn vào bữa phụ (cách bữa chính 1.5–2 tiếng), định lượng 100–150g/lần, không ăn dồn ngay sau bữa chính.
+Theo dõi mục tiêu đường huyết chuẩn ADA (lúc đói 4.4–7.2 mmol/L, sau ăn < 10.0 mmol/L) và xét nghiệm HbA1c định kỳ 3 tháng/lần.
+Người sống chung với đái tháo đường (thường gọi là bệnh tiểu đường) hoàn toàn không cần nhịn ăn khắt khe, mà cần kiểm soát khẩu phần thông qua mô hình chiếc đĩa dinh dưỡng của ADA: 1/2 đĩa là rau không chứa tinh bột, 1/4 đĩa là đạm nạc và 1/4 đĩa là carbohydrate phức hợp có chỉ số GI thấp. Kết hợp cùng việc thay đổi thứ tự ăn (rau trước, tinh bột sau cùng), bạn có thể làm chậm quá trình hấp thu glucose vào máu, duy trì cảm giác no lâu và giữ mức đường huyết sau ăn ổn định mà không lo suy nhược cơ thể.
+Người tiểu đường nên ăn gì: Nguyên tắc đĩa ăn chuẩn và thứ tự ăn thông minh
+Nhóm carbohydrate lành mạnh: Cách chọn tinh bột GI thấp và kiểm soát lượng ăn
+Chất đạm và chất béo tốt: Tăng cảm giác no, bảo vệ tim mạch
+Rau củ và trái cây ít ngọt: Bổ sung chất xơ an toàn, đúng thời điểm
+Hiểu lầm thường gặp: Có cần cắt bỏ hoàn toàn tinh bột?
+Thực phẩm cần hạn chế và cạm bẫy 'đồ ăn cho người tiểu đường'
+Gợi ý thực đơn 1 ngày chuẩn món Việt cho người đái tháo đường
+Khi nào nên đi khám và tham vấn chuyên gia dinh dưỡng?
+## Người tiểu đường nên ăn gì: Nguyên tắc đĩa ăn chuẩn và thứ tự ăn thông minh
+Mô hình đĩa ăn (Diabetes Plate Method) được khuyến nghị bởi Hiệp hội Đái tháo đường Hoa Kỳ (ADA) là công cụ trực quan và hiệu quả nhất cho mỗi bữa chính. Trên một chiếc đĩa tiêu chuẩn có đường kính khoảng 20–22 cm, khẩu phần được phân chia rõ ràng:
+1/2 đĩa – Rau không chứa tinh bột: Bao gồm rau bina (chân vịt), rau muống, cải bắp, dưa chuột, bông cải xanh, măng tây, ớt chuông. Nhóm này giàu chất xơ, vitamin và khoáng chất nhưng chứa rất ít năng lượng và carbohydrate, giúp bạn no mà không làm tăng glucose máu.
+1/4 đĩa – Chất đạm nạc (Protein): Chọn thịt gia cầm bỏ da, cá tươi, đậu phụ, trứng hoặc các loại đậu. Chất đạm giúp kích thích giải phóng hormone gây no và làm chậm tốc độ rỗng của dạ dày.
+1/4 đĩa – Carbohydrate phức hợp: Gồm gạo lứt, yến mạch, khoai lang, bánh mì nguyên cám hoặc bắp ngô. Đây là nguồn cung cấp năng lượng thiết yếu cho não bộ và cơ bắp.
+Bên cạnh tỷ lệ trên đĩa ăn, thứ tự ăn trong bữa là bí quyết then chốt đã được chứng minh lâm sàng: Bạn hãy ăn toàn bộ phần rau củ và nước canh trước, tiếp đến là các món đạm và chất béo, cuối cùng mới ăn đến cơm hoặc phần tinh bột. Lượng chất xơ đi vào trước sẽ tạo thành một lớp lưới nhớt trong ruột non, làm chậm đáng kể quá trình phân giải và hấp thu đường. Trình tự này giúp giảm đỉnh đường huyết sau ăn từ 20–30% so với việc ăn tinh bột ngay từ đầu hoặc ăn lẫn lộn các món cùng lúc.
+## Nhóm carbohydrate lành mạnh: Cách chọn tinh bột GI thấp và kiểm soát lượng ăn
+Vấn đề đối với người sống chung với đái tháo đường không nằm ở bản thân tinh bột, mà ở loại tinh bột và số lượng tiêu thụ. Tinh bột tinh chế (cơm trắng, bánh mì trắng, bún, miến dong) được tiêu hóa rất nhanh, khiến nồng độ glucose trong máu tăng vọt đột ngột.
+Bạn nên ưu tiên các thực phẩm có chỉ số đường huyết (GI)[a] thấp dưới 55. Các chuỗi carbohydrate phức hợp này cần nhiều thời gian để enzyme tiêu hóa bẻ gãy, giúp đường giải phóng từ từ vào vòng tuần hoàn máu.
+Cảnh báo quan trọng về khẩu phần: Nhiều người lầm tưởng rằng gạo lứt, khoai lang hay yến mạch có GI thấp nên có thể ăn thoải mái mà không sợ tăng đường huyết. Đây là sai lầm nguy hiểm. Dù thực phẩm có GI thấp, nhưng nếu bạn ăn quá lượng (ví dụ vượt quá 1 bát con cơm gạo lứt trong một bữa), tổng tải lượng đường (GL)[c] nạp vào cơ thể vẫn ở mức cao và khiến glucose máu tăng vọt kéo dài. Nguyên tắc vàng luôn là: kiểm soát số lượng (không quá 1 bát con tinh bột chín mỗi bữa chính) quan trọng tương đương với việc chọn chất lượng tinh bột.
+Nhóm thực phẩmLựa chọn ưu tiên (GI < 55, ăn chừng mực)Thực phẩm nên hạn chế (GI > 70)
+Ngũ cốc & Tinh bộtGạo lứt, yến mạch cán dẹt, bánh mì lúa mạch đen, quinoaCơm gạo trắng dẻo, bánh mì trắng, bột dong, xôi nếp
+Củ & Hạt họ đậuKhoai lang luộc cả vỏ, đậu đen, đậu lăng, đậu gàKhoai tây nghiền nướng/chiên, khoai tây sấy
+Chế phẩm sợiMì kiều mạch, bún nưa (shirataki), yến mạch thôMiến sợi nhỏ, bánh phở trắng, hủ tiếu tinh chế
+## Chất đạm và chất béo tốt: Tăng cảm giác no mà không gây áp lực lên tim mạch
+Biến chứng tim mạch là một trong những rủi ro dài hạn cần phòng ngừa ở người có đường huyết tăng cao. Do đó, việc chọn chất đạm và chất béo cần hướng đến mục tiêu vừa tạo cảm giác thỏa mãn sau bữa ăn, vừa duy trì lipid máu ở ngưỡng tối ưu.
+Về chất đạm, hãy duy trì tối thiểu 2 khẩu phần cá béo mỗi tuần (như cá hồi, cá thu, cá trích hoặc cá mòi) theo khuyến cáo chung về tim mạch. Các loại cá này cung cấp axit béo omega-3 dồi dào, hỗ trợ kiểm soát phản ứng viêm và bảo vệ thành mạch. Khi sử dụng gia cầm, bạn nên bỏ phần da để giảm lượng mỡ bão hòa.
+Về chất béo, hãy thay thế hoàn toàn mỡ động vật và dầu chiên rán nhiều lần bằng chất béo không bão hòa đơn và đa. Dầu ô liu nguyên chất, quả bơ cùng các loại hạt vỏ cứng (hạnh nhân, óc chó, hạt điều) cung cấp chất béo có lợi, hỗ trợ cải thiện tình trạng kháng insulin[b]. Tuy nhiên, vì hạt và dầu rất đậm đặc calo, bạn chỉ nên dùng một lượng vừa phải (khoảng một nắm nhỏ hạt mỗi ngày).
+## Rau củ và trái cây ít ngọt: Bổ sung chất xơ an toàn, đúng thời điểm
+Mục tiêu dinh dưỡng được khuyến nghị là nạp tối thiểu 25–30g chất xơ mỗi ngày từ thực phẩm tự nhiên. Chất xơ hòa tan khi vào đường ruột sẽ tạo thành một lớp gel nhớt, làm chậm sự khuếch tán của phân tử đường vào mao mạch, đồng thời nuôi dưỡng hệ vi sinh đường ruột khỏe mạnh.
+Đối với trái cây, nguyên tắc quan trọng là đánh giá dựa trên tải lượng đường huyết (GL) thay vì chỉ nhìn vào vị ngọt cảm tính. Các loại quả như ổi, táo, lê (ăn cả vỏ sau khi rửa sạch), bưởi, thanh long ruột trắng và các loại quả mọng (dâu tây, việt quất) có tải lượng đường thấp và giàu chất chống oxy hóa.
+Thời điểm và lượng ăn hoa quả: Nên ăn hoa quả vào bữa phụ cách bữa chính 1.5–2 tiếng, giới hạn 100–150g mỗi lần (khoảng 1 nắm tay) và ưu tiên ăn nguyên miếng thay vì ép nước.
+## Hiểu lầm thường gặp: Có cần cắt bỏ hoàn toàn tinh bột và đường tự nhiên?
+Một sai lầm rất phổ biến là loại bỏ 100% tinh bột ra khỏi khẩu phần ăn (chế độ ăn kiêng cực đoan). Cách tiếp cận này tiềm ẩn nhiều nguy hiểm, đặc biệt đối với những người đang sử dụng thuốc kích thích tiết insulin hoặc tiêm insulin ngoại sinh.
+Khi cơ thể thiếu hụt carbohydrate nghiêm trọng mà thuốc điều trị vẫn hoạt động, nồng độ glucose trong máu có thể tụt nhanh xuống dưới 3.9 mmol/L (70 mg/dL), gây ra cơn hạ đường huyết cấp tính. Tình trạng này có thể dẫn đến chóng mặt, vã mồ hôi, tim đập nhanh, run rẩy và thậm chí co giật, hôn mê nếu không can thiệp kịp thời. Hơn nữa, việc kiêng khem khắc nghiệt kéo dài còn gây rối loạn chuyển hóa lipid, tăng thể ceton trong máu và thiếu hụt các vi chất dinh dưỡng thiết yếu nhóm B.
+## Thực phẩm cần hạn chế và cạm bẫy 'đồ ăn cho người tiểu đường'
+Người sống chung với đái tháo đường cần cảnh giác trước các nhóm thực phẩm chế biến sẵn và các sản phẩm công nghiệp mang nhãn mác chuyên biệt:
+Thực phẩm chứa đường hấp thu nhanh: Nước ngọt có gas, trà sữa, nước ép đóng lon, bánh kẹo ngọt, siro cây phong và đường mía tinh luyện.
+Bẫy thực phẩm 'không đường' (sugar-free) hoặc 'dành cho người tiểu đường': Rất nhiều loại bánh quy, ngũ cốc ăn liền gắn mác không đường nhưng lại sử dụng tinh bột biến tính, maltodextrin hoặc siro ngô có hàm lượng fructose cao (HFCS). Những chất này có chỉ số GI tương đương, thậm chí cao hơn đường kính thông thường.
+Chất béo chuyển hóa (Trans fat): Có trong đồ ăn nhanh, bánh nướng công nghiệp, bơ thực vật dạng rắn. Chất béo chuyển hóa làm tăng cholesterol xấu (LDL-C), giảm cholesterol tốt (HDL-C) và trực tiếp gia tăng mức độ kháng insulin.
+## Gợi ý thực đơn 1 ngày chuẩn món Việt cho người đái tháo đường
+Dưới đây là gợi ý thực đơn 1 ngày được thiết kế theo văn hóa ẩm thực quen thuộc của người Việt, đảm bảo đủ tỷ lệ mô hình đĩa ăn và kiểm soát định lượng carbohydrate chặt chẽ:
+Bữa ănMón ăn & Định lượng gợi ýLưu ý dinh dưỡng
+Bữa sáng (6h30 - 7h00)- 1/2 bát phở bò tái (chỉ lấy 70g bánh phở tươi, 60g thịt bò nạc, nước dùng trong không béo).- Ăn kèm 1 đĩa giá đỗ chần và rau thơm phong phú.Ăn phần rau giá trước khi ăn bánh phở. Hoặc có thể thay bằng 1 bắp ngô luộc vừa + 1 quả trứng luộc.
+Bữa phụ sáng (9h30)- 2 múi bưởi da xanh hoặc năm roi (khoảng 100g).Ăn nguyên múi có tép xơ, không chấm muối ớt nhiều đường.
+Bữa trưa (11h30 - 12h00)- Rau (1/2 đĩa): 1 đĩa rau muống luộc (200g) + 1 bát con nước canh vắt chanh.- Đạm (1/4 đĩa): 1 khúc cá quả (cá lóc) kho tộ ít ngọt (100g) hoặc 80g ức gà áp chảo.- Tinh bột (1/4 đĩa): 1 bát con gạt ngang cơm gạo lứt (khoảng 100g cơm chín).Ăn theo thứ tự: rau muống và canh -> cá kho -> cơm gạo lứt cuối cùng.
+Bữa phụ chiều (15h30)- 1 hộp sữa chua không đường (100g) hoặc 1 nắm nhỏ hạt hạnh nhân (20g).Cung cấp lợi khuẩn và chất béo tốt làm dịu cơn đói chiều.
+Bữa tối (18h30 - 19h00)- Rau (1/2 đĩa): 1 đĩa cải thìa xào tỏi với 1 thìa cà phê dầu thực vật (150g) + Canh bí xanh nấu tôm (100g bí).- Đạm (1/4 đĩa): 1 bìa đậu phụ luộc (100g) hoặc 80g tôm hấp sả.- Tinh bột (1/4 đĩa): 1/2 củ khoai lang luộc (khoảng 80g) hoặc 1/2 bát con cơm gạo lứt.Nên ăn tối nhẹ nhàng trước 19h30 để tránh tích trữ năng lượng ban đêm.
+## Khi nào nên đi khám và tham vấn chuyên gia dinh dưỡng?
+Chế độ ăn của mỗi người cần được điều chỉnh tùy thuộc vào thể trạng (chỉ số BMI), chức năng gan, thận và phác đồ thuốc điều trị hiện tại. Theo khuyến cáo của Hiệp hội Đái tháo đường Hoa Kỳ (ADA), mục tiêu đường huyết an toàn ở người trưởng thành không mang thai điển hình bao gồm:
+Đường huyết lúc đói: Duy trì trong khoảng từ 4.4 đến 7.2 mmol/L (80–130 mg/dL).
+Đường huyết sau ăn 1–2 giờ: Giữ ở mức dưới 10.0 mmol/L (< 180 mg/dL).
+Bạn nên đi khám hoặc liên hệ ngay với bác sĩ điều trị khi nhận thấy các dấu hiệu bất thường sau:
+Dấu hiệu hạ đường huyết (< 3.9 mmol/L): Cảm thấy cồn cào dữ dội, run rẩy tay chân, vã mồ hôi lạnh, hoa mắt, choáng váng. Cần xử trí ngay bằng nguyên tắc 15-15 (uống 15g đường hấp thu nhanh như 1/2 ly nước ngọt hoặc 3 viên kẹo đường, đo lại sau 15 phút) và trao đổi với bác sĩ để điều chỉnh liều thuốc.
+Đường huyết tăng cao kéo dài: Các chỉ số đo tại nhà thường xuyên vượt mục tiêu điều trị kèm triệu chứng khát nước liên tục, tiểu nhiều lần về đêm, sụt cân không rõ nguyên nhân.
+Xét nghiệm HbA1c định kỳ: Cần thực hiện xét nghiệm đánh giá mức đường huyết trung bình trong 2–3 tháng qua (HbA1c) định kỳ 3 tháng/lần để cùng bác sĩ đánh giá mức độ thích ứng của cơ thể với thực đơn hiện tại.
+Lưu ý y tế: Thông tin trong bài chỉ mang tính tham khảo, không thay thế tư vấn, chẩn đoán hay phác đồ điều trị của bác sĩ chuyên khoa và chuyên gia dinh dưỡng lâm sàng.
+Ghi chú
+Chỉ số đường huyết (GI - Glycemic Index) phản ánh tốc độ làm tăng nồng độ glucose trong máu của một loại thực phẩm so với đường glucose chuẩn (tính theo thang điểm từ 0 đến 100).
+Kháng insulin là tình trạng các tế bào trong cơ thể giảm khả năng đáp ứng với hormone insulin, khiến glucose khó đi vào tế bào và tích tụ lại trong máu.
+Tải lượng đường huyết (GL - Glycemic Load) kết hợp cả chỉ số GI và lượng carbohydrate thực tế trong một khẩu phần thông thường, giúp đánh giá chính xác hơn tác động làm tăng đường huyết của thực phẩm.
+

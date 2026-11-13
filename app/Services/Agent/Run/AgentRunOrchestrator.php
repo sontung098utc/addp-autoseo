@@ -53,6 +53,12 @@ final class AgentRunOrchestrator
 {
     private int $seq = 0;
 
+    /** Model viết vừa trả lời thành công trong phiên này (null = chưa có). Dùng cho biên tập viên để không gọi lại model chính đang lỗi. */
+    private ?AiProviderInterface $workingWriter = null;
+
+    /** Tư liệu bậc 1 tìm được trên web cho bài đang chạy (rỗng = không có). Chỉ hỗ trợ viết. @var list<array{title:string,domain:string,url:string,excerpt:string}> */
+    private array $references = [];
+
     /** Mốc đồng hồ (giây, mili) lúc bước trước xong / phiên bắt đầu: thời lượng bước = hiện tại - mốc. */
     private float $markT = 0.0;
 
@@ -137,6 +143,8 @@ final class AgentRunOrchestrator
         $this->redo = $redo !== null && trim((string) ($redo['message'] ?? '')) !== '' ? $redo : null;
         $this->redoPlan = null;
         $this->seq = 0;
+        $this->workingWriter = null;
+        $this->references = [];
         $this->markT = microtime(true);
         $this->aiMs = 0.0;
         $this->trigger = $trigger;
@@ -396,6 +404,7 @@ final class AgentRunOrchestrator
         [$editorPb, $editorNote] = $this->skills['grade'];
 
         // 4. Nghiên cứu: nạp ngữ cảnh bằng luật (không gọi AI), rồi kiểm ngân sách trước khi viết.
+        $this->gatherReferences($run, $article, (string) $assess->level);
         $this->research($run, $article, $outline['outline'] ?? []);
         if ($this->spent($run) >= $this->policy->budgetVnd) {
             $reason = 'Hết ngân sách cho phiên chạy ('.number_format($this->policy->budgetVnd, 0, ',', '.').' ₫) trước bước viết nên không gọi AI viết.';
@@ -409,14 +418,17 @@ final class AgentRunOrchestrator
         // 5. Viết.
         $attrs = $this->write($run, $article, $outline['outline'] ?? [], [], 'write', 'Viết bản đầu', null);
         $report = $this->grade($run, $article, $attrs, 'Chấm bản đầu', 0, $editorPb, $editorNote);
+        // Biên tập viên (AI) đọc bài như người thật: bắt chỗ nói vòng, chung chung, thiếu ý mà luật hình thức không thấy; có điểm nghiêm trọng thì sửa trực tiếp bản đang có.
+        [$attrs, $report, $editRounds] = $this->editorialPass($run, $article, $outline['outline'] ?? [], $attrs, $report, (string) $assess->level, $editorPb);
+        $maxRounds = $this->policy->maxRepairRounds + $editRounds;
         $penalty = $this->penalty($report);
         $score = RunScorer::score($report);
 
         // 6. Vòng sửa có giới hạn.
         $reason = null;
-        $round = 0;
+        $round = $editRounds;
         // Vòng sửa chạy khi còn lỗi CHẶN, hoặc (Trí tuệ bắt buộc nguồn) còn đoạn khẳng định chưa có dấu trích dẫn [KB#id] (CITE01, P1): lỗi sau không chặn bàn giao nhưng được sửa.
-        while (($report->hasBlocking() || $report->citationGaps() !== [] || $report->layoutGaps() !== [] || $report->supportGaps() !== []) && $round < $this->policy->maxRepairRounds) {
+        while ($this->needsRepair($report) && $round < $maxRounds) {
             if ($this->spent($run) >= $this->policy->budgetVnd) {
                 $reason = 'Hết ngân sách cho phiên chạy ('.number_format($this->policy->budgetVnd, 0, ',', '.').' ₫) nên dừng sửa.';
                 $this->decision($run, 'budget_exhausted', 'Dừng sửa vì hết ngân sách', $reason, ['spent_vnd' => $this->spent($run), 'budget_vnd' => $this->policy->budgetVnd, 'score' => $score]);
@@ -429,21 +441,20 @@ final class AgentRunOrchestrator
                 $this->decision($run, 'repair_route_missing', 'Dừng sửa vì thiếu cấu hình AI', $reason, ['task' => 'repair']);
                 break;
             }
-            $feedback = array_map(fn ($r) => "{$r->code}: {$r->message}", $report->blocking());
-            foreach ($report->citationGaps() as $excerpt) {
-                $feedback[] = "CITE01: đoạn «{$excerpt}» có khẳng định nhưng chưa có dấu [KB#id]; thêm dấu của mục kho đã cung cấp hỗ trợ khẳng định đó, hoặc bỏ/nêu chung chung nếu kho không có căn cứ (không bịa mã).";
+            $feedback = $this->ruleFeedback($report);
+            try {
+                $candidate = $this->write($run, $article, $outline['outline'] ?? [], $feedback, 'repair', "Sửa lần {$round}", $editorPb, (string) ($attrs['html_content'] ?? ''));
+                $candidateReport = $this->grade($run, $article, $candidate, "Chấm lại sau lần sửa {$round}", $round, $editorPb, '');
+            } catch (Throwable $e) { // đã có bản nháp: lỗi AI ở lần sửa không được làm mất nó (trước đây cả phiên bị đánh dấu thất bại)
+                $reason = 'Lần sửa gặp lỗi AI ('.ErrorMasker::short($e->getMessage(), 120).') nên giữ bản nháp hiện tại.';
+                $this->decision($run, 'repair_failed', 'Giữ bản nháp hiện tại vì lần sửa lỗi', $reason, ['round' => $round, 'error' => class_basename($e), 'score' => $score]);
+                break;
             }
-            foreach (array_slice($report->supportGaps(), 0, 6) as $gap) {
-                $feedback[] = 'CITE02: '.$gap.' (chỉ trích mục thật sự nói điều đó, hoặc bỏ/nêu chung chung; không bịa mã.)';
-            }
-            foreach (array_slice($report->layoutGaps(), 0, 6) as $gap) {
-                $feedback[] = 'LAY01: '.$gap;
-            }
-            $attrs = $this->write($run, $article, $outline['outline'] ?? [], $feedback, 'repair', "Sửa lần {$round}", $editorPb);
-            $report = $this->grade($run, $article, $attrs, "Chấm lại sau lần sửa {$round}", $round, $editorPb, '');
+            $attrs = $candidate;
+            $report = $candidateReport;
             $new = $this->penalty($report);
             $newScore = RunScorer::score($report);
-            if (($report->hasBlocking() || $report->citationGaps() !== [] || $report->layoutGaps() !== [] || $report->supportGaps() !== []) && $new >= $penalty) {
+            if ($this->needsRepair($report) && $new >= $penalty) {
                 // Các con số (điểm, điểm phạt trước → sau) hiện ở khối cặp số của quyết định; lời giải thích không nhắc lại để khỏi lặp.
                 $reason = 'Sửa không cải thiện (điểm phạt không giảm) nên dừng, tránh tốn thêm chi phí.';
                 $this->decision($run, 'no_improvement', 'Dừng sửa vì không cải thiện', $reason, ['penalty_before' => $penalty, 'penalty_after' => $new, 'score_before' => $score, 'score_after' => $newScore]);
@@ -454,8 +465,8 @@ final class AgentRunOrchestrator
             $penalty = $new;
             $score = $newScore;
         }
-        if ($reason === null && $report->hasBlocking() && $round >= $this->policy->maxRepairRounds) {
-            $this->decision($run, 'max_rounds', 'Dừng sửa vì hết số vòng cho phép', "Đã sửa {$round}/{$this->policy->maxRepairRounds} vòng, còn lỗi chặn nên không sửa thêm.", ['rounds' => $round, 'max_rounds' => $this->policy->maxRepairRounds, 'score' => $score]);
+        if ($reason === null && $report->hasBlocking() && $round >= $maxRounds) {
+            $this->decision($run, 'max_rounds', 'Dừng sửa vì hết số vòng cho phép', "Đã sửa {$round}/{$maxRounds} vòng, còn lỗi chặn nên không sửa thêm.", ['rounds' => $round, 'max_rounds' => $maxRounds, 'score' => $score]);
         }
         $run->update(['repair_rounds' => $round]);
 
@@ -703,10 +714,132 @@ final class AgentRunOrchestrator
             $kbData + $assetData + ['citable_sources' => $citableData] + $brand + $this->brainCtx->stepData() + ($this->needsExpert ? ['needs_expert' => true, 'reason' => 'high_risk_no_knowledge'] : []));
     }
 
+    /**
+     * Lượt biên tập: AI mạnh (route `write`, rồi `repair`, `summary`) đọc bản đầu như tổng biên tập. Không có AI/vai trò tắt/hết ngân sách thì bỏ qua im lặng (luồng cũ giữ nguyên).
+     * Có điểm nghiêm trọng (nói vòng, thiếu điều người đọc cần, khẳng định đáng ngờ) thì người viết SỬA TRỰC TIẾP bản đang có, kèm cả lỗi luật chưa đạt.
+     * Nếu bản sau biên tập trượt luật bắt buộc trong khi bản đầu đạt thì giữ bản đầu (ghi quyết định). Không bao giờ làm hỏng phiên.
+     *
+     * @param  array<string, mixed>  $attrs
+     * @return array{0: array<string, mixed>, 1: QualityReport, 2: int} thuộc tính bản, báo cáo luật, số vòng viết đã dùng
+     */
+    private function editorialPass(AgentRun $run, Article $article, array $outline, array $attrs, QualityReport $report, string $risk, ?Playbook $editorPb): array
+    {
+        $ai = $this->editorAi();
+        if ($ai === null || $this->roleOff('editor') || $this->spent($run) >= $this->policy->budgetVnd || trim((string) ($attrs['html_content'] ?? '')) === '') {
+            return [$attrs, $report, 0];
+        }
+        $r = (new \App\Services\Content\EditorialReviewer(new AiJson($ai, $this->sleep)))
+            ->review((string) $attrs['html_content'], (string) $article->primary_keyword, (string) ($article->search_intent ?: 'informational'), $risk);
+        if ($r['status'] !== 'done') {
+            $this->step($run, 'edit', 'editor', 'warn', 'Biên tập viên chưa chạy', ($r['reason'] ?? 'Lỗi AI.').' Bỏ qua bước biên tập; bài vẫn đi tiếp theo bộ luật.', ['reason' => $r['reason']], $r['model'], $r['tokens'], $r['cost']);
+
+            return [$attrs, $report, 0];
+        }
+        $data = ['verdict' => $r['verdict'], 'issues' => $r['issues'], 'missing' => $r['missing']];
+        if ($r['feedback'] === []) {
+            $this->step($run, 'edit', 'editor', 'ok', 'Biên tập viên: không có điểm nghiêm trọng', $r['summary'] !== '' ? $r['summary'] : 'Không có yêu cầu sửa lớn.', $data, $r['model'], $r['tokens'], $r['cost']);
+
+            return [$attrs, $report, 0];
+        }
+        $this->step($run, 'edit', 'editor', 'warn', 'Biên tập viên yêu cầu sửa ('.count($r['feedback']).' điểm)', ($r['summary'] !== '' ? $r['summary'].' ' : '').'Người viết sửa trực tiếp bản đang có.', $data, $r['model'], $r['tokens'], $r['cost']);
+
+        try {
+            $new = $this->write($run, $article, $outline, array_merge($r['feedback'], $this->ruleFeedback($report)), 'repair', 'Sửa theo biên tập viên', $editorPb, (string) $attrs['html_content']);
+            $newReport = $this->grade($run, $article, $new, 'Chấm lại sau khi biên tập', 1, $editorPb, '');
+        } catch (Throwable $e) { // bước biên tập chỉ là bổ sung: lỗi AI ở đây không được làm mất bản đầu đã viết xong
+            $this->step($run, 'edit', 'editor', 'warn', 'Sửa theo biên tập viên không thành, giữ bản đầu', ErrorMasker::short($e->getMessage(), 160).' Bản đầu được giữ để đi tiếp theo bộ luật; nhận xét của biên tập viên nằm trong nhật ký để người duyệt xem.', ['error' => class_basename($e)]);
+
+            return [$attrs, $report, 1];
+        }
+        if ($newReport->hasBlocking() && ! $report->hasBlocking()) {
+            $this->decision($run, 'edit_rejected', 'Giữ bản đầu: bản sau biên tập trượt luật bắt buộc', 'Bản sửa theo biên tập trượt '.implode(', ', $newReport->blockingCodes()).' trong khi bản đầu đạt nên giữ bản đầu; nhận xét của biên tập viên vẫn nằm trong nhật ký để người duyệt xem.', ['blocking' => $newReport->blockingCodes()]);
+
+            return [$attrs, $report, 1];
+        }
+
+        return [$new, $newReport, 1];
+    }
+
+    /** AI cho biên tập viên: model viết vừa trả lời thành công (mạnh nhất đã cấu hình và đang chạy được); chưa có thì route write, repair, summary; không router thì chính nhà cung cấp của phiên nếu hỗ trợ JSON có cấu trúc. */
+    private function editorAi(): ?\App\Contracts\StructuredAiInterface
+    {
+        if ($this->workingWriter instanceof \App\Contracts\StructuredAiInterface) {
+            return $this->workingWriter;
+        }
+        if ($this->router) {
+            foreach (['write', 'repair', 'summary'] as $task) {
+                $ai = $this->router->target($task)?->ai;
+                if ($ai instanceof \App\Contracts\StructuredAiInterface) {
+                    return $ai;
+                }
+            }
+
+            return null;
+        }
+
+        return $this->ai instanceof \App\Contracts\StructuredAiInterface ? $this->ai : null;
+    }
+
+    /**
+     * Tìm tài liệu bậc 1 trên web làm chất liệu cho người viết (chủ đề rủi ro vừa/cao hoặc Trí tuệ bắt buộc nguồn). Không chặn: không có khóa/lỗi/không kết quả
+     * thì ghi một dòng nhật ký rồi viết tiếp. Kết quả mô phỏng không bao giờ được dùng (xem ReferenceDossier).
+     */
+    private function gatherReferences(AgentRun $run, Article $article, string $risk): void
+    {
+        if (($risk === 'low' && $this->brainCtx->reliance() !== 'must_cite') || $this->spent($run) >= $this->policy->budgetVnd) {
+            return;
+        }
+        try {
+            $r = (new \App\Services\Content\ReferenceDossier)->gather($article->website, (string) $article->primary_keyword);
+        } catch (Throwable $e) {
+            report($e);
+
+            return;
+        }
+        $this->references = $r['references'];
+        $n = count($r['references']);
+        $this->step($run, 'research', 'system', $n > 0 ? 'ok' : 'warn', $n > 0 ? "Tìm được {$n} tài liệu bậc 1 trên web" : 'Chưa có tài liệu bậc 1 từ web',
+            $n > 0 ? 'Đoạn trích từ: '.implode(', ', array_unique(array_column($r['references'], 'domain'))).'. Người viết dùng làm căn cứ cho số liệu và khuyến cáo (chỉ hỗ trợ viết, chưa nạp vào kho).'
+                : (($r['reason'] ?? 'Không có kết quả.').' Vẫn viết tiếp, dựa trên kiến thức đã duyệt và hiểu biết chuẩn mực của người viết.'),
+            ['purpose' => 'references', 'status' => $r['status'], 'query' => $r['query'], 'references' => array_map(fn ($x) => ['domain' => $x['domain'], 'url' => $x['url'], 'title' => $x['title']], $r['references'])], null, 0, $r['cost_vnd']);
+    }
+
+    /** Còn việc phải sửa không: lỗi chặn, đoạn thiếu dấu trích (CHỈ khi kho có mục để trích), trích dẫn không hỗ trợ, lỗi bố cục. */
+    private function needsRepair(QualityReport $report): bool
+    {
+        return $report->hasBlocking() || ($this->kbHasItems() && $report->citationGaps() !== []) || $report->layoutGaps() !== [] || $report->supportGaps() !== [];
+    }
+
+    /** Kho kiến thức đã nạp được ít nhất một mục (không tính quy tắc/sản phẩm) cho bài đang chạy. */
+    private function kbHasItems(): bool
+    {
+        return $this->kb !== null && (int) ($this->kb->stepInfo()[0]['knowledge']['count'] ?? 0) > 0;
+    }
+
+    /** Yêu cầu sửa từ bộ luật: lỗi chặn, đoạn thiếu dấu trích, trích dẫn không hỗ trợ, lỗi bố cục. @return list<string> */
+    private function ruleFeedback(QualityReport $report): array
+    {
+        $feedback = array_map(fn ($r) => "{$r->code}: {$r->message}", $report->blocking());
+        foreach ($this->kbHasItems() ? $report->citationGaps() : [] as $excerpt) { // kho rỗng thì người viết không có mã [KB#id] nào để thêm: bắt sửa chỉ tốn lượt
+            $feedback[] = "CITE01: đoạn «{$excerpt}» có khẳng định nhưng chưa có dấu [KB#id]; thêm dấu của mục kho đã cung cấp hỗ trợ khẳng định đó, hoặc bỏ/nêu chung chung nếu kho không có căn cứ (không bịa mã).";
+        }
+        foreach (array_slice($report->supportGaps(), 0, 6) as $gap) {
+            $feedback[] = 'CITE02: '.$gap.' (chỉ trích mục thật sự nói điều đó, hoặc bỏ/nêu chung chung; không bịa mã.)';
+        }
+        foreach (array_slice($report->layoutGaps(), 0, 6) as $gap) {
+            $feedback[] = 'LAY01: '.$gap;
+        }
+
+        return $feedback;
+    }
+
     /** @return array<string, mixed> thuộc tính ArticleVersion (đã làm sạch HTML) */
-    private function write(AgentRun $run, Article $article, array $outline, array $feedback, string $stage, string $title, ?Playbook $editorPb): array
+    private function write(AgentRun $run, Article $article, array $outline, array $feedback, string $stage, string $title, ?Playbook $editorPb, ?string $previousHtml = null): array
     {
         $options = $feedback === [] ? [] : ['feedback' => $feedback];
+        if ($feedback !== [] && $previousHtml !== null && trim($previousHtml) !== '') {
+            $options['previous_html'] = $previousHtml; // sửa trực tiếp bản đang có, không viết lại mù từ danh sách lỗi
+        }
         if ($this->redoPlan !== null) { // làm lại theo lời nhắn: người viết thấy lời nhắn, chỉ dẫn của điều phối và bản trước để giữ phần đạt
             $options['redo'] = ['message' => $this->redo['message'], 'note' => $this->redoPlan['writer_note'], 'previous' => $this->redoPlan['previous_text']];
         }
@@ -722,6 +855,9 @@ final class AgentRunOrchestrator
         if (($lay = $this->skills['layout'][0] ?? null) !== null) {
             $options['layout'] = $lay->body;
             $options['layout_ref'] = $lay->ref();
+        }
+        if ($this->references !== []) {
+            $options['references'] = $this->references;
         }
         $options += $this->guidanceOptions($article) + $this->roleOptions('writer') + $this->brandOptions() + $this->brainCtx->options($article);
         $this->kb ??= new KnowledgeContext();
@@ -1072,6 +1208,9 @@ final class AgentRunOrchestrator
             $r = $this->withRetry($run, $what.' (dự phòng)', fn () => $call($fb->ai));
         }
         $r['_provider_id'] = $used->providerId;
+        if (in_array($task, ['write', 'repair'], true)) {
+            $this->workingWriter = $used->ai; // model viết đã trả lời được: biên tập viên dùng cùng model (kể cả khi vừa chuyển sang dự phòng)
+        }
         $cost = (float) ($r['cost_vnd'] ?? 0);
         if ($used->costCapVnd !== null && $used->costCapVnd > 0 && $cost > $used->costCapVnd) {
             $e = new CostCapExceeded($task, $cost, $used->costCapVnd);

@@ -1,0 +1,1106 @@
+{
+ "schema": "autoseo-golden-queries/1",
+ "version": 1,
+ "status": "nhap",
+ "note": "Bộ chuẩn đo chất lượng (Q0.1). Câu hỏi bắt buộc do Claude soạn ngày 13/11/2026, CHƯA có đáp án và CHƯA được dược sĩ duyệt. Khóa `kind`: khai_niem|so_lieu|quy_trinh|canh_bao|so_sanh|gia|lua_chon. `needs_source`: câu trả lời là sự thật cần chứng minh (lớp S).",
+ "queries": [
+  {
+   "id": "q-d01",
+   "keyword": "HbA1c là gì",
+   "intent": "informational",
+   "risk": "high",
+   "domain": "dai_thao_duong",
+   "must_answer": [
+    {
+     "id": "d01-1",
+     "q": "HbA1c đo điều gì và phản ánh đường huyết trong khoảng thời gian nào?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "d01-2",
+     "q": "Xét nghiệm lấy mẫu thế nào, có cần nhịn ăn không?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "d01-3",
+     "q": "Ngưỡng HbA1c dùng để chẩn đoán đái tháo đường và tiền đái tháo đường là bao nhiêu?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "d01-4",
+     "q": "Những tình huống nào làm kết quả HbA1c kém chính xác?",
+     "kind": "canh_bao",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-d02",
+   "keyword": "chỉ số HbA1c bao nhiêu là tốt",
+   "intent": "informational",
+   "risk": "high",
+   "domain": "dai_thao_duong",
+   "must_answer": [
+    {
+     "id": "d02-1",
+     "q": "Giá trị HbA1c bình thường (người không mắc bệnh) là bao nhiêu?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "d02-2",
+     "q": "Ngưỡng HbA1c của tiền đái tháo đường và đái tháo đường?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "d02-3",
+     "q": "Mục tiêu HbA1c cho người đã mắc đái tháo đường là bao nhiêu và vì sao cần cá nhân hóa?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "d02-4",
+     "q": "Bao lâu nên xét nghiệm HbA1c một lần?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "d02-5",
+     "q": "Khi nào cần gặp bác sĩ?",
+     "kind": "canh_bao",
+     "needs_source": true
+    }
+   ],
+   "note": "Ca lỗi đã đo: bài 1.979 chữ không nêu ngưỡng nào."
+  },
+  {
+   "id": "q-d03",
+   "keyword": "chỉ số đường huyết bình thường",
+   "intent": "informational",
+   "risk": "high",
+   "domain": "dai_thao_duong",
+   "must_answer": [
+    {
+     "id": "d03-1",
+     "q": "Đường huyết lúc đói bình thường là bao nhiêu?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "d03-2",
+     "q": "Đường huyết sau ăn 2 giờ (hoặc nghiệm pháp dung nạp glucose) bình thường là bao nhiêu?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "d03-3",
+     "q": "Các ngưỡng của tiền đái tháo đường và đái tháo đường?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "d03-4",
+     "q": "Khác nhau giữa đơn vị mmol/L và mg/dL?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "d03-5",
+     "q": "Cách đo đường huyết đúng để kết quả tin cậy?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-d04",
+   "keyword": "chỉ số đường huyết bình thường và tiền tiểu đường",
+   "intent": "informational",
+   "risk": "high",
+   "domain": "dai_thao_duong",
+   "must_answer": [
+    {
+     "id": "d04-1",
+     "q": "Các ngưỡng đường huyết bình thường, tiền đái tháo đường, đái tháo đường?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "d04-2",
+     "q": "Tiền đái tháo đường là gì và có nguy cơ gì?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "d04-3",
+     "q": "Làm gì để giảm nguy cơ tiến triển thành đái tháo đường?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "d04-4",
+     "q": "Khi nào cần xét nghiệm và gặp bác sĩ?",
+     "kind": "canh_bao",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-d05",
+   "keyword": "tiểu đường tuýp 2 là gì",
+   "intent": "informational",
+   "risk": "high",
+   "domain": "dai_thao_duong",
+   "must_answer": [
+    {
+     "id": "d05-1",
+     "q": "Đái tháo đường típ 2 là gì?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "d05-2",
+     "q": "Nguyên nhân và yếu tố nguy cơ chính?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "d05-3",
+     "q": "Triệu chứng thường gặp?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "d05-4",
+     "q": "Tiêu chuẩn chẩn đoán (các ngưỡng xét nghiệm)?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "d05-5",
+     "q": "Phân biệt típ 1 và típ 2?",
+     "kind": "so_sanh",
+     "needs_source": true
+    },
+    {
+     "id": "d05-6",
+     "q": "Khi nào cần đi khám?",
+     "kind": "canh_bao",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-d06",
+   "keyword": "biến chứng tiểu đường",
+   "intent": "informational",
+   "risk": "high",
+   "domain": "dai_thao_duong",
+   "must_answer": [
+    {
+     "id": "d06-1",
+     "q": "Các biến chứng cấp tính cần cấp cứu?",
+     "kind": "canh_bao",
+     "needs_source": true
+    },
+    {
+     "id": "d06-2",
+     "q": "Các biến chứng mạn tính (mạch máu nhỏ, mạch máu lớn, thần kinh, mắt, thận)?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "d06-3",
+     "q": "Dấu hiệu cảnh báo cần đi khám sớm?",
+     "kind": "canh_bao",
+     "needs_source": true
+    },
+    {
+     "id": "d06-4",
+     "q": "Cách phòng ngừa và kiểm soát để giảm nguy cơ biến chứng?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-d07",
+   "keyword": "người tiểu đường nên ăn gì",
+   "intent": "informational",
+   "risk": "high",
+   "domain": "dai_thao_duong",
+   "must_answer": [
+    {
+     "id": "d07-1",
+     "q": "Nguyên tắc chế độ ăn cho người đái tháo đường?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "d07-2",
+     "q": "Nhóm thực phẩm nên ưu tiên và nên hạn chế?",
+     "kind": "lua_chon",
+     "needs_source": true
+    },
+    {
+     "id": "d07-3",
+     "q": "Vai trò của carbohydrate và chỉ số đường huyết của thực phẩm?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "d07-4",
+     "q": "Lưu ý khi ăn uống lúc đang dùng thuốc hạ đường huyết (nguy cơ hạ đường huyết)?",
+     "kind": "canh_bao",
+     "needs_source": true
+    },
+    {
+     "id": "d07-5",
+     "q": "Khi nào nên hỏi bác sĩ hoặc chuyên gia dinh dưỡng?",
+     "kind": "canh_bao",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-d08",
+   "keyword": "thực phẩm tốt cho người tiểu đường",
+   "intent": "informational",
+   "risk": "high",
+   "domain": "dai_thao_duong",
+   "must_answer": [
+    {
+     "id": "d08-1",
+     "q": "Những nhóm thực phẩm tốt cho người đái tháo đường và lý do?",
+     "kind": "lua_chon",
+     "needs_source": true
+    },
+    {
+     "id": "d08-2",
+     "q": "Thực phẩm nên hạn chế hoặc tránh?",
+     "kind": "lua_chon",
+     "needs_source": true
+    },
+    {
+     "id": "d08-3",
+     "q": "Cách chế biến và chia bữa hợp lý?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "d08-4",
+     "q": "Có thực phẩm nào thay thế được thuốc điều trị không?",
+     "kind": "canh_bao",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-d09",
+   "keyword": "cách trị bệnh tiểu đường tại nhà",
+   "intent": "informational",
+   "risk": "high",
+   "domain": "dai_thao_duong",
+   "must_answer": [
+    {
+     "id": "d09-1",
+     "q": "Đái tháo đường có chữa khỏi hoàn toàn được không?",
+     "kind": "canh_bao",
+     "needs_source": true
+    },
+    {
+     "id": "d09-2",
+     "q": "Những việc người bệnh tự thực hiện được tại nhà để kiểm soát bệnh?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "d09-3",
+     "q": "Những việc không được làm (tự ngừng/đổi thuốc, dùng bài thuốc chưa kiểm chứng)?",
+     "kind": "canh_bao",
+     "needs_source": true
+    },
+    {
+     "id": "d09-4",
+     "q": "Cách theo dõi đường huyết tại nhà?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "d09-5",
+     "q": "Khi nào cần đi khám ngay?",
+     "kind": "canh_bao",
+     "needs_source": true
+    }
+   ],
+   "note": "Ý định có nguy cơ khẳng định chữa khỏi."
+  },
+  {
+   "id": "q-d10",
+   "keyword": "lợi ích của việc đi bộ mỗi ngày",
+   "intent": "informational",
+   "risk": "medium",
+   "domain": "dai_thao_duong",
+   "must_answer": [
+    {
+     "id": "d10-1",
+     "q": "Mức vận động thể lực khuyến cáo cho người trưởng thành (thời lượng/tuần)?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "d10-2",
+     "q": "Lợi ích với đường huyết và tim mạch?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "d10-3",
+     "q": "Cách bắt đầu an toàn và tăng dần?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "d10-4",
+     "q": "Khi nào cần dừng hoặc đi khám (đau ngực, chóng mặt, hạ đường huyết)?",
+     "kind": "canh_bao",
+     "needs_source": true
+    }
+   ],
+   "note": "Ca lỗi đã đo: không nêu số phút/tuần."
+  },
+  {
+   "id": "q-d11",
+   "keyword": "thuốc hạ đường huyết loại nào tốt",
+   "intent": "commercial",
+   "risk": "high",
+   "domain": "dai_thao_duong",
+   "must_answer": [
+    {
+     "id": "d11-1",
+     "q": "Việc chọn thuốc phụ thuộc yếu tố nào và do ai quyết định?",
+     "kind": "canh_bao",
+     "needs_source": true
+    },
+    {
+     "id": "d11-2",
+     "q": "Các nhóm thuốc hạ đường huyết chính và cơ chế tác dụng?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "d11-3",
+     "q": "Tác dụng không mong muốn và lưu ý an toàn?",
+     "kind": "canh_bao",
+     "needs_source": true
+    },
+    {
+     "id": "d11-4",
+     "q": "Vì sao không nên tự ý dùng, đổi hoặc ngừng thuốc?",
+     "kind": "canh_bao",
+     "needs_source": true
+    }
+   ],
+   "note": "Ý định thương mại về thuốc."
+  },
+  {
+   "id": "q-d12",
+   "keyword": "máy đo đường huyết loại nào chính xác",
+   "intent": "commercial",
+   "risk": "medium",
+   "domain": "dai_thao_duong",
+   "must_answer": [
+    {
+     "id": "d12-1",
+     "q": "Tiêu chuẩn độ chính xác của máy đo đường huyết?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "d12-2",
+     "q": "Cách đo đúng để kết quả đáng tin?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "d12-3",
+     "q": "Các yếu tố làm sai lệch kết quả (que thử, bảo quản, tay ướt...)?",
+     "kind": "canh_bao",
+     "needs_source": true
+    },
+    {
+     "id": "d12-4",
+     "q": "Tiêu chí chọn máy theo nhu cầu (người cao tuổi, đo thường xuyên)?",
+     "kind": "lua_chon",
+     "needs_source": false
+    },
+    {
+     "id": "d12-5",
+     "q": "Cách bảo quản và hiệu chuẩn?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-h01",
+   "keyword": "tăng huyết áp là gì",
+   "intent": "informational",
+   "risk": "high",
+   "domain": "tim_mach",
+   "must_answer": [
+    {
+     "id": "h01-1",
+     "q": "Định nghĩa và ngưỡng chẩn đoán tăng huyết áp?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "h01-2",
+     "q": "Triệu chứng và vì sao thường không rõ?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "h01-3",
+     "q": "Biến chứng nguy hiểm?",
+     "kind": "canh_bao",
+     "needs_source": true
+    },
+    {
+     "id": "h01-4",
+     "q": "Biện pháp phòng ngừa và kiểm soát?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "h01-5",
+     "q": "Dấu hiệu cần cấp cứu?",
+     "kind": "canh_bao",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-h02",
+   "keyword": "huyết áp bao nhiêu là bình thường",
+   "intent": "informational",
+   "risk": "high",
+   "domain": "tim_mach",
+   "must_answer": [
+    {
+     "id": "h02-1",
+     "q": "Mức huyết áp bình thường?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "h02-2",
+     "q": "Các mức tăng huyết áp?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "h02-3",
+     "q": "Cách đo huyết áp tại nhà đúng?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "h02-4",
+     "q": "Tần suất đo và theo dõi?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "h02-5",
+     "q": "Khi nào cần gặp bác sĩ?",
+     "kind": "canh_bao",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-h03",
+   "keyword": "dấu hiệu nhồi máu cơ tim",
+   "intent": "informational",
+   "risk": "high",
+   "domain": "tim_mach",
+   "must_answer": [
+    {
+     "id": "h03-1",
+     "q": "Triệu chứng điển hình?",
+     "kind": "canh_bao",
+     "needs_source": true
+    },
+    {
+     "id": "h03-2",
+     "q": "Triệu chứng không điển hình (nữ giới, người cao tuổi, đái tháo đường)?",
+     "kind": "canh_bao",
+     "needs_source": true
+    },
+    {
+     "id": "h03-3",
+     "q": "Cần làm gì ngay khi nghi ngờ?",
+     "kind": "canh_bao",
+     "needs_source": true
+    },
+    {
+     "id": "h03-4",
+     "q": "Yếu tố nguy cơ?",
+     "kind": "khai_niem",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-h04",
+   "keyword": "mỡ máu cao nên ăn gì",
+   "intent": "informational",
+   "risk": "high",
+   "domain": "tim_mach",
+   "must_answer": [
+    {
+     "id": "h04-1",
+     "q": "Nguyên tắc ăn khi mỡ máu cao?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "h04-2",
+     "q": "Thực phẩm nên ưu tiên và nên hạn chế?",
+     "kind": "lua_chon",
+     "needs_source": true
+    },
+    {
+     "id": "h04-3",
+     "q": "Các ngưỡng mỡ máu (cholesterol toàn phần, LDL, HDL, triglyceride)?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "h04-4",
+     "q": "Vai trò của vận động?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "h04-5",
+     "q": "Khi nào cần dùng thuốc hoặc gặp bác sĩ?",
+     "kind": "canh_bao",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-h05",
+   "keyword": "cách trị mụn tại nhà",
+   "intent": "informational",
+   "risk": "medium",
+   "domain": "da_lieu",
+   "must_answer": [
+    {
+     "id": "h05-1",
+     "q": "Nguyên nhân gây mụn?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "h05-2",
+     "q": "Biện pháp chăm sóc tại nhà an toàn?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "h05-3",
+     "q": "Điều không nên làm (nặn mụn, tự dùng thuốc)?",
+     "kind": "canh_bao",
+     "needs_source": true
+    },
+    {
+     "id": "h05-4",
+     "q": "Khi nào cần đến bác sĩ da liễu?",
+     "kind": "canh_bao",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-h06",
+   "keyword": "chạy bộ chân đất",
+   "intent": "informational",
+   "risk": "medium",
+   "domain": "the_thao",
+   "must_answer": [
+    {
+     "id": "h06-1",
+     "q": "Lợi ích và rủi ro được ghi nhận?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "h06-2",
+     "q": "Cách bắt đầu từ từ?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "h06-3",
+     "q": "Ai không nên chạy chân đất?",
+     "kind": "canh_bao",
+     "needs_source": true
+    },
+    {
+     "id": "h06-4",
+     "q": "Chấn thương thường gặp và cách phòng tránh?",
+     "kind": "canh_bao",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-p01",
+   "keyword": "tiêu chuẩn GMP-WHO là gì",
+   "intent": "informational",
+   "risk": "medium",
+   "domain": "duoc_san_xuat",
+   "must_answer": [
+    {
+     "id": "p01-1",
+     "q": "GMP-WHO là gì và do tổ chức nào ban hành?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "p01-2",
+     "q": "Các nguyên tắc/yêu cầu chính?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "p01-3",
+     "q": "Cơ quan và quy trình chứng nhận tại Việt Nam?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "p01-4",
+     "q": "Khác biệt với các chuẩn GMP khác?",
+     "kind": "so_sanh",
+     "needs_source": true
+    }
+   ],
+   "note": "Ca lỗi đã đo: 100 điểm nhưng không có nguồn."
+  },
+  {
+   "id": "q-p02",
+   "keyword": "so sánh GMP-WHO và EU-GMP",
+   "intent": "commercial",
+   "risk": "medium",
+   "domain": "duoc_san_xuat",
+   "must_answer": [
+    {
+     "id": "p02-1",
+     "q": "Mỗi chuẩn do ai ban hành và ai kiểm tra?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "p02-2",
+     "q": "Những khác biệt chính (có bảng so sánh)?",
+     "kind": "so_sanh",
+     "needs_source": true
+    },
+    {
+     "id": "p02-3",
+     "q": "Doanh nghiệp nên chọn chuẩn nào theo thị trường mục tiêu?",
+     "kind": "lua_chon",
+     "needs_source": true
+    },
+    {
+     "id": "p02-4",
+     "q": "Chi phí/thời gian nhìn chung?",
+     "kind": "gia",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-p03",
+   "keyword": "hướng dẫn thẩm định quy trình sản xuất thuốc viên nén",
+   "intent": "informational",
+   "risk": "medium",
+   "domain": "duoc_san_xuat",
+   "must_answer": [
+    {
+     "id": "p03-1",
+     "q": "Các loại thẩm định (tiền đề, đồng thời, hồi cứu)?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "p03-2",
+     "q": "Các bước thực hiện?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "p03-3",
+     "q": "Tiêu chí chấp nhận và thông số cần theo dõi?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "p03-4",
+     "q": "Hồ sơ/tài liệu cần có?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-p04",
+   "keyword": "máy dập viên là gì và nguyên lý hoạt động",
+   "intent": "informational",
+   "risk": "low",
+   "domain": "may_moc",
+   "must_answer": [
+    {
+     "id": "p04-1",
+     "q": "Máy dập viên là gì và dùng để làm gì?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "p04-2",
+     "q": "Cấu tạo chính?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "p04-3",
+     "q": "Nguyên lý hoạt động?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "p04-4",
+     "q": "Phân loại (xoay tròn, tâm sai) và khác biệt?",
+     "kind": "so_sanh",
+     "needs_source": true
+    },
+    {
+     "id": "p04-5",
+     "q": "Lưu ý vận hành và bảo trì?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-p05",
+   "keyword": "báo giá máy dập viên công nghiệp",
+   "intent": "transactional",
+   "risk": "low",
+   "domain": "may_moc",
+   "must_answer": [
+    {
+     "id": "p05-1",
+     "q": "Khoảng giá hoặc cách nhận báo giá?",
+     "kind": "gia",
+     "needs_source": true
+    },
+    {
+     "id": "p05-2",
+     "q": "Các yếu tố ảnh hưởng giá?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "p05-3",
+     "q": "Thông số cần cung cấp để được báo giá?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "p05-4",
+     "q": "Thời gian giao hàng, bảo hành, hỗ trợ?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "p05-5",
+     "q": "Cách liên hệ?",
+     "kind": "quy_trinh",
+     "needs_source": false
+    }
+   ],
+   "note": "Ca lỗi đã đo: bài 'báo giá' không có số giá."
+  },
+  {
+   "id": "q-p06",
+   "keyword": "dịch vụ tư vấn xây dựng nhà máy dược đạt GMP",
+   "intent": "transactional",
+   "risk": "medium",
+   "domain": "duoc_san_xuat",
+   "must_answer": [
+    {
+     "id": "p06-1",
+     "q": "Phạm vi dịch vụ tư vấn?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "p06-2",
+     "q": "Quy trình triển khai từng giai đoạn?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "p06-3",
+     "q": "Thời gian và chi phí tham khảo?",
+     "kind": "gia",
+     "needs_source": true
+    },
+    {
+     "id": "p06-4",
+     "q": "Sản phẩm bàn giao/hồ sơ?",
+     "kind": "khai_niem",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-n01",
+   "keyword": "marketing automation là gì",
+   "intent": "informational",
+   "risk": "low",
+   "domain": "phan_mem",
+   "must_answer": [
+    {
+     "id": "n01-1",
+     "q": "Marketing automation là gì?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "n01-2",
+     "q": "Các hoạt động chính được tự động hóa?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "n01-3",
+     "q": "Lợi ích và hạn chế?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "n01-4",
+     "q": "Khi nào doanh nghiệp nên dùng? Ví dụ cụ thể?",
+     "kind": "lua_chon",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-n02",
+   "keyword": "so sánh phần mềm marketing automation cho doanh nghiệp vừa và nhỏ",
+   "intent": "commercial",
+   "risk": "low",
+   "domain": "phan_mem",
+   "must_answer": [
+    {
+     "id": "n02-1",
+     "q": "Tiêu chí so sánh?",
+     "kind": "lua_chon",
+     "needs_source": true
+    },
+    {
+     "id": "n02-2",
+     "q": "Nêu tên ít nhất 3 phần mềm cụ thể và đặc điểm?",
+     "kind": "so_sanh",
+     "needs_source": true
+    },
+    {
+     "id": "n02-3",
+     "q": "Có bảng so sánh?",
+     "kind": "so_sanh",
+     "needs_source": true
+    },
+    {
+     "id": "n02-4",
+     "q": "Mức giá tham khảo?",
+     "kind": "gia",
+     "needs_source": true
+    },
+    {
+     "id": "n02-5",
+     "q": "Khuyến nghị theo từng nhu cầu?",
+     "kind": "lua_chon",
+     "needs_source": true
+    }
+   ],
+   "note": "Ca lỗi đã đo: không nêu tên phần mềm nào."
+  },
+  {
+   "id": "q-n03",
+   "keyword": "hướng dẫn thiết lập quy trình email tự động chăm sóc khách hàng",
+   "intent": "informational",
+   "risk": "low",
+   "domain": "phan_mem",
+   "must_answer": [
+    {
+     "id": "n03-1",
+     "q": "Các bước thiết lập?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "n03-2",
+     "q": "Ví dụ một chuỗi email (tiêu đề, nội dung chính)?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "n03-3",
+     "q": "Khoảng cách thời gian giữa các email?",
+     "kind": "so_lieu",
+     "needs_source": true
+    },
+    {
+     "id": "n03-4",
+     "q": "Chỉ số đo hiệu quả?",
+     "kind": "khai_niem",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-n04",
+   "keyword": "crm là gì và có cần cho doanh nghiệp nhỏ",
+   "intent": "informational",
+   "risk": "low",
+   "domain": "phan_mem",
+   "must_answer": [
+    {
+     "id": "n04-1",
+     "q": "CRM là gì?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "n04-2",
+     "q": "Lợi ích cho doanh nghiệp nhỏ?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "n04-3",
+     "q": "Khi nào chưa cần?",
+     "kind": "lua_chon",
+     "needs_source": true
+    },
+    {
+     "id": "n04-4",
+     "q": "Cách chọn và chi phí tham khảo?",
+     "kind": "gia",
+     "needs_source": true
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-n05",
+   "keyword": "học bổng toàn phần",
+   "intent": "informational",
+   "risk": "low",
+   "domain": "giao_duc",
+   "must_answer": [
+    {
+     "id": "n05-1",
+     "q": "Học bổng toàn phần là gì, gồm những khoản nào?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "n05-2",
+     "q": "Điều kiện xét tuyển phổ biến?",
+     "kind": "khai_niem",
+     "needs_source": true
+    },
+    {
+     "id": "n05-3",
+     "q": "Hồ sơ và thời hạn?",
+     "kind": "quy_trinh",
+     "needs_source": true
+    },
+    {
+     "id": "n05-4",
+     "q": "Mẹo tăng cơ hội?",
+     "kind": "lua_chon",
+     "needs_source": false
+    }
+   ],
+   "note": ""
+  },
+  {
+   "id": "q-n06",
+   "keyword": "cách viết thư xin học bổng",
+   "intent": "informational",
+   "risk": "low",
+   "domain": "giao_duc",
+   "must_answer": [
+    {
+     "id": "n06-1",
+     "q": "Cấu trúc của thư?",
+     "kind": "quy_trinh",
+     "needs_source": false
+    },
+    {
+     "id": "n06-2",
+     "q": "Nội dung cần có?",
+     "kind": "quy_trinh",
+     "needs_source": false
+    },
+    {
+     "id": "n06-3",
+     "q": "Lỗi thường gặp?",
+     "kind": "canh_bao",
+     "needs_source": false
+    },
+    {
+     "id": "n06-4",
+     "q": "Một đoạn mẫu minh họa?",
+     "kind": "quy_trinh",
+     "needs_source": false
+    }
+   ],
+   "note": ""
+  }
+ ]
+}
