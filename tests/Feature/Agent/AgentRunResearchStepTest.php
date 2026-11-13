@@ -86,8 +86,8 @@ class AgentRunResearchStepTest extends TestCase
         $kb = $this->kb($a);
         $run = (new AgentRunOrchestrator($this->fake(), policy: new RunPolicy))->run($a, null);
 
-        $this->assertSame(['guard', 'risk', 'brief', 'images', 'research', 'write', 'grade', 'assemble', 'handoff'], $run->steps->pluck('stage')->all());
-        $r = $run->steps->firstWhere('stage', 'research');
+        $this->assertSame(['guard', 'risk', 'research', 'brief', 'images', 'research', 'write', 'grade', 'assemble', 'handoff'], $run->steps->pluck('stage')->all());
+        $r = $run->steps->where('stage', 'research')->last();
         $this->assertSame('ok', $r->status);
         $this->assertSame('system', $r->role);
         $this->assertSame(0, (int) $r->tokens_used);
@@ -104,7 +104,7 @@ class AgentRunResearchStepTest extends TestCase
     public function test_kho_thieu_thi_research_warn_va_gap(): void
     {
         $run = (new AgentRunOrchestrator($this->fake(), policy: new RunPolicy))->run($this->article(), null);
-        $r = $run->steps->firstWhere('stage', 'research');
+        $r = $run->steps->where('stage', 'research')->last();
         $this->assertSame('warn', $r->status);
         $this->assertTrue($r->data['knowledge']['gap']);
         $this->assertSame(1, KnowledgeGap::count());

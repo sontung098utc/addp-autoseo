@@ -193,7 +193,7 @@ class ImagePipelineTest extends TestCase
         $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider))->run($this->article('dịch vụ thiết kế website'), null, 'manual');
         $stages = $run->steps->pluck('stage')->all();
 
-        $this->assertSame(['guard', 'risk', 'brief', 'images', 'research', 'write', 'grade', 'edit', 'assemble', 'handoff'], array_values(array_unique(array_diff($stages, ['retry', 'decision', 'repair']))));
+        $this->assertSame(['guard', 'risk', 'research', 'synthesize', 'brief', 'images', 'write', 'grade', 'edit', 'assemble', 'handoff'], array_values(array_unique(array_diff($stages, ['retry', 'decision', 'repair']))));
         $brief = $run->steps->firstWhere('stage', 'brief');
         $this->assertNotEmpty($brief->data['image_plan']['plan']['slots'], 'kế hoạch ảnh nằm trong dữ kiện bước Dàn ý');
         $this->assertNull($run->steps->firstWhere('stage', 'image_plan'), 'không có bước kế hoạch ảnh riêng');

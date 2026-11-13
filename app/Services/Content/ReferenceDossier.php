@@ -7,27 +7,77 @@ use App\Services\Knowledge\Discover\SourceDiscoveryService;
 use App\Services\Search\WebSearchUnavailable;
 
 /**
- * Tư liệu tham khảo bậc 1 cho NGƯỜI VIẾT: tìm web (chỉ nguồn mà luật `SourceTrust` đã xếp "tin cậy") và đưa đoạn trích tìm được vào lời nhắn
- * để số liệu/ngưỡng/khuyến cáo dựa trên tài liệu thật thay vì trí nhớ của model. Chỉ là chất liệu hỗ trợ viết: KHÔNG nạp vào kho, KHÔNG tự phong
- * "đã duyệt", KHÔNG chặn gì. Không tìm được (chưa có khóa, lỗi mạng, không có kết quả) thì trả danh sách rỗng kèm lý do.
- * Kết quả tìm kiếm GIẢ LẬP (môi trường local) không bao giờ được đưa vào lời nhắn: dữ liệu giả không được giả làm tài liệu thật.
+ * Tư liệu tham khảo bậc 1 cho NGƯỜI VIẾT và bước tổng hợp: tìm web theo NHIỀU GÓC (hướng dẫn chính thức, bằng chứng/nghiên cứu, lời khuyên thực hành)
+ * để có nhiều nguồn uy tín khác nhau, chỉ giữ nguồn mà luật `SourceTrust` đã xếp "tin cậy", tối đa MAX_PER_DOMAIN trang mỗi tên miền.
+ * Chỉ là chất liệu hỗ trợ viết: KHÔNG nạp vào kho, KHÔNG tự phong "đã duyệt", KHÔNG chặn gì. Không tìm được (chưa có khóa, lỗi mạng, không có kết quả)
+ * thì trả danh sách rỗng kèm lý do. Kết quả tìm kiếm GIẢ LẬP (môi trường local) không bao giờ được dùng: dữ liệu giả không được giả làm tài liệu thật.
  */
 final class ReferenceDossier
 {
-    public const MAX = 4;
+    public const MAX = 8;
+
+    public const MAX_PER_DOMAIN = 2;
 
     public const MIN_SNIPPET_CHARS = 160;
 
     public const EXCERPT_CHARS = 1000;
+
+    /** Hậu tố truy vấn cho từng góc tìm; '' = từ khóa gốc (SourceDiscoveryService tự thêm gợi ý lĩnh vực). */
+    public const ANGLES = ['', ' nghiên cứu bằng chứng tổng quan', ' lời khuyên thực hành từ chuyên gia'];
 
     public function __construct(private readonly ?SourceDiscoveryService $discovery = null)
     {
     }
 
     /**
+     * @param  list<string>|null  $topics  chủ đề tìm cụ thể (vd. các khoảng trống kiến thức); null = từ khóa theo ANGLES
      * @return array{status: string, references: list<array{title: string, domain: string, url: string, excerpt: string}>, reason: ?string, cost_vnd: float, provider: ?string, query: ?string}
      */
-    public function gather(Website $site, string $keyword): array
+    public function gather(Website $site, string $keyword, ?array $topics = null): array
+    {
+        $topics ??= array_map(fn ($a) => trim($keyword.$a), self::ANGLES);
+        $out = ['status' => 'none', 'references' => [], 'reason' => null, 'cost_vnd' => 0.0, 'provider' => null, 'query' => null];
+        $seen = [];
+        $perDomain = [];
+        foreach ($topics as $i => $topic) {
+            $r = $this->attempt($site, $topic);
+            $out['cost_vnd'] += $r['cost_vnd'];
+            $out['provider'] ??= $r['provider'];
+            $out['query'] ??= $r['query'];
+            if (in_array($r['status'], ['unavailable', 'error', 'demo'], true)) {
+                if ($out['references'] === []) {
+                    return ['status' => $r['status'], 'reason' => $r['reason']] + $out;
+                }
+                break; // đã có tài liệu từ các góc trước: giữ, không bỏ phí
+            }
+            foreach ($r['references'] as $ref) {
+                if (isset($seen[$ref['url']]) || ($perDomain[$ref['domain']] ?? 0) >= self::MAX_PER_DOMAIN) {
+                    continue;
+                }
+                $seen[$ref['url']] = true;
+                $perDomain[$ref['domain']] = ($perDomain[$ref['domain']] ?? 0) + 1;
+                $out['references'][] = $ref;
+            }
+            if (count($out['references']) >= self::MAX) {
+                break;
+            }
+            if ($i === 0 && $out['references'] === [] && count($topics) === 1) { // kết quả tìm web thay đổi giữa các lần gọi: thử thêm một lần
+                $again = $this->attempt($site, $topic);
+                $out['cost_vnd'] += $again['cost_vnd'];
+                foreach ($again['references'] as $ref) {
+                    $out['references'][] = $ref;
+                }
+            }
+        }
+        $out['references'] = array_slice($out['references'], 0, self::MAX);
+        $out['status'] = $out['references'] === [] ? 'none' : 'found';
+        $out['reason'] = $out['references'] === [] ? 'Không có tài liệu từ nguồn tin cậy đủ nội dung.' : null;
+
+        return $out;
+    }
+
+    /** @return array{status: string, references: list<array{title: string, domain: string, url: string, excerpt: string}>, reason: ?string, cost_vnd: float, provider: ?string, query: ?string} */
+    private function attempt(Website $site, string $keyword): array
     {
         $out = ['status' => 'none', 'references' => [], 'reason' => null, 'cost_vnd' => 0.0, 'provider' => null, 'query' => null];
         try {
@@ -51,12 +101,8 @@ final class ReferenceDossier
                 continue;
             }
             $out['references'][] = ['title' => self::clean((string) $c['title'], 160), 'domain' => (string) $c['domain'], 'url' => (string) $c['url'], 'excerpt' => mb_substr($excerpt, 0, self::EXCERPT_CHARS)];
-            if (count($out['references']) >= self::MAX) {
-                break;
-            }
         }
         $out['status'] = $out['references'] === [] ? 'none' : 'found';
-        $out['reason'] = $out['references'] === [] ? 'Không có tài liệu từ nguồn tin cậy đủ nội dung.' : null;
 
         return $out;
     }

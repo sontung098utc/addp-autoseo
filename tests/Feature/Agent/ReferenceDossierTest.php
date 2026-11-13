@@ -49,7 +49,20 @@ class ReferenceDossierTest extends TestCase
         return str_repeat($s.'. ', 9);
     }
 
-    public function test_chi_lay_nguon_tin_cay_du_noi_dung_va_toi_da_bon(): void
+    public function test_toi_da_hai_trang_moi_ten_mien_de_nguon_phong_phu(): void
+    {
+        FakeSearch::$rows = [];
+        foreach (['a', 'b', 'c', 'd'] as $k) {
+            FakeSearch::$rows[] = $this->row("https://www.who.int/{$k}", $this->long("Hướng dẫn của tổ chức số {$k} nêu ngưỡng chẩn đoán"));
+        }
+        FakeSearch::$rows[] = $this->row('https://moh.gov.vn/x', $this->long('Bộ Y tế ban hành hướng dẫn'));
+        $r = (new ReferenceDossier)->gather($this->site, 'tiểu đường');
+        $domains = array_count_values(array_column($r['references'], 'domain'));
+        $this->assertSame(ReferenceDossier::MAX_PER_DOMAIN, $domains['who.int']);
+        $this->assertSame(1, $domains['moh.gov.vn']);
+    }
+
+    public function test_chi_lay_nguon_tin_cay_du_noi_dung(): void
     {
         FakeSearch::$rows = [
             $this->row('https://www.who.int/a', $this->long()),
@@ -63,7 +76,9 @@ class ReferenceDossierTest extends TestCase
         ];
         $r = (new ReferenceDossier)->gather($this->site, 'tiểu đường tuýp 2');
         $this->assertSame('found', $r['status']);
-        $this->assertCount(ReferenceDossier::MAX, $r['references']);
+        $this->assertGreaterThanOrEqual(4, count($r['references']));
+        $this->assertContains('who.int', array_column($r['references'], 'domain'));
+        $this->assertLessThanOrEqual(ReferenceDossier::MAX, count($r['references']));
         $domains = array_column($r['references'], 'domain');
         $this->assertNotContains('facebook.com', $domains);
         $this->assertNotContains('nih.gov', $domains, 'Đoạn trích quá ngắn bị bỏ.');
@@ -155,7 +170,7 @@ class ReferenceDossierTest extends TestCase
         $this->assertStringNotContainsString('autoseo-refs', (string) $run2->finalVersion->html_content, 'Không có tài liệu thật thì không bịa khối nguồn.');
     }
 
-    public function test_chu_de_thuong_khong_ton_luot_tim_web(): void
+    public function test_chu_de_thuong_chi_tim_mot_goc(): void
     {
         $ai = new class implements AiProviderInterface
         {
@@ -175,9 +190,10 @@ class ReferenceDossierTest extends TestCase
             }
         };
         $article = Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'học bổng toàn phần', 'workflow_status' => 'planned']);
-        FakeSearch::$throw = new \RuntimeException('Không được gọi tìm kiếm cho chủ đề thường.');
+        FakeSearch::$calls = 0;
         $run = (new AgentRunOrchestrator($ai, sleep: fn () => null))->run($article);
-        $this->assertNull($run->steps->first(fn ($s) => ($s->data['purpose'] ?? null) === 'references'));
+        $this->assertLessThanOrEqual(2, FakeSearch::$calls, 'Chủ đề thường chỉ tìm MỘT góc (cộng tối đa một lần thử lại).');
+        $this->assertNotNull($run->steps->first(fn ($s) => ($s->data['purpose'] ?? null) === 'references'));
     }
 }
 
@@ -189,8 +205,11 @@ class FakeSearch implements WebSearchProvider
 
     public static ?\Throwable $throw = null;
 
+    public static int $calls = 0;
+
     public function search(string $query, array $options = []): array
     {
+        self::$calls++;
         if (self::$throw) {
             throw self::$throw;
         }

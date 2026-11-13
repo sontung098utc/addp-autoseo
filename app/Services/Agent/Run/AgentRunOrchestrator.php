@@ -60,6 +60,11 @@ final class AgentRunOrchestrator
     /** Tư liệu bậc 1 tìm được trên web cho bài đang chạy (rỗng = không có). Chỉ hỗ trợ viết. @var list<array{title:string,domain:string,url:string,excerpt:string}> */
     private array $references = [];
 
+    /** Hồ sơ nội dung do bước tổng hợp lập (ContentPlanner) và bản văn bản đưa vào lời nhắn; null = không có (không AI, chưa có nguồn, lỗi). */
+    private ?array $contentPlan = null;
+
+    private ?string $contentPlanText = null;
+
     /** Mốc đồng hồ (giây, mili) lúc bước trước xong / phiên bắt đầu: thời lượng bước = hiện tại - mốc. */
     private float $markT = 0.0;
 
@@ -146,6 +151,8 @@ final class AgentRunOrchestrator
         $this->seq = 0;
         $this->workingWriter = null;
         $this->references = [];
+        $this->contentPlan = null;
+        $this->contentPlanText = null;
         $this->markT = microtime(true);
         $this->aiMs = 0.0;
         $this->trigger = $trigger;
@@ -365,6 +372,8 @@ final class AgentRunOrchestrator
         // 3. Dàn ý (vai trò Chiến lược; tắt được: bỏ bước này, người viết tự bố cục, các bước sau không phụ thuộc).
         $this->skills['write'] = $this->usePlaybook('writer', 'article-draft');
         $this->skills['layout'] = $this->usePlaybook('writer', 'article-layout'); // quy tắc chọn khối bố cục, nạp kèm vào prompt viết bài
+        // 2c. Thu thập nguồn rồi TỔNG HỢP & ĐỊNH HƯỚNG (trước dàn ý): bài là kết quả của việc đọc, đối chiếu, suy luận từ nhiều nguồn.
+        $this->prepareEvidence($run, $article, $assess);
         if ($this->redo !== null) {
             $this->redoPlan = $this->coordinateRedo($run, $article);
             if ($this->redoPlan['reuse_outline'] && $this->presetOutline === null) {
@@ -384,7 +393,7 @@ final class AgentRunOrchestrator
         } else {
             $this->skills['brief'] = $this->usePlaybook('brief', 'content-brief');
             [$briefPb, $briefNote] = $this->skills['brief'];
-            $briefOptions = ($briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : []) + $this->guidanceOptions($article) + $this->roleOptions('strategist') + $this->brandOptions() + $this->brainCtx->options($article);
+            $briefOptions = ($briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : []) + $this->guidanceOptions($article) + $this->roleOptions('strategist') + $this->brandOptions() + $this->brainCtx->options($article) + ($this->contentPlanText !== null ? ['content_plan' => $this->contentPlanText] : []);
             if ($this->redoPlan !== null && trim($this->redoPlan['outline_note'].$this->redoPlan['image_note']) !== '') {
                 $briefOptions['guidance'] = trim((string) ($briefOptions['guidance'] ?? '')."\nLời nhắn làm lại, điều phối dặn bộ phận dàn ý: ".trim($this->redoPlan['outline_note'].($this->redoPlan['image_note'] !== '' ? ' Về ảnh: '.$this->redoPlan['image_note'] : '')));
             }
@@ -405,7 +414,6 @@ final class AgentRunOrchestrator
         [$editorPb, $editorNote] = $this->skills['grade'];
 
         // 4. Nghiên cứu: nạp ngữ cảnh bằng luật (không gọi AI), rồi kiểm ngân sách trước khi viết.
-        $this->gatherReferences($run, $article, (string) $assess->level);
         $this->research($run, $article, $outline['outline'] ?? []);
         if ($this->spent($run) >= $this->policy->budgetVnd) {
             $reason = 'Hết ngân sách cho phiên chạy ('.number_format($this->policy->budgetVnd, 0, ',', '.').' ₫) trước bước viết nên không gọi AI viết.';
@@ -782,16 +790,145 @@ final class AgentRunOrchestrator
     }
 
     /**
+     * Điều phối nguồn cho bài: (1) tìm tài liệu web nhiều góc; (2) bước TỔNG HỢP & ĐỊNH HƯỚNG: một biên tập viên cấp cao đọc kiến thức đã duyệt và tài liệu web, đối chiếu,
+     * quyết định dùng/bỏ, góc tiếp cận, dạng trình bày, độ dài và chỉ ra khoảng trống; (3) nếu còn khoảng trống thì chạy luồng NẠP BỔ SUNG kho cho đúng phần thiếu rồi tổng hợp lại một lần.
+     * Không chặn gì: không AI, hết ngân sách, lỗi mạng thì ghi nhật ký rồi lập dàn ý và viết như cũ.
+     */
+    private function prepareEvidence(AgentRun $run, Article $article, \App\Services\Agent\Risk\RiskAssessment $assess): void
+    {
+        $risk = (string) $assess->level;
+        $this->gatherReferences($run, $article, $risk);
+        $ai = $this->roleOff('strategist') ? null : $this->strategistAi();
+        if ($ai === null || $this->spent($run) >= $this->policy->budgetVnd) {
+            return;
+        }
+        $planner = new \App\Services\Content\ContentPlanner(new AiJson($ai, $this->sleep));
+        $intent = (string) ($article->search_intent ?: 'informational');
+        $kb = $this->kbForPlanner($article);
+        $r = $planner->plan((string) $article->primary_keyword, $intent, $risk, $kb, $this->references);
+        if ($r['status'] !== 'done') {
+            $this->step($run, 'synthesize', 'strategist', 'warn', 'Chưa tổng hợp được nguồn', ($r['reason'] ?? 'Lỗi AI.').' Dàn ý và bài viết đi tiếp như cũ, không có hồ sơ nội dung.', ['reason' => $r['reason'], 'sources' => $r['sources']], $r['model'], $r['tokens'], $r['cost']);
+
+            return;
+        }
+        $plan = $r['plan'];
+        $cost = $r['cost'];
+        $tokens = $r['tokens'];
+        $extra = '';
+        $gaps = (array) $plan['gaps'];
+        if ($gaps !== [] && $this->spent($run) + $cost < $this->policy->budgetVnd) {
+            // Luồng nạp bổ sung: chỉ cho phần còn thiếu căn cứ.
+            $topics = array_map(fn ($g) => trim((string) $article->primary_keyword.' '.$g), array_slice($gaps, 0, 2));
+            $added = $this->topUpEvidence($run, $article, $topics, $risk);
+            if ($added > 0) {
+                $kb = $this->kbForPlanner($article);
+                $r2 = $planner->plan((string) $article->primary_keyword, $intent, $risk, $kb, $this->references);
+                $cost += $r2['cost'];
+                $tokens += $r2['tokens'];
+                if ($r2['status'] === 'done') {
+                    $plan = $r2['plan'];
+                    $extra = ' Đã tìm thêm nguồn cho '.count($topics).' khoảng trống rồi tổng hợp lại.';
+                }
+            }
+        }
+        $this->contentPlan = $plan;
+        $this->contentPlanText = \App\Services\Content\ContentPlanner::render($plan);
+        $use = array_count_values(array_column($plan['findings'], 'use'));
+        $this->step($run, 'synthesize', 'strategist', 'ok', 'Tổng hợp '.($r['sources']).' nguồn: '.count($plan['findings']).' luận điểm, '.count($plan['questions']).' câu hỏi cho bài',
+            'Biên tập đọc và đối chiếu các nguồn rồi chốt hướng nội dung: dùng chắc '.($use['dung'] ?? 0).', dùng thận trọng '.($use['than_trong'] ?? 0).', bỏ '.($use['bo'] ?? 0).' luận điểm; '
+            .count((array) $plan['conflicts']).' mâu thuẫn giữa nguồn; góc tiếp cận: '.mb_substr((string) $plan['angle'], 0, 160).'; độ dài mục tiêu ~'.(int) $plan['length_words'].' từ.'.$extra
+            .($plan['gaps'] !== [] ? ' Còn thiếu căn cứ: '.implode('; ', array_slice((array) $plan['gaps'], 0, 3)).'.' : ''),
+            ['plan' => $plan, 'sources' => $r['sources'], 'kb_items' => count($kb), 'web_references' => count($this->references)], $r['model'], $tokens, $cost);
+    }
+
+    /** Mục kiến thức đã duyệt khớp chủ đề để tổng hợp (ngữ cảnh riêng, không chiếm lượt truy xuất theo dàn ý của bước nghiên cứu). @return list<array<string,mixed>> */
+    private function kbForPlanner(Article $article): array
+    {
+        try {
+            $c = (new KnowledgeContext())->scopeToBrains($this->writerBrainScope($this->brainCtx->ids()));
+            $c->load($article, []);
+
+            return array_values(array_filter((array) ($c->options()['knowledge'] ?? []), fn ($k) => ($k['type'] ?? '') !== 'product'));
+        } catch (Throwable $e) {
+            report($e);
+
+            return [];
+        }
+    }
+
+    /**
+     * Luồng nạp bổ sung cho các khoảng trống: (a) tìm thêm tài liệu web đúng chủ đề thiếu, hợp vào danh sách nguồn của bài; (b) rủi ro vừa/cao: nạp tối đa 2 nguồn tin cậy vào kho
+     * (trần chi phí 10% ngân sách phiên). Trả số nguồn/mục thêm được.
+     *
+     * @param  list<string>  $topics
+     */
+    private function topUpEvidence(AgentRun $run, Article $article, array $topics, string $risk): int
+    {
+        $added = 0;
+        try {
+            $more = (new \App\Services\Content\ReferenceDossier)->gather($article->website, (string) $article->primary_keyword, $topics);
+            $have = array_column($this->references, 'url');
+            foreach ($more['references'] as $ref) {
+                if (! in_array($ref['url'], $have, true) && count($this->references) < \App\Services\Content\ReferenceDossier::MAX + 4) {
+                    $this->references[] = $ref;
+                    $added++;
+                }
+            }
+            $this->step($run, 'research', 'system', $added > 0 ? 'ok' : 'warn', $added > 0 ? "Tìm thêm {$added} tài liệu cho phần còn thiếu" : 'Tìm thêm tài liệu cho phần còn thiếu nhưng chưa có kết quả',
+                'Chủ đề tìm: '.implode(' | ', $topics).'.', ['purpose' => 'references_gap', 'topics' => $topics, 'added' => $added], null, 0, $more['cost_vnd']);
+        } catch (Throwable $e) {
+            report($e);
+        }
+        if ($risk === 'low') {
+            return $added;
+        }
+        try {
+            $cap = $this->policy->budgetVnd * 0.1;
+            $svc = app(\App\Services\Knowledge\Discover\SourceDiscoveryService::class);
+            $d = $svc->discover($article->website, $topics[0]);
+            $trusted = array_values(array_filter($d['candidates'], fn ($c) => $c['trust']['level'] === 'trusted'));
+            $imp = $svc->import($article->website, $trusted, null, ['as_system' => true, 'max_sources' => 2, 'only_trusted' => true, 'field' => $d['field'], 'budget_cap_vnd' => $cap, 'purpose' => 'gap',
+                'search' => ['query' => $d['query'], 'results' => count($d['candidates']), 'cost_vnd' => $d['cost_vnd'], 'provider' => $d['provider']]]);
+            $this->step($run, 'research', 'system', $imp['imported'] > 0 ? 'ok' : 'warn', 'Nạp bổ sung kho cho phần còn thiếu: '.$imp['imported'].' nguồn',
+                'Điều phối chạy luồng nạp cho khoảng trống "'.mb_substr($topics[0], 0, 120).'": '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.',
+                ['purpose' => 'kb_topup', 'imported' => $imp['imported'], 'items_auto' => $imp['items_auto'], 'items_proposed' => $imp['items_proposed'], 'build_run_id' => $imp['run_id']], null, 0, (float) $imp['cost_vnd']);
+            $added += (int) $imp['items_auto'];
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return $added;
+    }
+
+    /** AI có cấu trúc cho bước tổng hợp: route lập dàn ý (Chiến lược), rồi các route viết/sửa/tóm tắt; không có router thì chính nhà cung cấp của phiên nếu hỗ trợ. */
+    private function strategistAi(): ?\App\Contracts\StructuredAiInterface
+    {
+        if ($this->router) {
+            foreach (['outline', 'write', 'repair', 'summary'] as $task) {
+                $ai = $this->router->target($task)?->ai;
+                if ($ai instanceof \App\Contracts\StructuredAiInterface) {
+                    return $ai;
+                }
+            }
+
+            return null;
+        }
+
+        return $this->ai instanceof \App\Contracts\StructuredAiInterface ? $this->ai : null;
+    }
+
+    /**
      * Tìm tài liệu bậc 1 trên web làm chất liệu cho người viết (chủ đề rủi ro vừa/cao hoặc Trí tuệ bắt buộc nguồn). Không chặn: không có khóa/lỗi/không kết quả
      * thì ghi một dòng nhật ký rồi viết tiếp. Kết quả mô phỏng không bao giờ được dùng (xem ReferenceDossier).
      */
     private function gatherReferences(AgentRun $run, Article $article, string $risk): void
     {
-        if (($risk === 'low' && $this->brainCtx->reliance() !== 'must_cite') || $this->spent($run) >= $this->policy->budgetVnd) {
+        if ($this->spent($run) >= $this->policy->budgetVnd) {
             return;
         }
         try {
-            $r = (new \App\Services\Content\ReferenceDossier)->gather($article->website, (string) $article->primary_keyword);
+            $kw = (string) $article->primary_keyword;
+            $r = (new \App\Services\Content\ReferenceDossier)->gather($article->website, $kw, $risk === 'low' && $this->brainCtx->reliance() !== 'must_cite' ? [$kw] : null); // chủ đề thường: một góc tìm; còn lại: nhiều góc
         } catch (Throwable $e) {
             report($e);
 
@@ -800,7 +937,7 @@ final class AgentRunOrchestrator
         $this->references = $r['references'];
         $n = count($r['references']);
         $this->step($run, 'research', 'system', $n > 0 ? 'ok' : 'warn', $n > 0 ? "Tìm được {$n} tài liệu bậc 1 trên web" : 'Chưa có tài liệu bậc 1 từ web',
-            $n > 0 ? 'Đoạn trích từ: '.implode(', ', array_unique(array_column($r['references'], 'domain'))).'. Người viết dùng làm căn cứ cho số liệu và khuyến cáo (chỉ hỗ trợ viết, chưa nạp vào kho).'
+            $n > 0 ? 'Đoạn trích từ '.count(array_unique(array_column($r['references'], 'domain'))).' nguồn khác nhau: '.implode(', ', array_unique(array_column($r['references'], 'domain'))).'. Bước tổng hợp đối chiếu các nguồn này; người viết dùng làm căn cứ (chỉ hỗ trợ viết, chưa nạp vào kho).'
                 : (($r['reason'] ?? 'Không có kết quả.').' Vẫn viết tiếp, dựa trên kiến thức đã duyệt và hiểu biết chuẩn mực của người viết.'),
             ['purpose' => 'references', 'status' => $r['status'], 'query' => $r['query'], 'references' => array_map(fn ($x) => ['domain' => $x['domain'], 'url' => $x['url'], 'title' => $x['title']], $r['references'])], null, 0, $r['cost_vnd']);
     }
@@ -859,6 +996,9 @@ final class AgentRunOrchestrator
         }
         if ($this->references !== []) {
             $options['references'] = $this->references;
+        }
+        if ($this->contentPlanText !== null) {
+            $options['content_plan'] = $this->contentPlanText;
         }
         $options += $this->guidanceOptions($article) + $this->roleOptions('writer') + $this->brandOptions() + $this->brainCtx->options($article);
         $this->kb ??= new KnowledgeContext();

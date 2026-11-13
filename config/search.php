@@ -19,6 +19,9 @@ return [
         'url' => env('TAVILY_URL', 'https://api.tavily.com/search'),
     ],
 
+    /** Thời gian chờ tối đa (giây) cho tìm web qua cầu nối Claude (tìm + mở trang chậm hơn API tìm kiếm thường). */
+    'bridge_timeout' => (int) env('SEARCH_BRIDGE_TIMEOUT', 240),
+
     'timeout' => (int) env('SEARCH_TIMEOUT', 15),
 
     'max_results' => 10,

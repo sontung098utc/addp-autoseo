@@ -18,6 +18,7 @@ return [
     'steps' => [
         ['id' => 'guard', 'role' => 'system', 'label' => 'Kiểm điều kiện', 'kind' => 'rule'],
         ['id' => 'risk', 'role' => 'editor', 'label' => 'Xét rủi ro', 'kind' => 'rule'],
+        ['id' => 'synthesize', 'role' => 'strategist', 'label' => 'Tổng hợp nguồn', 'kind' => 'llm', 'task' => 'outline', 'when' => 'Trước dàn ý: tìm tài liệu web nhiều góc, rồi biên tập cấp cao đọc, đối chiếu cùng kiến thức trong kho, chốt luận điểm dùng/bỏ, góc tiếp cận, dạng trình bày, độ dài; còn khoảng trống thì chạy luồng nạp bổ sung cho đúng phần thiếu. Không có AI hoặc nguồn thì bỏ qua'],
         ['id' => 'brief', 'role' => 'strategist', 'label' => 'Lập dàn ý', 'kind' => 'llm', 'task' => 'outline', 'when' => 'Bỏ qua nếu vai trò Chiến lược tắt. Dàn ý kèm KẾ HOẠCH ẢNH (cần ảnh nào, đặt sau mục nào, mô tả ảnh) do vai trò Họa viên soạn bằng luật, không phải bước riêng'],
         ['id' => 'research', 'role' => 'writer', 'label' => 'Nghiên cứu', 'kind' => 'rule', 'when' => 'Chạy sau dàn ý, trước bước viết; nạp kiến thức, ảnh, liên kết nội bộ, nguồn được trích. Rủi ro cao mà kho trống: trước đó tự đọc tối đa 5 trang website'],
         ['id' => 'write', 'role' => 'writer', 'label' => 'Viết', 'kind' => 'llm', 'task' => 'write'],

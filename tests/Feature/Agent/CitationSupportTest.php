@@ -139,6 +139,9 @@ class CitationSupportTest extends TestCase
 
             public function generateStructured(string $system, string $user): array
             {
+                if (str_contains($system, 'HƯỚNG NỘI DUNG')) { // bước tổng hợp nguồn: không phải lượt chấm trích dẫn
+                    return ['data' => [], 'tokens_used' => 1, 'cost_vnd' => 0.0, 'model' => 'fake'];
+                }
                 $this->judged++;
 
                 return ['data' => ['verdicts' => [['n' => 1, 'verdict' => $this->judged === 1 ? 'unsupported' : 'supported', 'reason' => 'mục chỉ nói về học phí chung']]], 'tokens_used' => 3, 'cost_vnd' => 1.5, 'model' => 'fake-judge'];
