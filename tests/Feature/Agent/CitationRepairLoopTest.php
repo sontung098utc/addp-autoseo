@@ -88,6 +88,7 @@ class CitationRepairLoopTest extends TestCase
         $fb = (array) $ai->options[1]['feedback'];
         $this->assertTrue(collect($fb)->contains(fn ($f) => str_contains($f, 'CITE01') && str_contains($f, 'học bổng toàn phần miễn 100%')), 'phản hồi nêu đúng đoạn thiếu dấu');
         $this->assertTrue(collect($fb)->contains(fn ($f) => str_contains($f, 'không bịa mã')));
+        $this->assertTrue(collect($fb)->contains(fn ($f) => str_contains($f, 'KHÔNG xóa số liệu')), 'sửa lỗi trích dẫn không được xóa mốc/số liệu có căn cứ');
         $this->assertNull($this->cite01($run), 'sau sửa mọi đoạn khẳng định có dấu [KB#id] hợp lệ');
         $html = (string) $run->finalVersion->html_content;
         // Bản lưu cho người đọc: chú thích số + khối Nguồn tham khảo, không còn dấu thô [KB#id]; data-kb vẫn trỏ đúng mục để chấm lại.

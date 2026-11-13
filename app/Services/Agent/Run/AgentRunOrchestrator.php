@@ -437,8 +437,8 @@ final class AgentRunOrchestrator
         $reason = null;
         $round = $editRounds;
         // Vòng sửa chạy khi còn lỗi CHẶN, hoặc (Trí tuệ bắt buộc nguồn) còn đoạn khẳng định chưa có dấu trích dẫn [KB#id] (CITE01, P1): lỗi sau không chặn bàn giao nhưng được sửa.
-        // Lỗi MỀM (thiếu dấu trích, trích không hỗ trợ) chỉ được sửa tối đa 2 vòng sau biên tập: sửa mãi chỉ làm dấu trích rơi vào chỗ không hợp và bài kém đi.
-        while ($this->needsRepair($report) && $round < $maxRounds && ($report->hasBlocking() || $report->layoutGaps() !== [] || $round - $editRounds < 2)) {
+        // Lỗi MỀM (thiếu dấu trích, trích không hỗ trợ) chỉ được sửa tối đa 1 vòng sau biên tập: sửa mãi chỉ làm dấu trích rơi vào chỗ không hợp và bài kém đi.
+        while ($this->needsRepair($report) && $round < $maxRounds && ($report->hasBlocking() || $report->layoutGaps() !== [] || $round - $editRounds < 1)) {
             if ($this->spent($run) >= $this->policy->budgetVnd) {
                 $reason = 'Hết ngân sách cho phiên chạy ('.number_format($this->policy->budgetVnd, 0, ',', '.').' ₫) nên dừng sửa.';
                 $this->decision($run, 'budget_exhausted', 'Dừng sửa vì hết ngân sách', $reason, ['spent_vnd' => $this->spent($run), 'budget_vnd' => $this->policy->budgetVnd, 'score' => $score]);
@@ -967,6 +967,11 @@ final class AgentRunOrchestrator
         }
         foreach (array_slice($report->layoutGaps(), 0, 6) as $gap) {
             $feedback[] = 'LAY01: '.$gap;
+        }
+
+        if (array_filter($feedback, fn ($f) => str_starts_with($f, 'CITE') || str_starts_with($f, 'EVID') || str_starts_with($f, 'SRC'))) {
+            // Lỗi trích dẫn chỉ là lỗi của DẤU TRÍCH; trước đây người viết xóa luôn cả mốc chuẩn (vd. 90/60) cho "sạch" lỗi. Giữ nội dung có căn cứ.
+            $feedback[] = 'LƯU Ý CHUNG KHI SỬA LỖI TRÍCH DẪN: tuyệt đối KHÔNG xóa số liệu, mốc chuẩn hay ý có căn cứ từ tài liệu tham khảo/hồ sơ nội dung chỉ vì chưa có dấu [KB#id] hoặc mục kho không nói điều đó. Cách sửa đúng: gỡ dấu [KB#id] đặt sai chỗ (giữ nguyên nội dung), hoặc thêm dấu của mục kho thật sự nói điều đó. Bài phải giữ đủ những gì người đọc cần.';
         }
 
         return $feedback;
