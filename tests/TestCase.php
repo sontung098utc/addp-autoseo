@@ -15,5 +15,7 @@ abstract class TestCase extends BaseTestCase
         config(['knowledge.min_relevance' => 0.0]);
         // Giao đội AI chạy NỀN khi CSDL dùng chung được (MariaDB): test của nút cần chạy đồng bộ, nên tắt; việc bật/tắt có test riêng (BackgroundRunTest).
         config(['agent.background_runs' => false]);
+        // Dữ liệu minh họa và bản giả (AI/tìm web/ảnh) chỉ bật trong test để test dựng được ngữ cảnh; ngoài test mặc định TẮT (STUDIO_DEMO).
+        config(['studio.demo' => true]);
     }
 }

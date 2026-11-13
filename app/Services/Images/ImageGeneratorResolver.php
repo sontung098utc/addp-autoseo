@@ -44,7 +44,7 @@ final class ImageGeneratorResolver
 
         $route = Schema::hasTable('ai_model_routes') ? AiModelRoute::query()->with('primaryProvider')->where('task', 'image_gen')->first() : null;
         if (! $route) {
-            if (app()->environment('local')) {
+            if (\App\Filament\Support\Demo\DemoMode::enabled()) {
                 return ['generator' => new MockImageGenerator, 'label' => 'Ảnh giả lập (môi trường local)', 'demo' => true, 'source' => 'mock'];
             }
             throw new ImageGeneratorUnavailable('Chưa cấu hình model ảnh: gán cho vai trò Họa viên (Đội AI → Vai trò → Họa viên hình ảnh → Mô hình & kỹ thuật).');

@@ -24,7 +24,7 @@ final class WebSearchResolver
             throw new WebSearchUnavailable('Nhà cung cấp tìm kiếm "'.$name.'" chưa được cài.');
         }
         if ($name === 'tavily' && trim((string) config('search.tavily.key')) === '') {
-            if (app()->environment(['local', 'testing']) && (bool) config('search.allow_mock', app()->environment('local'))) {
+            if (\App\Filament\Support\Demo\DemoMode::enabled() && (bool) config('search.allow_mock', true)) {
                 return ['provider' => new MockWebSearchProvider, 'label' => 'Tìm kiếm mô phỏng (môi trường local)', 'demo' => true];
             }
             throw new WebSearchUnavailable(self::HINT);

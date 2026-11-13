@@ -82,11 +82,12 @@ class AgentRunUiTest extends TestCase
         $a = $this->article();
         $this->actingAs($this->user('approver'));
 
-        // Không có khóa AI thật và không ở local: nút KHÔNG chạy, chỉ báo "chưa kết nối AI".
+        // Không có khóa AI và không bật chế độ minh họa (STUDIO_DEMO): nút KHÔNG chạy, chỉ báo "chưa kết nối AI".
+        config(['studio.demo' => false]);
         Livewire::test(ListArticles::class)->callTableAction('run_agent', $a)->assertHasNoTableActionErrors();
         $this->assertSame(0, AgentRun::count());
 
-        $this->app->detectEnvironment(fn () => 'local');
+        config(['studio.demo' => true]);
         Livewire::test(ListArticles::class)->callTableAction('run_agent', $a)->assertHasNoTableActionErrors();
         $this->assertSame(1, AgentRun::count());
         $this->assertSame(0, Publication::count());

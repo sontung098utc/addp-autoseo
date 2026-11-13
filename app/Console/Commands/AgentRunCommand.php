@@ -22,7 +22,13 @@ class AgentRunCommand extends Command
 
             return self::FAILURE;
         }
-        $ai = $this->option('demo') ? new DemoScriptedAiProvider() : (\App\Services\Agent\Settings\AgentAi::real() ?? new MockAiProvider());
+        $demoOk = \App\Filament\Support\Demo\DemoMode::enabled();
+        $ai = ($this->option('demo') && $demoOk) ? new DemoScriptedAiProvider() : (\App\Services\Agent\Settings\AgentAi::real() ?? ($demoOk ? new MockAiProvider() : null));
+        if ($ai === null) {
+            $this->error('Chưa kết nối AI. Cấu hình ở Cấu hình AI → Tích hợp AI (AI giả lập chỉ dùng khi bật STUDIO_DEMO ở môi trường phát triển).');
+
+            return self::FAILURE;
+        }
         $run = \App\Services\Agent\Refresh\AgentRunDispatcher::run($article, $ai, null, 'manual', policy: \App\Services\Agent\Settings\AgentAi::policy());
         $this->info("Phiên #{$run->id}: {$run->status}".($run->outcome_reason ? " — {$run->outcome_reason}" : ''));
 

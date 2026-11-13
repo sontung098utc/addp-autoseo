@@ -75,7 +75,7 @@ final class AgentAi
     /** AI thật; riêng môi trường local được phép dùng bản giả lập theo kịch bản (luôn có nhãn "AI giả lập"). */
     public static function forInteractiveUse(): ?AiProviderInterface
     {
-        return self::real() ?? (app()->environment('local') ? new DemoScriptedAiProvider() : null);
+        return self::real() ?? (\App\Filament\Support\Demo\DemoMode::enabled() ? new DemoScriptedAiProvider() : null);
     }
 
     public static function policy(): RunPolicy

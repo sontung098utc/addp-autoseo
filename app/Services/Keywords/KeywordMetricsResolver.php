@@ -20,7 +20,7 @@ final class KeywordMetricsResolver
         if (config('keywords.provider', 'dataforseo') === 'dataforseo' && $login !== '' && $pass !== '') {
             return ['provider' => new DataForSeoKeywordMetricsProvider($login, $pass), 'label' => 'DataForSEO', 'demo' => false];
         }
-        if (app()->environment('local')) {
+        if (\App\Filament\Support\Demo\DemoMode::enabled()) {
             return ['provider' => new MockKeywordMetricsProvider, 'label' => 'Số liệu giả lập (môi trường local, không phải lượt tìm thật)', 'demo' => true];
         }
         throw new KeywordMetricsUnavailable('Chưa cấu hình nguồn số liệu lượt tìm. '.self::HOWTO);

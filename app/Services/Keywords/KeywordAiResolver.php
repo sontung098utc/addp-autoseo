@@ -31,7 +31,7 @@ final class KeywordAiResolver
         if ($real instanceof StructuredAiInterface) {
             return ['ai' => $real, 'label' => 'AI đã kết nối', 'cap' => null, 'demo' => false];
         }
-        if (app()->environment('local')) {
+        if (\App\Filament\Support\Demo\DemoMode::enabled()) {
             return ['ai' => new DemoScriptedAiProvider, 'label' => 'AI giả lập (môi trường local)', 'cap' => null, 'demo' => true];
         }
         throw new KeywordAiUnavailable('Chưa kết nối AI. Cấu hình ở Cấu hình AI → Tích hợp AI.');
