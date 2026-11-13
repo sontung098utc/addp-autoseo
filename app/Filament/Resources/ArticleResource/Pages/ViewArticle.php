@@ -351,6 +351,11 @@ class ViewArticle extends EditArticle
         $latest = $versions->first();
         $runs = AgentRun::query()->where('article_id', $article->id)->with('steps')->orderByDesc('id')->get();
         $lastRun = $runs->first();
+        // Chi tiết phiên: phiên đang chọn (?phien=, mặc định mới nhất) cho tab Phiên chạy, và phiên mới nhất cho thẻ Luồng chạy ở Tổng quan; dựng một lần nếu là cùng một phiên.
+        $selectedRun = ($this->phien ? $runs->firstWhere('id', $this->phien) : null) ?? $lastRun;
+        $canRuns = \App\Filament\Resources\AgentRunResource::canViewAny();
+        $runView = $selectedRun && $canRuns ? \App\Filament\Support\Agent\RunViewData::for($selectedRun) : null;
+        $latestRunView = $lastRun && $canRuns ? ($selectedRun && $selectedRun->is($lastRun) ? $runView : \App\Filament\Support\Agent\RunViewData::for($lastRun)) : null;
         $live = $lastRun && RunActivity::isLive($lastRun) ? $lastRun : null;
         $campaignId = $article->campaign_id ?: $lastRun?->campaign_id;
         $publications = Publication::query()->whereIn('article_version_id', $versions->pluck('id'))->with(['website', 'articleVersion'])->orderByDesc('id')->get();
@@ -407,8 +412,10 @@ class ViewArticle extends EditArticle
             'liveStage' => $live ? RunActivity::currentStage($live->steps) : null,
             'runFlow' => $this->runFlowOf($runs->first(), $live),
             // Chi tiết đầy đủ MỘT phiên (Diễn biến, Báo cáo, Chi phí và model, Dữ liệu) ngay trong trang bài; phiên đang xem theo ?phien=, mặc định phiên mới nhất.
-            'selectedRun' => $selectedRun = ($this->phien ? $runs->firstWhere('id', $this->phien) : null) ?? $runs->first(),
-            'runView' => $selectedRun && \App\Filament\Resources\AgentRunResource::canViewAny() ? \App\Filament\Support\Agent\RunViewData::for($selectedRun) : null,
+            'selectedRun' => $selectedRun,
+            'runView' => $runView,
+            // Phiên MỚI NHẤT cho thẻ Luồng chạy ở Tổng quan: cùng dữ liệu với tab Phiên chạy để bấm từng bước mở ngăn chi tiết như ở đó (cần quyền xem phiên).
+            'latestRunView' => $latestRunView,
             'campaign' => $campaignId ? Campaign::find($campaignId) : null,
             'keyword' => $keyword,
             'keywordMatched' => $keywordMatched,

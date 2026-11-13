@@ -94,4 +94,36 @@ class RunDetailInArticleTest extends TestCase
         $this->assertStringNotContainsString('Bước của bài khác', $html, 'mã phiên của bài khác bị bỏ qua, rơi về phiên mới nhất của bài này');
         $this->assertStringContainsString('Phiên #'.$mine->id, $html);
     }
+
+    public function test_the_luong_chay_o_tong_quan_la_phien_moi_nhat_va_bam_tung_buoc_mo_ngan_chi_tiet_nhu_tab_phien_chay(): void
+    {
+        $old = $this->run_($this->article, 'Bước của phiên cũ');
+        $new = $this->run_($this->article, 'Bước của phiên mới');
+        $base = ArticleResource::getUrl('view', ['record' => $this->article]);
+
+        // Đang xem phiên CŨ ở tab Phiên chạy, nhưng thẻ ở Tổng quan vẫn là phiên MỚI NHẤT.
+        $html = $this->get($base.'?phien='.$old->id)->assertOk()->getContent();
+        $a = strpos($html, 'data-testid="aw-flow"');
+        $b = strpos($html, 'data-testid="aw-run-detail"');
+        $this->assertNotFalse($a);
+        $card = substr($html, $a, ($b !== false && $b > $a ? $b : strlen($html)) - $a);
+        $this->assertStringContainsString('data-run="'.$new->id.'"', $card);
+        $this->assertStringContainsString('data-testid="agent-run-flow"', $card, 'thẻ dùng chung phần Diễn biến');
+        $this->assertStringContainsString('data-testid="run-stats"', $card, 'có hàng chỉ số (thời lượng, chi phí, điểm, vòng sửa, token)');
+        $this->assertStringContainsString('data-testid="stage-detail"', $card, 'mỗi bước có ngăn chi tiết để mở khi bấm');
+        $this->assertStringContainsString('Bước của phiên mới', $card);
+        $this->assertStringNotContainsString('Bước của phiên cũ', $card);
+        $this->assertStringContainsString("x-on:click=\"sel = 'guard'\"", $card, 'bấm bước mở ngăn chi tiết');
+    }
+
+    public function test_nguoi_khong_co_quyen_xem_phien_van_thay_the_luong_cu_khong_co_ngan_chi_tiet(): void
+    {
+        $this->run_($this->article, 'Được phép chạy');
+        $this->actingAs(User::create(['name' => 'w', 'email' => 'w@x.vn', 'password' => 'secret123', 'role' => 'writer', 'is_active' => true]));
+
+        $html = $this->get(ArticleResource::getUrl('view', ['record' => $this->article]))->assertOk()->getContent();
+        $this->assertStringContainsString('data-testid="aw-flow"', $html);
+        $this->assertStringNotContainsString('data-testid="stage-detail"', $html);
+        $this->assertStringNotContainsString('data-testid="agent-run-flow"', $html);
+    }
 }

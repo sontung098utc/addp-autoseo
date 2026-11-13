@@ -302,8 +302,13 @@
                                         @if ($rRun->repair_rounds > 0)<span>{{ $rRun->repair_rounds }} vòng sửa</span>@endif
                                     </div>
                                 </div>
-                                <x-filament::button tag="a" :href="$rf['url']" icon="heroicon-m-arrow-right" icon-position="after" data-testid="aw-flow-open">Xem chi tiết luồng</x-filament::button>
+                                @php $openJs = $latestRunView ? "set('activity'); \$wire.set('phien', ".(int) $rRun->id.')' : 'window.location = '.json_encode($rf['url']); @endphp
+                                <x-filament::button tag="a" :href="$rf['url']" icon="heroicon-m-arrow-right" icon-position="after" data-testid="aw-flow-open" x-on:click.prevent="{{ $openJs }}">Xem chi tiết luồng</x-filament::button>
                             </div>
+                            @if ($latestRunView)
+                                {{-- Cùng nội dung với tab Phiên chạy: chỉ số, lưu đồ, bấm một bước để xem đầu vào/đầu ra của bước đó. --}}
+                                @include('filament.agent.partials.run-detail', $latestRunView + ['flowOnly' => true])
+                            @else
                             <div class="fl-wrap">
                                 <div class="fl-grid">
                                     @foreach ($rNodes as $n)
@@ -325,6 +330,7 @@
                                     @endforeach
                                 </div>
                             </div>
+                            @endif
                         </section>
                     @else
                     <section class="ss-review-card" data-testid="aw-chain">
