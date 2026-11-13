@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Models\Website;
 use App\Services\Agent\Readiness\ArticleReadiness;
 use App\Services\Agent\Refresh\AgentRunDispatcher;
+use App\Services\Agent\Run\BackgroundRun;
 use App\Services\Agent\Settings\AgentAi;
 use App\Services\Brain\BrainContext;
 use App\Services\Content\ContentPipelineService;
@@ -150,20 +151,27 @@ class ArticleResource extends Resource
     }
 
     /** Giao bài cho đội AI (dùng chung cho bảng Bài viết và trang của bài); kết quả báo qua thông báo. */
-    public static function assignToAgent(Article $record, bool $allowWithoutKnowledge = false /* không còn tác dụng, giữ để tương thích */): void
+    public static function assignToAgent(Article $record, bool $allowWithoutKnowledge = false /* không còn tác dụng, giữ để tương thích */, bool $background = false): ?string
     {
         abort_unless(Auth::user()?->isWriter(), 403);
         // Chống giao trùng: đã có phiên đang chạy thật thì không tạo phiên thứ hai.
         if (ArticleRows::liveRun($record) !== null) {
             Notification::make()->title('Bài này đang có phiên chạy')->body('Đợi phiên hiện tại xong rồi hãy giao lại.')->warning()->send();
 
-            return;
+            return AgentRunResource::getUrl('view', ['record' => ArticleRows::liveRun($record)]);
         }
         $ai = AgentAi::forInteractiveUse();
         if ($ai === null) {
             Notification::make()->title('Chưa kết nối AI')->body('Vào Đội AI → Kết nối AI để nhập khóa trước khi giao việc.')->warning()->send();
 
-            return;
+            return null;
+        }
+        // Chạy NỀN rồi chuyển sang trang luồng đang chạy (không treo hộp thoại hàng phút). Giao hàng loạt vẫn tuần tự đồng bộ.
+        if ($background && BackgroundRun::available()) {
+            $started = BackgroundRun::start($record, Auth::id());
+            Notification::make()->title('Đã giao bài #'.$record->id.' cho đội AI')->body($started ? 'Phiên #'.$started->id.' đang chạy, theo dõi diễn biến ngay tại đây.' : 'Phiên đang khởi động, xem tiến trình ở trang bài.')->success()->send();
+
+            return $started ? AgentRunResource::getUrl('view', ['record' => $started]) : static::getUrl('view', ['record' => $record]);
         }
         $run = AgentRunDispatcher::run($record, $ai, Auth::user(), policy: AgentAi::policy());
         $n = Notification::make()->title('Bài #'.$record->id.' · phiên #'.$run->id.': '.(AgentRunResource::STATUS[$run->status][0] ?? $run->status))
@@ -171,6 +179,8 @@ class ArticleResource extends Resource
             ->actions([Action::make('xem')->label('Xem diễn biến')->url(AgentRunResource::getUrl('view', ['record' => $run]))]);
         in_array($run->status, ['ready_for_review'], true) ? $n->success() : $n->warning();
         $n->send();
+
+        return null;
     }
 
     public const BULK_MAX = 5;
@@ -449,7 +459,10 @@ class ArticleResource extends Resource
                         ->modalHeading('Giao bài này cho đội AI')
                         ->modalDescription(fn (Article $record) => static::assignContent($record))
                         ->modalSubmitActionLabel('Giao việc')
-                        ->action(fn (Article $record) => static::assignToAgent($record)),
+                        ->action(function (Article $record, Tables\Actions\Action $action) {
+                            $url = static::assignToAgent($record, background: true);
+                            $url ? $action->redirect($url) : null;
+                        }),
                 ])->label('⋯')->icon('heroicon-m-ellipsis-horizontal')->iconButton()->tooltip('Thao tác khác'),
             ], position: Tables\Enums\ActionsPosition::AfterColumns)
             ->bulkActions([

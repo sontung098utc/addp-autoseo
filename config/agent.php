@@ -1,6 +1,9 @@
 <?php
 
 return [
+    // Bấm "Giao đội AI" khởi chạy phiên ở NỀN và chuyển sang trang luồng đang chạy (cần CSDL dùng chung được giữa hai tiến trình). Đặt false để chạy đồng bộ như trước.
+    'background_runs' => (bool) env('AGENT_BACKGROUND_RUNS', true),
+
     'images' => [
         // Tắt hẳn việc tự tạo ảnh. Mặc định bật; vẫn cần nhà cung cấp ảnh được cấu hình thì mới tạo.
         'enabled' => (bool) env('AGENT_IMAGES_ENABLED', true),

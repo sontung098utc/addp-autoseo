@@ -276,9 +276,10 @@ class ViewArticle extends EditArticle
                 ->modalHeading('Giao bài này cho đội AI')
                 ->modalDescription(fn () => ArticleResource::assignContent($this->record))
                 ->modalSubmitActionLabel('Giao việc')
-                ->action(function () {
-                    ArticleResource::assignToAgent($this->record);
+                ->action(function (Actions\Action $action) {
+                    $url = ArticleResource::assignToAgent($this->record, background: true);
                     $this->refreshRecord();
+                    $url ? $action->redirect($url) : null;
                 }),
             Actions\Action::make('submit_review')->label('Gửi duyệt')->icon('heroicon-o-paper-airplane')
                 ->visible(fn () => ArticleResource::primaryActionFor($this->record) === 'submit_review')
