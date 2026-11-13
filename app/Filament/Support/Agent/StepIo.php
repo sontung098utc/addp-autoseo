@@ -107,6 +107,15 @@ final class StepIo
                 $add($in, 'Bài viết và ảnh đã tạo', 'text', isset($d['version_id']) ? 'Phiên bản #'.$d['version_id'].' + ảnh theo kế hoạch ảnh' : null);
                 $add($out, 'Vị trí từng ảnh', 'placements', (array) ($d['placements'] ?? []));
                 break;
+            case 'decision':
+                // Điều phối đọc lời nhắn làm lại: hiện lời nhắn vào và việc đã báo cho từng bộ phận.
+                if (($d['decision'] ?? null) === 'redo_plan') {
+                    $add($in, 'Lời nhắn của người duyệt', 'text', $d['message'] ?? null);
+                    $add($out, 'Điều phối hiểu và quyết định', 'text', $s->detail);
+                    $add($out, 'Dàn ý', 'text', ($d['reuse_outline'] ?? null) === true ? 'Giữ dàn ý hiện có' : (($d['reuse_outline'] ?? null) === false ? 'Lập lại dàn ý' : null));
+                    $add($out, 'Đã báo cho từng bộ phận', 'list', (array) ($d['told'] ?? []));
+                }
+                break;
             case 'handoff':
                 $add($in, 'Phiên bản', 'text', isset($d['version']) ? 'v'.$d['version'] : null);
                 $add($out, 'Kết quả', 'text', trim($s->title.'. '.$s->detail));

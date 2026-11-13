@@ -18,6 +18,8 @@ class AiModelRoute extends Model
         'knowledge' => ['Đọc và tách mục kiến thức', 'cheap'],
         // G3: khảo sát thị trường (mắt xích Từ khóa). Chưa cấu hình riêng thì dùng route 'summary' (KeywordAiResolver).
         // Lượt AI kiểm NGHĨA trích dẫn (CITE02). Chưa cấu hình riêng thì AgentRunOrchestrator dùng route 'summary', rồi 'repair'.
+        // Điều phối đọc lời nhắn làm lại của người duyệt. Chưa cấu hình riêng thì dùng route 'summary', rồi 'repair'.
+        'coordinator' => ['Điều phối (đọc lời nhắn làm lại)', 'cheap'],
         'citation_check' => ['Kiểm trích dẫn', 'standard'],
         'keyword_suggest' => ['Đề xuất từ khóa', 'cheap'],
         'keyword_cluster' => ['Gom cụm từ khóa', 'cheap'],

@@ -281,6 +281,17 @@ class ViewArticle extends EditArticle
                     $this->refreshRecord();
                     $url ? $action->redirect($url) : null;
                 }),
+            Actions\Action::make('redo_agent')->label('Giao làm lại')->icon('heroicon-o-arrow-path')
+                ->visible(fn () => ArticleResource::canRedoWithAgent($this->record))
+                ->modalHeading('Giao bài này làm lại')
+                ->modalDescription('Chưa vừa ý với bản hiện tại? Gửi lời nhắn cho điều phối: đội AI làm lại theo đó và giữ những phần đã đạt. Mọi quy tắc an toàn, nguồn và từ cấm vẫn áp dụng.')
+                ->form(ArticleResource::redoForm())
+                ->modalSubmitActionLabel('Giao làm lại')
+                ->action(function (array $data, Actions\Action $action) {
+                    $url = ArticleResource::assignToAgent($this->record, background: true, redoMessage: (string) $data['message']);
+                    $this->refreshRecord();
+                    $url ? $action->redirect($url) : null;
+                }),
             Actions\Action::make('submit_review')->label('Gửi duyệt')->icon('heroicon-o-paper-airplane')
                 ->visible(fn () => ArticleResource::primaryActionFor($this->record) === 'submit_review')
                 ->authorize(fn () => ReviewActions::canSubmit())

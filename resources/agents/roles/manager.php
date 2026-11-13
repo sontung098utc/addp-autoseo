@@ -33,12 +33,16 @@ return [
     'on_timeout' => 'Giữ kế hoạch ở trạng thái nháp, không tự chạy.',
     'skills' => [
         'manager/seo-orchestrator',
+        // Đã nối: điều phối đọc lời nhắn làm lại của người duyệt (nút Giao làm lại).
+        'manager/redo-coordination',
         // Ý ĐỊNH (chưa nối): tổng kết tuần/tháng, xem docs/seo-agent/ROLE_WORKFLOWS.md
         'manager/weekly-review',
     ],
-    'orchestrator_steps' => [],
+    'orchestrator_steps' => [
+        'redo_plan' => 'manager',
+    ],
     'readiness' => 'idea',
-    'readiness_note' => 'Hiện chưa có bộ điều phối: thứ tự các bước do hệ thống cố định, không phải vai trò này quyết định.',
+    'readiness_note' => 'Mới nối MỘT việc: điều phối đọc lời nhắn của người duyệt khi giao làm lại (nút Giao làm lại), quyết định giữ hay lập lại dàn ý và dặn từng bộ phận. Thứ tự các bước của phiên chạy thường vẫn do hệ thống cố định, không phải vai trò này quyết định. Mới kiểm bằng AI giả lập và một lượt chạy thật, chưa có người nghiệm thu.',
     'origin' => [
         'claude-seo/seo',
     ],

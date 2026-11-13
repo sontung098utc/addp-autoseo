@@ -19,7 +19,6 @@ use App\Services\Agent\Refresh\AgentRunDispatcher;
 use App\Services\Agent\Run\BackgroundRun;
 use App\Services\Agent\Settings\AgentAi;
 use App\Services\Brain\BrainContext;
-use App\Services\Content\ContentPipelineService;
 use App\Services\Content\Quality\QualityReport;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -101,6 +100,25 @@ class ArticleResource extends Resource
             && ArticleRows::liveRun($record) === null;
     }
 
+    /** Giao làm lại: bài đã có bản nháp để người duyệt nhận xét (chờ duyệt, cần sửa, đang viết dở có bản) và chưa có phiên chạy. */
+    public static function canRedoWithAgent(Article $record): bool
+    {
+        return (Auth::user()?->isWriter() ?? false)
+            && in_array($record->workflow_status, ['needs_review', 'rejected', 'drafting'], true)
+            && ArticleRows::liveRun($record) === null
+            && $record->versions()->exists();
+    }
+
+    /** Biểu mẫu lời nhắn của "Giao làm lại" (dùng chung cho bảng và trang bài). @return list<\Filament\Forms\Components\Component> */
+    public static function redoForm(): array
+    {
+        return [
+            Forms\Components\Textarea::make('message')->label('Lời nhắn cho điều phối')->required()->minLength(10)->maxLength(1500)->rows(5)
+                ->placeholder('Ví dụ: Mở bài dài dòng; mục 2 thiếu số liệu; ảnh bìa chưa hợp chủ đề; giọng văn quá trang trọng…')
+                ->helperText('Nói rõ chưa vừa ý ở đâu. Điều phối đọc lời nhắn, quyết định làm lại phần nào (dàn ý, bài viết, ảnh) và báo từng bộ phận. Bản mới được lưu thành phiên bản mới, bản cũ vẫn còn.'),
+        ];
+    }
+
     public const RISK_LABELS = ['low' => 'Thấp', 'medium' => 'Vừa', 'high' => 'Cao'];
 
     public const SCORE_NOTE = 'Chỉ đo luật hình thức (độ dài, tiêu đề, SEO, từ cấm...). Không đo độ đúng của nội dung.';
@@ -151,7 +169,7 @@ class ArticleResource extends Resource
     }
 
     /** Giao bài cho đội AI (dùng chung cho bảng Bài viết và trang của bài); kết quả báo qua thông báo. */
-    public static function assignToAgent(Article $record, bool $allowWithoutKnowledge = false /* không còn tác dụng, giữ để tương thích */, bool $background = false): ?string
+    public static function assignToAgent(Article $record, bool $allowWithoutKnowledge = false /* không còn tác dụng, giữ để tương thích */, bool $background = false, ?string $redoMessage = null): ?string
     {
         abort_unless(Auth::user()?->isWriter(), 403);
         // Chống giao trùng: đã có phiên đang chạy thật thì không tạo phiên thứ hai.
@@ -168,12 +186,12 @@ class ArticleResource extends Resource
         }
         // Chạy NỀN rồi chuyển sang trang luồng đang chạy (không treo hộp thoại hàng phút). Giao hàng loạt vẫn tuần tự đồng bộ.
         if ($background && BackgroundRun::available()) {
-            $started = BackgroundRun::start($record, Auth::id());
-            Notification::make()->title('Đã giao bài #'.$record->id.' cho đội AI')->body($started ? 'Phiên #'.$started->id.' đang chạy, theo dõi diễn biến ngay tại đây.' : 'Phiên đang khởi động, xem tiến trình ở trang bài.')->success()->send();
+            $started = BackgroundRun::start($record, Auth::id(), redoMessage: $redoMessage);
+            Notification::make()->title($redoMessage !== null ? 'Đã giao bài #'.$record->id.' làm lại' : 'Đã giao bài #'.$record->id.' cho đội AI')->body($started ? 'Phiên #'.$started->id.' đang chạy, theo dõi diễn biến ngay tại đây.' : 'Phiên đang khởi động, xem tiến trình ở trang bài.')->success()->send();
 
             return $started ? AgentRunResource::getUrl('view', ['record' => $started]) : static::getUrl('view', ['record' => $record]);
         }
-        $run = AgentRunDispatcher::run($record, $ai, Auth::user(), policy: AgentAi::policy());
+        $run = AgentRunDispatcher::run($record, $ai, Auth::user(), policy: AgentAi::policy(), redo: $redoMessage !== null ? ['message' => $redoMessage] : null);
         $n = Notification::make()->title('Bài #'.$record->id.' · phiên #'.$run->id.': '.(AgentRunResource::STATUS[$run->status][0] ?? $run->status))
             ->body($run->outcome_reason ?: 'Đã có bản nháp chờ duyệt.')
             ->actions([Action::make('xem')->label('Xem diễn biến')->url(AgentRunResource::getUrl('view', ['record' => $run]))]);
@@ -436,21 +454,17 @@ class ArticleResource extends Resource
                 static::viewVersionAction(),
                 Tables\Actions\ActionGroup::make([
                     static::rejectAction(),
-                    Tables\Actions\Action::make('generate_ai')
-                        ->label('AI Viết bài')
-                        ->icon('heroicon-o-sparkles')
-                        ->requiresConfirmation()
-                        ->modalHeading('Sinh bản thảo bài viết bằng AI')
-                        ->modalDescription('Hệ thống sẽ dựa trên từ khóa chính và cụm chủ đề để sinh dàn ý, bài viết chuẩn SEO và metadata.')
-                        ->modalSubmitActionLabel('Bắt đầu sinh')
-                        ->action(function (Article $record) {
-                            $service = new ContentPipelineService;
-                            $version = $service->generateArticleVersion($record);
-                            Notification::make()
-                                ->title('Đã sinh xong bản thảo mới!')
-                                ->body("Bản thảo phiên bản #{$version->version} ({$version->title}) đã được tạo và chuyển sang chờ duyệt.")
-                                ->success()
-                                ->send();
+                    Tables\Actions\Action::make('redo_agent')
+                        ->label('Giao làm lại')
+                        ->icon('heroicon-o-arrow-path')
+                        ->visible(fn (Article $record) => static::canRedoWithAgent($record))
+                        ->modalHeading('Giao bài này làm lại')
+                        ->modalDescription('Chưa vừa ý với bản hiện tại? Gửi lời nhắn cho điều phối: đội AI làm lại theo đó và giữ những phần đã đạt. Mọi quy tắc an toàn, nguồn và từ cấm vẫn áp dụng.')
+                        ->form(static::redoForm())
+                        ->modalSubmitActionLabel('Giao làm lại')
+                        ->action(function (Article $record, array $data, Tables\Actions\Action $action) {
+                            $url = static::assignToAgent($record, background: true, redoMessage: (string) $data['message']);
+                            $url ? $action->redirect($url) : null;
                         }),
                     Tables\Actions\Action::make('run_agent')
                         ->label('Giao đội AI')

@@ -21,12 +21,12 @@ final class BackgroundRun
     }
 
     /** Chờ tối đa $waitSeconds để phiên vừa khởi chạy ghi hàng của nó. @return ?AgentRun null nếu không khởi chạy được hoặc chưa thấy phiên */
-    public static function start(Article $article, ?int $actorId, int $waitSeconds = 10): ?AgentRun
+    public static function start(Article $article, ?int $actorId, int $waitSeconds = 10, ?string $redoMessage = null): ?AgentRun
     {
         $before = (int) AgentRun::query()->where('article_id', $article->id)->max('id');
         $php = (new PhpExecutableFinder)->find(false) ?: PHP_BINARY;
         $log = storage_path('logs/agent-run-article.log');
-        $cmd = 'nohup '.escapeshellarg($php).' artisan agent:run-article '.(int) $article->id.($actorId ? ' --actor='.$actorId : '').' >> '.escapeshellarg($log).' 2>&1 &';
+        $cmd = 'nohup '.escapeshellarg($php).' artisan agent:run-article '.(int) $article->id.($actorId ? ' --actor='.$actorId : '').($redoMessage !== null && trim($redoMessage) !== '' ? ' --redo='.escapeshellarg(mb_substr($redoMessage, 0, 1500)) : '').' >> '.escapeshellarg($log).' 2>&1 &';
         try {
             (new Process(['sh', '-c', $cmd], base_path(), ImageJob::childEnv()))->run();
         } catch (\Throwable) {

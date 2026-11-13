@@ -86,10 +86,10 @@ class AgentRolesTest extends TestCase
         foreach ($reg->all() as $r) {
             $this->assertNotSame('active', $r['readiness'], "{$r['key']} không được tô 'active' khi chưa có bằng chứng staging và người thật nghiệm thu");
         }
-        foreach (['writer', 'strategist', 'editor'] as $k) {
+        // Điều phối đã nối MỘT việc thật (đọc lời nhắn làm lại, bước redo_plan) nên được suy ra 'in_development'; không phải 'active'.
+        foreach (['writer', 'strategist', 'editor', 'manager'] as $k) {
             $this->assertSame('in_development', $reg->find($k)['readiness']);
         }
-        $this->assertSame('idea', $reg->find('manager')['readiness']);
         foreach (['auditor', 'keyword', 'competitor', 'monitor'] as $k) {
             $this->assertSame('not_connected', $reg->find($k)['readiness']);
         }

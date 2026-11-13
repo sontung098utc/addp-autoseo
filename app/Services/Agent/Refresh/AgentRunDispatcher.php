@@ -37,6 +37,7 @@ final class AgentRunDispatcher
         bool $allowWithoutKnowledge = false, // deprecated: không còn cổng dừng, giữ để nơi gọi cũ không vỡ
         ?array $presetOutline = null, // dàn ý người đã duyệt/sửa (điểm dừng 'outline'): không gọi AI lập dàn ý
         ?array $checkpoints = null, // điểm dừng chờ người của chiến dịch
+        ?array $redo = null, // lời nhắn làm lại của người duyệt: ['message' => string]; điều phối quyết định làm lại phần nào
     ): AgentRun {
         $policy ??= new RunPolicy;
         // Chưa chỉ định thì lấy điểm dừng của chiến dịch chứa bài (giao tay một bài của chiến dịch cũng dừng đúng chỗ); [] = không dừng.
@@ -45,6 +46,6 @@ final class AgentRunDispatcher
             return (new ArticleRefreshRunner($ai, stop: $stop, policy: $policy, handoff: $handoff, router: $router))->run($article, $actor, $trigger, $campaignId);
         }
 
-        return (new AgentRunOrchestrator($ai, stop: $stop, policy: $policy, handoff: $handoff, router: $router))->run($article, $actor, $trigger, $campaignId, $presetOutline, $allowWithoutKnowledge, $checkpoints);
+        return (new AgentRunOrchestrator($ai, stop: $stop, policy: $policy, handoff: $handoff, router: $router))->run($article, $actor, $trigger, $campaignId, $presetOutline, $allowWithoutKnowledge, $checkpoints, $redo);
     }
 }
