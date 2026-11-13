@@ -13,5 +13,7 @@ abstract class TestCase extends BaseTestCase
         config(['quality.blocking_codes' => 'ALL']);
         // Test cũ về truy xuất không dựng dữ liệu đủ giống thật để qua ngưỡng liên quan; ngưỡng có test riêng (RelevanceThresholdTest).
         config(['knowledge.min_relevance' => 0.0]);
+        // Giao đội AI chạy NỀN khi CSDL dùng chung được (MariaDB): test của nút cần chạy đồng bộ, nên tắt; việc bật/tắt có test riêng (BackgroundRunTest).
+        config(['agent.background_runs' => false]);
     }
 }
