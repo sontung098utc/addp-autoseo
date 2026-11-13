@@ -52,6 +52,12 @@ final class AgentRunOrchestrator
 {
     private int $seq = 0;
 
+    /** Mốc đồng hồ (giây, mili) lúc bước trước xong / phiên bắt đầu: thời lượng bước = hiện tại - mốc. */
+    private float $markT = 0.0;
+
+    /** Mili giây chờ AI (kể cả thử lại) cộng dồn kể từ bước trước. */
+    private float $aiMs = 0.0;
+
     private ?KnowledgeContext $kb = null;
 
     private ?ContextAssets $assets = null; // AG-S25: ảnh thư viện + liên kết nội bộ
@@ -123,6 +129,8 @@ final class AgentRunOrchestrator
         $this->needsExpert = false;
         $this->presetOutline = $presetOutline === [] ? null : $presetOutline;
         $this->seq = 0;
+        $this->markT = microtime(true);
+        $this->aiMs = 0.0;
         $this->trigger = $trigger;
         $this->campaignId = $campaignId;
         $this->skills = [];
@@ -741,7 +749,9 @@ final class AgentRunOrchestrator
         try {
             $pb = $this->usePlaybook('editor', 'citation-support')[0] ?? null;
             $aiJson = new AiJson($ai);
+            $t = microtime(true);
             $r = (new CitationSupportJudge($aiJson, (string) $pb?->body))->judge($html);
+            $this->aiMs += (microtime(true) - $t) * 1000;
         } catch (\Throwable $e) {
             report($e);
 
@@ -896,6 +906,17 @@ final class AgentRunOrchestrator
      */
     private function callAi(AgentRun $run, string $task, string $what, \Closure $call): array
     {
+        $t = microtime(true);
+        try {
+            return $this->callAiInner($run, $task, $what, $call);
+        } finally {
+            $this->aiMs += (microtime(true) - $t) * 1000;
+        }
+    }
+
+    /** @param \Closure(AiProviderInterface): array $call */
+    private function callAiInner(AgentRun $run, string $task, string $what, \Closure $call): array
+    {
         if ($this->router === null) {
             return $this->withRetry($run, $what, fn () => $call($this->ai));
         }
@@ -1031,6 +1052,16 @@ final class AgentRunOrchestrator
     private function step(AgentRun $run, string $stage, string $role, string $status, string $title, string $detail, array $data = [], ?string $model = null, int $tokens = 0, float $cost = 0.0): AgentRunStep
     {
         $now = now();
+        // Thời lượng ĐO THẬT bằng đồng hồ máy chủ (mili giây): từ lúc bước trước xong đến lúc bước này xong. ai_ms = phần chờ AI (kể cả thử lại) trong đó. Bước chạy nền (ảnh) ghi lại khi xong.
+        $ms = $this->markT > 0 ? max(0, (int) round((microtime(true) - $this->markT) * 1000)) : null;
+        $this->markT = microtime(true);
+        if ($ms !== null) {
+            $data['duration_ms'] = $ms;
+        }
+        if ($this->aiMs > 0) {
+            $data['ai_ms'] = (int) round($this->aiMs);
+            $this->aiMs = 0.0;
+        }
         // Token vào/ra tách riêng (null = nhà cung cấp không báo, vd AI giả lập); cộng dồn lại bằng tokens_used khi có đủ cả hai.
         $tokensIn = isset($data['prompt_tokens']) ? (int) $data['prompt_tokens'] : null;
         $tokensOut = isset($data['completion_tokens']) ? (int) $data['completion_tokens'] : null;
@@ -1044,7 +1075,7 @@ final class AgentRunOrchestrator
 
         $attrs = [
             'agent_run_id' => $run->id, 'seq' => ++$this->seq, 'stage' => $stage, 'role' => $role, 'status' => $status, 'title' => $title,
-            'detail' => $detail, 'data' => $data ?: null, 'model' => $model, 'tokens_used' => $tokens, 'cost_vnd' => $cost, 'started_at' => $now, 'finished_at' => $now,
+            'detail' => $detail, 'data' => $data ?: null, 'model' => $model, 'tokens_used' => $tokens, 'cost_vnd' => $cost, 'started_at' => $ms !== null ? $now->copy()->subMilliseconds($ms) : $now, 'finished_at' => $now,
         ];
         // Môi trường chưa chạy migration 2026_11_12_000002 (thiếu cột token vào/ra) vẫn phải chạy được: không ghi hai cột đó thay vì làm hỏng cả phiên.
         if (self::hasTokenSplitColumns()) {

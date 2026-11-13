@@ -113,6 +113,16 @@ final class StepIo
                 break;
         }
 
+        // Thời gian ĐO THẬT (đồng hồ máy chủ) của bước; phiên cũ chưa có thì bỏ khối này, không bịa.
+        if (is_numeric($d['duration_ms'] ?? null)) {
+            $fmt = static fn (float $ms): string => $ms < 1000 ? '<1 giây' : number_format($ms / 1000, 1, ',', '.').' giây';
+            $note = $fmt((float) $d['duration_ms']);
+            if (is_numeric($d['ai_ms'] ?? null) && (float) $d['ai_ms'] > 0) {
+                $note .= ', trong đó chờ AI '.$fmt((float) $d['ai_ms']).' (kể cả thử lại)';
+            }
+            $add($out, 'Thời gian đo thật', 'text', $note);
+        }
+
         return ['in' => $in, 'out' => $out];
     }
 

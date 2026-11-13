@@ -89,6 +89,11 @@ final class RunFlow
             if ($at && $upd && $upd->gt($at)) {
                 $durations[$s->id] = max((int) ($durations[$s->id] ?? 0), (int) $at->diffInSeconds($upd, true));
             }
+            // Phiên mới ghi thời lượng ĐO THẬT (mili giây) vào dữ liệu bước; ưu tiên số đó. Phiên cũ giữ ước lượng theo mốc ghi ở trên.
+            $ms = ((array) $s->data)['duration_ms'] ?? null;
+            if (is_numeric($ms)) {
+                $durations[$s->id] = round(((float) $ms) / 1000, 1);
+            }
             $prev = $at ?? $prev;
         }
 

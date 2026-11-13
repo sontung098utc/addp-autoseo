@@ -33,6 +33,8 @@ final class ImageJob
         $step->refresh();
         $data = (array) $step->data;
         $data['gen'] = $gen + ['done' => true];
+        // Thời lượng thật của việc chạy nền: từ lúc bước được ghi đến khi xong.
+        $data['duration_ms'] = $step->started_at ? max(0, (int) now()->diffInMilliseconds($step->started_at, true)) : ($data['duration_ms'] ?? null);
         $step->update(['data' => $data, 'cost_vnd' => $gen['cost_vnd'], 'finished_at' => now()]);
     }
 
