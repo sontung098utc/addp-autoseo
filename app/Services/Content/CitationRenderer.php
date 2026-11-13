@@ -34,8 +34,11 @@ final class CitationRenderer
                 }
                 $number[$id] ??= count($number) + 1;
                 $it = $items[$id];
-                $tip = trim((string) $it->title.': '.mb_substr(trim(preg_replace('/\s+/u', ' ', strip_tags((string) $it->body)) ?? ''), 0, 240));
-                // Rê chuột vào số để xem nội dung mục được trích; bấm để nhảy tới dòng nguồn ở cuối bài. Mỗi số một thẻ để mỗi chú thích có nội dung riêng.
+                $srcT = $it->source ? trim((string) $it->source->title) : '';
+                $url0 = (string) ($it->source?->final_url ?: $it->source?->url);
+                $host0 = preg_match('#^https?://#i', $url0) ? preg_replace('/^www\./', '', (string) parse_url($url0, PHP_URL_HOST)) : '';
+                // Rê chuột vào số chỉ cho biết NGUỒN (không nhắc lại nội dung câu ở thân bài); bấm để nhảy tới dòng nguồn cuối bài. Định nghĩa/khái niệm bổ sung nằm ở khối Ghi chú.
+                $tip = 'Nguồn: '.trim(($srcT !== '' ? $srcT : (string) $it->title).($host0 !== '' ? ' ('.$host0.')' : ''));
                 $out .= '<sup class="autoseo-cite" data-kb="'.$id.'" title="'.e($tip).'"><a href="#nguon-'.$number[$id].'">['.$number[$id].']</a></sup>';
             }
 

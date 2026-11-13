@@ -28,6 +28,7 @@ use App\Services\Content\CitationRenderer;
 use App\Services\Content\CitationSupportJudge;
 use App\Services\Knowledge\AiJson;
 use App\Services\Content\MedicalDisclaimer;
+use App\Services\Content\NoteRenderer;
 use App\Services\Content\HtmlSanitizer;
 use App\Models\BrandProfile;
 use App\Services\Brand\BrandProfileData;
@@ -681,7 +682,7 @@ final class AgentRunOrchestrator
         $options += \App\Services\Audit\RefreshOptions::for($article); // AG-S26: bài làm mới từ lỗi Audit
         [$kbData, $kbNote] = $this->kb->stepInfo();
         $r = $this->callAi($run, $stage, $title, fn (AiProviderInterface $ai) => $ai->generateArticle($article, $outline, $options));
-        $html = HtmlSanitizer::clean($r['html_content'] ?? '');
+        $html = NoteRenderer::apply(HtmlSanitizer::clean($r['html_content'] ?? ''), (array) ($r['notes'] ?? [])); // ghi chú thật (định nghĩa, khái niệm) khác với chú thích nguồn
         $disclaimerAdded = false;
         if (! empty($options['medical'])) {
             [$html, $disclaimerAdded] = MedicalDisclaimer::ensure($html); // AI quên câu lưu ý y tế thì hệ thống tự thêm (MED01)

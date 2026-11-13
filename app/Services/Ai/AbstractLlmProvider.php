@@ -86,6 +86,7 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             ."  \"seo_title\": \"Tiêu đề SEO (tối đa 60 ký tự)\",\n"
             ."  \"meta_description\": \"Mô tả meta hấp dẫn chuẩn SEO (120 - 160 ký tự)\",\n"
             ."  \"faq_schema\": [{\"question\": \"...\", \"answer\": \"...\"}],\n"
+            ."  \"notes\": [{\"key\": \"a\", \"text\": \"Ghi chú 1-3 câu (xem mục GHI CHÚ); mảng rỗng nếu không có\"}],\n"
             ."  \"sources_cited\": [\"Nguồn 1\", \"Nguồn 2\"]\n"
             ."}\n"
             .'Chỉ trả về JSON thuần túy.'
@@ -94,6 +95,7 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             .$this->domainBlock($options)
             .$this->knowledgeBlock($options)
             .$this->layoutBlock($options)
+            .$this->noteBlock()
             .$this->medicalBlock($options)
             .$this->rulesBlock($options)
             .$this->citableSourcesBlock($options)
@@ -119,6 +121,7 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             'focus_keyword' => $article->primary_keyword,
             'faq_schema' => is_array($data['faq_schema'] ?? null) ? $data['faq_schema'] : [],
             'sources_cited' => is_array($data['sources_cited'] ?? null) ? $data['sources_cited'] : [],
+            'notes' => \App\Services\Content\NoteRenderer::clean(is_array($data['notes'] ?? null) ? $data['notes'] : []),
             'tokens_used' => $r['total_tokens'],
             'prompt_tokens' => $r['prompt_tokens'],
             'completion_tokens' => $r['completion_tokens'],
@@ -526,6 +529,16 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
         return "\n\nBỐ CỤC: mỗi khối trình bày phải có lý do nội dung, không chèn cho đủ bộ. Tóm tắt nhanh (div.autoseo-summary) chỉ cho bài từ ~800 từ; mục lục (ul.autoseo-toc) chỉ khi bài từ ~1200 từ và có từ 4 h2;"
             .' bảng chỉ khi so sánh từ 2 đối tượng theo từ 2 tiêu chí, có hàng tiêu đề và từ 2 hàng dữ liệu; khung lưu ý (aside.autoseo-callout) tối đa 2 cái, mỗi cái 1-2 câu về một cảnh báo hay điều dễ nhầm, không đặt danh sách/bảng trong khung và không lặp ý;'
             .' danh sách có thứ tự cho quy trình thật; hỏi đáp gập (details/summary) chỉ khi có câu hỏi thật. Còn lại dùng đề mục, đoạn ngắn và danh sách thường.';
+    }
+
+    /**
+     * GHI CHÚ thật (footnote): nơi đặt khái niệm, định nghĩa, bối cảnh bổ sung, KHÁC với dấu trích dẫn nguồn [KB#id]. Văn bản cố định của hệ thống.
+     */
+    protected function noteBlock(): string
+    {
+        return "\n\nGHI CHÚ (footnote): dùng cho khái niệm, định nghĩa thuật ngữ, giải thích nền hoặc lưu ý bổ sung mà đưa vào thân bài sẽ làm đứt mạch. "
+            ."Ghi chú KHÔNG được nhắc lại điều thân bài đã nói và không chứa khẳng định chính của bài. Đặt dấu [^a], [^b]... ngay sau thuật ngữ trong thân bài (mỗi dấu một lần) và khai báo nội dung ở trường JSON \"notes\": [{\"key\":\"a\",\"text\":\"1-3 câu\"}]. "
+            .'Tối đa 4 ghi chú; nếu nội dung lấy từ kho kiến thức thì kết thúc ghi chú bằng dấu [KB#id]. Không có gì đáng ghi chú thì để notes rỗng, đừng ép. Không viết [^x] ở nơi khác.';
     }
 
     /** Bài sức khỏe: hai đoạn bắt buộc để người đọc được hướng tới bác sĩ (khớp luật MED01). Văn bản cố định của hệ thống, không lấy từ nội dung ngoài. */
