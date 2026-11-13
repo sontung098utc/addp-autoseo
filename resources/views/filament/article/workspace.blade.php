@@ -82,7 +82,7 @@
         ['key' => 'keyword', 'label' => 'Từ khóa và kế hoạch'],
         ['key' => 'research', 'label' => 'Nghiên cứu và nguồn', 'tone' => $knowledgeGap ? 'warn' : null],
         ['key' => 'content', 'label' => 'Nội dung', 'count' => $versions->count() ?: null, 'tone' => $quality?->hasBlocking() ? 'danger' : null],
-        ['key' => 'activity', 'label' => 'Hoạt động', 'count' => $runs->count() ?: null, 'tone' => $live ? 'info' : null],
+        ['key' => 'activity', 'label' => 'Phiên chạy', 'count' => $runs->count() ?: null, 'tone' => $live ? 'info' : null],
         ['key' => 'publish', 'label' => 'Xuất bản', 'count' => $publications->count() ?: null],
     ];
 @endphp
@@ -580,7 +580,7 @@
                                                 <td>P0 {{ $q['P0'] }} · P1 {{ $q['P1'] }} · P2 {{ $q['P2'] }}</td>
                                                 <td>{{ $num(count(preg_split('/\s+/u', trim(strip_tags((string) $v->html_content)), -1, PREG_SPLIT_NO_EMPTY))) }}</td>
                                                 <td>{{ $v->mediaAssets->count() }}</td>
-                                                <td>@if ($vr && AgentRunResource::canViewAny())<a class="aw-link" href="{{ AgentRunResource::getUrl('view', ['record' => $vr]) }}">Phiên AI #{{ $vr->id }}</a>@elseif ($vr) Phiên AI #{{ $vr->id }} @else {{ $v->ai_model ? 'AI' : 'Người viết' }} @endif</td>
+                                                <td>@if ($vr && AgentRunResource::canViewAny())<a class="aw-link" href="{{ AgentRunResource::viewUrl($vr) }}">Phiên AI #{{ $vr->id }}</a>@elseif ($vr) Phiên AI #{{ $vr->id }} @else {{ $v->ai_model ? 'AI' : 'Người viết' }} @endif</td>
                                                 <td>{{ VnTime::format($v->created_at) }}</td>
                                                 <td>@if ($canOpenVersion)<a class="aw-btn" data-testid="aw-version-open" href="{{ V::getUrl('view', ['record' => $v]) }}">Xem</a>@endif
                                                     @if (! $loop->last)<button type="button" class="aw-btn" data-testid="aw-compare-open" wire:click="mountAction('compare', @js(['version' => $v->id]))">So với bản trước</button>@endif</td>
@@ -615,7 +615,6 @@
                         <section class="aw-live" data-testid="aw-live">
                             <div class="aw-head">
                                 <span class="ss-live-pill"><span class="ss-spin" aria-hidden="true"></span>Phiên #{{ $live->id }} đang chạy · {{ RunActivity::formatElapsed(RunActivity::elapsedSeconds($live)) }}</span>
-                                @if (AgentRunResource::canViewAny())<a class="aw-link aw-muted" href="{{ AgentRunResource::getUrl('view', ['record' => $live]) }}">Xem diễn biến đầy đủ</a>@endif
                             </div>
                             <div class="aw-rail" data-testid="aw-rail">
                                 @foreach (W::runStages() as $code => $label)
@@ -637,19 +636,19 @@
                             @endif
                         </section>
                     @endif
+                    {{-- Chọn phiên: bảng các phiên của bài; bấm "Xem" để xem đầy đủ phiên đó bên dưới (không rời trang bài). --}}
                     <section class="ss-review-card">
                         <h2 class="ss-review-card__title">Các phiên chạy của đội AI @if ($runs->isNotEmpty())<x-help title="Điểm hình thức"><p data-testid="aw-score-note">{{ ArticleResource::SCORE_NOTE }}</p></x-help>@endif</h2>
                         @if ($runs->isEmpty())
                             <p>Bài này chưa được giao cho đội AI.</p>
                         @else
-                            
                             <div class="aw-scroll">
                                 <table class="aw-table" data-testid="aw-runs">
                                     <thead><tr><th>Phiên</th><th>Kết quả</th><th class="aw-opt">Điểm hình thức</th><th class="aw-opt">Tạo ra bản</th><th class="aw-opt">AI</th><th class="aw-opt">Vòng sửa</th><th>Chi phí</th><th>Bắt đầu</th><th></th></tr></thead>
                                     <tbody>
                                         @foreach ($runs as $r)
-                                            @php $isLive = $live && $r->id === $live->id; $fv = $r->final_version_id ? $versions->firstWhere('id', $r->final_version_id) : null; @endphp
-                                            <tr>
+                                            @php $isLive = $live && $r->id === $live->id; $fv = $r->final_version_id ? $versions->firstWhere('id', $r->final_version_id) : null; $isSel = $selectedRun && $selectedRun->id === $r->id; @endphp
+                                            <tr @class(['aw-row-sel' => $isSel]) wire:key="aw-run-{{ $r->id }}">
                                                 <td>#{{ $r->id }}</td>
                                                 <td>
                                                     @if ($isLive)<span class="ss-running"><span class="ss-spin" aria-hidden="true"></span>Đang chạy · {{ W::runStages()[$liveStage] ?? 'sắp xong' }}</span>
@@ -663,7 +662,7 @@
                                                 <td class="aw-opt">{{ (int) $r->repair_rounds }}</td>
                                                 <td>{{ V::formatVnd($r->cost_vnd) }}</td>
                                                 <td>{{ VnTime::format($r->started_at ?? $r->created_at) }}</td>
-                                                <td>@if (AgentRunResource::canViewAny())<a class="aw-link" href="{{ AgentRunResource::getUrl('view', ['record' => $r]) }}">Xem diễn biến</a>@endif</td>
+                                                <td>@if (AgentRunResource::canViewAny())@if ($isSel)<span class="aw-muted">Đang xem</span>@else<a class="aw-link" href="{{ AgentRunResource::viewUrl($r) }}" wire:click.prevent="$set('phien', {{ $r->id }})" data-testid="aw-run-open">Xem</a>@endif @endif</td>
                                             </tr>
                                         @endforeach
                                     </tbody>
@@ -671,6 +670,14 @@
                             </div>
                         @endif
                     </section>
+                    @if ($runView)
+                        <section class="aw-run-detail" data-testid="aw-run-detail" wire:key="aw-run-detail-{{ $selectedRun->id }}">
+                            <h3 class="aw-run-detail__title">Phiên #{{ $selectedRun->id }}
+                                @if ($selectedRun->finalVersion)<a class="aw-link" href="{{ \App\Filament\Resources\ArticleVersionResource::getUrl('view', ['record' => $selectedRun->finalVersion]) }}" data-testid="aw-run-draft">Xem bản nháp v{{ $selectedRun->finalVersion->version }}</a>@endif
+                            </h3>
+                            @include('filament.agent.partials.run-detail', $runView)
+                        </section>
+                    @endif
                 </div>
             </x-studio.panel>
 

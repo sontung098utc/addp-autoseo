@@ -176,7 +176,7 @@ class ArticleResource extends Resource
         if (ArticleRows::liveRun($record) !== null) {
             Notification::make()->title('Bài này đang có phiên chạy')->body('Đợi phiên hiện tại xong rồi hãy giao lại.')->warning()->send();
 
-            return AgentRunResource::getUrl('view', ['record' => ArticleRows::liveRun($record)]);
+            return AgentRunResource::viewUrl(ArticleRows::liveRun($record));
         }
         $ai = AgentAi::forInteractiveUse();
         if ($ai === null) {
@@ -189,12 +189,12 @@ class ArticleResource extends Resource
             $started = BackgroundRun::start($record, Auth::id(), redoMessage: $redoMessage);
             Notification::make()->title($redoMessage !== null ? 'Đã giao bài #'.$record->id.' làm lại' : 'Đã giao bài #'.$record->id.' cho đội AI')->body($started ? 'Phiên #'.$started->id.' đang chạy, theo dõi diễn biến ngay tại đây.' : 'Phiên đang khởi động, xem tiến trình ở trang bài.')->success()->send();
 
-            return $started ? AgentRunResource::getUrl('view', ['record' => $started]) : static::getUrl('view', ['record' => $record]);
+            return $started ? AgentRunResource::viewUrl($started) : static::getUrl('view', ['record' => $record]);
         }
         $run = AgentRunDispatcher::run($record, $ai, Auth::user(), policy: AgentAi::policy(), redo: $redoMessage !== null ? ['message' => $redoMessage] : null);
         $n = Notification::make()->title('Bài #'.$record->id.' · phiên #'.$run->id.': '.(AgentRunResource::STATUS[$run->status][0] ?? $run->status))
             ->body($run->outcome_reason ?: 'Đã có bản nháp chờ duyệt.')
-            ->actions([Action::make('xem')->label('Xem diễn biến')->url(AgentRunResource::getUrl('view', ['record' => $run]))]);
+            ->actions([Action::make('xem')->label('Xem diễn biến')->url(AgentRunResource::viewUrl($run))]);
         in_array($run->status, ['ready_for_review'], true) ? $n->success() : $n->warning();
         $n->send();
 
@@ -410,7 +410,7 @@ class ArticleResource extends Resource
                     ->state(fn (Article $r) => ($run = ArticleRows::lastRun($r)) ? static::runSummary($run) : '—')
                     ->limit(40)
                     ->tooltip(fn (Article $r) => ($run = ArticleRows::lastRun($r)) ? static::runSummary($run).' · bấm để xem diễn biến' : null)
-                    ->url(fn (Article $r) => ($run = ArticleRows::lastRun($r)) && AgentRunResource::canViewAny() ? AgentRunResource::getUrl('view', ['record' => $run]) : null)
+                    ->url(fn (Article $r) => ($run = ArticleRows::lastRun($r)) && AgentRunResource::canViewAny() ? AgentRunResource::viewUrl($run) : null)
                     ->color('gray')
                     ->visibleFrom('2xl')),
                 static::narrow(Tables\Columns\TextColumn::make('updated_at')->label('Cập nhật')->since()->sortable()

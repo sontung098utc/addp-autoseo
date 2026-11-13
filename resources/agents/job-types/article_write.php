@@ -13,7 +13,7 @@ return [
     'summary' => 'Từ một bài đã có từ khóa: lập dàn ý, chuẩn bị tài liệu, viết, chấm bằng luật, sửa, bàn giao bản nháp. Không có cổng dừng: tự gắn Trí tuệ khớp chủ đề; bài rủi ro cao mà kho chưa có kiến thức đã duyệt thì AI tự đọc tối đa 5 trang trên website công ty để bổ sung (trần chi phí ≤ 10% ngân sách phiên), rồi vẫn viết; còn trống thì bài được gắn nhãn cần chuyên gia xem lại sau khi viết. Sau khi lưu bản nháp, bước Tạo ảnh (luật, trần 10% ngân sách) chỉ tạo ảnh khi website chưa có ảnh bìa từ thư viện. Chiến dịch chỉ là cách hẹn giờ để gọi loại việc này.',
     'reads' => ['articles', 'knowledge_items (đã duyệt)', 'brand_profiles', 'brain_sources', 'media_assets'],
     'writes' => ['agent_runs', 'agent_run_steps', 'article_versions (kèm sources_cited)', 'knowledge_item_usages', 'article_version_media', 'knowledge_gaps'],
-    'shown_at' => ['Trang bài: tab Nghiên cứu và nguồn', 'Trang bài: tab Nội dung', 'Trang bài: tab Hoạt động', 'Trang Phiên chạy'],
+    'shown_at' => ['Trang bài: tab Nghiên cứu và nguồn', 'Trang bài: tab Nội dung', 'Trang bài: tab Phiên chạy (chi tiết từng phiên)', 'Đội AI: danh sách Phiên chạy'],
     'used_by' => ['human', 'brain_build'],
     'steps' => [
         ['id' => 'guard', 'role' => 'system', 'label' => 'Kiểm điều kiện', 'kind' => 'rule'],

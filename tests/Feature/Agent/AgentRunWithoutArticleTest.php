@@ -51,7 +51,7 @@ class AgentRunWithoutArticleTest extends TestCase
         $run = $this->mkRun();
 
         $this->get(AgentRunResource::getUrl('index'))->assertOk()->assertSee('Khảo sát thị trường');
-        $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()
+        $this->get(AgentRunResource::viewUrl($run))->assertOk()
             ->assertSee('Khảo sát thị trường')->assertSee('Đề xuất từ khóa')->assertSee('Gom cụm')
             ->assertDontSee('Từ khóa:');
     }
@@ -61,7 +61,7 @@ class AgentRunWithoutArticleTest extends TestCase
         $run = $this->mkRun('running');
 
         $this->get(AgentRunResource::getUrl('index'))->assertOk();
-        $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertOk();
+        $this->get(AgentRunResource::viewUrl($run))->assertOk();
         Livewire::test(AgentOverview::class)->assertSuccessful();
     }
 

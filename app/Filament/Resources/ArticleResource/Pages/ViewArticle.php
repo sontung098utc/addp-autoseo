@@ -45,6 +45,10 @@ class ViewArticle extends EditArticle
 {
     protected static string $view = 'filament.article.workspace';
 
+    /** Phiên chạy đang xem ở tab Phiên chạy (mã phiên; trống = phiên mới nhất). Nằm trên địa chỉ (?phien=) để liên kết tới đúng phiên. */
+    #[\Livewire\Attributes\Url(as: 'phien')]
+    public ?int $phien = null;
+
     public const ORIGINS = [
         'plan' => 'Kế hoạch nội dung', 'keyword' => 'Kho từ khóa', 'audit' => 'Kiểm tra SEO', 'competitor' => 'Phân tích đối thủ',
         'gsc' => 'Search Console', 'manual' => 'Tạo tay',
@@ -402,6 +406,9 @@ class ViewArticle extends EditArticle
             'live' => $live,
             'liveStage' => $live ? RunActivity::currentStage($live->steps) : null,
             'runFlow' => $this->runFlowOf($runs->first(), $live),
+            // Chi tiết đầy đủ MỘT phiên (Diễn biến, Báo cáo, Chi phí và model, Dữ liệu) ngay trong trang bài; phiên đang xem theo ?phien=, mặc định phiên mới nhất.
+            'selectedRun' => $selectedRun = ($this->phien ? $runs->firstWhere('id', $this->phien) : null) ?? $runs->first(),
+            'runView' => $selectedRun && \App\Filament\Resources\AgentRunResource::canViewAny() ? \App\Filament\Support\Agent\RunViewData::for($selectedRun) : null,
             'campaign' => $campaignId ? Campaign::find($campaignId) : null,
             'keyword' => $keyword,
             'keywordMatched' => $keywordMatched,
@@ -444,7 +451,7 @@ class ViewArticle extends EditArticle
             'flow' => \App\Filament\Support\Agent\RunFlow::build($run, $run->steps, $isLive, $stale, $current),
             'blueprint' => \App\Filament\Support\Agent\AgentFlowBlueprint::byStage(),
             'elapsed' => RunActivity::formatElapsed(RunActivity::elapsedSeconds($run)),
-            'url' => \App\Filament\Resources\AgentRunResource::getUrl('view', ['record' => $run]),
+            'url' => \App\Filament\Resources\AgentRunResource::viewUrl($run),
         ];
     }
 }

@@ -79,13 +79,13 @@ class LiveMotionTest extends TestCase
         $this->actingAs($this->user('approver'));
         $run = $this->makeRun('running', ['guard', 'risk', 'brief']);
 
-        $html = $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()->getContent();
+        $html = $this->get(AgentRunResource::viewUrl($run))->assertOk()->getContent();
         $this->assertStringContainsString('wire:poll.2s', $html);
         $this->assertStringContainsString('data-live-stage="write"', $html);
         $this->assertStringContainsString('Đang ở:', $html);
 
         $run->update(['status' => 'ready_for_review']);
-        $html = $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()->getContent();
+        $html = $this->get(AgentRunResource::viewUrl($run))->assertOk()->getContent();
         $this->assertStringNotContainsString('wire:poll.2s', $html);
         $this->assertStringNotContainsString('data-live-stage', $html);
         $this->assertStringNotContainsString('data-testid="run-live"', $html);
@@ -102,7 +102,7 @@ class LiveMotionTest extends TestCase
         $this->assertFalse(RunActivity::isLive($run));
         $this->assertSame(0, RunActivity::liveCount());
 
-        $html = $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()->getContent();
+        $html = $this->get(AgentRunResource::viewUrl($run))->assertOk()->getContent();
         $this->assertStringContainsString('Có thể bị treo', $html);
         $this->assertStringNotContainsString('wire:poll.2s', $html);
         $this->assertStringNotContainsString('data-live-stage', $html);

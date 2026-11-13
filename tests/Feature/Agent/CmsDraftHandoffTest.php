@@ -319,7 +319,7 @@ class CmsDraftHandoffTest extends TestCase
         $a = $this->article();
         $run = $this->go($a, $this->campaign($a)->id);
         $this->actingAs($this->user('approver'));
-        $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()->assertSee('Nháp trên CMS')->assertSee('link xem trước');
+        $this->get(AgentRunResource::viewUrl($run))->assertOk()->assertSee('Nháp trên CMS')->assertSee('link xem trước');
     }
 
     public function test_link_khong_https_khong_duoc_render_thanh_lien_ket(): void

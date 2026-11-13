@@ -237,7 +237,7 @@ class RoleWiringTest extends TestCase
     {
         $run = (new AgentRunOrchestrator(new DemoScriptedAiProvider))->run($this->article(), null, 'manual');
         $this->actingAs($this->user('approver'));
-        $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()
+        $this->get(AgentRunResource::viewUrl($run))->assertOk()
             ->assertSee('Vai trò: Người viết · Kỹ năng: writer/article-draft@1 (bản nháp)', false)
             ->assertSee('Kỹ năng: Chỉ dẫn mặc định');
     }

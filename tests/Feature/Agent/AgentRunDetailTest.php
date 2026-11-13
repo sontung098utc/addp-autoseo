@@ -40,7 +40,11 @@ class AgentRunDetailTest extends TestCase
     {
         auth()->check() || $this->actingAs($this->user());
 
-        return $this->get(AgentRunResource::getUrl('view', ['record' => $r]))->assertOk()->getContent();
+        // Phiên của bài nằm trong tab Phiên chạy của trang bài: chỉ xét phần chi tiết phiên (không lẫn các tab khác của trang bài).
+        $html = $this->get(AgentRunResource::viewUrl($r))->assertOk()->getContent();
+        $i = strpos($html, 'data-testid="aw-run-detail"');
+
+        return $i === false ? $html : substr($html, $i);
     }
 
     private function state(string $html, string $stage): string
@@ -60,7 +64,8 @@ class AgentRunDetailTest extends TestCase
 
         $v = ArticleVersion::create(['article_id' => $r->article_id, 'version' => 1, 'title' => 'Tiêu đề bản bài thật', 'slug' => 'tieu-de', 'html_content' => '<p>x</p>', 'review_status' => 'needs_review']);
         $r->update(['final_version_id' => $v->id]);
-        $this->assertStringContainsString('Tiêu đề bản bài thật', $this->page($r));
+        // Tên bài là tiêu đề của TRANG BÀI chứa phiên (không còn trang phiên riêng).
+        $this->assertStringContainsString('Tiêu đề bản bài thật', $this->get(AgentRunResource::viewUrl($r))->assertOk()->getContent());
     }
 
     public function test_tieu_de_chua_html_bi_escape(): void
@@ -191,6 +196,8 @@ class AgentRunDetailTest extends TestCase
         $r = $this->run_('ready_for_review', [['guard', 'ok']]);
         $this->actingAs($this->user('writer'));
         $this->get(AgentRunResource::getUrl('view', ['record' => $r]))->assertForbidden();
+        // Trang bài vẫn xem được nhưng KHÔNG có chi tiết phiên chạy.
+        $this->get(AgentRunResource::viewUrl($r))->assertOk()->assertDontSee('data-testid="aw-run-detail"', false);
     }
 
     public function test_trang_phien_co_bon_tab_ngang_dung_khoa_va_mac_dinh_theo_trang_thai(): void

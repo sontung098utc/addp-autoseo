@@ -88,7 +88,7 @@ class StepIoTest extends TestCase
         $run = $this->run_();
         $this->actingAs(User::create(['name' => 'a', 'email' => uniqid().'@x.vn', 'password' => 'secret123', 'role' => 'approver', 'is_active' => true]));
 
-        $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()
+        $this->get(AgentRunResource::viewUrl($run))->assertOk()
             ->assertSee('Đầu vào')->assertSee('Đầu ra')->assertSee('Từ khóa chính')->assertSee('dịch vụ thiết kế website')->assertSee('Dàn ý')->assertSee('Phân tích');
     }
 }

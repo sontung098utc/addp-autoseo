@@ -77,7 +77,7 @@
                         @if ($c['working'])
                             @php $w = $c['working'][0]; @endphp
                             @if (\App\Filament\Resources\AgentRunResource::canViewAny())
-                                <a class="rc-chip rc-chip--live" href="{{ \App\Filament\Resources\AgentRunResource::getUrl('view', ['record' => $w['run']]) }}" data-testid="role-status-{{ $k }}" data-status="working" title="Xem phiên đang chạy"><span class="rc-dot"></span>Đang làm: {{ $w['current'] ?? $w['job_title'] }} · {{ preg_replace('/^(Bài|Website): /u', '', $w['subject']) }}</a>
+                                <a class="rc-chip rc-chip--live" href="{{ \App\Filament\Resources\AgentRunResource::viewUrl($w['run']) }}" data-testid="role-status-{{ $k }}" data-status="working" title="Xem phiên đang chạy"><span class="rc-dot"></span>Đang làm: {{ $w['current'] ?? $w['job_title'] }} · {{ preg_replace('/^(Bài|Website): /u', '', $w['subject']) }}</a>
                             @else
                                 <span class="rc-chip rc-chip--live" data-testid="role-status-{{ $k }}" data-status="working"><span class="rc-dot"></span>Đang làm: {{ $w['current'] ?? $w['job_title'] }} · {{ preg_replace('/^(Bài|Website): /u', '', $w['subject']) }}</span>
                             @endif

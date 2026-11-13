@@ -5,8 +5,7 @@ namespace App\Filament\Resources\AgentRunResource\Pages;
 use App\Filament\Resources\AgentRunResource;
 use App\Filament\Resources\ArticleVersionResource;
 use App\Filament\Support\Agent\AgentFlowBlueprint;
-use App\Filament\Support\Agent\RunActivity;
-use App\Filament\Support\Agent\RunFlow;
+use App\Filament\Support\Agent\RunViewData;
 use App\Filament\Support\Review\ReviewActions;
 use App\Models\AgentRun;
 use App\Models\Campaign;
@@ -23,6 +22,19 @@ class ViewAgentRun extends ViewRecord
 
     protected static string $view = 'filament.agent.run-view';
 
+    /**
+     * Phiên của một bài không còn trang riêng: chuyển sang tab "Phiên chạy" của trang bài (đúng phiên đó) để chi tiết nằm cùng chỗ với nội dung, từ khóa, xuất bản.
+     * Liên kết cũ (thông báo, đường dẫn đã lưu) vẫn dùng được. Phiên không gắn bài (xây kho, khảo sát...) vẫn xem ở trang này.
+     */
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+        $url = AgentRunResource::viewUrl($this->record);
+        if ($this->record->article_id && ! str_contains($url, '/phien-chay/')) {
+            $this->redirect($url);
+        }
+    }
+
     /** AG-S15: tiêu đề trang là TÊN BÀI VIẾT (phiên không gắn bài: tên loại việc) (tiêu đề bản bài nếu có, không thì từ khóa chính), không phải số phiên. */
     public function getTitle(): string
     {
@@ -31,12 +43,7 @@ class ViewAgentRun extends ViewRecord
 
     public static function articleName(AgentRun $run): string
     {
-        if (! $run->article_id && $run->job_type && $run->job_type !== 'article_write') {
-            return JobTypeRegistry::find($run->job_type)['title'] ?? $run->job_type;
-        }
-        $title = trim((string) $run->finalVersion?->title);
-
-        return $title !== '' ? $title : (trim((string) $run->article?->primary_keyword) ?: 'Phiên chạy #'.$run->id);
+        return RunViewData::articleName($run);
     }
 
     public function getBreadcrumbs(): array
@@ -76,31 +83,6 @@ class ViewAgentRun extends ViewRecord
 
     protected function getViewData(): array
     {
-        // Làm mới mỗi lần poll để thấy bước mới và trạng thái mới.
-        $this->record->refresh()->load(['steps', 'article', 'website', 'finalVersion']);
-        $run = $this->record;
-        $live = RunActivity::isLive($run);
-        $stale = RunActivity::isStale($run);
-        $current = ($live || $stale) ? RunActivity::currentStageOf($run, $run->steps) : null;
-
-        $flow = RunFlow::build($run, $run->steps, $live, $stale, $current);
-        $problem = $live || $stale || in_array($run->status, ['failed', 'blocked', 'held'], true) || collect($flow['nodes'])->contains('state', 'waiting');
-
-        return [
-            'run' => $run,
-            'verdict' => RunFlow::verdict($run, $flow, $live, $stale),
-            'focus' => RunFlow::focusStage($flow['nodes']),
-            'tab' => $problem ? 'dien-bien' : 'bao-cao',
-            'name' => self::articleName($run),
-            'campaign' => $run->campaign_id ? Campaign::query()->find($run->campaign_id) : null,
-            'blueprint' => AgentFlowBlueprint::byStage(),
-            'statusMap' => AgentRunResource::STATUS,
-            'live' => $live,
-            'stale' => $stale,
-            'currentStage' => $live ? $current : null,
-            'flow' => $flow,
-            'elapsed' => RunActivity::formatElapsed(RunActivity::elapsedSeconds($run)),
-            'pollSeconds' => $live ? RunActivity::POLL_LIVE : null,
-        ];
+        return RunViewData::for($this->record);
     }
 }

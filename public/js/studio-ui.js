@@ -37,7 +37,8 @@ document.addEventListener('alpine:init', () => {
       if (l < s.scrollLeft) x = Math.max(0, l); else if (r > s.scrollLeft + s.clientWidth) x = r - s.clientWidth;
       if (x !== s.scrollLeft) s.scrollTo({ left: x, behavior: smooth && !reduce ? 'smooth' : 'auto' });
     },
-    keys() { return [...this.$el.querySelectorAll('[role=tab]')].map((e) => e.dataset.key); },
+    // Chỉ các tab của CHÍNH thanh này (tab lồng bên trong một panel, ví dụ các phần của phiên chạy trong tab Phiên chạy của bài, có thanh riêng).
+    keys() { return [...(this.$refs.strip || this.$el).querySelectorAll('[role=tab]')].map((e) => e.dataset.key); },
     set(k) {
       this.active = k;
       if (persist) save('session', 'studio.tab.' + persist, k);

@@ -287,7 +287,7 @@ class AgentRunLogTest extends TestCase
         [$run] = $this->go($this->provider([$this->timeout(), $this->bad()]));
         $this->actingAs(User::create(['name' => 'ap', 'email' => 'ap@x.vn', 'password' => 'secret123', 'role' => 'approver', 'is_active' => true]));
 
-        $this->get(\App\Filament\Resources\AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()
+        $this->get(\App\Filament\Resources\AgentRunResource::viewUrl($run))->assertOk()
             ->assertSee('Vòng Chấm ↔ Sửa')->assertSee('v1 ')->assertSee('sửa 1 ')
             ->assertSee('Quyết định tự động')->assertSee('Dừng sửa vì không cải thiện')
             ->assertSee('Thử lại lần 1/3');
@@ -299,5 +299,6 @@ class AgentRunLogTest extends TestCase
         $this->actingAs(User::create(['name' => 'w', 'email' => 'w@x.vn', 'password' => 'secret123', 'role' => 'writer', 'is_active' => true]));
 
         $this->get(\App\Filament\Resources\AgentRunResource::getUrl('view', ['record' => $run]))->assertForbidden();
+        $this->get(\App\Filament\Resources\AgentRunResource::viewUrl($run))->assertOk()->assertDontSee('data-testid="aw-run-detail"', false);
     }
 }

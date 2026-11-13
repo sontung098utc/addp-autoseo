@@ -178,7 +178,7 @@ class AgentRolesTest extends TestCase
         $this->assertSame(1, preg_match('#<article[^>]*data-testid="role-card-auditor".*?</article>#s', $html, $m));
         $this->assertStringContainsString('data-status="working"', $m[0]);
         $this->assertStringContainsString('Đang làm:', $m[0]);
-        $this->assertStringContainsString(AgentRunResource::getUrl('view', ['record' => $run]), $m[0]);
+        $this->assertStringContainsString(AgentRunResource::viewUrl($run), $m[0]);
         $this->assertSame(1, preg_match('#<article[^>]*data-testid="role-card-editor".*?</article>#s', $html, $e));
         $this->assertStringNotContainsString('data-status="working"', $e[0]);
     }

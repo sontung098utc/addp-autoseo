@@ -361,7 +361,7 @@ class AgentRoles extends Page
         $d = ['key' => $key, 'role' => $role, 'profile' => AgentProfiles::for($key), 'tab' => $this->studioTab,
             'canEdit' => $this->isAdmin(), 'enabled' => (new RoleSwitches($reg))->isEnabled($key), 'switchable' => $reg->isSwitchable($key),
             'suggested' => AgentProfiles::SUGGESTED_TRAITS, 'pipelineUrl' => PipelineMap::getUrl(), 'skillsUrl' => self::skillsTabUrl(),
-            'runUrl' => fn (int $id) => AgentRunResource::getUrl('view', ['record' => $id])];
+            'runUrl' => fn (int $id) => AgentRunResource::viewUrl($id)];
         $d['canUndo'] = AgentProfiles::previousVersion($key) !== null;
         match ($this->studioTab) {
             'overview' => $d += $this->overviewData($key, $role, $d['profile'], $assign),

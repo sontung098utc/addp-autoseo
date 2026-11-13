@@ -52,7 +52,7 @@ class AgentRunUiTest extends TestCase
         $this->actingAs($this->user('approver'));
 
         $this->get(AgentRunResource::getUrl('index'))->assertOk()->assertSee('Phiên chạy')->assertSee('tối ưu seo cho website')->assertSee('AI giả lập');
-        $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()
+        $this->get(AgentRunResource::viewUrl($run))->assertOk()
             ->assertSee('data-testid="stage-rail"', false)->assertSee('Nhật ký từng bước')->assertSee('Dev1 cần')
             ->assertSee('AI giả lập')->assertSee('chỉ tạo bản nháp');
     }
@@ -64,6 +64,7 @@ class AgentRunUiTest extends TestCase
 
         $this->get(AgentRunResource::getUrl('index'))->assertForbidden();
         $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertForbidden();
+        $this->get(AgentRunResource::viewUrl($run))->assertOk()->assertDontSee('data-testid="aw-run-detail"', false);
     }
 
     public function test_phien_chay_chi_xem_khong_co_tao_sua_xoa(): void

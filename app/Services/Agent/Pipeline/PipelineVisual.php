@@ -203,7 +203,7 @@ final class PipelineVisual
                 'id' => $r->id, 'status' => $r->status,
                 'subject' => $r->article ? ($r->article->primary_keyword ?: $r->article->title ?: 'Bài #'.$r->article_id) : ($r->website ? $r->website->name : 'Phiên #'.$r->id),
                 'when' => $r->created_at ? VnTime::format(VnTime::fromRaw($r, 'created_at') ?? $r->created_at, 'd/m H:i') : '',
-                'url' => $canView ? AgentRunResource::getUrl('view', ['record' => $r]) : null,
+                'url' => $canView ? AgentRunResource::viewUrl($r) : null,
             ];
             if (count($out) >= $limit) {
                 break;

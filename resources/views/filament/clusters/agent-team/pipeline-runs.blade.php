@@ -12,7 +12,7 @@
             @if ($r['live'])<div class="pv-bar" style="flex:2 1 16rem">@foreach ($r['bar'] as $b)<span class="pv-seg pv-seg--{{ $b['state'] }}">{{ $b['label'] }}</span>@endforeach</div>@endif
             <div class="text-xs" style="flex:0 0 7rem;margin-left:auto;text-align:right">{{ $r['elapsed'] }}<br>{{ number_format($r['cost'], 0, ',', '.') }} ₫</div>
             <div style="display:flex;gap:.3rem;flex-wrap:wrap;flex:0 0 auto">
-                @if (\App\Filament\Resources\AgentRunResource::canViewAny())<x-filament::button size="xs" tag="a" :href="\App\Filament\Resources\AgentRunResource::getUrl('view', ['record' => $r['run']])">Xem diễn biến</x-filament::button>@endif
+                @if (\App\Filament\Resources\AgentRunResource::canViewAny())<x-filament::button size="xs" tag="a" :href="\App\Filament\Resources\AgentRunResource::viewUrl($r['run'])">Xem diễn biến</x-filament::button>@endif
                 @if ($r['result_url'])<x-filament::button size="xs" color="gray" tag="a" :href="$r['result_url']">Xem kết quả</x-filament::button>@endif
             </div>
         </div>

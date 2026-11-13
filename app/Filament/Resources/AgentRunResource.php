@@ -49,6 +49,20 @@ class AgentRunResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
+    /**
+     * Liên kết MỘT nơi tới chi tiết phiên chạy: phiên của một bài mở tab "Phiên chạy" của trang bài (đúng phiên đó); phiên không gắn bài
+     * (xây kho, khảo sát...) mở trang phiên riêng. Mọi nơi tạo liên kết tới phiên đều dùng hàm này để không loạn đường dẫn.
+     */
+    public static function viewUrl(AgentRun|int $run): string
+    {
+        $model = $run instanceof AgentRun ? $run : AgentRun::query()->find($run);
+        if ($model && $model->article_id && \App\Models\Article::query()->whereKey($model->article_id)->exists()) {
+            return ArticleResource::getUrl('view', ['record' => $model->article_id]).'?phien='.$model->id.'#tab-activity';
+        }
+
+        return static::getUrl('view', ['record' => $model ?? $run]);
+    }
+
     public static function canViewAny(): bool
     {
         $u = Auth::user();

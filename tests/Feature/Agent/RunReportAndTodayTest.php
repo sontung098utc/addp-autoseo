@@ -69,7 +69,7 @@ class RunReportAndTodayTest extends TestCase
 
         $r = RunReport::for($run);
         $this->assertStringContainsString('Chưa có bản nháp', $r['lines'][0]);
-        $this->get(AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()->assertSee('run-report', false)->assertSee('Lý do kết thúc: AI lỗi');
+        $this->get(AgentRunResource::viewUrl($run))->assertOk()->assertSee('run-report', false)->assertSee('Lý do kết thúc: AI lỗi');
     }
 
     public function test_writer_khong_thay_so_lieu_chi_phi_cua_quan_ly(): void

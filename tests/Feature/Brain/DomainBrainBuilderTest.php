@@ -149,7 +149,7 @@ class DomainBrainBuilderTest extends TestCase
         $this->assertSame('', $terms[0]['definition'], 'định nghĩa không có mục kho hỗ trợ bị bỏ');
         $this->assertNotEmpty($fresh->settings['build_report']['todo_for_experts']);
         $this->actingAs($this->by);
-        $this->get(\App\Filament\Resources\AgentRunResource::getUrl('view', ['record' => $run]))->assertOk()
+        $this->get(\App\Filament\Resources\AgentRunResource::viewUrl($run))->assertOk()
             ->assertSee('Kho có 1 mục')->assertSee('Việc cho chuyên gia'); // hồi quy lỗi 500: dữ kiện bước hợp với trang phiên chạy; báo cáo hiện số đo thật, không phải "0 mục"
         $this->assertSame(1, $fresh->settings['build_report']['metrics']['verified_faithful']);
     }
@@ -231,7 +231,7 @@ class DomainBrainBuilderTest extends TestCase
         }
         $this->actingAs($this->by);
 
-        $this->get(\App\Filament\Resources\AgentRunResource::getUrl('view', ['record' => $run]))->assertOk();
+        $this->get(\App\Filament\Resources\AgentRunResource::viewUrl($run))->assertOk();
     }
 
     public function test_khong_co_website_hoac_khong_co_chu_de_thi_dung_voi_ly_do_ro(): void

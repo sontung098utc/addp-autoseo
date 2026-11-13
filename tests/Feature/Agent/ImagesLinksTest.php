@@ -321,7 +321,7 @@ class ImagesLinksTest extends TestCase
             'images' => ['selected' => [['id' => 9, 'diem' => 7.5, 'ly_do' => '<b>khớp</b>', 'alt' => '<script>alert(1)</script>', 'url' => '/x']], 'inserted_ids' => [9], 'warning' => null],
             'internal_links' => ['suggested' => [['url' => 'https://a.vn/p', 'anchor' => 'Neo <i>x</i>', 'diem' => 5, 'ly_do' => 'ok']], 'inserted' => ['https://a.vn/p']],
         ]]);
-        $html = $this->get(AgentRunResource::getUrl('view', ['record' => $r]))->assertOk()->getContent();
+        $html = $this->get(AgentRunResource::viewUrl($r))->assertOk()->getContent();
         $this->assertStringContainsString('data-testid="context-assets"', $html);
         $this->assertStringContainsString('#9', $html);
         $this->assertStringContainsString('https://a.vn/p', $html);
@@ -334,6 +334,6 @@ class ImagesLinksTest extends TestCase
     {
         $a = $this->article();
         $r = AgentRun::create(['website_id' => $this->site->id, 'article_id' => $a->id, 'trigger' => 'manual', 'status' => 'ready_for_review', 'trust_tier' => 'T1', 'ai_mode' => 'real', 'started_at' => now()]);
-        $this->get(AgentRunResource::getUrl('view', ['record' => $r]))->assertRedirect();
+        $this->get(AgentRunResource::viewUrl($r))->assertRedirect();
     }
 }

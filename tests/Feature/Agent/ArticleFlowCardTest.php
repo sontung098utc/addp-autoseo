@@ -53,7 +53,7 @@ class ArticleFlowCardTest extends TestCase
             ->assertSeeHtml('data-state="running"')
             ->assertSeeHtml('data-stage="write"')
             ->assertSee('Xem chi tiết luồng')
-            ->assertSeeHtml('href="'.AgentRunResource::getUrl('view', ['record' => $run]).'"')
+            ->assertSeeHtml('href="'.AgentRunResource::viewUrl($run).'"')
             ->assertDontSeeHtml('data-testid="aw-chain"');
     }
 
