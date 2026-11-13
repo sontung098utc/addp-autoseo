@@ -819,7 +819,7 @@ final class AgentRunOrchestrator
         $gaps = (array) $plan['gaps'];
         if ($gaps !== [] && $this->spent($run) + $cost < $this->policy->budgetVnd) {
             // Luồng nạp bổ sung: chỉ cho phần còn thiếu căn cứ.
-            $topics = array_map(fn ($g) => trim((string) $article->primary_keyword.' '.$g), array_slice($gaps, 0, 2));
+            $topics = array_map(fn ($g) => str_word_count(preg_replace('/[^\p{L}\p{N}\s]/u', ' ', (string) $g), 0, 'àáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ') >= 3 ? trim((string) $g) : trim((string) $article->primary_keyword.' '.$g), array_slice($gaps, 0, 3)); // cụm tìm kiếm đủ cụ thể thì tìm riêng, ngắn quá thì ghép với từ khóa
             $added = $this->topUpEvidence($run, $article, $topics, $risk);
             if ($added > 0) {
                 $kb = $this->kbForPlanner($article);

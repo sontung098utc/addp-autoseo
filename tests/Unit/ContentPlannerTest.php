@@ -67,7 +67,10 @@ class ContentPlannerTest extends TestCase
         $this->assertStringContainsString('khoảng 1300 từ', $t);
         $this->assertStringContainsString('orthostatic hypotension = hạ huyết áp tư thế đứng', $t);
         $this->assertStringContainsString('Nhóm thực phẩm giàu sắt', $t);
-        $this->assertStringContainsString('NGUỒN KHÔNG NÓI', ContentPlanner::systemPrompt('n', 'k', 'informational', 'low'));
+        $prompt = ContentPlanner::systemPrompt('n', 'k', 'informational', 'low');
+        $this->assertStringContainsString('NGUỒN KHÔNG NÓI', $prompt);
+        $this->assertStringContainsString('mốc/ngưỡng chuẩn bao nhiêu', $prompt, 'Câu hỏi nền về mốc/ngưỡng luôn được hỏi.');
+        $this->assertStringContainsString('CỤM TÌM KIẾM ngắn', $prompt);
         $this->assertStringNotContainsString('T1', $t);
     }
 
