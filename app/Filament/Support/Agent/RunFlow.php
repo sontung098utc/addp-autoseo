@@ -84,6 +84,11 @@ final class RunFlow
             $at = VnTime::fromRaw($s, 'created_at');
             $clock[$s->id] = $at;
             $durations[$s->id] = ($at && $prev) ? max(0, (int) abs($at->diffInSeconds($prev, false))) : null;
+            // Bước chạy nền (tạo ảnh song song) được ghi lúc bắt đầu rồi cập nhật khi xong: thời lượng thật là khoảng từ lúc ghi đến lần cập nhật cuối, không phải khoảng cách tới bước kế.
+            $upd = VnTime::fromRaw($s, 'updated_at');
+            if ($at && $upd && $upd->gt($at)) {
+                $durations[$s->id] = max((int) ($durations[$s->id] ?? 0), (int) $at->diffInSeconds($upd, true));
+            }
             $prev = $at ?? $prev;
         }
 

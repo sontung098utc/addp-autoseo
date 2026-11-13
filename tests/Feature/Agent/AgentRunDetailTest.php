@@ -171,6 +171,21 @@ class AgentRunDetailTest extends TestCase
         $this->assertStringContainsString('aria-valuenow="50"', $html);
     }
 
+    public function test_buoc_chay_nen_tinh_thoi_luong_tu_luc_ghi_den_lan_cap_nhat_cuoi(): void
+    {
+        $r = $this->run_('ready_for_review', [['guard', 'ok'], ['brief', 'ok'], ['images', 'ok'], ['research', 'ok']], []);
+        $steps = $r->steps->values();
+        $t = now()->subMinutes(10)->startOfSecond();
+        foreach ($steps as $i => $s) {
+            $s->forceFill(['created_at' => $t, 'updated_at' => $s->stage === 'images' ? $t->copy()->addSeconds(158) : $t])->saveQuietly();
+        }
+        $r = $r->fresh();
+        $d = RunFlow::build($r, $r->steps, false, false, null)['durations'];
+        $images = $r->steps->firstWhere('stage', 'images');
+        $this->assertSame(158, $d[$images->id], 'ảnh chạy nền 158 giây phải hiện 158 giây, không phải 0 giây');
+        $this->assertSame(0, $d[$r->steps->firstWhere('stage', 'research')->id], 'bước luật tức thời vẫn là 0 giây');
+    }
+
     public function test_bien_tap_vien_bi_chan(): void
     {
         $r = $this->run_('ready_for_review', [['guard', 'ok']]);
