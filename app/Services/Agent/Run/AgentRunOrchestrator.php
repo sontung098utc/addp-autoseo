@@ -1041,8 +1041,11 @@ final class AgentRunOrchestrator
     private function penalty(QualityReport $r): int
     {
         $c = $r->counts();
+        // Ngoài số luật còn trượt, tính cả SỐ CHỖ còn lệch (đoạn thiếu trích dẫn, trích dẫn không hỗ trợ câu, khối bố cục lạm dụng): sửa 11 chỗ còn 2 chỗ là tiến bộ thật
+        // dù luật vẫn trượt. Trước đây chỉ đếm luật nên vòng sửa dừng nhầm với lý do "không cải thiện".
+        $gaps = count($r->citationGaps()) + count($r->supportGaps()) + count($r->layoutGaps());
 
-        return $c['P0'] * 10 + $c['P1'] * 3 + $c['P2'];
+        return $c['P0'] * 10 + $c['P1'] * 3 + $c['P2'] + $gaps;
     }
 
     private function spent(AgentRun $run): float

@@ -173,4 +173,19 @@ class CitationSupportTest extends TestCase
         $this->assertSame(0, $fake->calls);
         $this->assertNull($r['result']);
     }
+
+    public function test_diem_phat_tinh_ca_so_cho_con_lech_nen_sua_bot_cho_la_tien_bo(): void
+    {
+        $ref = new \ReflectionMethod(AgentRunOrchestrator::class, 'penalty');
+        $ref->setAccessible(true);
+        $o = new AgentRunOrchestrator($this->createMock(AiProviderInterface::class), policy: new RunPolicy);
+        $res = fn (array $uncited, array $unsupported) => new \App\Services\Content\Quality\QualityReport([
+            new \App\Services\Content\Quality\RuleResult('CITE01', 'P1', false, 'Mỗi khẳng định có dấu trích dẫn', 'm', 'x', 'y', null, $uncited),
+            new \App\Services\Content\Quality\RuleResult('CITE02', 'P1', false, 'Mục được trích hỗ trợ đúng câu (AI kiểm lại)', 'm', 'x', 'y', null, $unsupported),
+        ]);
+        $before = $ref->invoke($o, $res(array_fill(0, 8, 'a'), ['x', 'y', 'z']));
+        $after = $ref->invoke($o, $res(['a', 'b'], ['x']));
+        $this->assertSame(2 * 3 + 8 + 3, $before);
+        $this->assertLessThan($before, $after, 'cùng số luật trượt nhưng ít chỗ lệch hơn thì phải được tính là cải thiện');
+    }
 }
