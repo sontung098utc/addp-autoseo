@@ -671,7 +671,7 @@
                             @if ($runView)<p class="aw-runs-help" data-testid="aw-runs-help">Bấm vào một phiên để xem chi tiết ở khung bên dưới. Phiên <strong>đang xem</strong> được tô màu và có nhãn "Đang xem".</p>@endif
                             <div class="aw-scroll">
                                 <table class="aw-table" data-testid="aw-runs">
-                                    <thead><tr><th>Phiên</th><th>Kết quả</th><th class="aw-opt">Điểm hình thức</th><th class="aw-opt">Tạo ra bản</th><th class="aw-opt">AI</th><th class="aw-opt">Vòng sửa</th><th>Chi phí</th><th>Bắt đầu</th><th></th></tr></thead>
+                                    <thead><tr><th>Phiên</th><th>Kết quả</th><th class="aw-opt">Điểm hình thức</th><th class="aw-opt">Tạo ra bản</th>@if ($runs->contains(fn ($x) => $x->ai_mode !== 'real'))<th class="aw-opt">AI</th>@endif<th class="aw-opt">Vòng sửa</th><th>Chi phí</th><th>Bắt đầu</th><th></th></tr></thead>
                                     <tbody>
                                         @foreach ($runs as $r)
                                             @php $isLive = $live && $r->id === $live->id; $fv = $r->final_version_id ? $versions->firstWhere('id', $r->final_version_id) : null; $isSel = $selectedRun && $selectedRun->id === $r->id; @endphp
@@ -686,7 +686,7 @@
                                                 </td>
                                                 <td class="aw-opt">{{ ArticleRows::score($r) ?? '—' }}</td>
                                                 <td class="aw-opt">{{ $fv ? 'v'.$fv->version : '—' }}</td>
-                                                <td class="aw-opt">{{ $r->ai_mode === 'real' ? 'AI thật' : 'AI giả lập' }}</td>
+                                                @if ($runs->contains(fn ($x) => $x->ai_mode !== 'real'))<td class="aw-opt">{{ $r->ai_mode === 'real' ? '' : 'AI giả lập' }}</td>@endif
                                                 <td class="aw-opt">{{ (int) $r->repair_rounds }}</td>
                                                 <td>{{ V::formatVnd($r->cost_vnd) }}</td>
                                                 <td>{{ VnTime::format($r->started_at ?? $r->created_at) }}</td>

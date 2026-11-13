@@ -45,7 +45,7 @@ return [
     'orchestrator_steps' => [
         'write' => 'writer',
     ],
-    'readiness_note' => 'Đã chạy được trong phiên chạy. Mới kiểm bằng AI giả lập, chưa thử với model thật và chưa có người nghiệm thu.',
+    'readiness_note' => 'Đã chạy được trong phiên chạy. Đã chạy với AI thật trên dữ liệu thử, chưa có người nghiệm thu.',
     'origin' => [
         'claude-seo/seo-content',
     ],

@@ -130,9 +130,10 @@ class AgentRunResource extends Resource
                     ->state(fn (AgentRun $r) => $r->steps->where('stage', 'grade')->last()?->data['score'] ?? null)
                     ->tooltip('Điểm 0–100 của lần chấm gần nhất. Quyết định đạt/không do luật, điểm chỉ để theo dõi.')
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%']),
+                // Phiên dùng AI thật là mặc định nên không gắn nhãn; chỉ đánh dấu phiên chạy bằng AI giả lập (dữ liệu cũ hoặc chế độ minh họa).
                 Tables\Columns\TextColumn::make('ai_mode')->label('AI')->visibleFrom('2xl')->badge()
-                    ->formatStateUsing(fn (string $state) => $state === 'real' ? 'AI thật' : 'AI giả lập')
-                    ->color(fn (string $state) => $state === 'real' ? 'success' : 'gray')
+                    ->formatStateUsing(fn (string $state) => $state === 'real' ? '' : 'AI giả lập')
+                    ->color('gray')
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
                 Tables\Columns\TextColumn::make('repair_rounds')->label('Vòng sửa')->alignCenter()->toggleable(isToggledHiddenByDefault: true)
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%']),

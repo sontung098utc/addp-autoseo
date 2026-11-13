@@ -22,7 +22,7 @@
     $startedAt = VnTime::fromRaw($run, 'started_at') ?? VnTime::fromRaw($run, 'created_at');
     $tail = fn (string $t, int $n = 150) => mb_strlen($t) > $n ? [rtrim(mb_substr($t, 0, $n)).'…', true] : [$t, false];
     $retries = $run->steps->where('stage', 'retry');
-    $aiNote = ($run->ai_mode === 'real' ? 'AI thật' : 'AI giả lập: nội dung chỉ để kiểm luồng, không phản ánh chất lượng AI thật.').' Bậc tin cậy '.$run->trust_tier.($run->trust_tier === 'T1' ? ': chỉ tạo bản nháp chờ người duyệt, không bao giờ tự xuất bản.' : '.');
+    $aiNote = ($run->ai_mode === 'real' ? '' : 'AI giả lập: nội dung chỉ để kiểm luồng, không phản ánh chất lượng AI thật. ').'Bậc tin cậy '.$run->trust_tier.($run->trust_tier === 'T1' ? ': chỉ tạo bản nháp chờ người duyệt, không bao giờ tự xuất bản.' : '.');
     $isAdmin = (bool) auth()->user()?->isAdmin();
     $problem = in_array($run->status, ['failed', 'blocked', 'held'], true) || $stale || collect($nodes)->contains('state', 'waiting');
     $tabs = [

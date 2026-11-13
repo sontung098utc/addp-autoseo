@@ -47,7 +47,7 @@ return [
     'orchestrator_steps' => [
         'brief' => 'strategist',
     ],
-    'readiness_note' => 'Đã chạy được trong phiên chạy. Mới kiểm bằng AI giả lập, chưa thử với model thật và chưa có người nghiệm thu. Mới nối bước dàn ý; phân tích SERP, liên kết nội bộ theo cụm, schema chỉ là thiết kế.',
+    'readiness_note' => 'Đã chạy được trong phiên chạy. Đã chạy với AI thật trên dữ liệu thử, chưa có người nghiệm thu. Mới nối bước dàn ý; phân tích SERP, liên kết nội bộ theo cụm, schema chỉ là thiết kế.',
     'origin' => [
         'claude-seo/seo-plan',
         'claude-seo/seo-content-brief',
