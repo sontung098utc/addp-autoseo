@@ -32,8 +32,9 @@ final class BrainFromSuggestion
     public function create(Website $site, string $field, ?Article $article, ?User $by): array
     {
         $field = trim(mb_substr(strip_tags($field), 0, 160));
-        $covers = $article ? $this->coversOf($article, $field) : [];
-        $template = BrainTemplates::suggestFor($field.' '.implode(' ', $covers));
+        [$covers, $sensitive] = $article ? $this->suggestionOf($article, $field) : [[], false];
+        // Mẫu sức khỏe (YMYL: bắt buộc nguồn, rủi ro cao, chủ đề bệnh/thuốc) CHỈ khi lĩnh vực thật sự nhạy cảm với sức khỏe người đọc; lĩnh vực kỹ thuật/công nghiệp dùng mẫu trống rồi dựng cây chủ đề từ định hướng của bài.
+        $template = $sensitive ? BrainTemplates::suggestFor($field.' '.implode(' ', $covers)) : 'trong';
         $brain = (new BrainService)->createFromTemplate($field, $template, [$site], $by);
 
         $refs = $article ? $this->referencesOf($article) : [];
@@ -94,19 +95,19 @@ final class BrainFromSuggestion
         return trim($t);
     }
 
-    /** Các mảng điều phối đề xuất kho nên bao quát cho lĩnh vực này (suy ngược từ chủ đề lên lĩnh vực), lấy từ bước điều phối của các phiên gần nhất. @return list<string> */
-    private function coversOf(Article $article, string $field): array
+    /** Các mảng kho nên bao quát và cờ "nhạy cảm sức khỏe" mà điều phối đã đề xuất cho lĩnh vực này (suy ngược từ chủ đề lên lĩnh vực). @return array{0: list<string>, 1: bool} */
+    private function suggestionOf(Article $article, string $field): array
     {
         foreach (AgentRun::query()->where('article_id', $article->id)->with('steps')->orderByDesc('id')->limit(5)->get() as $run) {
             foreach ($run->steps->where('stage', 'research') as $st) {
                 $sg = ((array) $st->data)['suggestion'] ?? null;
-                if (is_array($sg) && mb_strtolower((string) ($sg['field'] ?? '')) === mb_strtolower($field) && ! empty($sg['covers'])) {
-                    return array_values(array_filter(array_map(fn ($c) => trim(mb_substr((string) $c, 0, 60)), (array) $sg['covers'])));
+                if (is_array($sg) && mb_strtolower((string) ($sg['field'] ?? '')) === mb_strtolower($field)) {
+                    return [array_values(array_filter(array_map(fn ($c) => trim(mb_substr((string) $c, 0, 60)), (array) ($sg['covers'] ?? [])))), (bool) ($sg['sensitive'] ?? false)];
                 }
             }
         }
 
-        return [];
+        return [[], false];
     }
 
     /** Tài liệu web (url, tiêu đề) mà các phiên gần nhất của bài đã tìm được. @return list<array{url:string,title:string}> */

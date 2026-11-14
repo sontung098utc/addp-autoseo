@@ -278,7 +278,8 @@ final class SourceDiscoveryService
                 // Nguồn TIN CẬY (danh sách cố định) + có đoạn nguyên văn từ trang thì tự nhận, kể cả chủ đề y tế/tài chính (tầng C do hạng rủi ro): nội dung lấy đúng từ nguồn uy tín, hoàn tác được.
                 // Loại mục của doanh nghiệp (giá, chính sách, quan niệm sai, điều cấm) và mục mâu thuẫn với mục khác vẫn chờ người duyệt. Tắt bằng trusted_sources.auto_approve_any_risk=false để quay lại "tầng C luôn chờ".
                 $anyRisk = (bool) config('trusted_sources.auto_approve_any_risk', true);
-                $ok = $trust['level'] === 'trusted' && trim((string) $item->source_span) !== '' && ! in_array($item->type, RiskTiering::C_TYPES, true)
+                // Mục loại "sản phẩm" từ nguồn ngoài (bài báo, trang nhà sản xuất) KHÔNG tự nhận: kho chỉ coi sản phẩm là sản phẩm của chính công ty (lấy từ website của họ).
+                $ok = $trust['level'] === 'trusted' && trim((string) $item->source_span) !== '' && ! in_array($item->type, RiskTiering::C_TYPES, true) && $item->type !== 'product'
                     && ($anyRisk || $t['tier'] !== RiskTiering::C)
                     && $builder->autoApprove($item, $by, 'Tự nhận từ nguồn tin cậy '.$domain.' (tải '.now()->format('d/m/Y').')');
                 if ($ok) {

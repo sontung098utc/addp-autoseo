@@ -297,4 +297,15 @@ class SourceDiscoveryTest extends TestCase
         $this->assertSame('trusted', SourceTrust::assess('https://www.fda.gov/drugs/x', null, 'pharma')['level']);
         $this->assertSame('neutral', SourceTrust::assess('https://hang-ban-may.vn/may-dap-vien', null, 'pharma')['level']);
     }
+
+    public function test_muc_san_pham_tu_nguon_ngoai_khong_tu_nhan(): void
+    {
+        Http::fake([
+            'who.int/robots.txt' => Http::response('', 404),
+            'who.int/sp' => Http::response($this->page('Thiết bị', 'Máy dập viên để bàn GTP-1 được hãng X dùng trong nghiên cứu tạo viên.'), 200, ['Content-Type' => 'text/html']),
+        ]);
+        $ai = $this->ai([['items' => [$this->item('product', 'Máy GTP-1', 'Máy dập viên để bàn GTP-1 được hãng X dùng trong nghiên cứu tạo viên.', 'Máy dập viên để bàn GTP-1 được hãng X dùng trong nghiên cứu tạo viên')]]]);
+        $this->svc($ai)->import($this->site, [['url' => 'https://www.who.int/sp']], $this->user());
+        $this->assertSame('proposed', KnowledgeItem::where('title', 'Máy GTP-1')->first()->status, 'Sản phẩm từ nguồn ngoài luôn chờ người xem.');
+    }
 }

@@ -97,6 +97,10 @@ class KnowledgeCoordinatorTest extends TestCase
         $this->assertStringContainsString('covers', $prompt);
         $r = (new KnowledgeCoordinator(new AiJson($this->ai(['brain_id' => null, 'field' => 'Công nghiệp dược', 'recurring' => true, 'covers' => ['Thiết bị sản xuất', 'GMP và thẩm định', 'Thiết bị sản xuất', '', 'Kiểm soát chất lượng']]))))->classify('máy dập viên', []);
         $this->assertSame('Công nghiệp dược', $r['field']);
+        $this->assertFalse($r['sensitive'], 'Mặc định không nhạy cảm sức khỏe.');
+        $s = (new KnowledgeCoordinator(new AiJson($this->ai(['brain_id' => null, 'field' => 'Đái tháo đường', 'recurring' => true, 'sensitive' => true]))))->classify('HbA1c', []);
+        $this->assertTrue($s['sensitive']);
+        $this->assertStringContainsString('sensitive', KnowledgeCoordinator::systemPrompt('n', 'k'));
         $this->assertSame(['Thiết bị sản xuất', 'GMP và thẩm định', 'Kiểm soát chất lượng'], $r['covers'], 'Bỏ trùng và rỗng.');
     }
 }

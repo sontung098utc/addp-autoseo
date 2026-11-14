@@ -92,7 +92,7 @@ class BrainSuggestionTest extends TestCase
         \App\Models\AgentRunStep::create(['agent_run_id' => $run->id, 'seq' => 1, 'stage' => 'research', 'role' => 'system', 'status' => 'ok', 'title' => 'Tìm tài liệu', 'detail' => 'd', 'data' => ['purpose' => 'references', 'references' => [
             ['url' => 'https://www.who.int/gmp', 'title' => 'GMP', 'domain' => 'who.int'], ['url' => 'https://hang-ban-may.vn/may-dap-vien', 'title' => 'Máy dập viên giá tốt', 'domain' => 'hang-ban-may.vn']]]]);
         \App\Models\AgentRunStep::create(['agent_run_id' => $run->id, 'seq' => 2, 'stage' => 'synthesize', 'role' => 'strategist', 'status' => 'ok', 'title' => 'Tổng hợp', 'detail' => 'd', 'data' => ['plan' => ['angle' => 'Chọn máy theo nhu cầu', 'questions' => ['Khác nhau thế nào?']]]]);
-        \App\Models\AgentRunStep::create(['agent_run_id' => $run->id, 'seq' => 3, 'stage' => 'research', 'role' => 'system', 'status' => 'warn', 'title' => 'Đề xuất', 'detail' => 'd', 'data' => ['purpose' => 'kb_coordination', 'suggestion' => ['type' => 'new_brain', 'field' => 'Thiết bị sản xuất dược', 'covers' => ['Thiết bị sản xuất', 'GMP và thẩm định', 'Kiểm soát chất lượng']]]]);
+        \App\Models\AgentRunStep::create(['agent_run_id' => $run->id, 'seq' => 3, 'stage' => 'research', 'role' => 'system', 'status' => 'warn', 'title' => 'Đề xuất', 'detail' => 'd', 'data' => ['purpose' => 'kb_coordination', 'suggestion' => ['type' => 'new_brain', 'field' => 'Thiết bị sản xuất dược', 'covers' => ['Thiết bị sản xuất', 'GMP và thẩm định', 'Kiểm soát chất lượng'], 'sensitive' => false]]]);
 
         $admin = $this->admin();
         $r = (new \App\Services\Brain\BrainFromSuggestion)->create($this->site, 'Thiết bị sản xuất dược', $article, $admin);
@@ -100,6 +100,9 @@ class BrainSuggestionTest extends TestCase
         $brain = $r['brain'];
         $this->assertSame('Chọn máy theo nhu cầu', $brain->settings['build_direction']['angle']);
         $this->assertStringContainsString('máy dập viên một chày', (string) $brain->description);
+        $this->assertSame('trong', $r['template'], 'Lĩnh vực kỹ thuật không dùng mẫu sức khỏe YMYL.');
+        $this->assertSame('numbers', $brain->reliance());
+        $this->assertSame('low', $brain->riskClass());
         $this->assertSame(2 + 3, $r['topics'], '3 mảng của lĩnh vực rộng + 2 mục dàn ý của bài.');
         $this->assertSame(['Thiết bị sản xuất', 'GMP và thẩm định', 'Kiểm soát chất lượng'], \App\Models\KnowledgeTopic::where('brain_id', $brain->id)->whereNull('parent_id')->whereIn('name', ['Thiết bị sản xuất', 'GMP và thẩm định', 'Kiểm soát chất lượng'])->orderBy('id')->pluck('name')->all());
         $this->assertSame(['Thiết bị sản xuất', 'GMP và thẩm định', 'Kiểm soát chất lượng'], $brain->settings['build_direction']['covers']);
