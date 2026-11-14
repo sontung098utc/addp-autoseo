@@ -40,8 +40,10 @@ final class BrainFromSuggestion
         $refs = $article ? $this->referencesOf($article) : [];
         $plan = $article ? $this->planOf($article) : [];
         $topics = $this->direction($brain, $article, $plan, $covers);
+        // Hồ sơ lĩnh vực (giọng, khung loại bài, thuật ngữ, quy tắc) soạn nháp ĐÚNG lĩnh vực này, không giữ khung của mẫu khác.
+        $profileDraft = (new BrainProfileDrafter(self::lightJson()))->draft($brain, $field, $covers, (string) ($plan['angle'] ?? ''), (string) ($article?->primary_keyword ?? ''), $sensitive);
 
-        $res = ['brain' => $brain->fresh(), 'template' => $template, 'topics' => $topics, 'imported' => 0, 'items_auto' => 0, 'items_proposed' => 0, 'sources' => [], 'registered' => 0, 'seed_error' => null];
+        $res = ['brain' => $brain->fresh(), 'template' => $template, 'topics' => $topics, 'imported' => 0, 'items_auto' => 0, 'items_proposed' => 0, 'sources' => [], 'registered' => 0, 'seed_error' => null, 'profile' => $profileDraft['status']];
         $trusted = [];
         foreach ($refs as $r) {
             $level = SourceTrust::assess($r['url'], $brain, SourceDiscoveryService::fieldFor($field.' '.($article?->primary_keyword ?? '')))['level'];
@@ -81,10 +83,34 @@ final class BrainFromSuggestion
         return $res;
     }
 
+    /** AI nhẹ cho việc soạn nháp hồ sơ: model của vai trò Điều phối/Biên tập (vd. agy), chưa có thì không dùng AI (hồ sơ trung tính). */
+    public static function lightJson(): ?AiJson
+    {
+        try {
+            if (! \App\Services\Agent\Ai\AiModelRouter::isConfigured()) {
+                return null;
+            }
+            $router = new \App\Services\Agent\Ai\AiModelRouter;
+            $chain = [];
+            foreach (['coordinator', 'summary', 'outline'] as $task) {
+                foreach ([$router->target($task)?->ai, $router->fallback($task)?->ai] as $ai) {
+                    if ($ai instanceof \App\Contracts\StructuredAiInterface) {
+                        $chain[] = $ai;
+                    }
+                }
+            }
+            $f = new \App\Services\Ai\FailoverStructuredAi($chain);
+
+            return $f->isEmpty() ? null : new AiJson($f);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     /** Câu thông báo cho người dùng: đã tạo gì, đã nạp gì, còn thiếu gì. @param array<string,mixed> $r kết quả create() */
     public static function summary(array $r): string
     {
-        $t = 'Mẫu dùng: '.$r['template'].'. Định hướng từ bài: '.$r['topics'].' chủ đề của kho. ';
+        $t = 'Mẫu dùng: '.$r['template'].'. Định hướng từ bài: '.$r['topics'].' chủ đề của kho; hồ sơ lĩnh vực '.(($r['profile'] ?? '') === 'done' ? 'đã được soạn nháp theo đúng lĩnh vực (giọng, khung loại bài, thuật ngữ)' : 'dùng bản trung tính (chưa soạn được bằng AI)').'. ';
         $t .= $r['imported'] > 0
             ? 'Đã nạp '.$r['imported'].' nguồn tin cậy tìm được khi viết bài ('.$r['items_auto'].' mục tự nhận, '.$r['items_proposed'].' mục chờ duyệt): '.implode(', ', array_map(fn ($s) => $s['title'] !== '' ? $s['title'] : $s['domain'], array_slice($r['sources'], 0, 3))).'. '
             : 'Chưa nạp nguồn nào'.($r['seed_error'] ? ' ('.$r['seed_error'].')' : ' (bài chưa có nguồn tin cậy để nạp)').'; bài kế tiếp thuộc lĩnh vực này sẽ tự nạp. ';
@@ -177,5 +203,14 @@ final class BrainFromSuggestion
         }
 
         return $made + min(10, count($names));
+    }
+
+    /** Soạn lại hồ sơ lĩnh vực cho một Trí tuệ đã có (dùng định hướng đã lưu trong settings.build_direction). */
+    public function redraftProfile(Brain $brain): array
+    {
+        $dir = (array) (((array) $brain->settings)['build_direction'] ?? []);
+        $sensitive = $brain->riskClass() === 'high';
+
+        return (new BrainProfileDrafter(self::lightJson()))->draft($brain, (string) $brain->name, array_values((array) ($dir['covers'] ?? [])), (string) ($dir['angle'] ?? ''), (string) ($dir['keyword'] ?? ''), $sensitive);
     }
 }
