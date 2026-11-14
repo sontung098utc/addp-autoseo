@@ -19,10 +19,14 @@ final class ReferenceListRenderer
     public static function append(string $html, array $references): string
     {
         $items = [];
+        $existingRefs = preg_match('#<div class="autoseo-refs">.*#s', $html, $mm) ? html_entity_decode($mm[0]) : '';
         foreach ($references as $r) {
             $url = (string) ($r['url'] ?? '');
             if (! preg_match('#^https?://#i', $url)) {
                 continue;
+            }
+            if (! isset($r['_n']) && $existingRefs !== '' && str_contains($existingRefs, 'href="'.$url.'"')) {
+                continue; // cùng một trang đã có trong khối nguồn (vd. từ kho): không liệt kê hai lần
             }
             $host = (string) (preg_replace('/^www\./', '', (string) parse_url($url, PHP_URL_HOST)) ?: ($r['domain'] ?? ''));
             $title = trim(strip_tags((string) ($r['title'] ?? '')));

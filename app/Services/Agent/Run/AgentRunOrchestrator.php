@@ -990,6 +990,12 @@ final class AgentRunOrchestrator
         if ($r['brain_id'] !== null) {
             $this->matchedBrainId = $r['brain_id'];
             $name = (string) (collect($brains)->firstWhere('id', $r['brain_id'])['name'] ?? 'Trí tuệ');
+            $empty = $covered >= self::KB_ENOUGH ? $this->emptyTopics($r['brain_id'], $name) : [];
+            if ($empty !== []) { // đủ cho chủ đề này nhưng các mảng định hướng của kho còn trống: nạp dần theo định hướng
+                $this->topUpBrain($run, $article, $r['brain_id'], $name, $covered, $base + ['empty_topics' => $empty], $r, $empty);
+
+                return;
+            }
             if ($covered >= self::KB_ENOUGH) {
                 $this->step($run, 'research', 'system', 'ok', 'Kho đã đủ cho chủ đề này', 'Chủ đề thuộc Trí tuệ «'.$name.'» ('.$r['field'].'), kho đã có '.$covered.' mục đã duyệt khớp nên không nạp thêm.', $base + ['brain_name' => $name], $r['model'], $r['tokens'], $r['cost']);
 
@@ -1077,7 +1083,7 @@ final class AgentRunOrchestrator
     }
 
     /** Luồng nạp cho đúng Trí tuệ đã xác định: nguồn tin cậy từ web, tối đa 3 nguồn, trần 10% ngân sách phiên. */
-    private function topUpBrain(AgentRun $run, Article $article, int $brainId, string $name, int $covered, array $base, array $cl): void
+    private function topUpBrain(AgentRun $run, Article $article, int $brainId, string $name, int $covered, array $base, array $cl, ?array $topics = null): void
     {
         $webOk = (new \App\Services\Search\WebSearchResolver)->availability()['ok'];
         if (! $webOk) {
@@ -1087,16 +1093,60 @@ final class AgentRunOrchestrator
         }
         try {
             $svc = app(\App\Services\Knowledge\Discover\SourceDiscoveryService::class);
-            $d = $svc->discover($article->website, (string) $article->primary_keyword);
-            $trusted = array_values(array_filter($d['candidates'], fn ($c) => $c['trust']['level'] === 'trusted'));
-            $imp = $svc->import($article->website, $trusted, null, ['as_system' => true, 'brain_id' => $brainId, 'max_sources' => 4, 'only_trusted' => true, 'field' => $d['field'], 'budget_cap_vnd' => $this->policy->budgetVnd * 0.1, 'purpose' => 'gap',
-                'search' => ['query' => $d['query'], 'results' => count($d['candidates']), 'cost_vnd' => $d['cost_vnd'], 'provider' => $d['provider']]]);
-            $this->step($run, 'research', 'system', $imp['imported'] > 0 ? 'ok' : 'warn', 'Nạp kho «'.$name.'»: '.$imp['imported'].' nguồn mới',
-                'Kho mới có '.$covered.' mục khớp chủ đề nên điều phối chạy luồng nạp TRƯỚC khi viết: '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.',
+            // Có danh sách mảng còn trống thì nạp theo TỪNG MẢNG (truy vấn = tên Trí tuệ + tên mảng, 2 nguồn mỗi mảng); không thì nạp theo chủ đề của bài (tối đa 4 nguồn).
+            $queries = $topics !== null ? array_map(fn ($t) => $name.' '.$t, array_slice($topics, 0, 2)) : [(string) $article->primary_keyword];
+            $imp = ['imported' => 0, 'items_auto' => 0, 'items_proposed' => 0, 'pages' => [], 'auto_item_ids' => [], 'proposed_item_ids' => [], 'cost_vnd' => 0.0, 'run_id' => null];
+            foreach ($queries as $q) {
+                $d = $svc->discover($article->website, $q);
+                $trusted = array_values(array_filter($d['candidates'], fn ($c) => $c['trust']['level'] === 'trusted'));
+                $one = $svc->import($article->website, $trusted, null, ['as_system' => true, 'brain_id' => $brainId, 'max_sources' => $topics !== null ? 2 : 4, 'only_trusted' => true, 'field' => $d['field'], 'budget_cap_vnd' => $this->policy->budgetVnd * 0.1, 'purpose' => 'gap',
+                    'search' => ['query' => $d['query'], 'results' => count($d['candidates']), 'cost_vnd' => $d['cost_vnd'], 'provider' => $d['provider']]]);
+                foreach (['imported', 'items_auto', 'items_proposed'] as $k) {
+                    $imp[$k] += (int) $one[$k];
+                }
+                $imp['cost_vnd'] += (float) $one['cost_vnd'];
+                $imp['run_id'] ??= $one['run_id'];
+                $imp['pages'] = array_merge($imp['pages'], (array) $one['pages']);
+                $imp['auto_item_ids'] = array_merge($imp['auto_item_ids'], (array) $one['auto_item_ids']);
+                $imp['proposed_item_ids'] = array_merge($imp['proposed_item_ids'], (array) $one['proposed_item_ids']);
+            }
+            $this->step($run, 'research', 'system', $imp['imported'] > 0 ? 'ok' : 'warn',
+                $topics !== null ? 'Nạp kho «'.$name.'» cho mảng còn trống ('.implode(', ', array_slice($topics, 0, 2)).'): '.$imp['imported'].' nguồn mới' : 'Nạp kho «'.$name.'»: '.$imp['imported'].' nguồn mới',
+                $topics !== null
+                    ? 'Kho đã đủ cho chủ đề này nhưng các mảng định hướng của kho còn chưa có kiến thức; điều phối nạp dần theo định hướng TRƯỚC khi viết: '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.'
+                    : 'Kho mới có '.$covered.' mục khớp chủ đề nên điều phối chạy luồng nạp TRƯỚC khi viết: '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.',
                 $base + $this->kbStepData($imp, $brainId) + ['imported' => $imp['imported'], 'items_auto' => $imp['items_auto'], 'items_proposed' => $imp['items_proposed'], 'build_run_id' => $imp['run_id']], $cl['model'], $cl['tokens'], $cl['cost'] + (float) $imp['cost_vnd']);
         } catch (Throwable $e) {
             report($e);
             $this->step($run, 'research', 'system', 'warn', 'Chưa nạp được kho «'.$name.'»', ErrorMasker::short($e->getMessage(), 160).' Bài vẫn viết từ các nguồn tìm được.', $base, $cl['model'], $cl['tokens'], $cl['cost']);
+        }
+    }
+
+    /**
+     * Các mảng ĐỊNH HƯỚNG của Trí tuệ (chủ đề cấp một, trừ nhánh "Từ bài") còn chưa có mục đã duyệt nào, dùng để nạp dần theo định hướng thay vì chỉ theo chủ đề của từng bài.
+     *
+     * @return list<string> tối đa 2 tên mảng
+     */
+    private function emptyTopics(int $brainId, string $brainName): array
+    {
+        try {
+            $out = [];
+            foreach (\App\Models\KnowledgeTopic::query()->where('brain_id', $brainId)->whereNull('parent_id')->orderBy('id')->get() as $t) {
+                if (str_starts_with((string) $t->name, 'Từ bài')) {
+                    continue;
+                }
+                $ids = \App\Models\KnowledgeTopic::query()->where('parent_id', $t->id)->pluck('id')->push($t->id);
+                if (! \App\Models\KnowledgeItem::query()->whereIn('topic_id', $ids)->where('status', 'approved')->exists()) {
+                    $out[] = (string) $t->name;
+                }
+                if (count($out) >= 2) {
+                    break;
+                }
+            }
+
+            return $out;
+        } catch (Throwable) {
+            return [];
         }
     }
 

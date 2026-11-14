@@ -51,4 +51,12 @@ class ReferenceListRendererTest extends TestCase
         $this->assertSame(1, substr_count($out, 'autoseo-refs'));
         $this->assertStringContainsString('<li id="nguon-2"><a href="https://who.int/a"', $out);
     }
+
+    public function test_khong_liet_ke_hai_lan_cung_mot_trang_da_co_trong_khoi_nguon_tu_kho(): void
+    {
+        $html = '<p>A.</p><div class="autoseo-refs"><p><strong>Nguồn tham khảo</strong></p><ol><li id="nguon-1"><a href="https://pmc.ncbi.nlm.nih.gov/x" rel="nofollow">Bài PMC (pmc.ncbi.nlm.nih.gov)</a></li></ol></div>';
+        $out = ReferenceListRenderer::append($html, [['title' => 'Bài PMC', 'domain' => 'pmc.ncbi.nlm.nih.gov', 'url' => 'https://pmc.ncbi.nlm.nih.gov/x'], ['title' => 'Khác', 'domain' => 'who.int', 'url' => 'https://who.int/y']]);
+        $this->assertSame(1, substr_count($out, 'href="https://pmc.ncbi.nlm.nih.gov/x"'));
+        $this->assertStringContainsString('https://who.int/y', $out);
+    }
 }
