@@ -27,7 +27,7 @@ return [
         ['id' => 'images', 'role' => 'designer', 'label' => 'Tạo ảnh', 'kind' => 'rule', 'parallel' => 'write', 'when' => 'Chạy song song với bước viết theo kế hoạch ảnh (trần chi phí ảnh theo ngân sách phiên); ô lỗi được thử lại một lần'],
         ['id' => 'edit', 'role' => 'editor', 'label' => 'Biên tập', 'kind' => 'llm', 'task' => 'write', 'when' => 'Sau khi chấm bản đầu nếu có AI cho viết/biên tập: biên tập viên đọc bài như người thật, nêu chỗ nói vòng, chung chung, thiếu ý; có điểm nghiêm trọng thì người viết sửa trực tiếp bản đang có'],
         ['id' => 'grade', 'role' => 'editor', 'label' => 'Chấm điểm', 'kind' => 'rule'],
-        ['id' => 'repair', 'role' => 'writer', 'label' => 'Sửa', 'kind' => 'llm', 'task' => 'repair', 'when' => 'Chỉ khi còn lỗi chặn; tối đa 3 vòng'],
+        ['id' => 'repair', 'role' => 'writer', 'label' => 'Sửa', 'kind' => 'llm', 'task' => 'repair', 'when' => 'Chỉ khi còn lỗi chặn; đến khi đạt mọi tiêu chí (tối đa 8 vòng)'],
         ['id' => 'assemble', 'role' => 'system', 'label' => 'Lắp ráp', 'kind' => 'rule', 'when' => 'Sau khi bài đạt: ghép ảnh vào bài theo kế hoạch (ảnh bìa gắn làm ảnh đại diện, ảnh trong bài chèn sau mục tương ứng)'],
         ['id' => 'learn', 'role' => 'system', 'label' => 'Học vào kho', 'kind' => 'rule', 'when' => 'Sau khi bài đã lưu: nạp các nguồn tin cậy bài đã dùng vào Trí tuệ đã xác định cho các bài sau; chỉ khi chủ đề thuộc một Trí tuệ'],
         ['id' => 'handoff', 'human' => true, 'role' => 'system', 'label' => 'Bàn giao', 'kind' => 'rule'],

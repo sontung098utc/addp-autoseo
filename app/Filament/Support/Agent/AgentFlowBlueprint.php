@@ -57,7 +57,7 @@ final class AgentFlowBlueprint
                 'what' => 'ContentQualityChecker quyết định đạt hay không, AI không được tự chấm.',
                 'built' => '10 luật có sẵn (gồm từ cấm BAN01), đã chạy thật trong hệ thống.',
                 'dev1' => 'Không cần thêm; chỉ nối cài đặt từ cấm theo website sau khi có hồ sơ doanh nghiệp (AG-K11).', 'task' => 'AG-K11'],
-            ['stage' => 'repair', 'title' => 'Tự sửa (tối đa 3 vòng)', 'role' => 'Người viết', 'readiness' => 'in_development',
+            ['stage' => 'repair', 'title' => 'Tự sửa (đến khi đạt mọi tiêu chí (tối đa 8 vòng))', 'role' => 'Người viết', 'readiness' => 'in_development',
                 'what' => 'Gửi lỗi chặn cho AI sửa; dừng khi hết vòng, hết ngân sách hoặc không cải thiện.',
                 'built' => 'Vòng lặp tất định có giới hạn, có test.',
                 'dev1' => 'Ngân sách và ngắt mạch thật theo ngày/tháng (AG-B09); thử với model thật để đo hội tụ (AG-K09).', 'task' => 'AG-B09'],

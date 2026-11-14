@@ -38,7 +38,7 @@ final class PipelineBlueprint
             ['n' => 6, 'id' => 'write', 'title' => 'Viết bài', 'role' => 'Người viết', 'nodes' => ['guard', 'brief', 'write', 'retry'], 'features' => ['run.slice', 'content.generate'], 'run_stages' => ['guard', 'brief', 'write', 'retry'],
                 'source' => 'Phiên chạy của đội AI (agent_runs). Mới được kiểm bằng test giả lập, chưa qua model thật ở quy mô.', 'gate' => 'Có bản nháp được tạo', 'dev1' => []],
             ['n' => 7, 'id' => 'quality', 'title' => 'Kiểm tra chất lượng', 'role' => 'Biên tập (tự động)', 'nodes' => ['risk', 'grade', 'repair', 'decision'], 'features' => ['content.quality', 'ai.selfrepair'], 'run_stages' => ['risk', 'grade', 'repair', 'decision'],
-                'source' => 'ContentQualityChecker (luật) và vòng tự sửa tối đa 3 vòng.', 'gate' => 'Không còn lỗi chặn P0', 'dev1' => []],
+                'source' => 'ContentQualityChecker (luật) và vòng tự sửa đến khi đạt mọi tiêu chí (tối đa 8 vòng).', 'gate' => 'Không còn lỗi chặn P0', 'dev1' => []],
             ['n' => 8, 'id' => 'publish', 'title' => 'Xuất bản', 'role' => 'Hệ thống', 'nodes' => ['handoff (bản nháp)', 'tự đăng: khóa'], 'features' => ['run.slice', 'publish.schedule'], 'run_stages' => ['handoff'],
                 'source' => 'Bậc T1: chỉ tạo bản nháp (và đẩy nháp lên CMS ở chế độ Cân bằng). Tự đăng bị khóa tới khi có văn bản chính sách.', 'gate' => 'Không bao giờ tự xuất bản ở T1', 'dev1' => []],
             ['n' => 9, 'id' => 'measure', 'title' => 'Đo lường', 'role' => 'Phân tích', 'nodes' => ['perf.measure', 'perf.recommend'], 'features' => ['gsc'], 'run_stages' => [],

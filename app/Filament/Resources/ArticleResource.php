@@ -86,7 +86,7 @@ class ArticleResource extends Resource
         return static::user()?->isAdmin() ?? false;
     }
 
-    public const ASSIGN_DESCRIPTION = 'Đội AI sẽ kiểm an toàn, phân hạng rủi ro, lập dàn ý, viết, tự chấm và sửa (tối đa 3 vòng). Kết quả luôn là BẢN NHÁP chờ người duyệt; không có gì được tự đăng.';
+    public const ASSIGN_DESCRIPTION = 'Đội AI sẽ kiểm an toàn, phân hạng rủi ro, lập dàn ý, viết, tự chấm và sửa (đến khi đạt mọi tiêu chí (tối đa 8 vòng)). Kết quả luôn là BẢN NHÁP chờ người duyệt; không có gì được tự đăng.';
 
     public static function canView(Model $record): bool
     {

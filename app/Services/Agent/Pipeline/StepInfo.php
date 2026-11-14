@@ -17,7 +17,7 @@ final class StepInfo
         'article_write.write' => [null, 'Viết bản nháp theo dàn ý.', 'Đây là bước tạo nội dung chính.', 'HTML luôn qua bộ làm sạch XSS.'],
         'article_write.images' => [null, 'Tạo hoặc chọn ảnh cho bài.', 'Bài có ảnh minh họa dễ đọc hơn.', 'Bỏ qua nếu đã có ảnh bìa hoặc hết trần chi phí ảnh.'],
         'article_write.grade' => [null, 'Chấm bản nháp bằng luật chất lượng.', 'AI không được tự chấm bài của chính nó.', 'ContentQualityChecker: lỗi P0 chặn, P1 P2 cảnh báo.'],
-        'article_write.repair' => [null, 'Sửa các lỗi chặn rồi chấm lại, tối đa 3 vòng.', 'Tự khắc phục lỗi để người duyệt ít phải làm lại.', 'Dừng khi hết vòng, hết ngân sách hoặc điểm không tăng.'],
+        'article_write.repair' => [null, 'Sửa đúng từng tiêu chí chưa đạt rồi chấm lại, đến khi đạt hết (tối đa 8 vòng).', 'Tự khắc phục lỗi để người duyệt ít phải làm lại.', 'Dừng khi hết vòng, hết ngân sách hoặc điểm không tăng.'],
         'article_write.handoff' => [null, 'Lưu bản nháp và chuyển cho bạn duyệt.', 'Hệ thống không bao giờ tự xuất bản.', 'Bậc tin cậy T1: chỉ tạo bản nháp.'],
         'article_refresh.guard' => [null, 'Kiểm điều kiện an toàn trước khi sửa bài cũ.', 'Tránh tốn chi phí khi hệ thống đang bị khóa.', null],
         'article_refresh.grade_old' => [null, 'Chấm bản hiện tại để biết chỗ yếu.', 'Có điểm "trước" để so sánh với bản mới.', 'Cùng luật chất lượng với bài mới.'],
