@@ -9,11 +9,11 @@
     $repairs = collect($t['cards'])->flatMap(fn ($c) => $c['subs'])->firstWhere('code', 'repair')['count'] ?? 0;
 @endphp
 <div class="ft" data-testid="flow-graph" x-ref="ft"
-    x-data="{ items: [], draw() { const c = this.$refs.ft; const cr = c.getBoundingClientRect(); let E = []; try { E = JSON.parse(this.$refs.events.textContent || '[]'); } catch (e) {}
-        const svg = this.$refs.arcs; svg.querySelectorAll('.ft-arc').forEach(n => n.remove()); const items = []; const co = c.querySelector('[data-coord]'); if (!co) { this.items = []; return; }
+    x-data="{ items: [], sig: '', draw() { const c = this.$refs.ft; const cr = c.getBoundingClientRect(); let E = []; try { E = JSON.parse(this.$refs.events.textContent || '[]'); } catch (e) {}
+        const svg = this.$refs.arcs; const items = []; const specs = []; const co = c.querySelector('[data-coord]'); if (!co) { this.items = []; return; }
         const xr = co.getBoundingClientRect().right - cr.left; const slot = {}; const occ = {}; let back = 0;
         const card = (g) => c.querySelector('[data-card=&quot;' + g + '&quot;]');
-        const mk = (d, kind, live) => { const el = document.createElementNS('http://www.w3.org/2000/svg', 'path'); el.setAttribute('d', d); el.setAttribute('fill', 'none'); el.setAttribute('class', 'ft-arc ft-arc--' + kind + (live ? ' ft-arc--live' : '')); el.setAttribute('marker-end', 'url(#ft-ar-' + kind + ')'); el.setAttribute('data-testid', 'flow-arc'); svg.appendChild(el); };
+        const mk = (d, kind, live) => { specs.push({ d: d, kind: kind, live: !!live }); };
         E.forEach((e, idx) => {
             if (e.dir === 'give' || e.dir === 'report') { const cd = card(e.card); if (!cd) return; const r = cd.getBoundingClientRect(); const xl = r.left - cr.left;
                 const s = slot[e.card] = (slot[e.card] ?? -1) + 1; const y = r.top - cr.top + 50 + s * 24; const give = e.dir === 'give'; const kind = give ? 'give' : (['warn', 'failed', 'blocked'].includes(e.state) ? 'warn' : 'report');
@@ -32,10 +32,16 @@
                 mk('M' + x1 + ' ' + y + 'H' + (x2 - 1), 'par'); items.push({ k: idx, n: e.n, x: (x1 + x2) / 2, y: y, mx: (x1 + x2) / 2, label: null, kind: 'par', sub: e.label }); return; }
             if (e.dir === 'join') { const x1 = br.right - cr.left, xs = ar.left - cr.left + ar.width / 2, y1 = ar.bottom - cr.top, y2 = br.top - cr.top + 40;
                 mk('M' + xs + ' ' + y1 + 'V' + y2 + 'H' + (x1 + 1), 'par'); items.push({ k: idx, n: e.n, x: xs, y: (y1 + y2) / 2, mx: xs, label: null, kind: 'par', sub: e.label }); } });
+        /* Chỉ vẽ lại khi hình thật sự đổi (kích thước, bước mới): trang tự làm mới mỗi vài giây nên vẽ lại liên tục làm đường nháy và hiệu ứng chạy bị reset. */
+        const sig = JSON.stringify([specs, items.map(i => [i.n, i.x, i.y, i.label, i.live])]);
+        if (sig === this.sig && svg.querySelectorAll('.ft-arc').length === specs.length) return;
+        this.sig = sig; svg.querySelectorAll('.ft-arc').forEach(n => n.remove());
+        for (const sp of specs) { const el = document.createElementNS('http://www.w3.org/2000/svg', 'path'); el.setAttribute('d', sp.d); el.setAttribute('fill', 'none'); el.setAttribute('class', 'ft-arc ft-arc--' + sp.kind + (sp.live ? ' ft-arc--live' : '')); el.setAttribute('marker-end', 'url(#ft-ar-' + sp.kind + ')'); el.setAttribute('data-testid', 'flow-arc'); svg.appendChild(el); }
         this.items = items; } }"
-    x-init="$nextTick(() => draw()); if (window.ResizeObserver) new ResizeObserver(() => draw()).observe($refs.ft); document.fonts && document.fonts.ready.then(() => draw()); const svg0 = $refs.arcs; new MutationObserver(() => { if (!svg0.querySelector('.ft-arc')) $nextTick(() => draw()); }).observe(svg0, { childList: true }); new MutationObserver(() => $nextTick(() => draw())).observe($refs.events, { childList: true, characterData: true, subtree: true })" x-on:resize.window.debounce.100ms="draw()">
+    x-init="$nextTick(() => draw()); if (window.ResizeObserver) new ResizeObserver(() => draw()).observe($refs.ft); document.fonts && document.fonts.ready.then(() => draw()); new MutationObserver(() => $nextTick(() => draw())).observe($refs.events, { childList: true, characterData: true, subtree: true })" x-on:resize.window.debounce.100ms="draw()">
     <script type="application/json" x-ref="events" @if ($t['events'] !== []) data-testid="flow-edges" @endif>{!! json_encode($t['events'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) !!}</script>
     @if ($repairs > 0)<span data-testid="flow-loop" class="sr-only">↻ {{ $repairs }} vòng sửa</span>@endif
+    <div class="ft-overlay" wire:ignore>
     <svg class="ft-arcs" x-ref="arcs" aria-hidden="true">
         <defs>
             @foreach (['give' => '#7c3aed', 'report' => '#059669', 'warn' => '#d97706', 'direct' => '#059669', 'back' => '#059669', 'par' => '#0284c7'] as $k => $col)
@@ -49,6 +55,7 @@
     <template x-for="it in items.filter(i => i.label || i.sub)" :key="'l' + it.k">
         <span :class="'ft-chip ft-chip--' + it.kind" :style="'left:' + (it.kind === 'par' ? it.x - 40 : (it.kind === 'direct' ? it.x : it.mx)) + 'px;top:' + (it.kind === 'par' ? it.y - 16 : it.y) + 'px'" x-text="it.label || it.sub"></span>
     </template>
+    </div>
 
     <div class="ft-grid">
         <aside class="ft-coord" data-coord data-testid="flow-coordinator">
@@ -104,6 +111,7 @@
 </div>
 @once
 <style>
+    .ft-overlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:2}
     .ft{position:relative;width:100%;max-width:1180px;margin:0 auto;padding:.2rem 0 .4rem}
     .ft-grid{display:grid;grid-template-columns:210px 270px minmax(0,1fr);align-items:stretch}
     .ft-arcs{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2}
