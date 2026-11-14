@@ -157,13 +157,20 @@ final class ImageDesigner
         return $res;
     }
 
-    /** Mô tả cho model ảnh: bỏ câu đòi chữ/logo/watermark, làm sạch, giới hạn độ dài. */
+    /**
+     * Mô tả cho model ảnh: làm sạch, GỠ các cụm phủ định ("no text", "without logos") vì khung an toàn cố định sẽ được nối lại ở cuối, rồi bỏ những câu còn ĐÒI chữ/logo/watermark.
+     * (Trước đây bỏ cả câu chứa từ "text" nên câu "..., no text, no logos." làm mất cả mô tả.)
+     */
     public static function safePrompt(string $p): string
     {
         $p = trim(preg_replace('/[\x00-\x1F\x7F"<>`{}\\\\]+/u', ' ', strip_tags($p)) ?? '');
+        $word = '(?:texts|text|logos|logo|watermarks|watermark|labels|label|captions|caption|letters|letter|numbers|number|symbols|symbol|typography|lettering|slogans|slogan|signage|writing)';
+        $p = preg_replace('/[,;]?\s*(?:with\s+)?\b(?:no|without|avoid|zero)\s+(?:any\s+)?'.$word.'(?:\s*(?:,|and|or|&)\s*(?:no\s+|any\s+)?'.$word.')*/iu', '', $p) ?? $p;
         $sentences = preg_split('/(?<=[.!?])\s+/u', preg_replace('/\s+/u', ' ', $p) ?? '') ?: [];
-        $keep = array_filter($sentences, fn ($s) => ! preg_match('/\b(text|caption|logo|watermark|label|typography|lettering|slogan|signage)\b/i', $s) || preg_match('/^\s*(no|without|avoid)\b/i', $s));
+        $keep = array_filter($sentences, fn ($s) => ! preg_match('/\b'.$word.'\b/i', $s));
+        $out = trim(implode(' ', $keep));
+        $out = trim((string) preg_replace('/\s+([,.;])/u', '$1', $out), " ,;");
 
-        return mb_substr(trim(implode(' ', $keep)), 0, 700);
+        return mb_substr($out, 0, 700);
     }
 }

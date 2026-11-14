@@ -113,4 +113,13 @@ class ImageDesignerTest extends TestCase
         $plan = ImagePlanner::plan($this->article(), [['level' => 'H2', 'heading' => 'Uống nước — Lượng nước mỗi ngày.']], ['brand' => null]);
         $this->assertSame('Uống nước', $plan['slots'][1]['section_heading']);
     }
+
+    public function test_safe_prompt_go_cum_phu_dinh_thay_vi_mat_ca_cau(): void
+    {
+        $this->assertSame('3D isometric illustration of two tablet press machines in a clean lab. Clean cool lighting, blue and white tones', ImageDesigner::safePrompt('3D isometric illustration of two tablet press machines in a clean lab. Clean cool lighting, blue and white tones, no text, no logos.'));
+        $this->assertNotSame('', ImageDesigner::safePrompt('A single punch press on a bench, soft light, without any text or labels'));
+        $out = ImageDesigner::safePrompt('Machine on a table. Add a logo and a text caption on it. Soft morning light.');
+        $this->assertStringNotContainsString('logo', $out);
+        $this->assertStringContainsString('Soft morning light', $out);
+    }
 }
