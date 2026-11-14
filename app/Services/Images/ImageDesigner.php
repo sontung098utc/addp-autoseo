@@ -60,6 +60,9 @@ final class ImageDesigner
         try {
             $d = $this->ai->call(self::briefPrompt($nonce, AiJson::clean($article->primary_keyword, 160), AiJson::clean($article->search_intent ?: 'informational', 30), max(0, $maxInline), $libraryCover, AiJson::clean($angle, 260)), $framed);
         } catch (\Throwable $e) {
+            if ($e instanceof \App\Services\Ai\AiQuotaExceeded) {
+                throw $e; // hết hạn mức: để phiên dừng rõ ràng, không lặng lẽ bỏ bước
+            }
             $res['reason'] = mb_substr(\App\Filament\Support\Schedule\ErrorMasker::mask($e->getMessage()) ?: class_basename($e), 0, 160);
 
             return $res;
@@ -127,6 +130,9 @@ final class ImageDesigner
         try {
             $d = $this->ai->call(self::designPrompt($nonce, AiJson::clean($article->primary_keyword, 160), $health, $skill, AiJson::clean($style, 100)), $framed);
         } catch (\Throwable $e) {
+            if ($e instanceof \App\Services\Ai\AiQuotaExceeded) {
+                throw $e; // hết hạn mức: để phiên dừng rõ ràng, không lặng lẽ bỏ bước
+            }
             $res['reason'] = mb_substr(\App\Filament\Support\Schedule\ErrorMasker::mask($e->getMessage()) ?: class_basename($e), 0, 160);
 
             return $res;

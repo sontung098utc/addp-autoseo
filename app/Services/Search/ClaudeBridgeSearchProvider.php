@@ -51,7 +51,10 @@ final class ClaudeBridgeSearchProvider implements WebSearchProvider
             throw new WebSearchUnavailable('Không gọi được cầu nối tìm kiếm: '.mb_substr(str_replace((string) $p->api_key, '***', $e->getMessage()), 0, 150));
         }
         if (! $resp->successful()) {
-            throw new WebSearchUnavailable('Cầu nối tìm kiếm trả mã '.$resp->status().($resp->status() === 429 ? ' (hết hạn mức Claude)' : '').'.');
+            if ($resp->status() === 429) { // hết hạn mức của Claude: mã 429 để bộ điều phối DỪNG phiên thay vì lặng lẽ viết thiếu nguồn
+                throw new WebSearchUnavailable('Claude đã hết hạn mức: '.mb_substr(trim((string) $resp->json('error.message')), 0, 160), 429);
+            }
+            throw new WebSearchUnavailable('Cầu nối tìm kiếm trả mã '.$resp->status().'.');
         }
         $out = [];
         foreach ((array) $resp->json('results') as $r) {

@@ -196,7 +196,7 @@ final class AgentRunOrchestrator
 
             return $this->finish($run, 'failed', $e->getMessage().' Phiên dừng; chưa có bản nháp nào được tạo.');
         } catch (\App\Services\Ai\AiQuotaExceeded $e) {
-            $this->step($run, 'handoff', 'system', 'failed', 'Hết hạn mức ngày của nhà cung cấp AI', $e->getMessage().' Không thử lại vì chờ vài giây không giúp ích; không thay bằng AI giả lập, bài được trả về trạng thái cũ.', ['error' => 'AiQuotaExceeded']);
+            $this->step($run, 'handoff', 'system', 'failed', 'Hết hạn mức của nhà cung cấp AI', $e->getMessage().' Không thử lại vì chờ vài giây không giúp ích; không thay bằng AI giả lập, bài được trả về trạng thái cũ. Chạy lại sau khi hạn mức đặt lại.', ['error' => 'AiQuotaExceeded']);
             $article->update(['workflow_status' => $previousStatus]);
 
             return $this->finish($run, 'failed', 'Hết hạn mức theo ngày của nhà cung cấp AI cho model này. Chưa có bản nháp nào được tạo; đổi model, chờ hạn mức đặt lại hoặc bật thanh toán.');
@@ -1127,6 +1127,9 @@ final class AgentRunOrchestrator
             report($e);
 
             return;
+        }
+        if ($r['status'] === 'quota') { // hết hạn mức của AI/tìm kiếm: DỪNG phiên (bài về trạng thái cũ) thay vì viết tiếp thiếu nguồn rồi nhìn như đã làm xong
+            throw new \App\Services\Ai\AiQuotaExceeded((string) $r['reason']);
         }
         $this->references = $r['references'];
         $n = count($r['references']);

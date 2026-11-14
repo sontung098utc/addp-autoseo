@@ -43,6 +43,9 @@ final class KnowledgeCoordinator
         try {
             $d = $this->ai->call(self::systemPrompt($nonce, AiJson::clean($keyword, 160)), $framed);
         } catch (\Throwable $e) {
+            if ($e instanceof \App\Services\Ai\AiQuotaExceeded) {
+                throw $e; // hết hạn mức: để phiên dừng rõ ràng, không lặng lẽ bỏ bước
+            }
             $res['reason'] = mb_substr(\App\Filament\Support\Schedule\ErrorMasker::mask($e->getMessage()) ?: class_basename($e), 0, 160);
 
             return $res;

@@ -365,7 +365,7 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
         }
         $msg = $response->json('error.message');
 
-        return is_string($msg) && (bool) preg_match('/\b(per day|daily|requests per day|RPD)\b/i', $msg);
+        return is_string($msg) && (bool) preg_match('/\b(per day|daily|requests per day|RPD|session limit|usage limit|hit your .{0,20}limit)\b/i', $msg);
     }
 
     /** Đổi phản hồi HTTP thành dữ liệu hoặc lỗi đã phân loại. Không đưa nội dung phản hồi vào thông điệp lỗi. */

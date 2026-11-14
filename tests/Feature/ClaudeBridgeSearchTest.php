@@ -56,10 +56,45 @@ class ClaudeBridgeSearchTest extends TestCase
             (new ClaudeBridgeSearchProvider)->search('x');
             $this->fail('phải ném lỗi');
         } catch (WebSearchUnavailable $e) {
-            $this->assertStringContainsString('429', $e->getMessage());
+            $this->assertStringContainsString('hết hạn mức', $e->getMessage());
+            $this->assertSame(429, $e->getCode());
         }
         config(['ai_models.private_base_url_allowlist' => []]);
         $this->expectException(WebSearchUnavailable::class);
         (new ClaudeBridgeSearchProvider)->search('x');
+    }
+
+    public function test_het_han_muc_claude_thi_phien_dung_ro_rang_thay_vi_viet_tiep_thieu_nguon(): void
+    {
+        $this->provider();
+        Http::fake(['172.17.0.1:8771/v1/search' => Http::response(['error' => ['message' => "Claude CLI lỗi: You've hit your session limit · resets 10:50am"]], 429)]);
+        $this->app->detectEnvironment(fn () => 'local');
+        $site = \App\Models\Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+        $r = (new \App\Services\Content\ReferenceDossier)->gather($site, 'máy dập viên');
+        $this->assertSame('quota', $r['status']);
+        $this->assertStringContainsString('resets 10:50am', (string) $r['reason'], 'Thông báo nêu giờ hạn mức đặt lại.');
+
+        $article = \App\Models\Article::create(['website_id' => $site->id, 'primary_keyword' => 'máy dập viên', 'workflow_status' => 'planned']);
+        $ai = new class implements \App\Contracts\AiProviderInterface
+        {
+            public function generateOutline(\App\Models\Article $article, array $options = []): array
+            {
+                return ['outline' => ['A'], 'tokens_used' => 1, 'model' => 'fake'];
+            }
+
+            public function generateArticle(\App\Models\Article $article, array $outline, array $options = []): array
+            {
+                throw new \RuntimeException('Không được viết khi hết hạn mức.');
+            }
+
+            public function calculateCostVnd(int $promptTokens, int $completionTokens, string $model): float
+            {
+                return 0.0;
+            }
+        };
+        $run = (new \App\Services\Agent\Run\AgentRunOrchestrator($ai, sleep: fn () => null))->run($article);
+        $this->assertSame('failed', $run->status);
+        $this->assertSame('planned', $article->fresh()->workflow_status, 'Bài về trạng thái cũ, không có bản nháp thiếu nguồn.');
+        $this->assertTrue($run->steps->contains(fn ($s) => str_contains($s->title, 'Hết hạn mức')));
     }
 }

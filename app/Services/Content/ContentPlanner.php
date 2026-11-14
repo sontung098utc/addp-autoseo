@@ -76,6 +76,9 @@ final class ContentPlanner
         try {
             $data = $this->ai->call(self::systemPrompt($nonce, AiJson::clean($keyword, 160), AiJson::clean($intent, 30), AiJson::clean($risk, 10)), $framed);
         } catch (\Throwable $e) {
+            if ($e instanceof \App\Services\Ai\AiQuotaExceeded) {
+                throw $e; // hết hạn mức: để phiên dừng rõ ràng, không lặng lẽ bỏ bước
+            }
             $res['reason'] = mb_substr(\App\Filament\Support\Schedule\ErrorMasker::mask($e->getMessage()) ?: class_basename($e), 0, 200);
 
             return $res;

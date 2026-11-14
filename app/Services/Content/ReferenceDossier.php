@@ -45,7 +45,7 @@ final class ReferenceDossier
             $out['cost_vnd'] += $r['cost_vnd'];
             $out['provider'] ??= $r['provider'];
             $out['query'] ??= $r['query'];
-            if (in_array($r['status'], ['unavailable', 'error', 'demo'], true)) {
+            if (in_array($r['status'], ['unavailable', 'error', 'demo', 'quota'], true)) {
                 if ($out['references'] === []) {
                     return ['status' => $r['status'], 'reason' => $r['reason']] + $out;
                 }
@@ -84,7 +84,7 @@ final class ReferenceDossier
         try {
             $d = ($this->discovery ?? new SourceDiscoveryService)->discover($site, $keyword, ['max_results' => 8]);
         } catch (WebSearchUnavailable $e) {
-            return ['status' => 'unavailable', 'reason' => mb_substr($e->getMessage(), 0, 200)] + $out;
+            return ['status' => $e->getCode() === 429 ? 'quota' : 'unavailable', 'reason' => mb_substr($e->getMessage(), 0, 200)] + $out;
         } catch (\Throwable $e) {
             report($e);
 
