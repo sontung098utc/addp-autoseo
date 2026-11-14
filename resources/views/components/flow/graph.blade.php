@@ -4,14 +4,10 @@
     vòng Chấm ↔ Sửa. Bấm một ô: đặt `sel` của khung cha (x-data của run-flow). Tự thu nhỏ vừa khung nếu hẹp (không nhỏ hơn 70%, hẹp hơn thì cuộn ngang).
 --}}
 @php use App\Filament\Support\Agent\RunFlow; @endphp
-<div class="fg-wrap" x-data="{ s: 1, fit() { const w = this.$refs.box.clientWidth; this.s = Math.max(0.85, Math.min(1, w / {{ $g['width'] }})); } }" x-init="fit()" x-on:resize.window.debounce.150ms="fit()" data-testid="flow-graph">
+<div class="fg-wrap" x-data="{ s: 1, fit() { const w = this.$refs.box.clientWidth || {{ $g['width'] }}; this.s = Math.max(0.7, Math.min(1, w / {{ $g['width'] }})); } }" x-init="fit(); if (window.ResizeObserver) new ResizeObserver(() => fit()).observe($refs.box)" x-on:resize.window.debounce.150ms="fit()" data-testid="flow-graph">
     <div x-ref="box" class="fg-scroll">
         <div class="fg-canvas" x-bind:style="'width:' + ({{ $g['width'] }} * s) + 'px;height:' + ({{ $g['height'] }} * s) + 'px'">
             <div class="fg-stage" style="width:{{ $g['width'] }}px;height:{{ $g['height'] }}px" x-bind:style="'width:{{ $g['width'] }}px;height:{{ $g['height'] }}px;transform:scale(' + s + ')'">
-                @foreach ($g['lanes'] as $i => $lane)
-                    <div class="fg-lane @if ($i % 2) fg-lane--alt @endif" style="top:{{ $lane['y'] }}px;height:{{ $lane['h'] }}px"><span>{{ $lane['label'] }}</span></div>
-                @endforeach
-
                 <svg class="fg-edges" width="{{ $g['width'] }}" height="{{ $g['height'] }}" viewBox="0 0 {{ $g['width'] }} {{ $g['height'] }}" aria-hidden="true">
                     <defs>
                         @foreach (['idle' => '#94a3b8', 'done' => '#059669', 'live' => '#0284c7', 'loop' => '#7c3aed'] as $k => $c)
@@ -24,30 +20,31 @@
                 </svg>
                 @foreach ($g['edges'] as $e)
                     @if ($e['label'])
-                        <span class="fg-elabel fg-elabel--{{ $e['state'] }}" style="left:{{ $e['lx'] }}px;top:{{ $e['ly'] }}px" @if ($e['kind'] === 'loop' && $e['from'] === 'grade' && $e['state'] === 'loop') data-testid="flow-loop" data-loop @endif>{{ $e['label'] }}</span>
+                        <span class="fg-elabel fg-elabel--{{ $e['state'] }}" style="left:{{ $e['lx'] }}px;top:{{ $e['ly'] }}px" @if ($e['kind'] === 'loop' && $e['state'] === 'loop') data-testid="flow-loop" data-loop @endif>{{ $e['label'] }}</span>
                     @endif
                 @endforeach
 
-                @foreach ($g['nodes'] as $code => $n)
-                    @php
-                        [$stLabel, $stIcon] = RunFlow::STATE[$n['state']];
-                        $icon = ['rule' => 'heroicon-m-cog-6-tooth', 'llm' => 'heroicon-m-sparkles', 'human' => 'heroicon-m-user'][$n['kind']] ?? 'heroicon-m-cog-6-tooth';
-                        $kindText = ['rule' => 'Luật', 'llm' => 'AI', 'human' => 'Người'][$n['kind']] ?? 'Luật';
-                    @endphp
-                    <button type="button" class="fl-node fl-node--{{ $n['state'] }} fg-node @if ($n['kind'] === 'human') fl-node--human @endif" style="left:{{ $n['x'] }}px;top:{{ $n['y'] }}px;width:{{ \App\Filament\Support\Agent\FlowGraph::NODE_W }}px;height:{{ \App\Filament\Support\Agent\FlowGraph::NODE_H }}px"
-                        data-stage="{{ $code }}" data-state="{{ $n['state'] }}" @if ($n['state'] === 'running') data-live-stage="{{ $code }}" @endif
-                        x-on:click="sel = '{{ $code }}'" x-bind:class="{ 'is-sel': sel === '{{ $code }}' }" title="{{ $n['title'] }} · {{ $stLabel }}">
-                        <span class="fg-node__head">
-                            <x-filament::icon :icon="$icon" class="fl-ico" :title="$kindText" /><small>{{ $kindText }}</small>
-                            @if ($n['state'] === 'running')<span class="fg-ping"></span>@else<x-filament::icon :icon="$stIcon" class="fl-stico" :title="$stLabel" />@endif
-                        </span>
-                        <span class="fg-node__name">{{ $n['title'] }}</span>
-                        <span class="fg-node__who">{{ $n['who']['title'] ?? '' }}</span>
-                        @if ($n['state'] === 'waiting')<span class="fl-wait-pill" data-testid="flow-waiting">Chờ bạn</span>@else<span class="fg-node__foot fl-state">{{ $stLabel }}@if ($n['count'] > 1) ×{{ $n['count'] }}@endif @if ($n['seconds'] !== null)<em>{{ $n['seconds'] }}s</em>@endif</span>@endif
-                    </button>
-                    @if ($n['parallel'] ?? null)
-                        <span class="fl-chip fg-par" data-testid="flow-parallel" style="left:{{ $n['x'] }}px;top:{{ $n['y'] - 15 }}px" title="Chạy cùng lúc, không chờ bước này xong">∥ song song với «{{ $n['parallel'] }}»</span>
-                    @endif
+                @foreach ($g['groups'] as $grp)
+                    @php [$gLabel, $gIcon] = RunFlow::STATE[$grp['state']]; @endphp
+                    <div class="fg-group fg-group--{{ $grp['state'] }}" data-group="{{ $grp['id'] }}" style="left:{{ $grp['x'] }}px;top:{{ $grp['y'] }}px;width:{{ $grp['w'] }}px;height:{{ $grp['h'] }}px">
+                        <div class="fg-group__head"><b>{{ $grp['title'] }}</b><small>{{ $grp['role'] }}</small><x-filament::icon :icon="$gIcon" class="fl-stico" :title="$gLabel" /></div>
+                        @if ($grp['parallel'])<span class="fl-chip fg-par" data-testid="flow-parallel" title="Chạy cùng lúc, không chờ khối này xong">∥ song song với «{{ $grp['parallel'] }}»</span>@endif
+                        @foreach ($grp['subs'] as $n)
+                            @php
+                                [$stLabel, $stIcon] = RunFlow::STATE[$n['state']];
+                                $icon = ['rule' => 'heroicon-m-cog-6-tooth', 'llm' => 'heroicon-m-sparkles', 'human' => 'heroicon-m-user'][$n['kind']] ?? 'heroicon-m-cog-6-tooth';
+                                $code = $n['code'];
+                            @endphp
+                            <button type="button" class="fg-sub fg-sub--{{ $n['state'] }} @if ($n['state'] === 'waiting') fl-node--waiting @endif" data-stage="{{ $code }}" data-state="{{ $n['state'] }}" @if ($n['state'] === 'running') data-live-stage="{{ $code }}" @endif
+                                x-on:click="sel = '{{ $code }}'" x-bind:class="{ 'is-sel': sel === '{{ $code }}' }" title="{{ $n['title'] }} · {{ $stLabel }}">
+                                <x-filament::icon :icon="$icon" class="fl-ico" />
+                                <span class="fg-sub__name">{{ $n['title'] }}</span>
+                                @if ($n['state'] === 'waiting')<span class="fl-wait-pill" data-testid="flow-waiting">Chờ bạn</span>
+                                @elseif ($n['state'] === 'running')<span class="fg-ping"></span>
+                                @else<span class="fg-sub__st fl-state">{{ $stLabel }}@if ($n['count'] > 1) ×{{ $n['count'] }}@endif @if ($n['seconds'] !== null)<em>{{ $n['seconds'] }}s</em>@endif</span><x-filament::icon :icon="$stIcon" class="fl-stico" :title="$stLabel" />@endif
+                            </button>
+                        @endforeach
+                    </div>
                 @endforeach
             </div>
         </div>
@@ -78,16 +75,22 @@
     .dark .fg-elabel{color:#cbd5e1}
     .fg-elabel--loop{background:#7c3aed;color:#fff;border-color:#7c3aed}
     .fg-elabel--done{border-color:#059669;color:#047857}.dark .fg-elabel--done{color:#34d399}
-    .fg-node{position:absolute;min-height:0 !important;padding:.4rem .6rem !important;gap:.12rem !important;justify-content:space-between;gap:.1rem;overflow:hidden;border-radius:.7rem}
-    .fg-node__head{display:flex;align-items:center;gap:.25rem;min-width:0}
-    .fg-node__head small{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;opacity:.7}
-    .fg-node__head .fl-stico{margin-left:auto;width:1.05rem;height:1.05rem}
-    .fg-node__who{font-size:.68rem;opacity:.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .fg-node__name{font-weight:700;font-size:.92rem;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
-    .fg-node__foot{font-size:.74rem !important;display:flex;gap:.3rem;align-items:baseline;white-space:nowrap}
-    .fg-node__foot em{font-style:normal;font-weight:500;opacity:.7}
+    .fg-group{position:absolute;display:flex;flex-direction:column;background:var(--fl-card,#fff);border:1.5px solid var(--fl-line,rgba(100,116,139,.35));border-radius:.9rem;box-shadow:var(--fl-shadow,0 1px 3px rgba(15,23,42,.08));padding:0 .45rem .45rem}
+    .fg-group--done{border-color:#059669}.fg-group--warn,.fg-group--stale{border-color:#d97706}.fg-group--failed,.fg-group--blocked{border-color:#dc2626}.fg-group--running{border-color:#0284c7;box-shadow:0 0 0 3px rgba(2,132,199,.18)}.fg-group--waiting{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.2)}
+    .fg-group--idle,.fg-group--pending{border-style:dashed;opacity:.65}
+    .fg-group__head{display:flex;align-items:baseline;gap:.5rem;height:36px;padding:.55rem .35rem 0;min-width:0}
+    .fg-group__head b{font-size:.95rem;font-weight:800;white-space:nowrap}
+    .fg-group__head small{font-size:.68rem;opacity:.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+    .fg-group__head .fl-stico{margin-left:auto;width:1.2rem;height:1.2rem;align-self:center;flex:none}
+    .fg-sub{display:flex;align-items:center;gap:.45rem;height:30px;width:100%;padding:0 .45rem;border:0;border-radius:.5rem;background:transparent;font:inherit;font-size:.82rem;color:inherit;text-align:left;cursor:pointer}
+    .fg-sub:hover{background:rgba(100,116,139,.12)}.fg-sub.is-sel{background:rgba(2,132,199,.16)}
+    .fg-sub__name{font-weight:600;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .fg-sub__st{font-size:.7rem;display:inline-flex;gap:.3rem;align-items:baseline;white-space:nowrap}.fg-sub__st em{font-style:normal;font-weight:500;opacity:.7}
+    .fg-sub .fl-stico{width:1rem;height:1rem;flex:none}
+    .fg-sub--idle,.fg-sub--pending,.fg-sub--skipped{opacity:.55}
+    .fg-sub--done .fl-stico,.fg-sub--done .fl-state{color:#059669}.fg-sub--warn .fl-stico,.fg-sub--warn .fl-state{color:#d97706}.fg-sub--failed .fl-stico,.fg-sub--failed .fl-state{color:#dc2626}
     .fg-ping{margin-left:auto;width:.5rem;height:.5rem;border-radius:50%;background:#0284c7;animation:fl-ping 1.5s ease-out infinite}
-    .fg-par{position:absolute;z-index:3;font-size:.64rem !important;white-space:nowrap;background:rgba(2,132,199,.14) !important;color:#0369a1}
+    .fg-par{position:absolute;top:-12px;left:.8rem;z-index:3;font-size:.64rem !important;white-space:nowrap;background:rgba(2,132,199,.14) !important;color:#0369a1}
     .fg-legend{display:flex;flex-wrap:wrap;gap:.9rem;margin-top:.5rem;font-size:.68rem;opacity:.75}
     .fg-legend span{display:inline-flex;align-items:center;gap:.3rem}
     .fg-sw{display:inline-block;width:1.3rem;height:0;border-top:3px solid #94a3b8}

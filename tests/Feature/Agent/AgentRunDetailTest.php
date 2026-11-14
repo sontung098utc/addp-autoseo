@@ -222,7 +222,7 @@ class AgentRunDetailTest extends TestCase
         $r = $this->run_('failed', [['guard', 'ok'], ['risk', 'ok'], ['brief', 'failed']], ['outcome_reason' => 'Nhà cung cấp lỗi', 'cost_vnd' => 1500]);
         $html = $this->page($r);
         preg_match_all('/data-stage="([a-z_]+)" data-state="/', $html, $m);
-        $this->assertSame(RunFlow::main(), $m[1]);
+        $this->assertEqualsCanonicalizing(RunFlow::main(), $m[1], "Mỗi chặng đúng một lần (khối vai trò gom các chặng nên thứ tự vẽ không còn bằng thứ tự chạy).");
         $this->assertSame('done', $this->state($html, 'guard'));
         $this->assertSame('failed', $this->state($html, 'brief'));
         $this->assertSame('idle', $this->state($html, 'write'));
