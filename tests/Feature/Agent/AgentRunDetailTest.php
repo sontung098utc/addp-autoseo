@@ -318,8 +318,9 @@ class AgentRunDetailTest extends TestCase
         $r = $this->run_('ready_for_review', [['guard', 'ok'], ['write', 'ok'], $g(0, 60), ['repair', 'ok'], $g(1, 70), ['repair', 'ok'], $g(2, 90), ['handoff', 'ok']], ['repair_rounds' => 2]);
         $html = $this->page($r);
         $this->assertStringContainsString('data-testid="flow-loop"', $html);
-        $this->assertStringContainsString('<b data-loop>↻ 2 vòng</b>', $html);
-        $this->assertStringContainsString('fl-link--loop', $html);
+        $this->assertStringContainsString('data-loop', $html);
+        $this->assertStringContainsString('↻ 2 vòng', $html);
+        $this->assertStringContainsString('fg-edge--loop', $html);
 
         $w = $this->run_('held', [['guard', 'ok'], ['risk', 'ok'], ['checkpoint', 'warn', ['waiting' => true]]]);
         $html = $this->page($w);

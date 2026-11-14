@@ -13,6 +13,10 @@
                     </div>
 
                     <div class="rvx-pane rvx-flowpane" data-testid="stage-rail">
+                        @php $graph = \App\Filament\Support\Agent\FlowGraph::build($nodes, $run->steps); @endphp
+                        @if ($graph)
+                            <x-flow.graph :g="$graph" />
+                        @else
                         <div class="fl-wrap">
                             <div class="fl-grid">
                                 @foreach ($nodes as $n)
@@ -36,6 +40,7 @@
                                 @endforeach
                             </div>
                         </div>
+                        @endif
                     </div>
 
                     {{-- MỘT khung chi tiết cho chặng đang chọn --}}
