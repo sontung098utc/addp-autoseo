@@ -4,7 +4,7 @@
     vòng Chấm ↔ Sửa. Bấm một ô: đặt `sel` của khung cha (x-data của run-flow). Tự thu nhỏ vừa khung nếu hẹp (không nhỏ hơn 70%, hẹp hơn thì cuộn ngang).
 --}}
 @php use App\Filament\Support\Agent\RunFlow; @endphp
-<div class="fg-wrap" x-data="{ s: 1, fit() { const w = this.$refs.box.clientWidth; this.s = Math.max(0.82, Math.min(1, w / {{ $g['width'] }})); } }" x-init="fit()" x-on:resize.window.debounce.150ms="fit()" data-testid="flow-graph">
+<div class="fg-wrap" x-data="{ s: 1, fit() { const w = this.$refs.box.clientWidth; this.s = Math.max(0.85, Math.min(1, w / {{ $g['width'] }})); } }" x-init="fit()" x-on:resize.window.debounce.150ms="fit()" data-testid="flow-graph">
     <div x-ref="box" class="fg-scroll">
         <div class="fg-canvas" x-bind:style="'width:' + ({{ $g['width'] }} * s) + 'px;height:' + ({{ $g['height'] }} * s) + 'px'">
             <div class="fg-stage" style="width:{{ $g['width'] }}px;height:{{ $g['height'] }}px" x-bind:style="'width:{{ $g['width'] }}px;height:{{ $g['height'] }}px;transform:scale(' + s + ')'">
@@ -42,6 +42,7 @@
                             @if ($n['state'] === 'running')<span class="fg-ping"></span>@else<x-filament::icon :icon="$stIcon" class="fl-stico" :title="$stLabel" />@endif
                         </span>
                         <span class="fg-node__name">{{ $n['title'] }}</span>
+                        <span class="fg-node__who">{{ $n['who']['title'] ?? '' }}</span>
                         @if ($n['state'] === 'waiting')<span class="fl-wait-pill" data-testid="flow-waiting">Chờ bạn</span>@else<span class="fg-node__foot fl-state">{{ $stLabel }}@if ($n['count'] > 1) ×{{ $n['count'] }}@endif @if ($n['seconds'] !== null)<em>{{ $n['seconds'] }}s</em>@endif</span>@endif
                     </button>
                     @if ($n['parallel'] ?? null)
@@ -73,19 +74,20 @@
     .fg-edge--back.fg-edge--done{stroke:#d97706;stroke-dasharray:6 4}
     @keyframes fg-march{to{stroke-dashoffset:-12}}
     @media (prefers-reduced-motion:reduce){.fg-edge--live{animation:none}}
-    .fg-elabel{position:absolute;transform:translate(-50%,-50%);font-size:.62rem;font-weight:700;padding:.02rem .4rem;border-radius:999px;background:var(--fl-card,#fff);border:1px solid rgba(100,116,139,.35);color:#475569;white-space:nowrap;pointer-events:none}
+    .fg-elabel{position:absolute;transform:translate(-50%,-50%);font-size:.7rem;font-weight:700;padding:.02rem .4rem;border-radius:999px;background:var(--fl-card,#fff);border:1px solid rgba(100,116,139,.35);color:#475569;white-space:nowrap;pointer-events:none}
     .dark .fg-elabel{color:#cbd5e1}
     .fg-elabel--loop{background:#7c3aed;color:#fff;border-color:#7c3aed}
     .fg-elabel--done{border-color:#059669;color:#047857}.dark .fg-elabel--done{color:#34d399}
-    .fg-node{position:absolute;min-height:0 !important;padding:.35rem .5rem !important;gap:.15rem !important;justify-content:space-between;overflow:hidden;border-radius:.7rem}
+    .fg-node{position:absolute;min-height:0 !important;padding:.4rem .6rem !important;gap:.12rem !important;justify-content:space-between;overflow:hidden;border-radius:.7rem}
     .fg-node__head{display:flex;align-items:center;gap:.25rem;min-width:0}
-    .fg-node__head small{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;opacity:.7}
+    .fg-node__head small{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;opacity:.7}
     .fg-node__head .fl-stico{margin-left:auto;width:1.05rem;height:1.05rem}
-    .fg-node__name{font-weight:700;font-size:.76rem;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-    .fg-node__foot{font-size:.64rem !important;display:flex;gap:.3rem;align-items:baseline;white-space:nowrap}
+    .fg-node__who{font-size:.68rem;opacity:.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .fg-node__name{font-weight:700;font-size:.92rem;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+    .fg-node__foot{font-size:.74rem !important;display:flex;gap:.3rem;align-items:baseline;white-space:nowrap}
     .fg-node__foot em{font-style:normal;font-weight:500;opacity:.7}
     .fg-ping{margin-left:auto;width:.5rem;height:.5rem;border-radius:50%;background:#0284c7;animation:fl-ping 1.5s ease-out infinite}
-    .fg-par{position:absolute;z-index:3;font-size:.58rem !important;white-space:nowrap;background:rgba(2,132,199,.14) !important;color:#0369a1}
+    .fg-par{position:absolute;z-index:3;font-size:.64rem !important;white-space:nowrap;background:rgba(2,132,199,.14) !important;color:#0369a1}
     .fg-legend{display:flex;flex-wrap:wrap;gap:.9rem;margin-top:.5rem;font-size:.68rem;opacity:.75}
     .fg-legend span{display:inline-flex;align-items:center;gap:.3rem}
     .fg-sw{display:inline-block;width:1.3rem;height:0;border-top:3px solid #94a3b8}

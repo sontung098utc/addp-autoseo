@@ -11,26 +11,23 @@ use Illuminate\Support\Collection;
  */
 final class FlowGraph
 {
-    public const NODE_W = 104;
+    public const NODE_W = 160;
 
-    public const NODE_H = 58;
+    public const NODE_H = 78;
 
-    private const STEP = 112;
+    private const COLW = 190;
 
-    private const LANE_H = 80;
+    private const ROWH = 118;
 
-    private const LEFT = 104;
+    private const LEFT = 14;
 
-    private const TOP = 14;
+    private const TOP = 46;
 
-    /** Làn (hàng) theo vai trò. */
-    public const LANES = ['Hệ thống', 'Kho và điều phối', 'Chiến lược', 'Họa viên ảnh', 'Người viết', 'Biên tập và chấm', 'Bạn'];
-
-    /** Vị trí [cột, làn] của từng chặng; cột có thể lẻ để nhánh lệch nhau. */
+    /** Vị trí [cột, hàng] của từng chặng. Hàng 1 là trục viết-chấm; hàng 2 là nhánh ảnh và hoàn tất; "Sửa" đặt cạnh "Chấm" (đẩy ra thêm để vòng lặp có chỗ). */
     private const POS = [
-        'guard' => [0, 0], 'risk' => [1, 0], 'sources' => [1.95, 1], 'synthesize' => [2.9, 2], 'brief' => [3.95, 2], 'image_design' => [4.9, 3],
-        'research' => [5.85, 4], 'write' => [6.9, 4], 'images' => [6.9, 3], 'edit' => [7.85, 5], 'grade' => [8.9, 5], 'repair' => [8.9, 4],
-        'assemble' => [9.95, 0], 'learn' => [11, 0], 'handoff' => [11, 6],
+        'guard' => [0, 0], 'risk' => [1, 0], 'sources' => [2, 0], 'synthesize' => [3, 0], 'brief' => [4, 0],
+        'image_design' => [0, 1], 'research' => [1, 1], 'write' => [2, 1], 'edit' => [3, 1], 'grade' => [4, 1], 'repair' => [5, 1],
+        'images' => [2, 2], 'assemble' => [3, 2], 'learn' => [4, 2], 'handoff' => [5, 2],
     ];
 
     /** Đường nối [từ, đến, nhãn, loại]. loại: main | fork | join | loop | back. */
@@ -60,7 +57,7 @@ final class FlowGraph
         $pos = self::POS;
         $edgeSpec = self::EDGES;
         if ($by->has('checkpoint')) { // điểm dừng chờ người (không phải phiên nào cũng có): nằm ở làn "Bạn", nối từ Xét rủi ro
-            $pos['checkpoint'] = [2, 6];
+            $pos['checkpoint'] = [1, 2];
             $edgeSpec[] = ['risk', 'checkpoint', 'chờ bạn', 'main'];
         }
         $ran = fn (string $c) => (int) ($by[$c]['count'] ?? 0) > 0;
@@ -68,7 +65,7 @@ final class FlowGraph
 
         $boxes = [];
         foreach ($pos as $code => [$col, $lane]) {
-            $boxes[$code] = ['x' => (int) round(self::LEFT + $col * self::STEP), 'y' => self::TOP + $lane * self::LANE_H + (int) ((self::LANE_H - self::NODE_H) / 2) - 4, 'node' => $by[$code]];
+            $boxes[$code] = ['x' => self::LEFT + $col * self::COLW + ($code === 'repair' ? 30 : 0), 'y' => self::TOP + $lane * self::ROWH, 'node' => $by[$code]];
         }
 
         $edges = [];
@@ -91,15 +88,10 @@ final class FlowGraph
         foreach ($boxes as $code => $b) {
             $nodesOut[$code] = ['x' => $b['x'], 'y' => $b['y']] + $b['node'];
         }
-        $lanes = [];
-        foreach (self::LANES as $i => $label) {
-            $lanes[] = ['label' => $label, 'y' => self::TOP + $i * self::LANE_H - 4, 'h' => self::LANE_H];
-        }
-
         return [
-            'width' => (int) (self::LEFT + 11 * self::STEP + self::NODE_W + 16),
-            'height' => (int) (self::TOP + count(self::LANES) * self::LANE_H + 26),
-            'lanes' => $lanes,
+            'width' => self::LEFT * 2 + 5 * self::COLW + self::NODE_W + 30,
+            'height' => self::TOP + 2 * self::ROWH + self::NODE_H + 22,
+            'lanes' => [],
             'nodes' => $nodesOut,
             'edges' => $edges,
         ];
@@ -112,45 +104,41 @@ final class FlowGraph
         $h = self::NODE_H;
         $A = $boxes[$a];
         $B = $boxes[$b];
-        $ay = $A['y'] + $h / 2;
-        $by = $B['y'] + $h / 2;
+        $acx = $A['x'] + $w / 2;
+        $bcx = $B['x'] + $w / 2;
+        $amy = $A['y'] + $h / 2;
+        $bmy = $B['y'] + $h / 2;
 
-        if ($kind === 'loop') { // Chấm ↔ Sửa: hai đường dọc song song giữa hai ô
+        if ($kind === 'loop') { // Chấm ↔ Sửa: hai đường ngang song song giữa hai ô, nhãn nằm trên
             $up = $a === 'grade';
-            $x = $A['x'] + $w / 2 + ($up ? -14 : 14);
-            $y1 = $up ? $A['y'] : $A['y'] + $h;
-            $y2 = $up ? $B['y'] + $h : $B['y'];
+            $y = $amy + ($up ? -11 : 11);
+            $x1 = $up ? $A['x'] + $w : $A['x'];
+            $x2 = $up ? $B['x'] : $B['x'] + $w;
 
-            return ['d' => "M{$x} {$y1}V{$y2}", 'lx' => (int) ($A['x'] + $w / 2 + ($up ? -34 : 34)), 'ly' => (int) (($y1 + $y2) / 2) + 4];
+            return ['d' => "M{$x1} {$y}H{$x2}", 'lx' => (int) (($x1 + $x2) / 2), 'ly' => (int) ($up ? $y - 17 : $y + 17)];
         }
-        if ($kind === 'back') { // từ đáy ô Chấm xuống dưới hàng, chạy ngược về cột của Kho và nguồn rồi đi lên
-            $bottom = self::TOP + count(self::LANES) * self::LANE_H - 6;
-            $x1 = $A['x'] + $w / 2;
-            $x2 = $B['x'] + $w / 2;
+        if ($kind === 'back') { // lên khỏi hàng đầu, chạy ngược về Kho và nguồn rồi đi xuống
+            $top = self::TOP - 26;
 
-            return ['d' => 'M'.$x1.' '.($A['y'] + $h)."V{$bottom}H{$x2}V".($B['y'] + $h), 'lx' => (int) (($x1 + $x2) / 2), 'ly' => $bottom - 6];
+            return ['d' => 'M'.($A['x'] + $w / 2)." {$A['y']}V{$top}H{$bcx}V{$B['y']}", 'lx' => (int) (($acx + $bcx) / 2), 'ly' => $top];
         }
-        $x1 = $A['x'] + $w;
-        $x2 = $B['x'];
-        if ($kind === 'join') { // nhánh ảnh nhập lại: đi ngang rồi lên, vào mép trái ô Lắp ráp ở cao độ riêng để không chồng đường "đạt"
-            $gx = $x2 - 22;
+        if (abs($A['y'] - $B['y']) < 1) { // cùng hàng: đi thẳng
+            $x1 = $A['x'] + $w;
 
-            return ['d' => "M{$x1} {$ay}H{$gx}V".($by + 8).'H'.$x2, 'lx' => (int) ($gx - 6), 'ly' => (int) (($ay + $by) / 2)];
+            return ['d' => "M{$x1} {$amy}H{$B['x']}", 'lx' => (int) (($x1 + $B['x']) / 2), 'ly' => (int) $amy - 14];
         }
-        if (abs($ay - $by) < 1) {
-            return ['d' => "M{$x1} {$ay}H{$x2}", 'lx' => (int) (($x1 + $x2) / 2), 'ly' => (int) $ay - 6];
+        $gapY = $A['y'] + $h + (self::ROWH - $h) / 2;
+        if ($B['y'] > $A['y'] && $B['x'] < $A['x'] - 1) { // xuống hàng và quay về đầu hàng (như xuống dòng)
+            return ['d' => "M{$acx} ".($A['y'] + $h)."V{$gapY}H{$bcx}V{$B['y']}", 'lx' => (int) (($acx + $bcx) / 2), 'ly' => (int) $gapY];
         }
-        $gx = $x1 + max(8, (int) (($x2 - $x1) / 2));
-        if ($x2 <= $x1) { // đích nằm sát/ngay dưới: đi từ đáy ô nguồn xuống đỉnh ô đích
-            $sx = $A['x'] + $w / 2;
-            $tx = $B['x'] + $w / 2;
-            $y1 = $by > $ay ? $A['y'] + $h : $A['y'];
-            $y2 = $by > $ay ? $B['y'] : $B['y'] + $h;
+        if ($kind === 'fork') { // nhánh song song: từ đáy ô nguồn xuống rồi sang mép trái ô đích
+            return ['d' => "M{$acx} ".($A['y'] + $h)."V{$bmy}H{$B['x']}", 'lx' => (int) $acx + 36, 'ly' => (int) $bmy - 14];
+        }
+        if ($B['y'] > $A['y'] && $B['x'] < $A['x'] + $w) { // xuống hàng dưới, lệch trái (Chấm → Lắp ráp)
+            return ['d' => "M{$acx} ".($A['y'] + $h)."V{$gapY}H{$bcx}V{$B['y']}", 'lx' => (int) (($acx + $bcx) / 2), 'ly' => (int) $gapY];
+        }
+        $gx = $A['x'] - 14; // chờ bạn: đi qua khe giữa hai cột
 
-            return ['d' => "M{$sx} {$y1}V".(($y1 + $y2) / 2)."H{$tx}V{$y2}", 'lx' => (int) $tx, 'ly' => (int) (($y1 + $y2) / 2) - 4];
-        }
-        $dy = $kind === 'main' && $b === 'assemble' ? -8 : 0;
-
-        return ['d' => "M{$x1} {$ay}H{$gx}V".($by + $dy)."H{$x2}", 'lx' => (int) $gx + 4, 'ly' => (int) (($ay + $by) / 2)];
+        return ['d' => "M{$acx} ".($A['y'] + $h)."V".($A['y'] + $h + 10)."H".($B['x'] - 14)."V{$bmy}H{$B['x']}", 'lx' => (int) ($B['x'] - 14), 'ly' => (int) (($A['y'] + $h + $bmy) / 2)];
     }
 }
