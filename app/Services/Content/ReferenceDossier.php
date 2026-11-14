@@ -18,7 +18,7 @@ final class ReferenceDossier
 
     public const MAX_PER_DOMAIN = 2;
 
-    public const MIN_SNIPPET_CHARS = 160;
+    public const MIN_SNIPPET_CHARS = 120;
 
     public const EXCERPT_CHARS = 1000;
 

@@ -19,6 +19,8 @@ return [
             'pubmed.ncbi.nlm.nih.gov', 'ncbi.nlm.nih.gov', 'cochrane.org', 'medlineplus.gov', 'heart.org', 'cancer.org', 'cancer.gov',
             'clevelandclinic.org', 'hopkinsmedicine.org', 'health.harvard.edu', 'nice.org.uk', 'ada.org', 'ema.europa.eu', 'fda.gov',
             'dav.gov.vn', 'vnras.com', 'vien-dinh-duong.org.vn', 'nin.gov.vn', 'bachmai.gov.vn', 'choray.vn',
+            // Bệnh viện và hệ thống y tế trong nước có ban chuyên môn biên soạn nội dung (tìm web thường chỉ trả về nhóm này cho từ khóa tiếng Việt)
+            'vinmec.com', 'tamanhhospital.vn', 'benhvien108.vn', 'nhi.org.vn', 'nhidong.org.vn',
         ],
         'pharma' => [
             'who.int', 'fda.gov', 'ema.europa.eu', 'picscheme.org', 'ispe.org', 'usp.org', 'edqm.eu', 'pda.org', 'ich.org', 'dav.gov.vn', 'cdsco.gov.in', 'tga.gov.au', 'mhra.gov.uk',

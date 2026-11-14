@@ -103,7 +103,10 @@ final class FlowGraph
         foreach ($hops as $h) {
             $g = $h['group'];
             $cards[$g] ??= ['group' => $g, 'steps' => [], 'visits' => 0, 'running' => false];
-            $cards[$g]['visits']++;
+            if (($prevGroup ?? null) !== $g) { // chỉ tính là một LẦN VÀO khi từ bộ phận khác chuyển sang (điều phối quyết định giữa chừng không tính là quay lại)
+                $cards[$g]['visits']++;
+            }
+            $prevGroup = $g;
             $cards[$g]['running'] = $cards[$g]['running'] || $h['running'];
             foreach ($h['steps'] as $code => $list) {
                 $cards[$g]['steps'][$code] = array_merge($cards[$g]['steps'][$code] ?? [], $list);
@@ -184,7 +187,7 @@ final class FlowGraph
                 $title = 'Viết';
             }
             $out[] = ['group' => $g, 'title' => $title, 'role' => $role, 'subs' => $subs, 'state' => self::groupState($subs), 'visits' => $c['visits'],
-                'minh' => 56 + ($slots[$g] ?? 0) * 22, 'parallel' => $g === 'images' ? (string) ($by['images']['parallel'] ?? 'Viết') : null];
+                'minh' => 62 + ($slots[$g] ?? 0) * 24, 'parallel' => $g === 'images' ? (string) ($by['images']['parallel'] ?? 'Viết') : null];
         }
 
         $anyRunning = collect($hops)->contains('running', true);

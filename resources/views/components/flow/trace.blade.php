@@ -16,9 +16,9 @@
         const mk = (d, kind) => { const el = document.createElementNS('http://www.w3.org/2000/svg', 'path'); el.setAttribute('d', d); el.setAttribute('fill', 'none'); el.setAttribute('class', 'ft-arc ft-arc--' + kind); el.setAttribute('marker-end', 'url(#ft-ar-' + kind + ')'); el.setAttribute('data-testid', 'flow-arc'); svg.appendChild(el); };
         E.forEach((e, idx) => {
             if (e.dir === 'give' || e.dir === 'report') { const cd = card(e.card); if (!cd) return; const r = cd.getBoundingClientRect(); const xl = r.left - cr.left;
-                const s = slot[e.card] = (slot[e.card] ?? -1) + 1; const y = r.top - cr.top + 50 + s * 22; const give = e.dir === 'give'; const kind = give ? 'give' : (['warn', 'failed', 'blocked'].includes(e.state) ? 'warn' : 'report');
+                const s = slot[e.card] = (slot[e.card] ?? -1) + 1; const y = r.top - cr.top + 50 + s * 24; const give = e.dir === 'give'; const kind = give ? 'give' : (['warn', 'failed', 'blocked'].includes(e.state) ? 'warn' : 'report');
                 mk(give ? ('M' + xr + ' ' + y + 'H' + (xl - 1)) : ('M' + xl + ' ' + y + 'H' + (xr + 1)), kind);
-                items.push({ k: idx, n: e.n, x: give ? xr + 16 : xl - 16, mx: (xr + xl) / 2, y: y, label: (give ? 'giao: ' : 'báo: ') + e.label, kind: kind }); return; }
+                items.push({ k: idx, n: e.n, x: give ? xr + 16 : xl - 16, mx: xr + 34, y: y, label: (give ? 'giao: ' : 'báo: ') + e.label, kind: kind }); return; }
             const A = card(e.from), B = card(e.to); if (!A || !B) return; const ar = A.getBoundingClientRect(), br = B.getBoundingClientRect();
             if (e.dir === 'direct') { const key = e.from + '>' + e.to; const o = occ[key] = (occ[key] ?? -1) + 1; const x = ar.left - cr.left + ar.width / 2 + (((o + 1) >> 1) * 30) * (o % 2 ? 1 : -1); const y1 = ar.bottom - cr.top, y2 = br.top - cr.top;
                 mk('M' + x + ' ' + y1 + 'V' + (y2 - 1), 'direct'); items.push({ k: idx, n: e.n, x: x, y: (y1 + y2) / 2, mx: x + 30, label: null, kind: 'direct' }); return; }
@@ -41,7 +41,7 @@
         <span :class="'ft-badge ft-badge--' + it.kind" :style="'left:' + it.x + 'px;top:' + it.y + 'px'"><b x-text="it.n"></b></span>
     </template>
     <template x-for="it in items.filter(i => i.label || i.sub)" :key="'l' + it.k">
-        <span :class="'ft-chip ft-chip--' + it.kind" :style="'left:' + (it.kind === 'par' || it.kind === 'direct' ? it.x + (it.kind === 'par' ? 0 : 0) : it.mx) + 'px;top:' + (it.kind === 'par' ? it.y - 16 : it.y) + 'px'" x-text="it.label || it.sub"></span>
+        <span :class="'ft-chip ft-chip--' + it.kind" :style="'left:' + (it.kind === 'par' ? it.x - 40 : (it.kind === 'direct' ? it.x : it.mx)) + 'px;top:' + (it.kind === 'par' ? it.y - 16 : it.y) + 'px'" x-text="it.label || it.sub"></span>
     </template>
 
     <div class="ft-grid">
@@ -105,7 +105,7 @@
     .ft-badge{position:absolute;z-index:4;transform:translate(-50%,-50%);pointer-events:none}
     .ft-badge b{min-width:1.3rem;height:1.3rem;padding:0 .25rem;border-radius:999px;color:#fff;font-size:.66rem;font-weight:800;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--fl-card,#fff)}
     .ft-badge--direct b{background:#059669}.ft-badge--par b{background:#0284c7}.ft-badge--give b{background:#7c3aed}.ft-badge--report b{background:#059669}.ft-badge--warn b{background:#d97706}
-    .ft-chip{position:absolute;z-index:3;transform:translate(-50%,-50%);font-size:.66rem;font-weight:700;padding:.02rem .5rem;border-radius:999px;white-space:nowrap;background:var(--fl-card,#fff);border:1px solid rgba(100,116,139,.4);color:#475569;pointer-events:none;max-width:262px;overflow:hidden;text-overflow:ellipsis}
+    .ft-chip{position:absolute;z-index:3;transform:translate(0,-50%);font-size:.66rem;font-weight:700;padding:.02rem .5rem;border-radius:999px;white-space:nowrap;background:var(--fl-card,#fff);border:1px solid rgba(100,116,139,.4);color:#475569;pointer-events:none;max-width:215px;overflow:hidden;text-overflow:ellipsis}
     .ft-chip--par{border-color:#0284c7;color:#0369a1}.ft-chip--give{border-color:#7c3aed;color:#6d28d9}.ft-chip--report{border-color:#059669;color:#047857}.ft-chip--warn{border-color:#d97706;color:#b45309}
     .dark .ft-chip{color:#cbd5e1}
     .ft-coord{position:relative;border:1.5px solid #7c3aed;border-radius:.9rem;background:linear-gradient(180deg,rgba(124,58,237,.08),transparent 30%),var(--fl-card,#fff);padding:0}
