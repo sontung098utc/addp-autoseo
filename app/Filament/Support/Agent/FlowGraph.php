@@ -110,42 +110,45 @@ final class FlowGraph
             }
         }
 
-        // 3. Sự kiện: GIAO (điều phối → bộ phận) tại bước đầu của lượt, BÁO (bộ phận → điều phối) sau bước cuối. Sắp theo thời gian thật rồi đánh số 1..N.
-        $events = [];
-        $visit = [];
+        // 3. Đường đi. Mặc định các bước NỐI THẲNG nhau (mũi tên giữa hai thẻ). Chỉ khi người điều phối ra quyết định giữa hai lượt thì mới đi qua điều phối:
+        //    bộ phận trước BÁO kết quả cho điều phối, điều phối GIAO việc cho bộ phận sau. Mọi đường đánh số theo thứ tự thật của phiên.
+        $info = [];
         foreach ($hops as $i => $h) {
-            $g = $h['group'];
-            $visit[$g] = ($visit[$g] ?? 0) + 1;
-            $hasRepair = isset($h['steps']['repair']);
-            $giveLabel = $h['decisions'] !== [] ? self::short($h['decisions'][0]['title']) : (self::GIVE[$g] ?? $g);
-            if ($h['decisions'] === []) {
-                if ($g === 'write' && $hasRepair && ! isset($h['steps']['write'])) {
-                    $giveLabel = 'sửa theo yêu cầu';
-                } elseif ($g === 'review' && $visit[$g] > 1) {
-                    $giveLabel = 'chấm lại';
-                } elseif ($g === 'sources' && $visit[$g] > 1) {
-                    $giveLabel = 'bổ sung nguồn';
-                }
-            }
             $subs = [];
             foreach ($h['steps'] as $code => $list) {
                 $subs[] = self::sub($by[$code], $list, $durations, $h['running'] && $runningCode === $code);
             }
             $state = $h['running'] ? 'running' : self::groupState($subs);
-            $events[] = ['key' => $h['first'] - 0.5, 'card' => $g, 'dir' => 'give', 'label' => $giveLabel, 'state' => 'give', 'hop' => $i];
-            if (! $h['running']) {
-                $events[] = ['key' => $h['last'] + 0.5, 'card' => $g, 'dir' => 'report', 'label' => self::reportLabel($g, $h['steps'], $state), 'state' => $state, 'hop' => $i];
-            }
+            $info[$i] = ['state' => $state, 'report' => self::reportLabel($h['group'], $h['steps'], $state)];
         }
-        usort($events, fn ($a, $b) => $a['key'] <=> $b['key']);
+        $main = array_values(array_filter(array_keys($hops), fn ($i) => $hops[$i]['group'] !== 'images'));
+        $hasImages = collect($hops)->contains('group', 'images');
+        $events = [];
         $giveNo = [];
-        foreach ($events as $k => &$e) {
-            $e['n'] = $k + 1;
-            if ($e['dir'] === 'give') {
-                $giveNo[$e['hop']] = $e['n'];
+        $n = 0;
+        $parDone = false;
+        $joinDone = false;
+        for ($k = 1; $k < count($main); $k++) {
+            $ia = $main[$k - 1];
+            $ib = $main[$k];
+            $a = $hops[$ia];
+            $b = $hops[$ib];
+            if ($b['decisions'] !== []) { // có quyết định của điều phối giữa hai lượt: đi qua điều phối
+                $events[] = ['n' => ++$n, 'card' => $a['group'], 'dir' => 'report', 'label' => $info[$ia]['report'], 'state' => $info[$ia]['state'], 'hop' => $ia];
+                $events[] = ['n' => ++$n, 'card' => $b['group'], 'dir' => 'give', 'label' => self::short($b['decisions'][0]['title'], 28), 'state' => 'give', 'hop' => $ib];
+                $giveNo[$ib] = $n;
+            } else {
+                $events[] = ['n' => ++$n, 'from' => $a['group'], 'to' => $b['group'], 'dir' => 'direct', 'label' => null, 'state' => $info[$ib]['state'], 'hop' => $ib];
+            }
+            if ($hasImages && ! $parDone && $b['group'] === 'write') { // Tạo ảnh bắt đầu cùng lúc với Viết
+                $events[] = ['n' => ++$n, 'from' => 'write', 'to' => 'images', 'dir' => 'par', 'label' => 'chạy cùng lúc', 'state' => 'done', 'hop' => $ib];
+                $parDone = true;
+            }
+            if ($hasImages && ! $joinDone && $b['group'] === 'finish') { // ảnh nhập vào bài khi lắp ráp
+                $events[] = ['n' => ++$n, 'from' => 'images', 'to' => 'finish', 'dir' => 'join', 'label' => 'ảnh nhập vào bài', 'state' => 'done', 'hop' => $ib];
+                $joinDone = true;
             }
         }
-        unset($e);
 
         // 4. Quyết định của điều phối, kèm số của lượt giao việc mà nó dẫn tới.
         $decisions = [];
@@ -162,7 +165,9 @@ final class FlowGraph
         // 5. Thẻ ra dữ liệu hiển thị, đúng thứ tự trên xuống; mỗi thẻ đủ cao cho các đường đi qua nó.
         $slots = [];
         foreach ($events as $e) {
-            $slots[$e['card']] = ($slots[$e['card']] ?? 0) + 1;
+            if (isset($e['card'])) {
+                $slots[$e['card']] = ($slots[$e['card']] ?? 0) + 1;
+            }
         }
         $out = [];
         foreach (self::CARD_ORDER as $g) {
