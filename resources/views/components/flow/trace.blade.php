@@ -33,7 +33,7 @@
             if (e.dir === 'join') { const x1 = br.right - cr.left, xs = ar.left - cr.left + ar.width / 2, y1 = ar.bottom - cr.top, y2 = br.top - cr.top + 40;
                 mk('M' + xs + ' ' + y1 + 'V' + y2 + 'H' + (x1 + 1), 'par'); items.push({ k: idx, n: e.n, x: xs, y: (y1 + y2) / 2, mx: xs, label: null, kind: 'par', sub: e.label }); } });
         this.items = items; } }"
-    x-init="$nextTick(() => draw()); if (window.ResizeObserver) new ResizeObserver(() => draw()).observe($refs.ft); document.fonts && document.fonts.ready.then(() => draw())" x-on:resize.window.debounce.100ms="draw()">
+    x-init="$nextTick(() => draw()); if (window.ResizeObserver) new ResizeObserver(() => draw()).observe($refs.ft); document.fonts && document.fonts.ready.then(() => draw()); const svg0 = $refs.arcs; new MutationObserver(() => { if (!svg0.querySelector('.ft-arc')) $nextTick(() => draw()); }).observe(svg0, { childList: true }); new MutationObserver(() => $nextTick(() => draw())).observe($refs.events, { childList: true, characterData: true, subtree: true })" x-on:resize.window.debounce.100ms="draw()">
     <script type="application/json" x-ref="events" @if ($t['events'] !== []) data-testid="flow-edges" @endif>{!! json_encode($t['events'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) !!}</script>
     @if ($repairs > 0)<span data-testid="flow-loop" class="sr-only">↻ {{ $repairs }} vòng sửa</span>@endif
     <svg class="ft-arcs" x-ref="arcs" aria-hidden="true">
