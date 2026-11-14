@@ -60,7 +60,7 @@
 <style>
     .fg-wrap{width:100%}
     .fg-scroll{overflow-x:auto;padding-bottom:.3rem}
-    .fg-canvas{position:relative}
+    .fg-canvas{position:relative;margin:0 auto}
     .fg-stage{position:absolute;left:0;top:0;transform-origin:0 0}
     .fg-lane{position:absolute;left:0;right:0;border-radius:.6rem;background:rgba(100,116,139,.045);border:1px solid rgba(100,116,139,.10)}
     .fg-lane--alt{background:rgba(100,116,139,.09)}
@@ -78,12 +78,12 @@
     .dark .fg-elabel{color:#cbd5e1}
     .fg-elabel--loop{background:#7c3aed;color:#fff;border-color:#7c3aed}
     .fg-elabel--done{border-color:#059669;color:#047857}.dark .fg-elabel--done{color:#34d399}
-    .fg-node{position:absolute;min-height:0 !important;padding:.4rem .6rem !important;gap:.12rem !important;justify-content:space-between;overflow:hidden;border-radius:.7rem}
+    .fg-node{position:absolute;min-height:0 !important;padding:.4rem .6rem !important;gap:.12rem !important;justify-content:space-between;gap:.1rem;overflow:hidden;border-radius:.7rem}
     .fg-node__head{display:flex;align-items:center;gap:.25rem;min-width:0}
     .fg-node__head small{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;opacity:.7}
     .fg-node__head .fl-stico{margin-left:auto;width:1.05rem;height:1.05rem}
     .fg-node__who{font-size:.68rem;opacity:.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .fg-node__name{font-weight:700;font-size:.92rem;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+    .fg-node__name{font-weight:700;font-size:.92rem;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
     .fg-node__foot{font-size:.74rem !important;display:flex;gap:.3rem;align-items:baseline;white-space:nowrap}
     .fg-node__foot em{font-style:normal;font-weight:500;opacity:.7}
     .fg-ping{margin-left:auto;width:.5rem;height:.5rem;border-radius:50%;background:#0284c7;animation:fl-ping 1.5s ease-out infinite}
