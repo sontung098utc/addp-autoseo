@@ -64,6 +64,12 @@ class SourceRule implements QualityRule
             /** @var BrainSource $s */
             $add($s->name, $s->domain);
         }
+        foreach ($ctx->knownSources as $k) { // tài liệu web hệ thống đã TÌM THẤY (có địa chỉ thật) khi viết bài này
+            $add((string) ($k['title'] ?? ''), (string) ($k['url'] ?? $k['domain'] ?? ''));
+            if (! empty($k['domain'])) {
+                $add(null, (string) $k['domain']);
+            }
+        }
 
         $unmatched = [];
         foreach ($cited as $c) {

@@ -118,7 +118,7 @@ class CampaignAutonomousTest extends TestCase
     {
         $this->app->bind(ReviewWorkflow::class, fn () => new ReviewWorkflow(quality: new class extends ContentQualityChecker
         {
-            public function check(ArticleVersion $version, ?Article $article = null, ?array $brainIds = null): QualityReport
+            public function check(ArticleVersion $version, ?Article $article = null, ?array $brainIds = null, array $knownSources = []): QualityReport
             {
                 return new QualityReport([new RuleResult('X_P0', RuleResult::P0, false, 'l', 'm')]);
             }

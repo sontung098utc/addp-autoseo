@@ -72,10 +72,14 @@ class ContentQualityChecker
         ];
     }
 
-    /** @param list<int>|null $brainIds Trí tuệ do chiến dịch chọn (AG-B3); null = suy từ website của bài */
-    public function check(ArticleVersion $version, ?Article $article = null, ?array $brainIds = null): QualityReport
+    /**
+     * @param  list<int>|null  $brainIds  Trí tuệ do chiến dịch chọn (AG-B3); null = suy từ website của bài
+     * @param  list<array{title?: string, url?: string, domain?: string}>  $knownSources  nguồn có thật hệ thống đã tìm thấy khi viết bài (cho SRC01)
+     */
+    public function check(ArticleVersion $version, ?Article $article = null, ?array $brainIds = null, array $knownSources = []): QualityReport
     {
         $ctx = new QualityContext($version, $article ?? $version->article, $brainIds);
+        $ctx->knownSources = $knownSources;
         $results = [];
         foreach ($this->rules as $rule) {
             foreach ($rule->evaluate($ctx) as $r) {
