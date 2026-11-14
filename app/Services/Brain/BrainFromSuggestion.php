@@ -9,6 +9,7 @@ use App\Models\KnowledgeGap;
 use App\Models\KnowledgeTopic;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Knowledge\AiJson;
 use App\Services\Knowledge\Build\BrainBuildService;
 use App\Services\Knowledge\Discover\SourceDiscoveryService;
 use App\Services\Knowledge\Discover\SourceTrust;
