@@ -43,6 +43,12 @@ final class ImagePromptBuilder
         return $p.' '.self::RULES;
     }
 
+    /** Mô tả do Họa viên thiết kế (đã qua ImageDesigner::safePrompt) + khung an toàn cố định luôn nối vào cuối. */
+    public static function finish(string $designed, bool $health = false): string
+    {
+        return rtrim($designed).($health ? self::SAFE_HEALTH : '').' '.self::RULES;
+    }
+
     /** Chủ đề an toàn: bỏ ký tự điều khiển/ngoặc kép/thẻ, bỏ "trước-sau", bỏ từ cấm và tên đối thủ của hồ sơ, giới hạn độ dài. */
     public static function clean(string $text, ?BrandProfile $brand): string
     {

@@ -63,6 +63,9 @@ final class AgentRunOrchestrator
     /** Hồ sơ nội dung do bước tổng hợp lập (ContentPlanner) và bản văn bản đưa vào lời nhắn; null = không có (không AI, chưa có nguồn, lỗi). */
     private ?array $contentPlan = null;
 
+    /** Kết quả bước yêu cầu + thiết kế ảnh của họa viên (ghi vào nhật ký khi bắt đầu tạo ảnh). */
+    private ?array $imageDesign = null;
+
     private ?string $contentPlanText = null;
 
     /** Giải nghĩa tiếng Việt cho tiêu đề nguồn kho tiếng nước ngoài (id mục kho => nghĩa) và Trí tuệ đã chọn nạp cho phiên này. */
@@ -567,7 +570,36 @@ final class AgentRunOrchestrator
             }
             $this->assets?->load($article, $outline); // truy xuất ảnh thư viện một lần (research() dùng lại): có ảnh khớp thì làm ảnh bìa, không tạo ảnh bìa AI
             $libraryCover = ($this->assets?->options()['images'] ?? []) !== [];
-            $plan = \App\Services\Images\ImagePlanner::plan($article, $outline, ['health' => $health, 'brand' => $brand, 'library_cover' => $libraryCover]);
+            $planOpts = ['health' => $health, 'brand' => $brand, 'library_cover' => $libraryCover];
+            $designer = null;
+            $briefs = [];
+            $this->imageDesign = null;
+            $dai = $this->roleOff('strategist') ? null : $this->strategistAi();
+            if ($dai !== null) {
+                // Họa viên làm việc như người thiết kế: yêu cầu ảnh phải nêu mục đích và giá trị, rồi mới thiết kế (lỗi AI thì dùng kế hoạch theo luật như cũ).
+                $designer = new \App\Services\Images\ImageDesigner(new AiJson($dai, $this->sleep, 1));
+                $maxInline = max(0, min((int) config('agent.images.max_inline', 2), 3));
+                $b = $designer->brief($article, \App\Services\Images\ImagePlanner::candidates($outline), $maxInline, $libraryCover, (string) ($this->contentPlan['angle'] ?? ''));
+                $this->imageDesign = ['brief' => $b];
+                if ($b['status'] === 'done') {
+                    $briefs = $b['briefs'];
+                    $planOpts['only_orders'] = array_values(array_map('intval', array_filter(array_keys($briefs), fn ($k) => $k !== 'cover')));
+                }
+            }
+            $plan = \App\Services\Images\ImagePlanner::plan($article, $outline, $planOpts);
+            if ($briefs !== [] && $plan['status'] === 'ok') {
+                $requests = [];
+                foreach ($plan['slots'] as $slot) {
+                    $k = $slot['role'] === 'featured' ? 'cover' : (string) ($slot['section_order'] ?? '');
+                    if (isset($briefs[$k])) {
+                        $requests[$slot['id']] = ['slot' => $slot['id'], 'heading' => $slot['section_heading'], 'brief' => $briefs[$k]];
+                    }
+                }
+                [$skillPb] = $this->usePlaybook('designer', 'image-design');
+                $dg = $designer->design($article, $requests, $health, (string) ($skillPb?->body ?? ''), (string) ($brand?->business_field ?? ''));
+                $this->imageDesign['design'] = $dg;
+                $plan = \App\Services\Images\ImagePlanner::enrich($plan, $briefs, $dg['designs'], $health);
+            }
             if ($plan['status'] !== 'ok') {
                 return $skip((string) $plan['skip_code'], (string) $plan['reason']);
             }
@@ -614,6 +646,30 @@ final class AgentRunOrchestrator
         return ['image_plan' => ['plan' => $c['plan'] ?? null, 'skip_code' => $c['skip_code'] ?? null, 'skipped_reason' => $c['skipped_reason'] ?? null, 'generator' => $c['generator'] ?? null]];
     }
 
+    /** Ghi bước yêu cầu + thiết kế ảnh của họa viên (mục đích, giá trị, ý tưởng từng ảnh) kèm chi phí AI; không có thì bỏ qua. */
+    private function recordImageDesign(AgentRun $run): void
+    {
+        $d = $this->imageDesign;
+        $this->imageDesign = null;
+        if ($d === null) {
+            return;
+        }
+        $b = $d['brief'];
+        $dg = $d['design'] ?? null;
+        $cost = (float) $b['cost'] + (float) ($dg['cost'] ?? 0);
+        $tokens = (int) $b['tokens'] + (int) ($dg['tokens'] ?? 0);
+        if ($b['status'] !== 'done') {
+            $this->step($run, 'brief', 'strategist', 'warn', 'Chưa đặt được yêu cầu ảnh theo mục đích và giá trị', ($b['reason'] ?? 'Lỗi AI.').' Dùng kế hoạch ảnh theo luật như cũ.', ['purpose' => 'image_brief', 'reason' => $b['reason']], $b['model'], $tokens, $cost);
+
+            return;
+        }
+        $n = count($b['briefs']);
+        $designed = count((array) ($dg['designs'] ?? []));
+        $this->step($run, 'brief', 'strategist', $designed > 0 ? 'ok' : 'warn', 'Yêu cầu và thiết kế ảnh: '.$n.' ảnh, mỗi ảnh có mục đích và giá trị',
+            'Người điều phối nội dung nêu mục đích và giá trị của '.$n.' ảnh, họa viên phân tích rồi thiết kế'.($designed > 0 ? ' ('.$designed.' bản thiết kế).' : ' nhưng chưa trả được thiết kế nên dùng mô tả theo luật.'),
+            ['purpose' => 'image_brief', 'briefs' => $b['briefs'], 'designs' => $dg['designs'] ?? [], 'design_reason' => $dg['reason'] ?? null], $dg['model'] ?? $b['model'], $tokens, $cost);
+    }
+
     /**
      * Sau dàn ý: bắt đầu tạo ảnh theo kế hoạch ảnh nằm trong dàn ý, SONG SONG với bước viết (tiến trình con khi config agent.images.parallel bật,
      * nếu không thì chạy ngay tại đây). Mọi lý do không tạo ảnh ghi ở bước 'images'; lỗi ở đây không làm hỏng phiên.
@@ -623,6 +679,7 @@ final class AgentRunOrchestrator
         $this->imageStep = null;
         $this->imageProc = null;
         $c = $this->imageCtx;
+        $this->recordImageDesign($run);
         try {
             if (($c['plan'] ?? null) === null) {
                 if (($c['skip_code'] ?? null) !== null) {

@@ -80,6 +80,9 @@ class EditorialPassTest extends TestCase
 
             public function generateStructured(string $system, string $user): array
             {
+                if (str_contains($system, 'đặt yêu cầu ảnh') || str_contains($system, 'họa viên thiết kế')) { // bước yêu cầu/thiết kế ảnh: không phải lượt biên tập
+                    return ['data' => [], 'tokens_used' => 1, 'cost_vnd' => 0.0, 'model' => 'fake-editor'];
+                }
                 $this->reviews++;
                 if ($this->review instanceof \Throwable) {
                     throw $this->review;

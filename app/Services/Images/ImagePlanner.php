@@ -29,6 +29,10 @@ final class ImagePlanner
         $out = ['status' => 'ok', 'skip_code' => null, 'reason' => null, 'slots' => [], 'library_cover' => $libraryCover];
 
         $sections = self::sections($outline);
+        if (isset($options['only_orders'])) { // Họa viên đã chọn đúng các mục cần ảnh (kèm mục đích, giá trị): chỉ lập ô ảnh cho các mục đó
+            $only = array_map('intval', (array) $options['only_orders']);
+            $sections = array_values(array_filter($sections, fn ($sec) => in_array($sec['order'], $only, true)));
+        }
         $hard = (int) config('agent.images.hard_cap', 4);
         $limit = max(0, min((int) ($options['max_inline'] ?? config('agent.images.max_inline', 2)), $hard - ($libraryCover ? 0 : 1), 3));
         $n = min($limit, count($sections));
@@ -42,9 +46,9 @@ final class ImagePlanner
                 'alt' => 'Hình minh họa chủ đề '.ImagePromptBuilder::clean($keyword, $brand),
             ];
         }
-        // Rải đều các mục dùng được thay vì lấy dồn ở đầu bài.
+        // Rải đều các mục dùng được thay vì lấy dồn ở đầu bài (mục do Họa viên chọn thì lấy đúng từng mục).
         for ($i = 0; $i < $n; $i++) {
-            $s = $sections[(int) floor($i * count($sections) / $n)];
+            $s = $sections[isset($options['only_orders']) ? $i : (int) floor($i * count($sections) / $n)];
             $out['slots'][] = [
                 'id' => 's'.($i + 1), 'role' => 'inline', 'section_order' => $s['order'], 'section_heading' => $s['heading'], 'aspect' => '4:3',
                 'why' => 'Minh họa mục "'.$s['heading'].'"'.($s['purpose'] !== '' ? ': '.Str::limit($s['purpose'], 140, '…') : '').'. Đặt ngay sau đoạn mở đầu của mục.',
@@ -59,6 +63,45 @@ final class ImagePlanner
         }
 
         return $out;
+    }
+
+    /** Các mục H2 có thể đặt ảnh (đã bỏ FAQ/kết luận) để người điều phối chọn. @return list<array{order:int, heading:string, purpose:string}> */
+    public static function candidates(array $outline): array
+    {
+        return array_map(fn ($s) => ['order' => $s['order'], 'heading' => $s['heading'], 'purpose' => $s['purpose']], self::sections($outline));
+    }
+
+    /**
+     * Gắn YÊU CẦU (mục đích, giá trị) và THIẾT KẾ của họa viên vào các ô ảnh: why = mục đích + giá trị, prompt/alt do họa viên viết (kèm khung an toàn cố định).
+     * Ô không có thiết kế giữ nguyên mô tả theo luật.
+     *
+     * @param  array<string,mixed>  $plan
+     * @param  array<string,array<string,mixed>>  $briefs  theo 'cover' hoặc số thứ tự mục
+     * @param  array<string,array<string,string>>  $designs  theo mã ô (cover, s1...)
+     * @return array<string,mixed>
+     */
+    public static function enrich(array $plan, array $briefs, array $designs, bool $health = false): array
+    {
+        foreach ($plan['slots'] as $i => $slot) {
+            $key = $slot['role'] === 'featured' ? 'cover' : (string) ($slot['section_order'] ?? '');
+            $brief = $briefs[$key] ?? null;
+            if ($brief === null) {
+                continue;
+            }
+            $plan['slots'][$i]['brief'] = $brief;
+            $plan['slots'][$i]['why'] = 'Mục đích: '.rtrim((string) $brief['purpose'], '. ').'. Giá trị cho người đọc: '.rtrim((string) $brief['value'], '. ').'.'
+                .($slot['role'] === 'featured' ? ' Ảnh đại diện của bài, không nằm trong nội dung.' : ' Đặt ngay sau đoạn mở đầu của mục "'.$slot['section_heading'].'".');
+            $d = $designs[$slot['id']] ?? null;
+            if ($d !== null) {
+                $plan['slots'][$i]['design'] = ['concept' => $d['concept'], 'image_type' => $d['image_type'], 'composition' => $d['composition']];
+                $plan['slots'][$i]['prompt'] = ImagePromptBuilder::finish($d['prompt'], $health);
+                if ($d['alt'] !== '') {
+                    $plan['slots'][$i]['alt'] = $d['alt'];
+                }
+            }
+        }
+
+        return $plan;
     }
 
     /** @return list<array{order:int, heading:string, purpose:string, hint:?string}> mục H2 dùng được, theo thứ tự H2 trong dàn ý */
