@@ -996,7 +996,7 @@ final class AgentRunOrchestrator
             return;
         }
         if ($r['recurring']) {
-            $query = '[Đề xuất Trí tuệ] '.$r['field'];
+            $query = \App\Services\Knowledge\Suggest\KnowledgeSuggestions::BRAIN_PREFIX.$r['field'];
             try {
                 $gap = \App\Models\KnowledgeGap::firstOrCreate(['website_id' => $article->website_id, 'query' => mb_substr($query, 0, 190)], ['article_id' => $article->id, 'count' => 0]);
                 $gap->update(['count' => $gap->count + 1, 'article_id' => $article->id, 'status' => 'open']);

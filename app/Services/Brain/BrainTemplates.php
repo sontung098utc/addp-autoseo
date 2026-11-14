@@ -154,4 +154,27 @@ final class BrainTemplates
     {
         self::$cache = null;
     }
+
+    /**
+     * Mẫu hợp nhất cho một lĩnh vực (tên lĩnh vực do điều phối đề xuất): so từ khóa của tên lĩnh vực với tên/mô tả mẫu; không khớp thì mẫu trống ('trong').
+     */
+    public static function suggestFor(string $field): string
+    {
+        $words = fn (string $t) => array_values(array_filter(preg_split('/[^a-z0-9]+/', \Illuminate\Support\Str::ascii(mb_strtolower($t))) ?: [], fn ($w) => strlen($w) >= 4));
+        $want = $words($field);
+        $best = 'trong';
+        $bestScore = 0;
+        foreach (self::all() as $key => $tpl) {
+            if ($key === 'trong' || $key === 'thuong_hieu') {
+                continue;
+            }
+            $have = $words((string) ($tpl['name'] ?? '').' '.(string) ($tpl['description'] ?? ''));
+            $score = count(array_intersect($want, $have));
+            if ($score > $bestScore) {
+                [$best, $bestScore] = [(string) $key, $score];
+            }
+        }
+
+        return $best;
+    }
 }

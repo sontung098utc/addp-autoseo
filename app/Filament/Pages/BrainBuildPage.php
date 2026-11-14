@@ -286,6 +286,32 @@ class BrainBuildPage extends Page
         Notification::make()->title('Đã hoàn tác hồ sơ tự điền')->body($cleared === [] ? 'Các trường đã được sửa tay nên được giữ nguyên.' : 'Đã xóa: '.implode(', ', $cleared).'.')->success()->send();
     }
 
+    /**
+     * Gợi ý "nên lập Trí tuệ cho lĩnh vực X": tạo Trí tuệ từ mẫu hợp nhất nhất, gắn vào website đang chọn; đóng gợi ý. Kiến thức vào kho từ các bài sau (điều phối tự nạp
+     * nguồn tin cậy khi kho còn thiếu) hoặc từ nút Xây kho. Cần quyền sửa Kho trí tuệ.
+     */
+    public function createBrain(string $key): void
+    {
+        $this->guard();
+        $site = $this->websiteId ? Website::find($this->websiteId) : null;
+        $sg = $site ? collect((new KnowledgeSuggestions)->forWebsite($site, 100))->firstWhere('key', $key) : null;
+        if ($site === null || $sg === null || $sg['type'] !== 'brain' || $sg['query'] === null) {
+            Notification::make()->title('Chưa tạo được')->body('Gợi ý không còn hiệu lực.')->danger()->send();
+
+            return;
+        }
+        try {
+            $tpl = \App\Services\Brain\BrainTemplates::suggestFor((string) $sg['query']);
+            $brain = (new \App\Services\Brain\BrainService)->createFromTemplate((string) $sg['query'], $tpl, [$site], Auth::user());
+        } catch (KnowledgeError|\InvalidArgumentException $e) {
+            Notification::make()->title('Chưa tạo được Trí tuệ')->body($e->getMessage())->danger()->send();
+
+            return;
+        }
+        \App\Models\KnowledgeGap::query()->where('website_id', $site->id)->where('query', mb_substr(KnowledgeSuggestions::BRAIN_PREFIX.$sg['query'], 0, 190))->update(['status' => 'filled', 'filled_at' => now()]);
+        Notification::make()->title('Đã tạo Trí tuệ «'.$brain->name.'» và gắn vào '.$site->name)->body('Bài kế tiếp thuộc lĩnh vực này sẽ tự nạp kho từ nguồn tin cậy trước khi viết. Mẫu dùng: '.$tpl.'. Bạn có thể chỉnh Hồ sơ lĩnh vực ở trang Trí tuệ.')->success()->send();
+    }
+
     public function dismissSuggestion(string $key): void
     {
         $this->guard();

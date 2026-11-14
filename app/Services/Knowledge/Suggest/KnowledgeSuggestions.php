@@ -24,7 +24,10 @@ final class KnowledgeSuggestions
 {
     public const DAYS = 30;
 
-    private const ORDER = ['gap' => 0, 'figure' => 1, 'source' => 2];
+    private const ORDER = ['brain' => 0, 'gap' => 1, 'figure' => 2, 'source' => 3];
+
+    /** Tiền tố khoảng trống do điều phối ghi khi chủ đề chưa thuộc Trí tuệ nào mà lĩnh vực đủ lớn (AgentRunOrchestrator::coordinateKnowledge). */
+    public const BRAIN_PREFIX = '[Đề xuất Trí tuệ] ';
 
     /**
      * @return list<array{type: string, title: string, detail: string, article_id: ?int, article_version_id: ?int, action: string, key: string, query: ?string}>
@@ -88,6 +91,14 @@ final class KnowledgeSuggestions
         foreach (KnowledgeGap::query()->where('website_id', $site->id)->where('status', 'open')->orderByDesc('count')->orderByDesc('id')->limit(100)->get() as $g) {
             $q = trim((string) $g->query);
             if ($q === '') {
+                continue;
+            }
+            if (str_starts_with($q, self::BRAIN_PREFIX)) {
+                $field = trim(mb_substr($q, mb_strlen(self::BRAIN_PREFIX)));
+                $out[] = ['type' => 'brain', 'title' => 'Nên lập Trí tuệ cho lĩnh vực «'.mb_substr($field, 0, 80).'»',
+                    'detail' => 'Đội AI đã gặp lĩnh vực này '.max(1, (int) $g->count).' lần mà chưa có Trí tuệ nào phù hợp. Lập Trí tuệ riêng để các bài sau có sẵn nền kiến thức đã nạp từ nguồn tin cậy.',
+                    'article_id' => $g->article_id, 'article_version_id' => null, 'action' => 'create_brain', 'key' => self::key('brain', $field), 'query' => mb_substr($field, 0, 120)];
+
                 continue;
             }
             $out[] = ['type' => 'gap', 'title' => 'Kho thiếu kiến thức về «'.mb_substr($q, 0, 80).'»',

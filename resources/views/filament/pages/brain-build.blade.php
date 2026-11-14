@@ -147,7 +147,8 @@
                     <tr data-testid="bb-sg">
                         <td><strong>{{ $sg['title'] }}</strong><br><span class="ss-muted ss-text-xs">{{ $sg['detail'] }}</span></td>
                         <td style="white-space:nowrap">
-                            @if ($sg['action'] === 'build')<x-filament::button size="xs" wire:click="fillGap('{{ $sg['key'] }}')" wire:loading.attr="disabled">Bổ sung từ website</x-filament::button>
+                            @if ($sg['action'] === 'create_brain')<x-filament::button size="xs" wire:click="createBrain('{{ $sg['key'] }}')" wire:loading.attr="disabled" data-testid="bb-create-brain">Tạo Trí tuệ và gắn vào website</x-filament::button>
+                            @elseif ($sg['action'] === 'build')<x-filament::button size="xs" wire:click="fillGap('{{ $sg['key'] }}')" wire:loading.attr="disabled">Bổ sung từ website</x-filament::button>
                             @else<a href="{{ $reviewUrl }}" wire:navigate class="ss-text-sm">Mở Kho trí tuệ</a>@endif
                             <x-filament::button size="xs" color="gray" wire:click="dismissSuggestion('{{ $sg['key'] }}')">Bỏ qua</x-filament::button>
                         </td>
