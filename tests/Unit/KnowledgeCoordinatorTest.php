@@ -77,4 +77,15 @@ class KnowledgeCoordinatorTest extends TestCase
         $this->assertFalse(ReferenceListRenderer::needsGloss('Hạ huyết áp sau ăn'));
         $this->assertFalse(ReferenceListRenderer::needsGloss('HbA1c'));
     }
+
+    public function test_dung_lai_ten_linh_vuc_da_de_xuat_va_prompt_nhac_ten_cu(): void
+    {
+        $existing = ['Thiết bị và công nghệ sản xuất dược phẩm', 'Dinh dưỡng cho người tiểu đường'];
+        $this->assertSame('Thiết bị và công nghệ sản xuất dược phẩm', KnowledgeCoordinator::reuseName('Thiết bị và máy móc ngành dược phẩm sản xuất', $existing));
+        $this->assertSame('Bất động sản cho thuê', KnowledgeCoordinator::reuseName('Bất động sản cho thuê', $existing), 'Lĩnh vực khác thì giữ tên mới.');
+        $prompt = KnowledgeCoordinator::systemPrompt('n', 'k', $existing);
+        $this->assertStringContainsString('PHẢI dùng ĐÚNG tên đó', $prompt);
+        $this->assertStringContainsString('Dinh dưỡng cho người tiểu đường', $prompt);
+        $this->assertStringNotContainsString('ĐÃ được đề xuất', KnowledgeCoordinator::systemPrompt('n', 'k'));
+    }
 }

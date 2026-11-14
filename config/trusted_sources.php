@@ -20,6 +20,10 @@ return [
             'clevelandclinic.org', 'hopkinsmedicine.org', 'health.harvard.edu', 'nice.org.uk', 'ada.org', 'ema.europa.eu', 'fda.gov',
             'dav.gov.vn', 'vnras.com', 'vien-dinh-duong.org.vn', 'nin.gov.vn', 'bachmai.gov.vn', 'choray.vn',
         ],
+        'pharma' => [
+            'who.int', 'fda.gov', 'ema.europa.eu', 'picscheme.org', 'ispe.org', 'usp.org', 'edqm.eu', 'pda.org', 'ich.org', 'dav.gov.vn', 'cdsco.gov.in', 'tga.gov.au', 'mhra.gov.uk',
+            'pubmed.ncbi.nlm.nih.gov', 'ncbi.nlm.nih.gov', 'sciencedirect.com', 'nature.com', 'springer.com', 'wiley.com', 'tandfonline.com', 'mdpi.com',
+        ],
         'education' => [
             'moet.gov.vn', 'unesco.org', 'oecd.org', 'britishcouncil.vn', 'britishcouncil.org', 'studyinaustralia.gov.au', 'educationusa.state.gov',
             'studyinuk.org', 'campusfrance.org', 'daad.de', 'ielts.org', 'toefl.org',

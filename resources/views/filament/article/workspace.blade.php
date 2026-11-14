@@ -492,6 +492,65 @@
                                 </ul>
                             @endif
                         </section>
+                        <section class="ss-review-card" data-testid="aw-kb-activity">
+                            <div class="aw-head">
+                                <h2 class="ss-review-card__title">Hoạt động kho trong phiên chạy gần nhất</h2>
+                                @if ($kbActivity['run_id'])<span class="aw-muted">phiên #{{ $kbActivity['run_id'] }}</span>@endif
+                            </div>
+                            @if ($kbActivity['entries'] === [])
+                                <p class="aw-muted">Phiên gần nhất chưa nạp hay tạo gì cho kho (chủ đề chưa cần hoặc kho đã đủ).</p>
+                            @else
+                                <ul class="aw-list">
+                                    @foreach ($kbActivity['entries'] as $e)
+                                        <li data-testid="aw-kb-entry">
+                                            <strong>{{ $e['title'] }}</strong>
+                                            @if ($e['brain_id'] && $e['brain_name'])<span class="aw-muted"> · kho <a class="aw-link" href="{{ BrainPage::getUrl(['brain' => $e['brain_id']]) }}">{{ $e['brain_name'] }}</a></span>@endif
+                                            @if ($e['items_auto'] + $e['items_proposed'] > 0)<span class="aw-muted"> · {{ $e['items_auto'] }} mục tự nhận, {{ $e['items_proposed'] }} mục chờ duyệt</span>@endif
+                                            <div class="aw-muted" style="font-size:.85em">{{ $e['detail'] }}</div>
+                                            @if (! empty($e['sources']))
+                                                <div class="aw-muted" style="font-size:.85em">Nguồn đã nạp:
+                                                    @foreach ($e['sources'] as $src)
+                                                        <a class="aw-link" href="{{ $src['url'] }}" target="_blank" rel="noopener noreferrer">{{ ($src['title'] ?? '') !== '' ? $src['title'] : ($src['domain'] ?? $src['url']) }}</a>@if (! $loop->last), @endif
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                            @php $ids = array_merge((array) ($e['item_ids']['auto'] ?? []), (array) ($e['item_ids']['proposed'] ?? [])); @endphp
+                                            @if ($ids !== [])
+                                                <details style="font-size:.85em"><summary class="aw-muted">Xem {{ count($ids) }} mục vừa nạp</summary>
+                                                    <ul class="aw-list">
+                                                        @foreach (array_slice($ids, 0, 12) as $iid)
+                                                            @if ($kbItems->has($iid))
+                                                                @php $it = $kbItems[$iid]; @endphp
+                                                                <li>{{ $it->title }} <span class="aw-muted">· {{ KnowledgeItem::STATUSES[$it->status] ?? $it->status }}{{ $it->review_mode === 'auto' ? ' · tự nhận' : '' }}</span></li>
+                                                            @endif
+                                                        @endforeach
+                                                    </ul>
+                                                </details>
+                                            @endif
+                                            @if (! empty($e['suggestion']) && $buildPage)
+                                                <div style="font-size:.85em"><a class="aw-link" data-testid="aw-kb-suggest" href="{{ \App\Filament\Pages\BrainBuildPage::getUrl() }}">Mở trang Xây kho để tạo Trí tuệ «{{ $e['suggestion']['field'] ?? '' }}»</a></div>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </section>
+                        @if ($citedSources !== [])
+                            <section class="ss-review-card" data-testid="aw-cited-sources">
+                                <h2 class="ss-review-card__title">Nguồn AI nêu trong bài</h2>
+                                <ul class="aw-list">
+                                    @foreach ($citedSources as $c)
+                                        <li>
+                                            @if ($c['url'])
+                                                <a class="aw-link" href="{{ $c['url'] }}" target="_blank" rel="noopener noreferrer">{{ $c['name'] }}</a>
+                                            @else
+                                                {{ $c['name'] }} <span class="aw-muted" data-testid="aw-cited-nolink">· chưa có liên kết xác thực: AI nêu tên nhưng hệ thống chưa gắn được trang gốc, cần người xem kiểm tra</span>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </section>
+                        @endif
                         @if (! empty($webSources))
                             <section class="ss-review-card" data-testid="aw-web-sources">
                                 <h2 class="ss-review-card__title">Nguồn web đã đọc cho bài này</h2>

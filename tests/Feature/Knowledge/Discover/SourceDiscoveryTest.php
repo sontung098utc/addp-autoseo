@@ -12,6 +12,7 @@ use App\Services\Crawler\SitemapCrawlerService;
 use App\Services\Knowledge\Build\BrainBuildService;
 use App\Services\Knowledge\Build\SafePageFetcher;
 use App\Services\Knowledge\Discover\SourceDiscoveryService;
+use App\Services\Knowledge\Discover\SourceTrust;
 use App\Services\Knowledge\KnowledgeError;
 use App\Services\Search\WebSearchUnavailable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -285,5 +286,15 @@ class SourceDiscoveryTest extends TestCase
         $this->assertSame(1, $r['pages_read']);
         $this->assertSame(1, $r['items_auto'], 'trước đây lượt hệ thống bị KnowledgeAiIngest từ chối vì không có người dùng');
         $this->assertNull(KnowledgeItem::first()->approved_by);
+    }
+
+    public function test_linh_vuc_san_xuat_duoc_co_nhom_nguon_chinh_thong_rieng_va_xet_truoc_nhom_suc_khoe(): void
+    {
+        $this->assertSame('pharma', SourceDiscoveryService::fieldFor('máy dập viên một chày và nhiều chày'));
+        $this->assertSame('pharma', SourceDiscoveryService::fieldFor('quy trình sản xuất thuốc theo GMP'));
+        $this->assertSame('health', SourceDiscoveryService::fieldFor('tiểu đường tuýp 2'));
+        $this->assertNull(SourceDiscoveryService::fieldFor('học bổng toàn phần'));
+        $this->assertSame('trusted', SourceTrust::assess('https://www.fda.gov/drugs/x', null, 'pharma')['level']);
+        $this->assertSame('neutral', SourceTrust::assess('https://hang-ban-may.vn/may-dap-vien', null, 'pharma')['level']);
     }
 }

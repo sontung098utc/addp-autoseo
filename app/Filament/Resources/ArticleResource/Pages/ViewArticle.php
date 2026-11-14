@@ -13,6 +13,7 @@ use App\Filament\Support\Schedule\RescheduleAction;
 use App\Models\AgentRun;
 use App\Models\Article;
 use App\Models\ArticleVersion;
+use App\Models\KnowledgeItem;
 use App\Models\Brain;
 use App\Models\BrandProfile;
 use App\Models\Campaign;
@@ -343,6 +344,82 @@ class ViewArticle extends EditArticle
         ];
     }
 
+    /**
+     * Hoạt động KHO của phiên chạy gần nhất có ghi hoạt động kho: điều phối chọn Trí tuệ nào, đã nạp/học thêm nguồn nào vào kho nào (kèm liên kết nguồn),
+     * mục nào tự nhận / chờ duyệt, hay đề xuất lập Trí tuệ mới. Để người dùng biết kho vừa được cập nhật gì và xem lại.
+     *
+     * @return array{run_id:?int, entries:list<array<string,mixed>>}
+     */
+    private function kbActivity($runs): array
+    {
+        foreach ($runs as $run) {
+            $entries = [];
+            foreach ($run->steps->where('stage', 'research') as $st) {
+                $d = (array) $st->data;
+                $purpose = (string) ($d['purpose'] ?? '');
+                if (! in_array($purpose, ['kb_coordination', 'kb_topup', 'kb_learn', 'web_discover', 'gap'], true)) {
+                    continue;
+                }
+                $entries[] = ['purpose' => $purpose, 'status' => $st->status, 'title' => $st->title, 'detail' => $st->detail, 'brain_id' => $d['brain_id'] ?? null, 'brain_name' => $d['brain_name'] ?? null,
+                    'sources' => (array) ($d['sources'] ?? $d['web_sources'] ?? []), 'items_auto' => (int) ($d['items_auto'] ?? 0), 'items_proposed' => (int) ($d['items_proposed'] ?? 0),
+                    'item_ids' => (array) ($d['item_ids'] ?? []), 'suggestion' => $d['suggestion'] ?? null];
+            }
+            if ($entries !== []) {
+                return ['run_id' => $run->id, 'entries' => $entries];
+            }
+        }
+
+        return ['run_id' => null, 'entries' => []];
+    }
+
+    /** Mục kho được nhắc trong hoạt động kho (tối đa 40), theo mã. @return \Illuminate\Support\Collection<int, KnowledgeItem> */
+    private function kbItemsFor($runs)
+    {
+        $ids = [];
+        foreach ($this->kbActivity($runs)['entries'] as $e) {
+            $ids = array_merge($ids, (array) ($e['item_ids']['auto'] ?? []), (array) ($e['item_ids']['proposed'] ?? []));
+        }
+
+        return $ids === [] ? collect() : KnowledgeItem::query()->whereIn('id', array_slice(array_unique(array_map('intval', $ids)), 0, 40))->get()->keyBy('id');
+    }
+
+    /**
+     * Nguồn AI nêu trong bài (sources_cited) kèm liên kết khi khớp được với nguồn có địa chỉ thật (tài liệu web đã đọc, nguồn kho, mục Nguồn tham khảo của bài).
+     *
+     * @return list<array{name:string, url:?string, matched:?string}>
+     */
+    private function citedSources(?ArticleVersion $latest, $runs): array
+    {
+        if (! $latest) {
+            return [];
+        }
+        $candidates = [];
+        if (preg_match('#<div class="autoseo-refs">(.*)#s', (string) $latest->html_content, $m) && preg_match_all('#<a\b[^>]*\bhref="([^"]+)"[^>]*>(.*?)</a>#s', $m[1], $links, PREG_SET_ORDER)) {
+            foreach ($links as $l) {
+                $candidates[] = ['title' => trim(strip_tags(html_entity_decode($l[2]))), 'url' => html_entity_decode($l[1])];
+            }
+        }
+        foreach ($runs->take(3)->flatMap->steps as $st) {
+            foreach ((array) (((array) $st->data)['references'] ?? []) as $r) {
+                if (is_array($r) && ! empty($r['url'])) {
+                    $candidates[] = ['title' => (string) ($r['title'] ?? ''), 'url' => (string) $r['url'], 'domain' => (string) ($r['domain'] ?? '')];
+                }
+            }
+            foreach ((array) (((array) $st->data)['sources'] ?? ((array) $st->data)['web_sources'] ?? []) as $r) {
+                if (is_array($r) && ! empty($r['url'])) {
+                    $candidates[] = ['title' => (string) ($r['title'] ?? ''), 'url' => (string) $r['url'], 'domain' => (string) ($r['domain'] ?? '')];
+                }
+            }
+        }
+        foreach (KnowledgeItemUsage::query()->where('article_version_id', $latest->id)->with('item.source')->get() as $u) {
+            if (! empty($u->item?->source?->url)) {
+                $candidates[] = ['title' => (string) $u->item->source->title, 'url' => (string) ($u->item->source->final_url ?: $u->item->source->url)];
+            }
+        }
+
+        return \App\Services\Content\CitedSourceLinks::resolve(\App\Services\Content\Quality\Rules\FactRule::sources($latest->sources_cited), $candidates);
+    }
+
     protected function getViewData(): array
     {
         /** @var Article $article */
@@ -428,6 +505,9 @@ class ViewArticle extends EditArticle
             'brand' => BrandProfile::query()->where('website_id', $article->website_id)->first(),
             'outline' => array_values(array_filter((array) ($briefStep?->data['outline'] ?? []), 'is_string')),
             'research' => (array) ($researchStep?->data ?? []) + (array) ($writeStep?->data ?? []),
+            'kbActivity' => $this->kbActivity($runs),
+            'kbItems' => $this->kbItemsFor($runs),
+            'citedSources' => $this->citedSources($latest, $runs),
             'webSources' => (array) ($runs->flatMap->steps->where('stage', 'research')->filter(fn ($st) => ! empty($st->data['web_sources']))->sortByDesc('id')->first()?->data['web_sources'] ?? []),
             'publications' => $publications,
             'outlineHold' => OutlineHold::forArticle($article),

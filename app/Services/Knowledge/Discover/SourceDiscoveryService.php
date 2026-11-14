@@ -44,7 +44,10 @@ final class SourceDiscoveryService
     public const MIN_TEXT_CHARS = 200;
 
     /** Từ gợi ý thêm vào truy vấn theo lĩnh vực rủi ro. */
-    private const HINTS = ['health' => 'hướng dẫn khuyến cáo', 'finance' => 'quy định hướng dẫn', 'legal' => 'quy định hướng dẫn', 'education' => 'hướng dẫn'];
+    private const HINTS = ['health' => 'hướng dẫn khuyến cáo', 'pharma' => 'GMP hướng dẫn tiêu chuẩn', 'finance' => 'quy định hướng dẫn', 'legal' => 'quy định hướng dẫn', 'education' => 'hướng dẫn'];
+
+    /** Cụm chỉ sản xuất dược và thiết bị dược. */
+    public const PHARMA_PHRASES = ['máy dập viên', 'máy bào chế', 'thiết bị dược', 'thiết bị bào chế', 'sản xuất dược', 'sản xuất thuốc', 'nhà máy dược', 'nhà máy sản xuất thuốc', 'dây chuyền dược', 'dây chuyền sản xuất thuốc', 'gmp', 'dập viên', 'bao phim', 'tablet press', 'pharmaceutical manufacturing', 'thẩm định thiết bị'];
 
     private SafePageFetcher $fetcher;
 
@@ -73,6 +76,12 @@ final class SourceDiscoveryService
     public static function fieldFor(string $topic, ?Brain $brain = null): ?string
     {
         $t = mb_strtolower($topic);
+        // Sản xuất dược và thiết bị dược (máy dập viên, GMP, dây chuyền...) có nhóm nguồn chính thống riêng (WHO, FDA, EMA, PIC/S, ISPE, USP...); xét trước nhóm sức khỏe chung.
+        foreach (self::PHARMA_PHRASES as $p) {
+            if (preg_match('/(?<![\p{L}\p{N}])'.preg_quote($p, '/').'(?![\p{L}\p{N}])/u', $t)) {
+                return 'pharma';
+            }
+        }
         foreach (RiskTiering::HEALTH_PRODUCT_PHRASES as $p) {
             if (preg_match('/(?<![\p{L}\p{N}])'.preg_quote($p, '/').'(?![\p{L}\p{N}])/u', $t)) {
                 return 'health';

@@ -925,7 +925,7 @@ final class AgentRunOrchestrator
     private function neutralSourcesOk(string $keyword): bool
     {
         try {
-            return $this->risk->assess($keyword)->level === 'low' && \App\Services\Knowledge\Discover\SourceDiscoveryService::fieldFor($keyword) === null;
+            return $this->risk->assess($keyword)->level === 'low' && \App\Services\Knowledge\Discover\SourceDiscoveryService::fieldFor($keyword) !== 'health';
         } catch (Throwable) {
             return false;
         }
@@ -978,7 +978,11 @@ final class AgentRunOrchestrator
                 return; // không có Trí tuệ: chỉ điều phối khi kho còn thiếu và có tìm kiếm web THẬT (mô phỏng không đủ căn cứ để đề xuất)
             }
         }
-        $r = (new \App\Services\Knowledge\KnowledgeCoordinator(new AiJson($ai, $this->sleep, 0)))->classify($kw, $brains); // phân loại chỉ là tư vấn: một lần gọi, lỗi thì bỏ qua
+        $existing = $this->suggestedBrainFields($article);
+        $r = (new \App\Services\Knowledge\KnowledgeCoordinator(new AiJson($ai, $this->sleep, 0)))->classify($kw, $brains, $existing); // phân loại chỉ là tư vấn: một lần gọi, lỗi thì bỏ qua
+        if ($r['status'] === 'done' && $r['brain_id'] === null && $r['field'] !== '') {
+            $r['field'] = \App\Services\Knowledge\KnowledgeCoordinator::reuseName($r['field'], $existing); // cùng một lĩnh vực thì dùng đúng tên đã đề xuất, không sinh gợi ý trùng
+        }
         if ($r['status'] !== 'done') {
             return;
         }
@@ -987,7 +991,7 @@ final class AgentRunOrchestrator
             $this->matchedBrainId = $r['brain_id'];
             $name = (string) (collect($brains)->firstWhere('id', $r['brain_id'])['name'] ?? 'Trí tuệ');
             if ($covered >= self::KB_ENOUGH) {
-                $this->step($run, 'research', 'system', 'ok', 'Kho đã đủ cho chủ đề này', 'Chủ đề thuộc Trí tuệ «'.$name.'» ('.$r['field'].'), kho đã có '.$covered.' mục đã duyệt khớp nên không nạp thêm.', $base, $r['model'], $r['tokens'], $r['cost']);
+                $this->step($run, 'research', 'system', 'ok', 'Kho đã đủ cho chủ đề này', 'Chủ đề thuộc Trí tuệ «'.$name.'» ('.$r['field'].'), kho đã có '.$covered.' mục đã duyệt khớp nên không nạp thêm.', $base + ['brain_name' => $name], $r['model'], $r['tokens'], $r['cost']);
 
                 return;
             }
@@ -1038,9 +1042,37 @@ final class AgentRunOrchestrator
                 'field' => \App\Services\Knowledge\Discover\SourceDiscoveryService::fieldFor((string) $article->primary_keyword), 'budget_cap_vnd' => $this->policy->budgetVnd * 0.1, 'purpose' => 'learn']);
             $this->step($run, 'research', 'system', $imp['imported'] > 0 ? 'ok' : 'warn', 'Học vào kho: '.$imp['imported'].' nguồn mới từ tài liệu bài đã dùng',
                 'Nạp các nguồn tin cậy của bài vào Trí tuệ để các bài sau dùng ngay: '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, có đoạn nguyên văn, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.',
-                ['purpose' => 'kb_learn', 'imported' => $imp['imported'], 'items_auto' => $imp['items_auto'], 'items_proposed' => $imp['items_proposed'], 'build_run_id' => $imp['run_id']], null, 0, (float) $imp['cost_vnd']);
+                ['purpose' => 'kb_learn', 'imported' => $imp['imported'], 'items_auto' => $imp['items_auto'], 'items_proposed' => $imp['items_proposed'], 'build_run_id' => $imp['run_id']] + $this->kbStepData($imp, $this->matchedBrainId), null, 0, (float) $imp['cost_vnd']);
         } catch (Throwable $e) {
             report($e); // học vào kho là phần thêm: lỗi không được làm hỏng bài đã viết xong
+        }
+    }
+
+    /**
+     * Dữ kiện nạp kho cho người xem ở tab Nghiên cứu và nguồn: Trí tuệ nào, nguồn nào (kèm liên kết), mục nào tự nhận / chờ duyệt.
+     *
+     * @param  array<string,mixed>  $imp  kết quả SourceDiscoveryService::import
+     * @return array<string,mixed>
+     */
+    private function kbStepData(array $imp, ?int $brainId): array
+    {
+        return [
+            'brain_id' => $brainId, 'brain_name' => $brainId ? (string) \App\Models\Brain::query()->whereKey($brainId)->value('name') : null,
+            'sources' => array_values(array_map(fn ($p) => ['url' => (string) $p['url'], 'title' => (string) ($p['title'] ?? ''), 'domain' => (string) $p['domain'], 'items_auto' => (int) ($p['items_auto'] ?? 0), 'items_proposed' => (int) ($p['items_proposed'] ?? 0)],
+                array_filter((array) ($imp['pages'] ?? []), fn ($p) => ! empty($p['ok'])))),
+            'item_ids' => ['auto' => array_slice((array) ($imp['auto_item_ids'] ?? []), 0, 40), 'proposed' => array_slice((array) ($imp['proposed_item_ids'] ?? []), 0, 40)],
+        ];
+    }
+
+    /** Tên các lĩnh vực đã được đề xuất lập Trí tuệ (gợi ý đang mở) của website. @return list<string> */
+    private function suggestedBrainFields(Article $article): array
+    {
+        $prefix = \App\Services\Knowledge\Suggest\KnowledgeSuggestions::BRAIN_PREFIX;
+        try {
+            return \App\Models\KnowledgeGap::query()->where('website_id', $article->website_id)->where('status', 'open')->where('query', 'like', $prefix.'%')->orderByDesc('count')->limit(12)->pluck('query')
+                ->map(fn ($q) => trim(mb_substr((string) $q, mb_strlen($prefix))))->filter()->values()->all();
+        } catch (Throwable) {
+            return [];
         }
     }
 
@@ -1061,7 +1093,7 @@ final class AgentRunOrchestrator
                 'search' => ['query' => $d['query'], 'results' => count($d['candidates']), 'cost_vnd' => $d['cost_vnd'], 'provider' => $d['provider']]]);
             $this->step($run, 'research', 'system', $imp['imported'] > 0 ? 'ok' : 'warn', 'Nạp kho «'.$name.'»: '.$imp['imported'].' nguồn mới',
                 'Kho mới có '.$covered.' mục khớp chủ đề nên điều phối chạy luồng nạp TRƯỚC khi viết: '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.',
-                $base + ['imported' => $imp['imported'], 'items_auto' => $imp['items_auto'], 'items_proposed' => $imp['items_proposed'], 'build_run_id' => $imp['run_id']], $cl['model'], $cl['tokens'], $cl['cost'] + (float) $imp['cost_vnd']);
+                $base + $this->kbStepData($imp, $brainId) + ['imported' => $imp['imported'], 'items_auto' => $imp['items_auto'], 'items_proposed' => $imp['items_proposed'], 'build_run_id' => $imp['run_id']], $cl['model'], $cl['tokens'], $cl['cost'] + (float) $imp['cost_vnd']);
         } catch (Throwable $e) {
             report($e);
             $this->step($run, 'research', 'system', 'warn', 'Chưa nạp được kho «'.$name.'»', ErrorMasker::short($e->getMessage(), 160).' Bài vẫn viết từ các nguồn tìm được.', $base, $cl['model'], $cl['tokens'], $cl['cost']);
@@ -1118,7 +1150,7 @@ final class AgentRunOrchestrator
                 'search' => ['query' => $d['query'], 'results' => count($d['candidates']), 'cost_vnd' => $d['cost_vnd'], 'provider' => $d['provider']]]);
             $this->step($run, 'research', 'system', $imp['imported'] > 0 ? 'ok' : 'warn', 'Nạp bổ sung kho cho phần còn thiếu: '.$imp['imported'].' nguồn',
                 'Điều phối chạy luồng nạp cho khoảng trống "'.mb_substr($topics[0], 0, 120).'": '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.',
-                ['purpose' => 'kb_topup', 'imported' => $imp['imported'], 'items_auto' => $imp['items_auto'], 'items_proposed' => $imp['items_proposed'], 'build_run_id' => $imp['run_id']], null, 0, (float) $imp['cost_vnd']);
+                ['purpose' => 'kb_topup', 'imported' => $imp['imported'], 'items_auto' => $imp['items_auto'], 'items_proposed' => $imp['items_proposed'], 'build_run_id' => $imp['run_id']] + $this->kbStepData($imp, $this->matchedBrainId), null, 0, (float) $imp['cost_vnd']);
             $added += (int) $imp['items_auto'];
         } catch (Throwable $e) {
             report($e);

@@ -53,7 +53,7 @@ final class SourceTrust
 
     public static function fieldLabel(string $f): string
     {
-        return ['health' => 'sức khỏe', 'education' => 'giáo dục', 'finance' => 'tài chính', 'legal' => 'pháp lý'][$f] ?? $f;
+        return ['health' => 'sức khỏe', 'pharma' => 'sản xuất dược và thiết bị', 'education' => 'giáo dục', 'finance' => 'tài chính', 'legal' => 'pháp lý'][$f] ?? $f;
     }
 
     /** @param list<string> $patterns "a.b" khớp a.b và tên miền con; "*.a.b" chỉ tên miền con (và chính a.b). */
