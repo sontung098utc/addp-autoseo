@@ -121,6 +121,6 @@ final class EditorialReviewer
         }
         $text = implode("\n", $lines);
 
-        return trim(preg_replace('/\[(?:KB)?#?\d+(?:\s*[,;]\s*(?:KB)?#?\d+)*\]/u', '', $text) ?? $text);
+        return trim(preg_replace('/\[(?:KB|T)?#?\d+(?:\s*[,;]\s*(?:KB|T)?#?\d+)*\]/u', '', $text) ?? $text);
     }
 }

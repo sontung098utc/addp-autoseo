@@ -100,7 +100,7 @@ class ArticleVersionResourceTest extends TestCase
         $this->actingAs($this->user());
         $v = $this->version(['html_content' => '<p>ok</p><script>alert(1)</script><img src=x onerror=alert(1)><iframe src="javascript:alert(1)"></iframe>']);
         $html = Livewire::test(ViewArticleVersion::class, ['record' => $v->id])->html();
-        $this->assertMatchesRegularExpression('/<iframe[^>]*sandbox=""/', $html);
+        $this->assertMatchesRegularExpression('/<iframe[^>]*sandbox="allow-popups allow-popups-to-escape-sandbox"/', $html);
         $this->assertStringNotContainsString('<script>alert(1)', $html);
         $this->assertStringNotContainsString('onerror', $html);
         $this->assertStringNotContainsString('javascript:alert', $html);

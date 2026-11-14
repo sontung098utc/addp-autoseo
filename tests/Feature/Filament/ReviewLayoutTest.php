@@ -105,7 +105,9 @@ class ReviewLayoutTest extends TestCase
         $this->actingAs($this->user('approver'));
         $v = $this->version($this->article(), 1, 'needs_review', '<p>a</p><script>alert(1)</script>');
         $html = Livewire::test(ViewArticleVersion::class, ['record' => $v->id])->html();
-        $this->assertStringContainsString('sandbox=""', $html);
+        $this->assertStringContainsString('sandbox="allow-popups allow-popups-to-escape-sandbox"', $html);
+        $this->assertStringNotContainsString('allow-scripts', $html);
+        $this->assertStringNotContainsString('allow-same-origin', $html);
         $this->assertStringNotContainsString('<script>alert(1)', $html);
     }
 
