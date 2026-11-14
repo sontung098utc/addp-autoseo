@@ -201,7 +201,7 @@ class SourceDiscoveryTest extends TestCase
         $this->assertEqualsWithDelta(220.0, $r['cost_vnd'], 0.01);
     }
 
-    public function test_muc_tang_c_y_te_tu_nguon_tin_cay_van_cho_nguoi_duyet_con_muc_thuong_van_tu_nhan(): void
+    public function test_muc_tang_c_y_te_tu_nguon_tin_cay_co_doan_nguyen_van_duoc_tu_nhan_nhu_muc_thuong(): void
     {
         Http::fake([
             'who.int/robots.txt' => Http::response('', 404),
@@ -215,14 +215,26 @@ class SourceDiscoveryTest extends TestCase
 
         $health = KnowledgeItem::where('title', 'Theo dõi đường huyết')->first();
         $this->assertSame('C', $health->risk_tier);
-        $this->assertSame('proposed', $health->status, 'tầng C luôn chờ người duyệt, kể cả nguồn tin cậy có đoạn nguyên văn');
-        $this->assertNull($health->review_mode);
+        $this->assertSame('approved', $health->status, 'nguồn tin cậy + đoạn nguyên văn thì tự nhận, kể cả chủ đề y tế (tầng C do hạng rủi ro)');
+        $this->assertSame('auto', $health->review_mode);
         $plain = KnowledgeItem::where('title', 'Giờ mở cửa thư viện')->first();
         $this->assertNotSame('C', $plain->risk_tier);
         $this->assertSame('approved', $plain->status);
-        $this->assertSame('auto', $plain->review_mode);
-        $this->assertSame(1, $r['items_auto']);
-        $this->assertSame(1, $r['items_proposed']);
+        $this->assertSame(2, $r['items_auto']);
+        $this->assertSame(0, $r['items_proposed']);
+    }
+
+    public function test_tat_co_nhan_moi_rui_ro_thi_tang_c_lai_cho_nguoi_duyet(): void
+    {
+        config(['trusted_sources.auto_approve_any_risk' => false]);
+        Http::fake([
+            'who.int/robots.txt' => Http::response('', 404),
+            'who.int/tt' => Http::response($this->page('Tài liệu', 'Người tiểu đường cần theo dõi đường huyết thường xuyên cùng bác sĩ.'), 200, ['Content-Type' => 'text/html']),
+        ]);
+        $ai = $this->ai([['items' => [$this->item('fact', 'Theo dõi đường huyết', 'Người tiểu đường cần theo dõi đường huyết thường xuyên cùng bác sĩ.', 'Người tiểu đường cần theo dõi đường huyết thường xuyên cùng bác sĩ')]]]);
+        $this->svc($ai)->import($this->site, [['url' => 'https://www.who.int/tt']], $this->user());
+        $this->assertSame('proposed', KnowledgeItem::where('title', 'Theo dõi đường huyết')->first()->status, 'cờ tắt: tầng C luôn chờ người duyệt như trước');
+        $this->assertNull(KnowledgeItem::where('title', 'Theo dõi đường huyết')->first()->review_mode);
     }
 
     public function test_import_tin_cay_lai_tu_luat_khong_tin_du_lieu_gui_len_va_trung_bam_bo_qua(): void

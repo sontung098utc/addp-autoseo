@@ -266,9 +266,11 @@ final class SourceDiscoveryService
             foreach (KnowledgeItem::query()->where('source_id', $source->id)->where('status', 'proposed')->orderBy('id')->get() as $item) {
                 $t = $this->tiering->tier($item, $brain, false);
                 $item->update(['risk_tier' => $t['tier']]);
-                // Tầng C (y tế, pháp lý, tài chính, hạng rủi ro cao...) LUÔN chờ người duyệt, kể cả từ nguồn tin cậy (RiskTiering, như đường xây kho từ website).
+                // Nguồn TIN CẬY (danh sách cố định) + có đoạn nguyên văn từ trang thì tự nhận, kể cả chủ đề y tế/tài chính (tầng C do hạng rủi ro): nội dung lấy đúng từ nguồn uy tín, hoàn tác được.
+                // Loại mục của doanh nghiệp (giá, chính sách, quan niệm sai, điều cấm) và mục mâu thuẫn với mục khác vẫn chờ người duyệt. Tắt bằng trusted_sources.auto_approve_any_risk=false để quay lại "tầng C luôn chờ".
+                $anyRisk = (bool) config('trusted_sources.auto_approve_any_risk', true);
                 $ok = $trust['level'] === 'trusted' && trim((string) $item->source_span) !== '' && ! in_array($item->type, RiskTiering::C_TYPES, true)
-                    && $t['tier'] !== RiskTiering::C
+                    && ($anyRisk || $t['tier'] !== RiskTiering::C)
                     && $builder->autoApprove($item, $by, 'Tự nhận từ nguồn tin cậy '.$domain.' (tải '.now()->format('d/m/Y').')');
                 if ($ok) {
                     $auto++;

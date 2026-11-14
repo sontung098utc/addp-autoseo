@@ -505,6 +505,7 @@ final class AgentRunOrchestrator
         $this->assets?->attachFeatured($version); // AG-S25
         // 6b. Lắp ráp: đợi ảnh (chạy song song với bước viết), gắn vào phiên bản và chèn vào nội dung theo kế hoạch.
         $this->assembleImages($run, $article, $version);
+        $this->learnFromReferences($run, $article); // tài liệu tin cậy bài đã dùng được học vào kho cho các bài sau
 
         if ($passed && $assess->level === 'high') {
             $this->decision($run, 'high_risk_expert_review', 'Giữ cho người có chuyên môn duyệt', 'Đạt luật nhưng chủ đề rủi ro cao nên hệ thống không coi là xong; cần người có chuyên môn duyệt trước khi dùng.'.($this->needsExpert ? ' Kho chưa có kiến thức đã duyệt khớp chủ đề nên cần xem kỹ các khẳng định.' : ''), ['risk_level' => 'high', 'score' => $score] + ($this->needsExpert ? ['needs_expert' => true, 'reason' => 'high_risk_no_knowledge'] : []));
@@ -1011,6 +1012,38 @@ final class AgentRunOrchestrator
         $this->step($run, 'research', 'system', 'ok', 'Chủ đề lẻ: không cần lập kho', 'Chủ đề thuộc «'.($r['field'] !== '' ? $r['field'] : 'lĩnh vực khác').'», không thuộc Trí tuệ nào và không đủ lớn để đáng lập kho. Bài dùng các nguồn tìm được. '.$r['reason'], $base, $r['model'], $r['tokens'], $r['cost']);
     }
 
+    /**
+     * HỌC vào kho: các tài liệu tin cậy mà bài thật sự dựa vào (nằm trong danh sách Nguồn tham khảo) được nạp vào Trí tuệ đã xác định, để các bài sau có sẵn
+     * (mục từ nguồn tin cậy có đoạn nguyên văn được tự nhận). Chỉ khi chủ đề thuộc một Trí tuệ; tối đa 2 nguồn mới mỗi phiên, trần 10% ngân sách; chạy SAU khi bài đã lưu
+     * nên không ảnh hưởng bài này và mọi lỗi đều bị nuốt.
+     */
+    private function learnFromReferences(AgentRun $run, Article $article): void
+    {
+        if ($this->matchedBrainId === null || $this->spent($run) >= $this->policy->budgetVnd) {
+            return;
+        }
+        try {
+            $urls = [];
+            foreach ($this->referencesForList() as $r) {
+                $u = (string) ($r['url'] ?? '');
+                if (($r['trust'] ?? 'trusted') === 'trusted' && preg_match('#^https?://#i', $u) && ! \App\Models\KnowledgeSource::query()->where('website_id', $article->website_id)->where('url', mb_substr($u, 0, 2048))->exists()) {
+                    $urls[] = ['url' => $u, 'title' => (string) ($r['title'] ?? '')];
+                }
+            }
+            if ($urls === []) {
+                return;
+            }
+            $svc = app(\App\Services\Knowledge\Discover\SourceDiscoveryService::class);
+            $imp = $svc->import($article->website, array_slice($urls, 0, 2), null, ['as_system' => true, 'brain_id' => $this->matchedBrainId, 'max_sources' => 2, 'only_trusted' => true,
+                'field' => \App\Services\Knowledge\Discover\SourceDiscoveryService::fieldFor((string) $article->primary_keyword), 'budget_cap_vnd' => $this->policy->budgetVnd * 0.1, 'purpose' => 'learn']);
+            $this->step($run, 'research', 'system', $imp['imported'] > 0 ? 'ok' : 'warn', 'Học vào kho: '.$imp['imported'].' nguồn mới từ tài liệu bài đã dùng',
+                'Nạp các nguồn tin cậy của bài vào Trí tuệ để các bài sau dùng ngay: '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, có đoạn nguyên văn, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.',
+                ['purpose' => 'kb_learn', 'imported' => $imp['imported'], 'items_auto' => $imp['items_auto'], 'items_proposed' => $imp['items_proposed'], 'build_run_id' => $imp['run_id']], null, 0, (float) $imp['cost_vnd']);
+        } catch (Throwable $e) {
+            report($e); // học vào kho là phần thêm: lỗi không được làm hỏng bài đã viết xong
+        }
+    }
+
     /** Luồng nạp cho đúng Trí tuệ đã xác định: nguồn tin cậy từ web, tối đa 3 nguồn, trần 10% ngân sách phiên. */
     private function topUpBrain(AgentRun $run, Article $article, int $brainId, string $name, int $covered, array $base, array $cl): void
     {
@@ -1024,7 +1057,7 @@ final class AgentRunOrchestrator
             $svc = app(\App\Services\Knowledge\Discover\SourceDiscoveryService::class);
             $d = $svc->discover($article->website, (string) $article->primary_keyword);
             $trusted = array_values(array_filter($d['candidates'], fn ($c) => $c['trust']['level'] === 'trusted'));
-            $imp = $svc->import($article->website, $trusted, null, ['as_system' => true, 'brain_id' => $brainId, 'max_sources' => 3, 'only_trusted' => true, 'field' => $d['field'], 'budget_cap_vnd' => $this->policy->budgetVnd * 0.1, 'purpose' => 'gap',
+            $imp = $svc->import($article->website, $trusted, null, ['as_system' => true, 'brain_id' => $brainId, 'max_sources' => 4, 'only_trusted' => true, 'field' => $d['field'], 'budget_cap_vnd' => $this->policy->budgetVnd * 0.1, 'purpose' => 'gap',
                 'search' => ['query' => $d['query'], 'results' => count($d['candidates']), 'cost_vnd' => $d['cost_vnd'], 'provider' => $d['provider']]]);
             $this->step($run, 'research', 'system', $imp['imported'] > 0 ? 'ok' : 'warn', 'Nạp kho «'.$name.'»: '.$imp['imported'].' nguồn mới',
                 'Kho mới có '.$covered.' mục khớp chủ đề nên điều phối chạy luồng nạp TRƯỚC khi viết: '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.',

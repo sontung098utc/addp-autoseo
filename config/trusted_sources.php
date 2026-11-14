@@ -8,6 +8,9 @@
  * Danh sách chỉ là điểm khởi đầu hợp lý, chưa được chuyên gia thẩm định.
  */
 return [
+    /** Mục rút từ nguồn tin cậy, có đoạn nguyên văn: tự nhận kể cả chủ đề rủi ro cao (y tế...). false = chủ đề tầng C luôn chờ người duyệt như trước. */
+    'auto_approve_any_risk' => (bool) env('KB_AUTO_APPROVE_TRUSTED_ANY_RISK', true),
+
     'general' => ['*.gov.vn', '*.edu.vn', '*.gov', '*.edu', '*.gov.uk', '*.ac.uk'],
 
     'fields' => [

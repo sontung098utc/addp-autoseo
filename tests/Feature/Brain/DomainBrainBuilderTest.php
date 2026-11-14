@@ -135,8 +135,9 @@ class DomainBrainBuilderTest extends TestCase
         $this->assertSame('strategist/brain-source-plan@1', $src->data['skill']['ref'], 'bước ghi kỹ năng đã dùng (cùng dạng với bước của bài viết)');
 
         $item = KnowledgeItem::first();
-        $this->assertSame('proposed', $item->status, 'tầng C không bao giờ tự nhận');
-        $this->assertSame(0, KnowledgeItem::where('status', 'approved')->count());
+        $this->assertSame('approved', $item->status, 'nguồn tin cậy + đoạn nguyên văn đã kiểm lại khớp thì tự nhận, kể cả lĩnh vực rủi ro cao');
+        $this->assertSame('auto', $item->review_mode);
+        $this->assertSame(1, KnowledgeItem::where('status', 'approved')->count());
         $this->assertContains('kiểm lại: khớp', $item->tags);
         $this->assertNotNull($item->topic_id, 'đã gán chủ đề');
         $this->assertTrue(collect($ai->systems)->contains(fn ($s) => str_contains($s, 'HƯỚNG DẪN CHUYÊN NGÀNH BỔ SUNG')), 'rút mục có nạp kỹ năng claim-extract');
