@@ -73,6 +73,8 @@ class NewQualityRulesTest extends TestCase
         $f = $this->check(new ProcessLeakRule, $bad);
         $this->assertSame('PROC01', $f[0]->code);
         $this->assertStringContainsString('4 câu', $f[0]->message);
+        $labels = $this->check(new ProcessLeakRule, '<p>Mức này chưa xác minh. Bằng chứng còn hạn chế ở nhóm này. Điều này không chắc chắn.</p>');
+        $this->assertStringContainsString('3 câu', $labels[0]->message, 'Nhãn độ tin cậy không được lọt vào thân bài.');
         $ok = '<p>Huyết áp thấp là dưới khoảng 90/60 mmHg. Uống nước trước bữa ăn có thể giúp giảm tụt huyết áp sau ăn.</p><div class="autoseo-refs"><p>Một nguồn nêu</p></div>';
         $this->assertSame([], $this->check(new ProcessLeakRule, $ok));
     }

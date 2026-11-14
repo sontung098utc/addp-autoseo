@@ -26,7 +26,8 @@ final class AiJson
 
     private \Closure $sleep;
 
-    public function __construct(private readonly StructuredAiInterface $ai, ?\Closure $sleep = null)
+    /** @param int|null $maxRetries số lần thử lại tối đa khi lỗi tạm thời (null = theo WAITS; 0 = chỉ một lần gọi, dùng cho việc chỉ mang tính tư vấn) */
+    public function __construct(private readonly StructuredAiInterface $ai, ?\Closure $sleep = null, private readonly ?int $maxRetries = null)
     {
         $this->sleep = $sleep ?? static fn (int $s) => sleep($s);
     }
@@ -44,7 +45,7 @@ final class AiJson
 
                 return is_array($r['data'] ?? null) ? $r['data'] : [];
             } catch (\Throwable $e) {
-                if ($e instanceof AiQuotaExceeded || ! TransientAiError::is($e) || $n >= count(self::WAITS)) {
+                if ($e instanceof AiQuotaExceeded || ! TransientAiError::is($e) || $n >= min(count(self::WAITS), $this->maxRetries ?? PHP_INT_MAX)) {
                     throw $e;
                 }
                 $wait = min(60, max(self::WAITS[$n], (int) TransientAiError::retryAfterOf($e)));

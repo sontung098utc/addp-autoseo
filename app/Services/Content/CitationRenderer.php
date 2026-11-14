@@ -12,7 +12,8 @@ final class CitationRenderer
 {
     private const MARK = '/\s*\[KB#(\d+(?:\s*[,;]\s*(?:KB)?#?\d+)*)\]/u';
 
-    public static function render(string $html): string
+    /** @param array<int,string> $titlesVi giải nghĩa tiếng Việt cho tiêu đề nguồn tiếng nước ngoài, theo id mục kho */
+    public static function render(string $html, array $titlesVi = []): string
     {
         if ($html === '' || ! preg_match_all(self::MARK, $html, $all)) {
             return $html;
@@ -56,7 +57,7 @@ final class CitationRenderer
             $host = preg_match('#^https?://#i', $url) ? (string) (parse_url($url, PHP_URL_HOST) ?: '') : '';
             $from = trim(($src ? (string) $src->title : '').($host !== '' ? ' ('.preg_replace('/^www\./', '', $host).')' : ''));
             $from = $host !== '' ? '<a href="'.e($url).'" rel="nofollow noopener">'.e($from).'</a>' : e($from);
-            $li .= '<li id="nguon-'.$number[$id].'" data-kb="'.$id.'">'.($src && trim((string) $src->title) !== '' ? $from : '<strong>'.e((string) $it->title).'</strong>'.($from !== '' ? ' — '.$from : '')).'</li>'; // tên trang nguồn (không phải câu trích do AI rút ra)
+            $li .= '<li id="nguon-'.$number[$id].'" data-kb="'.$id.'">'.($src && trim((string) $src->title) !== '' ? $from : '<strong>'.e((string) $it->title).'</strong>'.($from !== '' ? ' — '.$from : '')).(isset($titlesVi[$id]) && $src && ReferenceListRenderer::needsGloss(trim((string) $src->title)) ? ' — <em>'.e($titlesVi[$id]).'</em>' : '').'</li>'; // tên trang nguồn (không phải câu trích do AI rút ra)
         }
 
         return $html."\n".'<div class="autoseo-refs"><p><strong>Nguồn tham khảo</strong></p><ol>'.$li.'</ol></div>';

@@ -65,6 +65,11 @@ final class AgentRunOrchestrator
 
     private ?string $contentPlanText = null;
 
+    /** Giải nghĩa tiếng Việt cho tiêu đề nguồn kho tiếng nước ngoài (id mục kho => nghĩa) và Trí tuệ đã chọn nạp cho phiên này. */
+    private array $kbTitlesVi = [];
+
+    private ?int $matchedBrainId = null;
+
     /** Mốc đồng hồ (giây, mili) lúc bước trước xong / phiên bắt đầu: thời lượng bước = hiện tại - mốc. */
     private float $markT = 0.0;
 
@@ -138,6 +143,9 @@ final class AgentRunOrchestrator
 
     public const GAP_PAGES = 5;
 
+    /** Số mục đã duyệt khớp chủ đề coi là "kho đã đủ" cho một bài; ít hơn thì điều phối cân nhắc nạp thêm. */
+    public const KB_ENOUGH = 4;
+
     /** kho vẫn chưa có mục đã duyệt khớp sau khi tự chuẩn bị, chủ đề rủi ro cao: bài cần chuyên gia xem lại sau khi viết */
     private bool $needsExpert = false;
 
@@ -153,6 +161,8 @@ final class AgentRunOrchestrator
         $this->references = [];
         $this->contentPlan = null;
         $this->contentPlanText = null;
+        $this->kbTitlesVi = [];
+        $this->matchedBrainId = null;
         $this->markT = microtime(true);
         $this->aiMs = 0.0;
         $this->trigger = $trigger;
@@ -484,7 +494,7 @@ final class AgentRunOrchestrator
         $passed = ! $report->hasBlocking();
         // Dấu [KB#id] chỉ để máy kiểm tra: bản lưu cho người đọc dùng chú thích số + khối Nguồn tham khảo (vẫn mang data-kb để chấm lại được).
         if (isset($attrs['html_content']) && is_string($attrs['html_content'])) {
-            $attrs['html_content'] = ReferenceListRenderer::append(CitationRenderer::render($attrs['html_content']), $this->references);
+            $attrs['html_content'] = ReferenceListRenderer::append(CitationRenderer::render($attrs['html_content'], $this->kbTitlesVi), $this->referencesForList());
         }
         $version = $this->persist($article, $attrs, $passed);
         $run->update(['final_version_id' => $version->id]);
@@ -798,6 +808,7 @@ final class AgentRunOrchestrator
     private function prepareEvidence(AgentRun $run, Article $article, \App\Services\Agent\Risk\RiskAssessment $assess): void
     {
         $risk = (string) $assess->level;
+        $this->coordinateKnowledge($run, $article, $risk); // kho (xây/nạp thêm hoặc đề xuất) luôn chạy TRƯỚC khi lấy nguồn, tổng hợp, dàn ý và viết
         $this->gatherReferences($run, $article, $risk);
         $ai = $this->roleOff('strategist') ? null : $this->strategistAi();
         if ($ai === null || $this->spent($run) >= $this->policy->budgetVnd) {
@@ -834,6 +845,13 @@ final class AgentRunOrchestrator
         }
         $this->contentPlan = $plan;
         $this->contentPlanText = \App\Services\Content\ContentPlanner::render($plan);
+        foreach ((array) ($plan['titles_vi'] ?? []) as $code => $vi) { // giải nghĩa tiếng Việt cho tiêu đề nguồn tiếng nước ngoài (hiện ở mục Nguồn tham khảo)
+            if (preg_match('/^T(\d+)$/', (string) $code, $m) && isset($this->references[(int) $m[1] - 1])) {
+                $this->references[(int) $m[1] - 1]['title_vi'] = $vi;
+            } elseif (preg_match('/^KB(\d+)$/', (string) $code, $m)) {
+                $this->kbTitlesVi[(int) $m[1]] = $vi;
+            }
+        }
         $use = array_count_values(array_column($plan['findings'], 'use'));
         $this->step($run, 'synthesize', 'strategist', 'ok', 'Tổng hợp '.($r['sources']).' nguồn: '.count($plan['findings']).' luận điểm, '.count($plan['questions']).' câu hỏi cho bài',
             'Biên tập đọc và đối chiếu các nguồn rồi chốt hướng nội dung: dùng chắc '.($use['dung'] ?? 0).', dùng thận trọng '.($use['than_trong'] ?? 0).', bỏ '.($use['bo'] ?? 0).' luận điểm; '
@@ -852,6 +870,111 @@ final class AgentRunOrchestrator
             return $this->risk->assess($keyword)->level === 'low' && \App\Services\Knowledge\Discover\SourceDiscoveryService::fieldFor($keyword) === null;
         } catch (Throwable) {
             return false;
+        }
+    }
+
+    /**
+     * Danh sách nguồn hiện ở cuối bài: có hồ sơ nội dung thì CHỈ nguồn mà luận điểm được dùng (không "bỏ") thật sự dựa vào; không có thì chỉ nguồn tin cậy
+     * (nguồn thường chưa xác minh không được lộ ra người đọc nếu không được dùng).
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function referencesForList(): array
+    {
+        $used = [];
+        foreach ((array) ($this->contentPlan['findings'] ?? []) as $f) {
+            if (($f['use'] ?? 'bo') === 'bo') {
+                continue;
+            }
+            foreach ((array) ($f['basis'] ?? []) as $code) {
+                if (preg_match('/^T(\d+)$/', (string) $code, $m)) {
+                    $used[(int) $m[1] - 1] = true;
+                }
+            }
+        }
+        $trusted = array_values(array_filter($this->references, fn ($r) => ($r['trust'] ?? 'trusted') === 'trusted'));
+        if ($this->contentPlan === null || $used === []) {
+            return $trusted;
+        }
+
+        return array_values(array_filter($this->references, fn ($r, $i) => isset($used[$i]), ARRAY_FILTER_USE_BOTH));
+    }
+
+    /**
+     * ĐIỀU PHỐI KHO trước khi viết: xác định chủ đề thuộc Trí tuệ nào; kho đã đủ thì thôi; còn thiếu thì chạy luồng nạp (đúng Trí tuệ đó, nguồn tin cậy, có trần chi phí).
+     * Chủ đề không thuộc Trí tuệ nào: KHÔNG tự xây kho; nếu là lĩnh vực lớn, lặp lại thì ghi ĐỀ XUẤT để người dùng quyết định lập Trí tuệ, còn chủ đề lẻ thì thôi.
+     * Không AI hoặc lỗi: bỏ qua im lặng (bài vẫn đi tiếp với nguồn tìm được).
+     */
+    private function coordinateKnowledge(AgentRun $run, Article $article, string $risk): void
+    {
+        $ai = $this->roleOff('strategist') ? null : $this->strategistAi();
+        if ($ai === null || $this->spent($run) >= $this->policy->budgetVnd) {
+            return;
+        }
+        $kw = (string) $article->primary_keyword;
+        $covered = count($this->kbForPlanner($article));
+        $brains = array_map(fn (\App\Models\Brain $b) => ['id' => $b->id, 'name' => $b->name, 'domain' => (string) $b->domain_key, 'description' => (string) $b->description], $this->brainCtx->brains);
+        if ($brains === []) {
+            $web = (new \App\Services\Search\WebSearchResolver)->availability();
+            if ($covered >= self::KB_ENOUGH || ! $web['ok'] || $web['demo']) {
+                return; // không có Trí tuệ: chỉ điều phối khi kho còn thiếu và có tìm kiếm web THẬT (mô phỏng không đủ căn cứ để đề xuất)
+            }
+        }
+        $r = (new \App\Services\Knowledge\KnowledgeCoordinator(new AiJson($ai, $this->sleep, 0)))->classify($kw, $brains); // phân loại chỉ là tư vấn: một lần gọi, lỗi thì bỏ qua
+        if ($r['status'] !== 'done') {
+            return;
+        }
+        $base = ['purpose' => 'kb_coordination', 'field' => $r['field'], 'brain_id' => $r['brain_id'], 'covered' => $covered, 'recurring' => $r['recurring']];
+        if ($r['brain_id'] !== null) {
+            $this->matchedBrainId = $r['brain_id'];
+            $name = (string) (collect($brains)->firstWhere('id', $r['brain_id'])['name'] ?? 'Trí tuệ');
+            if ($covered >= self::KB_ENOUGH) {
+                $this->step($run, 'research', 'system', 'ok', 'Kho đã đủ cho chủ đề này', 'Chủ đề thuộc Trí tuệ «'.$name.'» ('.$r['field'].'), kho đã có '.$covered.' mục đã duyệt khớp nên không nạp thêm.', $base, $r['model'], $r['tokens'], $r['cost']);
+
+                return;
+            }
+            $this->topUpBrain($run, $article, $r['brain_id'], $name, $covered, $base, $r);
+
+            return;
+        }
+        if ($r['recurring']) {
+            $query = '[Đề xuất Trí tuệ] '.$r['field'];
+            try {
+                $gap = \App\Models\KnowledgeGap::firstOrCreate(['website_id' => $article->website_id, 'query' => mb_substr($query, 0, 190)], ['article_id' => $article->id, 'count' => 0]);
+                $gap->update(['count' => $gap->count + 1, 'article_id' => $article->id, 'status' => 'open']);
+            } catch (Throwable $e) {
+                report($e);
+            }
+            $this->step($run, 'research', 'system', 'warn', 'Đề xuất lập Trí tuệ cho lĩnh vực «'.$r['field'].'»',
+                'Chủ đề chưa thuộc Trí tuệ nào đang có và lĩnh vực này sẽ còn lặp lại: nên lập Trí tuệ riêng để các bài sau có nền kiến thức duyệt sẵn. Hệ thống KHÔNG tự lập kho; việc này do người dùng quyết định (đã ghi vào Gợi ý cho kho). Bài này vẫn viết từ các nguồn tìm được. '.$r['reason'],
+                $base + ['suggestion' => ['type' => 'new_brain', 'field' => $r['field']]], $r['model'], $r['tokens'], $r['cost']);
+
+            return;
+        }
+        $this->step($run, 'research', 'system', 'ok', 'Chủ đề lẻ: không cần lập kho', 'Chủ đề thuộc «'.($r['field'] !== '' ? $r['field'] : 'lĩnh vực khác').'», không thuộc Trí tuệ nào và không đủ lớn để đáng lập kho. Bài dùng các nguồn tìm được. '.$r['reason'], $base, $r['model'], $r['tokens'], $r['cost']);
+    }
+
+    /** Luồng nạp cho đúng Trí tuệ đã xác định: nguồn tin cậy từ web, tối đa 3 nguồn, trần 10% ngân sách phiên. */
+    private function topUpBrain(AgentRun $run, Article $article, int $brainId, string $name, int $covered, array $base, array $cl): void
+    {
+        $webOk = (new \App\Services\Search\WebSearchResolver)->availability()['ok'];
+        if (! $webOk) {
+            $this->step($run, 'research', 'system', 'warn', 'Kho còn thiếu nhưng chưa nạp được', 'Trí tuệ «'.$name.'» mới có '.$covered.' mục khớp chủ đề; tìm kiếm web chưa sẵn sàng nên chưa nạp thêm.', $base, $cl['model'], $cl['tokens'], $cl['cost']);
+
+            return;
+        }
+        try {
+            $svc = app(\App\Services\Knowledge\Discover\SourceDiscoveryService::class);
+            $d = $svc->discover($article->website, (string) $article->primary_keyword);
+            $trusted = array_values(array_filter($d['candidates'], fn ($c) => $c['trust']['level'] === 'trusted'));
+            $imp = $svc->import($article->website, $trusted, null, ['as_system' => true, 'brain_id' => $brainId, 'max_sources' => 3, 'only_trusted' => true, 'field' => $d['field'], 'budget_cap_vnd' => $this->policy->budgetVnd * 0.1, 'purpose' => 'gap',
+                'search' => ['query' => $d['query'], 'results' => count($d['candidates']), 'cost_vnd' => $d['cost_vnd'], 'provider' => $d['provider']]]);
+            $this->step($run, 'research', 'system', $imp['imported'] > 0 ? 'ok' : 'warn', 'Nạp kho «'.$name.'»: '.$imp['imported'].' nguồn mới',
+                'Kho mới có '.$covered.' mục khớp chủ đề nên điều phối chạy luồng nạp TRƯỚC khi viết: '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.',
+                $base + ['imported' => $imp['imported'], 'items_auto' => $imp['items_auto'], 'items_proposed' => $imp['items_proposed'], 'build_run_id' => $imp['run_id']], $cl['model'], $cl['tokens'], $cl['cost'] + (float) $imp['cost_vnd']);
+        } catch (Throwable $e) {
+            report($e);
+            $this->step($run, 'research', 'system', 'warn', 'Chưa nạp được kho «'.$name.'»', ErrorMasker::short($e->getMessage(), 160).' Bài vẫn viết từ các nguồn tìm được.', $base, $cl['model'], $cl['tokens'], $cl['cost']);
         }
     }
 
@@ -893,15 +1016,15 @@ final class AgentRunOrchestrator
         } catch (Throwable $e) {
             report($e);
         }
-        if ($risk === 'low') {
-            return $added;
+        if ($this->matchedBrainId === null) {
+            return $added; // chỉ nạp kho khi chủ đề thuộc một Trí tuệ đã xác định; không thì chỉ tìm thêm tài liệu cho bài
         }
         try {
             $cap = $this->policy->budgetVnd * 0.1;
             $svc = app(\App\Services\Knowledge\Discover\SourceDiscoveryService::class);
             $d = $svc->discover($article->website, $topics[0]);
             $trusted = array_values(array_filter($d['candidates'], fn ($c) => $c['trust']['level'] === 'trusted'));
-            $imp = $svc->import($article->website, $trusted, null, ['as_system' => true, 'max_sources' => 2, 'only_trusted' => true, 'field' => $d['field'], 'budget_cap_vnd' => $cap, 'purpose' => 'gap',
+            $imp = $svc->import($article->website, $trusted, null, ['as_system' => true, 'brain_id' => $this->matchedBrainId, 'max_sources' => 2, 'only_trusted' => true, 'field' => $d['field'], 'budget_cap_vnd' => $cap, 'purpose' => 'gap',
                 'search' => ['query' => $d['query'], 'results' => count($d['candidates']), 'cost_vnd' => $d['cost_vnd'], 'provider' => $d['provider']]]);
             $this->step($run, 'research', 'system', $imp['imported'] > 0 ? 'ok' : 'warn', 'Nạp bổ sung kho cho phần còn thiếu: '.$imp['imported'].' nguồn',
                 'Điều phối chạy luồng nạp cho khoảng trống "'.mb_substr($topics[0], 0, 120).'": '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.',
@@ -982,7 +1105,7 @@ final class AgentRunOrchestrator
             $feedback[] = 'LAY01: '.$gap;
         }
         foreach (array_slice($report->leakGaps(), 0, 8) as $gap) {
-            $feedback[] = 'PROC01: câu «'.$gap.'» nói về việc tìm/đối chiếu nguồn. CẤM trong thân bài (kiểu "chúng tôi đối chiếu", "một nguồn nêu", "các nguồn đồng thuận", "bài này không đưa..."). Viết lại thành khẳng định trực tiếp, đúng mức chắc chắn, giữ nguyên nội dung hữu ích.';
+            $feedback[] = 'PROC01: câu «'.$gap.'» nói về việc tìm/đối chiếu nguồn hoặc gắn nhãn độ tin cậy. CẤM trong thân bài (kiểu "chúng tôi đối chiếu", "một nguồn nêu", "các nguồn đồng thuận", "chưa xác minh", "không chắc chắn", "bằng chứng còn hạn chế", "bài này không đưa..."). Viết lại thành khẳng định trực tiếp, đúng mức chắc chắn, giữ nguyên nội dung hữu ích.';
         }
 
         if (array_filter($feedback, fn ($f) => str_starts_with($f, 'CITE') || str_starts_with($f, 'EVID') || str_starts_with($f, 'SRC'))) {

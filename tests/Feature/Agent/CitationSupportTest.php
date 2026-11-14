@@ -139,7 +139,7 @@ class CitationSupportTest extends TestCase
 
             public function generateStructured(string $system, string $user): array
             {
-                if (str_contains($system, 'HƯỚNG NỘI DUNG')) { // bước tổng hợp nguồn: không phải lượt chấm trích dẫn
+                if (str_contains($system, 'HƯỚNG NỘI DUNG') || str_contains($system, 'điều phối viên kho')) { // bước tổng hợp nguồn: không phải lượt chấm trích dẫn
                     return ['data' => [], 'tokens_used' => 1, 'cost_vnd' => 0.0, 'model' => 'fake'];
                 }
                 $this->judged++;

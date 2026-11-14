@@ -9,7 +9,13 @@ namespace App\Services\Content;
  */
 final class ReferenceListRenderer
 {
-    /** @param list<array{title?: string, domain?: string, url?: string}> $references */
+    /** Tiêu đề không có chữ cái tiếng Việt (dấu) và có chữ Latin: coi là tiếng nước ngoài, cần giải nghĩa. */
+    public static function needsGloss(string $title): bool
+    {
+        return $title !== '' && preg_match('/[A-Za-z]{3,}\s+[A-Za-z]{2,}/', $title) === 1 && preg_match('/[àáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/iu', $title) !== 1;
+    }
+
+    /** @param list<array{title?: string, title_vi?: string, domain?: string, url?: string}> $references */
     public static function append(string $html, array $references): string
     {
         $items = [];
@@ -20,7 +26,9 @@ final class ReferenceListRenderer
             }
             $host = (string) (preg_replace('/^www\./', '', (string) parse_url($url, PHP_URL_HOST)) ?: ($r['domain'] ?? ''));
             $title = trim(strip_tags((string) ($r['title'] ?? '')));
-            $items[$url] = '<a href="'.e($url).'" rel="nofollow noopener">'.e($title !== '' ? $title : $host).'</a>'.($host !== '' ? ' — '.e($host) : '');
+            $vi = trim(strip_tags((string) ($r['title_vi'] ?? '')));
+            $items[$url] = '<a href="'.e($url).'" rel="nofollow noopener">'.e($title !== '' ? $title : $host).'</a>'.($host !== '' ? ' — '.e($host) : '')
+                .(self::needsGloss($title) && $vi !== '' ? ' — <em>'.e($vi).'</em>' : ''); // tiêu đề tiếng nước ngoài kèm giải nghĩa tiếng Việt
         }
         if ($html === '' || $items === []) {
             return $html;

@@ -39,10 +39,11 @@ final class ContentPlanner
             ."4. Điều nên TRÁNH (hiểu lầm phổ biến cần bác bỏ, khẳng định không có căn cứ, nội dung dễ gây hại nếu người đọc tự làm).\n"
             ."5. Chọn GÓC TIẾP CẬN riêng (điều khiến bài này có giá trị hơn bài tổng hợp thông thường) và DẠNG TRÌNH BÀY hợp nội dung nhất (ví dụ: bảng so sánh, các bước, hỏi–đáp, ví dụ một ngày, cây quyết định), ngắn gọn, đúng trọng tâm. Chọn độ dài (số từ) vừa đủ để trả lời tốt, không độn.\n"
             ."6. Nêu tối đa 4 KHOẢNG TRỐNG: câu hỏi quan trọng mà các nguồn hiện có CHƯA đủ căn cứ để trả lời tốt (để hệ thống tìm thêm). Mỗi khoảng trống viết thành CỤM TÌM KIẾM ngắn (3–8 từ, tiếng Việt, ví dụ \"ngưỡng huyết áp thấp chẩn đoán\"), KHÔNG viết thành câu mô tả hay lời than thiếu. Nếu đã đủ, để mảng rỗng.\n"
-            ."7. Thuật ngữ: liệt kê vài thuật ngữ nước ngoài người đọc sẽ gặp và cách gọi tiếng Việt thống nhất.\n\n"
+            ."7. Thuật ngữ: liệt kê vài thuật ngữ nước ngoài người đọc sẽ gặp và cách gọi tiếng Việt thống nhất.\n"
+            ."8. Với mỗi nguồn có tiêu đề KHÔNG phải tiếng Việt, viết GIẢI NGHĨA tiêu đề đó bằng tiếng Việt (ngắn gọn, dịch sát nghĩa, ≤110 ký tự) vào \"titles_vi\" theo mã nguồn; nguồn tiêu đề đã là tiếng Việt thì bỏ qua.\n\n"
             ."Quy tắc: không bịa dữ kiện hay nguồn; chỉ dùng mã nguồn có thật trong khung; không chép nguyên văn dài; mọi trường viết bằng tiếng Việt.\n"
             .'Chỉ trả về ĐÚNG một JSON: {"reader":"≤220 ký tự","questions":["..."],"findings":[{"point":"≤240 ký tự","basis":["T1","KB12"],"agreement":"dong_thuan|khac_nhau|mot_nguon","use":"dung|than_trong|bo","note":"≤180 ký tự"}],'
-            .'"conflicts":["≤240 ký tự"],"avoid":["≤200 ký tự"],"add":["≤200 ký tự: nội dung hữu ích nên đưa vào từ kiến thức chuẩn của nghề, kèm mức thận trọng"],"angle":"≤260 ký tự","format":"≤260 ký tự","length_words":1200,"terms":[{"foreign":"...","vi":"..."}],"gaps":["cụm tìm kiếm 3–8 từ"]}. Tối đa 14 findings.';
+            .'"conflicts":["≤240 ký tự"],"avoid":["≤200 ký tự"],"add":["≤200 ký tự: nội dung hữu ích nên đưa vào từ kiến thức chuẩn của nghề, kèm mức thận trọng"],"angle":"≤260 ký tự","format":"≤260 ký tự","length_words":1200,"terms":[{"foreign":"...","vi":"..."}],"gaps":["cụm tìm kiếm 3–8 từ"],"titles_vi":{"T1":"giải nghĩa tiếng Việt của tiêu đề nguồn"}}. Tối đa 14 findings.';
     }
 
     /**
@@ -127,8 +128,22 @@ final class ContentPlanner
             'reader' => AiJson::clean($d['reader'] ?? '', 240), 'questions' => $questions, 'findings' => $findings,
             'conflicts' => $list($d['conflicts'] ?? [], 5, 260), 'avoid' => $list($d['avoid'] ?? [], 6, 220), 'add' => $list($d['add'] ?? [], 8, 220), 'angle' => $angle,
             'format' => AiJson::clean($d['format'] ?? '', 280), 'length_words' => max(600, min(2600, (int) ($d['length_words'] ?? 1400))),
-            'terms' => $terms, 'gaps' => $list($d['gaps'] ?? [], 4, 90),
+            'terms' => $terms, 'gaps' => $list($d['gaps'] ?? [], 4, 90), 'titles_vi' => self::titles($d['titles_vi'] ?? [], $validCodes),
         ];
+    }
+
+    /** Giải nghĩa tiếng Việt cho tiêu đề nguồn, theo mã nguồn có thật. @param list<string> $validCodes @return array<string,string> */
+    private static function titles(mixed $v, array $validCodes): array
+    {
+        $out = [];
+        foreach (is_array($v) ? $v : [] as $code => $t) {
+            $t = AiJson::clean($t, 130);
+            if (is_string($code) && in_array($code, $validCodes, true) && $t !== '') {
+                $out[$code] = $t;
+            }
+        }
+
+        return $out;
     }
 
     /** Hồ sơ nội dung dạng văn bản cho lời nhắn (dàn ý và người viết). Không chứa mã bắt buộc: mã nguồn chỉ để truy vết nội bộ. */
@@ -151,7 +166,7 @@ final class ContentPlanner
             $o .= 'Dạng trình bày: '.$plan['format']."\n";
         }
         $o .= 'Độ dài mục tiêu: khoảng '.(int) ($plan['length_words'] ?? 1400)." từ (bám nội dung, không độn).\n";
-        $label = ['dung' => 'DÙNG, viết chắc', 'than_trong' => 'DÙNG THẬN TRỌNG (nói rõ mức chắc chắn/điều kiện)', 'bo' => 'BỎ, không đưa vào bài'];
+        $label = ['dung' => 'DÙNG, viết chắc', 'than_trong' => 'DÙNG THẬN TRỌNG (viết bằng điều kiện/phạm vi tự nhiên, KHÔNG gắn nhãn độ chắc chắn hay "chưa xác minh" vào bài)', 'bo' => 'BỎ, không đưa vào bài'];
         $agree = ['dong_thuan' => 'các nguồn đồng thuận', 'khac_nhau' => 'các nguồn khác nhau', 'mot_nguon' => 'chỉ một nguồn'];
         if (! empty($plan['findings'])) {
             $o .= "Luận điểm đã chắt lọc:\n";

@@ -20,6 +20,12 @@ class ProcessLeakRule implements QualityRule
         '/(?:một|nhiều|các|những|vài)\s+(?:nguồn|tài liệu)(?:\s+y khoa|\s+uy tín|\s+tham khảo)?\s+(?:mới\s+)?(?:đều\s+)?(?:nêu|cho (?:thấy|biết|rằng)|đồng thuận|khác nhau|không thống nhất|gợi ý|khuyên|cho phép)/iu',
         '/(?:các|những) nguồn\s+(?:y khoa\s+)?(?:hơi\s+)?(?:đồng thuận|khác nhau|không thống nhất)/iu',
         '/theo (?:các|những)\s+(?:nguồn|tài liệu)\s+(?:đã|chúng tôi)/iu',
+        // Nhãn về độ tin cậy của nguồn hoặc của chính bài: không được lộ ra thân bài.
+        '/(?:chưa|không|cần)\s+(?:được\s+)?(?:xác minh|kiểm chứng|xác nhận)\b/iu',
+        '/(?:chưa|không)\s+(?:chắc chắn|đủ chắc|đủ căn cứ|có căn cứ|đủ bằng chứng|có bằng chứng)\b/iu',
+        '/mức\s+(?:độ\s+)?(?:chắc chắn|tin cậy)\s+(?:còn\s+)?(?:thấp|hạn chế|chưa cao)/iu',
+        '/bằng chứng\s+(?:còn\s+)?(?:hạn chế|yếu|chưa (?:đủ|mạnh|thống nhất)|không thống nhất)/iu',
+        '/(?:chưa có|thiếu)\s+(?:nghiên cứu|tiêu chuẩn|căn cứ)\s+(?:mạnh|đủ|thống nhất)/iu',
     ];
 
     public function code(): string
@@ -44,8 +50,8 @@ class ProcessLeakRule implements QualityRule
         $n = count($bad);
 
         return [new RuleResult('PROC01', RuleResult::P1, $n === 0, 'Thân bài không lộ quá trình tìm/đối chiếu nguồn', $n === 0
-            ? 'Không có câu nói về việc tìm hay đối chiếu nguồn.'
-            : "{$n} câu nói về quá trình tìm/đối chiếu nguồn thay vì nói thẳng nội dung. Viết lại thành khẳng định trực tiếp (nguồn nằm ở cuối bài).",
+            ? 'Không có câu nói về việc tìm/đối chiếu nguồn hay nhãn độ tin cậy.'
+            : "{$n} câu nói về quá trình tìm/đối chiếu nguồn hoặc gắn nhãn độ tin cậy (chưa xác minh, không chắc chắn...) thay vì nói thẳng nội dung. Viết lại thành khẳng định trực tiếp (nguồn nằm ở cuối bài).",
             (string) $n, '0', $bad[0] ?? null, array_slice($bad, 0, 8))];
     }
 }
