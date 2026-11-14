@@ -42,7 +42,7 @@ MAX_BODY = 4 * 1024 * 1024
 MAX_ARG = 100_000  # tránh vượt giới hạn một đối số của hệ điều hành (~128 KB)
 MODEL_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 KNOWN_MODELS = ["opus", "sonnet", "haiku"]
-LIMIT_HINTS = ("rate limit", "usage limit", "overloaded", "429", "quota", "too many requests", "limit reached")
+LIMIT_HINTS = ("rate limit", "usage limit", "session limit", "hit your", "overloaded", "429", "quota", "too many requests", "limit reached", "resets ")
 
 slots = threading.BoundedSemaphore(PARALLEL)
 
