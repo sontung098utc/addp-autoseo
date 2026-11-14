@@ -5,13 +5,14 @@ namespace App\Filament\Support\Agent;
 use Illuminate\Support\Collection;
 
 /**
- * Sơ đồ luồng của MỘT phiên viết bài, dựng từ ĐƯỜNG ĐI THẬT chứ không từ khuôn dựng sẵn: chỉ những chặng đã chạy (và chặng đang chạy) mới xuất hiện, theo đúng thứ tự đã diễn ra.
- * Giữa hai chặng là quyết định của người điều phối (nếu có): chấm xong chưa đạt → yêu cầu sửa, thiếu nguồn → bổ sung nguồn, kho thiếu → nạp thêm... Phiên nào đi đường nào thì sơ đồ ra đường đó;
- * vòng lặp xuất hiện thành các chặng lặp lại, chặng không chạy thì không có. Tạo ảnh chạy song song với Viết nên nằm cạnh khối Viết.
+ * Sơ đồ luồng của MỘT phiên viết bài theo mô hình ĐIỀU PHỐI Ở GIỮA: mọi việc đều đi qua người điều phối, các bộ phận không nối thẳng với nhau.
+ * Mỗi lần điều phối GIAO việc cho một bộ phận là một đường (tím, đi ra), mỗi lần bộ phận BÁO KẾT QUẢ là một đường (xanh/cam, đi vào); tất cả đánh số theo thứ tự thật của phiên.
+ * Chỉ bộ phận đã được giao việc mới có thẻ; quay lại cùng bộ phận (sửa, bổ sung nguồn, chấm lại) là thêm một cặp đường giao/báo chứ không thêm thẻ.
+ * Tạo ảnh chạy song song nên lượt giao và báo của nó xen giữa lượt của Viết. Quyết định của điều phối ghi ở cột điều phối, kèm số của lượt giao việc mà nó dẫn tới.
  */
 final class FlowGraph
 {
-    /** Chặng → khối vai trò. Các chặng liền nhau thuộc cùng khối gộp thành một khối. */
+    /** Chặng → bộ phận. Các chặng liền nhau cùng bộ phận gộp thành một lượt làm việc. */
     private const GROUP_OF = [
         'guard' => 'prep', 'risk' => 'prep', 'sources' => 'sources',
         'synthesize' => 'strategy', 'brief' => 'strategy', 'image_design' => 'strategy', 'research' => 'strategy',
@@ -19,16 +20,25 @@ final class FlowGraph
         'assemble' => 'finish', 'learn' => 'finish', 'handoff' => 'finish', 'checkpoint' => 'checkpoint',
     ];
 
+    /** Thứ tự thẻ từ trên xuống. */
+    private const CARD_ORDER = ['prep', 'sources', 'strategy', 'write', 'images', 'review', 'finish', 'checkpoint'];
+
     private const GROUP_TITLE = [
         'prep' => ['Kiểm tra đầu vào', 'Hệ thống'], 'sources' => ['Kho và nguồn', 'Điều phối kho'], 'strategy' => ['Chiến lược nội dung', 'Trưởng phòng chiến lược'],
-        'write' => ['Viết', 'Người viết'], 'review' => ['Biên tập và chấm', 'Biên tập viên'], 'finish' => ['Hoàn tất', 'Hệ thống · Bạn'], 'checkpoint' => ['Chờ bạn', 'Bạn'],
+        'write' => ['Viết và sửa', 'Người viết'], 'review' => ['Biên tập và chấm', 'Biên tập viên'], 'finish' => ['Hoàn tất', 'Hệ thống · Bạn'], 'checkpoint' => ['Chờ bạn', 'Bạn'],
         'images' => ['Tạo ảnh', 'Họa viên ảnh'],
+    ];
+
+    /** Việc điều phối giao khi không có quyết định nào đi kèm. */
+    private const GIVE = [
+        'prep' => 'kiểm tra đầu vào', 'sources' => 'lấy nguồn và kiến thức', 'strategy' => 'lập chiến lược nội dung', 'write' => 'viết bài', 'images' => 'tạo ảnh (song song)',
+        'review' => 'biên tập và chấm', 'finish' => 'lắp ráp và bàn giao', 'checkpoint' => 'chờ người xác nhận',
     ];
 
     /**
      * @param  array<string, mixed>  $flow  kết quả RunFlow::build()
      * @param  Collection<int, mixed>  $steps  các bước của phiên
-     * @return array{cards: list<array<string,mixed>>, back: list<array<string,mixed>>, trailing: list<array<string,mixed>>, next: bool}|null  null nếu không phải phiên viết bài
+     * @return array{cards: list<array<string,mixed>>, events: list<array<string,mixed>>, decisions: list<array<string,mixed>>, next: bool}|null  null nếu không phải phiên viết bài
      */
     public static function trace(array $flow, Collection $steps, bool $live, ?string $current): ?array
     {
@@ -38,11 +48,10 @@ final class FlowGraph
         }
         $durations = $flow['durations'] ?? [];
 
+        // 1. Các lượt làm việc: bước liền nhau cùng bộ phận là một lượt; có quyết định xen giữa thì tách lượt mới (điều phối vừa quyết định lại).
         $hops = [];
         $imageSteps = [];
         $pending = [];
-        $ord = []; // số thứ tự của từng bước thật từ đầu tới cuối phiên (không tính quyết định, thử lại)
-        $counter = 0;
         foreach ($steps->sortBy('seq') as $s) {
             if (in_array($s->stage, ['retry', 'failover'], true)) {
                 continue;
@@ -53,119 +62,155 @@ final class FlowGraph
                 continue;
             }
             $code = RunFlow::segmentOf($s);
-            if ($code !== 'images' && ! isset(self::GROUP_OF[$code])) {
-                continue;
-            }
-            $ord[$s->id] = ++$counter;
             if ($code === 'images') {
                 $imageSteps[] = $s;
 
                 continue;
             }
-            $group = self::GROUP_OF[$code];
+            $group = self::GROUP_OF[$code] ?? null;
+            if ($group === null) {
+                continue;
+            }
             $last = $hops === [] ? null : array_key_last($hops);
             if ($last === null || $hops[$last]['group'] !== $group || $pending !== []) {
-                $hops[] = ['group' => $group, 'steps' => [], 'decisions' => $pending];
+                $hops[] = ['group' => $group, 'steps' => [], 'decisions' => $pending, 'first' => $s->seq, 'last' => $s->seq, 'running' => false];
                 $pending = [];
                 $last = array_key_last($hops);
             }
             $hops[$last]['steps'][$code][] = $s;
+            $hops[$last]['last'] = $s->seq;
         }
         $trailing = $pending;
 
         $runningCode = $live ? $current : null;
-        if ($runningCode !== null && isset(self::GROUP_OF[$runningCode])) {
-            $g = self::GROUP_OF[$runningCode];
+        $runGroup = $runningCode !== null ? (self::GROUP_OF[$runningCode] ?? ($runningCode === 'images' ? 'images' : null)) : null;
+        if ($runGroup !== null && $runGroup !== 'images') {
             $lastHop = $hops === [] ? null : array_key_last($hops);
-            if ($lastHop === null || $hops[$lastHop]['group'] !== $g || $trailing !== []) {
-                $hops[] = ['group' => $g, 'steps' => [], 'decisions' => $trailing];
+            if ($lastHop === null || $hops[$lastHop]['group'] !== $runGroup || $trailing !== []) {
+                $hops[] = ['group' => $runGroup, 'steps' => [], 'decisions' => $trailing, 'first' => PHP_INT_MAX, 'last' => PHP_INT_MAX, 'running' => true];
                 $trailing = [];
                 $lastHop = array_key_last($hops);
             }
             $hops[$lastHop]['steps'][$runningCode] ??= [];
+            $hops[$lastHop]['running'] = true;
+        }
+        if ($imageSteps !== []) { // Tạo ảnh chạy song song: một lượt riêng, xen giữa lượt Viết theo thời gian thật
+            $hops[] = ['group' => 'images', 'steps' => ['images' => $imageSteps], 'decisions' => [], 'first' => $imageSteps[0]->seq, 'last' => end($imageSteps)->seq, 'running' => false];
         }
 
-        // Gộp theo khối: quay lại một khối đã có KHÔNG tạo thẻ mới. Mỗi lần đi từ khối này sang khối kia là MỘT ĐƯỜNG riêng, đánh số theo thứ tự bước trong phiên.
+        // 2. Thẻ (mỗi bộ phận một thẻ) gom mọi lượt.
         $cards = [];
-        $seq = [];
-        $lastIndex = $hops === [] ? null : array_key_last($hops);
-        foreach ($hops as $i => $h) {
+        foreach ($hops as $h) {
             $g = $h['group'];
-            $firstStep = collect($h['steps'])->flatten()->first();
-            $firstN = $firstStep ? ($ord[$firstStep->id] ?? null) : $counter + 1;
-            foreach ($h['decisions'] as &$dd) {
-                $dd['to_n'] = $firstN;
-            }
-            unset($dd);
-            $same = $seq !== [] && end($seq)['g'] === $g;
-            if (! $same) {
-                $seq[] = ['g' => $g, 'n' => $firstN];
-            }
-            $cards[$g] ??= ['group' => $g, 'steps' => [], 'decisions' => [], 'visits' => 0];
-            $cards[$g]['visits'] += $same ? 0 : 1;
-            $cards[$g]['decisions'] = array_merge($cards[$g]['decisions'], $h['decisions']);
+            $cards[$g] ??= ['group' => $g, 'steps' => [], 'visits' => 0, 'running' => false];
+            $cards[$g]['visits']++;
+            $cards[$g]['running'] = $cards[$g]['running'] || $h['running'];
             foreach ($h['steps'] as $code => $list) {
                 $cards[$g]['steps'][$code] = array_merge($cards[$g]['steps'][$code] ?? [], $list);
             }
         }
-        $order = array_keys($cards);
-        $pos = array_flip($order);
 
-        $anyRunning = false;
+        // 3. Sự kiện: GIAO (điều phối → bộ phận) tại bước đầu của lượt, BÁO (bộ phận → điều phối) sau bước cuối. Sắp theo thời gian thật rồi đánh số 1..N.
+        $events = [];
+        $visit = [];
+        foreach ($hops as $i => $h) {
+            $g = $h['group'];
+            $visit[$g] = ($visit[$g] ?? 0) + 1;
+            $hasRepair = isset($h['steps']['repair']);
+            $giveLabel = $h['decisions'] !== [] ? self::short($h['decisions'][0]['title']) : (self::GIVE[$g] ?? $g);
+            if ($h['decisions'] === []) {
+                if ($g === 'write' && $hasRepair && ! isset($h['steps']['write'])) {
+                    $giveLabel = 'sửa theo yêu cầu';
+                } elseif ($g === 'review' && $visit[$g] > 1) {
+                    $giveLabel = 'chấm lại';
+                } elseif ($g === 'sources' && $visit[$g] > 1) {
+                    $giveLabel = 'bổ sung nguồn';
+                }
+            }
+            $subs = [];
+            foreach ($h['steps'] as $code => $list) {
+                $subs[] = self::sub($by[$code], $list, $durations, $h['running'] && $runningCode === $code);
+            }
+            $state = $h['running'] ? 'running' : self::groupState($subs);
+            $events[] = ['key' => $h['first'] - 0.5, 'card' => $g, 'dir' => 'give', 'label' => $giveLabel, 'state' => 'give', 'hop' => $i];
+            if (! $h['running']) {
+                $events[] = ['key' => $h['last'] + 0.5, 'card' => $g, 'dir' => 'report', 'label' => self::reportLabel($g, $h['steps'], $state), 'state' => $state, 'hop' => $i];
+            }
+        }
+        usort($events, fn ($a, $b) => $a['key'] <=> $b['key']);
+        $giveNo = [];
+        foreach ($events as $k => &$e) {
+            $e['n'] = $k + 1;
+            if ($e['dir'] === 'give') {
+                $giveNo[$e['hop']] = $e['n'];
+            }
+        }
+        unset($e);
+
+        // 4. Quyết định của điều phối, kèm số của lượt giao việc mà nó dẫn tới.
+        $decisions = [];
+        foreach ($hops as $i => $h) {
+            foreach ($h['decisions'] as $d) {
+                $decisions[] = ['n' => $giveNo[$i] ?? null, 'title' => self::short($d['title'], 90), 'full' => $d['title'].' — '.$d['detail'], 'routes' => $d['routes']];
+            }
+        }
+        foreach ($trailing as $d) {
+            $decisions[] = ['n' => null, 'title' => self::short($d['title'], 90), 'full' => $d['title'].' — '.$d['detail'], 'routes' => $d['routes']];
+        }
+        usort($decisions, fn ($a, $b) => ($a['n'] ?? PHP_INT_MAX) <=> ($b['n'] ?? PHP_INT_MAX));
+
+        // 5. Thẻ ra dữ liệu hiển thị, đúng thứ tự trên xuống; mỗi thẻ đủ cao cho các đường đi qua nó.
+        $slots = [];
+        foreach ($events as $e) {
+            $slots[$e['card']] = ($slots[$e['card']] ?? 0) + 1;
+        }
         $out = [];
-        foreach ($cards as $g => $c) {
+        foreach (self::CARD_ORDER as $g) {
+            if (! isset($cards[$g])) {
+                continue;
+            }
+            $c = $cards[$g];
             $subs = [];
             foreach ($c['steps'] as $code => $list) {
-                $running = $runningCode === $code && isset($hops[$lastIndex]['steps'][$code]) && $hops[$lastIndex]['group'] === $g;
-                $sub = self::sub($by[$code], $list, $durations, $running);
-                $sub['ords'] = self::ranges(array_map(fn ($x) => $ord[$x->id] ?? 0, $list));
-                $subs[] = $sub;
-                $anyRunning = $anyRunning || $running;
+                $subs[] = self::sub($by[$code], $list, $durations, $c['running'] && $runningCode === $code);
             }
             [$title, $role] = self::GROUP_TITLE[$g];
-            if ($g === 'write' && isset($c['steps']['repair'])) {
-                $title = 'Viết và sửa';
+            if ($g === 'write' && ! isset($c['steps']['repair'])) {
+                $title = 'Viết';
             }
-            $out[] = ['group' => $g, 'title' => $title, 'role' => $role, 'subs' => $subs, 'state' => self::groupState($subs), 'visits' => $c['visits'], 'decisions' => $c['decisions'], 'side' => null];
+            $out[] = ['group' => $g, 'title' => $title, 'role' => $role, 'subs' => $subs, 'state' => self::groupState($subs), 'visits' => $c['visits'],
+                'minh' => 56 + ($slots[$g] ?? 0) * 22, 'parallel' => $g === 'images' ? (string) ($by['images']['parallel'] ?? 'Viết') : null];
         }
 
-        // Đường đi: mỗi lần chuyển khối là một đường, số = số thứ tự của bước đầu tiên ở khối đích.
-        $edges = [];
-        $occ = [];
-        for ($i = 1; $i < count($seq); $i++) {
-            $from = $seq[$i - 1]['g'];
-            $to = $seq[$i]['g'];
-            $key = $from.'>'.$to;
-            $k = $occ[$key] = ($occ[$key] ?? 0) + 1;
-            $dist = ($pos[$to] ?? 0) - ($pos[$from] ?? 0);
-            $kind = $dist === 1 ? 'fwd' : ($to === 'sources' ? 'back' : ($dist < 0 ? 'loop' : 'skip'));
-            $label = null;
-            if ($k === 1) {
-                $label = match (true) {
-                    $to === 'finish' => 'đạt',
-                    $from === 'review' && $to === 'write' => 'chưa đạt → yêu cầu sửa',
-                    $from === 'write' && $to === 'review' && $kind === 'fwd' => null,
-                    $to === 'sources' && $kind === 'back' => 'thiếu nguồn → bổ sung',
-                    default => null,
-                };
-            }
-            $edges[] = ['from' => $from, 'to' => $to, 'n' => $seq[$i]['n'], 'kind' => $kind, 'occ' => $k - 1, 'label' => $label];
-        }
+        $anyRunning = collect($hops)->contains('running', true);
 
-        // Tạo ảnh song song: nằm cạnh khối Viết.
-        if ($imageSteps !== []) {
-            $sub = self::sub($by['images'], $imageSteps, $durations, false);
-            $sub['ords'] = self::ranges(array_map(fn ($x) => $ord[$x->id] ?? 0, $imageSteps));
-            $side = ['group' => 'images', 'title' => 'Tạo ảnh', 'role' => 'Họa viên ảnh', 'parallel' => (string) ($by['images']['parallel'] ?? 'Viết'), 'state' => self::groupState([$sub]), 'subs' => [$sub]];
-            $wi = $pos['write'] ?? null;
-            if ($wi !== null) {
-                $out[$wi]['side'] = $side;
-            } else {
-                $out[] = ['group' => 'images', 'title' => 'Tạo ảnh', 'role' => 'Họa viên ảnh', 'subs' => [$sub], 'state' => $side['state'], 'visits' => 1, 'decisions' => [], 'side' => null];
+        return ['cards' => $out, 'events' => $events, 'decisions' => $decisions, 'next' => $live && ! $anyRunning && $hops !== []];
+    }
+
+    /** Kết quả bộ phận báo lại, một cụm ngắn. @param array<string, list<mixed>> $steps */
+    private static function reportLabel(string $group, array $steps, string $state): string
+    {
+        $word = match ($state) {
+            'failed' => 'lỗi', 'blocked' => 'bị chặn', 'warn' => 'cần chú ý', 'waiting' => 'chờ bạn', default => 'xong',
+        };
+        if (isset($steps['grade'])) {
+            $score = collect($steps['grade'])->map(fn ($x) => ((array) $x->data)['score'] ?? null)->filter(fn ($v) => $v !== null)->last();
+            if ($score !== null) {
+                return "điểm {$score}/100";
             }
         }
+        if (isset($steps['repair'])) {
+            return $word.' · đã sửa';
+        }
 
-        return ['cards' => $out, 'back' => $edges, 'trailing' => $trailing, 'next' => $live && ! $anyRunning && $out !== []];
+        return $word;
+    }
+
+    private static function short(string $s, int $max = 60): string
+    {
+        $s = trim((string) preg_replace('/^Điều phối( kho)?:\s*/u', '', $s));
+
+        return mb_strlen($s) > $max ? mb_substr($s, 0, $max - 1).'…' : $s;
     }
 
     /** @param list<mixed> $list @param array<int|string,float|int|null> $durations @return array<string,mixed> */
@@ -198,24 +243,6 @@ final class FlowGraph
         return ['code' => $node['code'], 'title' => $node['title'], 'kind' => $node['kind'], 'state' => $state, 'count' => count($list), 'seconds' => $sec, 'summary' => $summary];
     }
 
-    /** Gom các số liền nhau thành khoảng: [3,4,5,9] → "#3–5 · #9". @param list<int> $nums */
-    private static function ranges(array $nums): string
-    {
-        sort($nums);
-        $parts = [];
-        $i = 0;
-        while ($i < count($nums)) {
-            $j = $i;
-            while ($j + 1 < count($nums) && $nums[$j + 1] === $nums[$j] + 1) {
-                $j++;
-            }
-            $parts[] = $i === $j ? '#'.$nums[$i] : '#'.$nums[$i].'–'.$nums[$j];
-            $i = $j + 1;
-        }
-
-        return implode(' · ', $parts);
-    }
-
     /** @param list<array<string,mixed>> $subs */
     private static function groupState(array $subs): string
     {
@@ -237,6 +264,6 @@ final class FlowGraph
             'sources' => 'Kho và nguồn', 'writer' => 'Người viết', default => (string) $r,
         }, (array) ($d['routes'] ?? []));
 
-        return ['title' => trim((string) preg_replace('/^Điều phối( kho)?:\s*/u', '', (string) $s->title)), 'detail' => mb_substr((string) $s->detail, 0, 260), 'routes' => $routes, 'code' => $d['decision'] ?? null];
+        return ['title' => trim((string) $s->title), 'detail' => mb_substr((string) $s->detail, 0, 260), 'routes' => $routes, 'code' => $d['decision'] ?? null];
     }
 }

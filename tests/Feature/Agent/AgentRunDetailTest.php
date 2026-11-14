@@ -96,6 +96,7 @@ class AgentRunDetailTest extends TestCase
         preg_match_all('/data-stage="grade" data-state="([a-z]+)"/', $html, $gm);
         $this->assertSame(['done'], $gm[1]);
         $this->assertStringContainsString('×3', $html);
+        $this->assertStringContainsString('data-testid="flow-coordinator"', $html, 'mọi việc đi qua khối Điều phối');
         $this->assertStringContainsString('H1_01', $html);
         $this->assertStringContainsString('Thiếu H1', $html);
     }
@@ -323,7 +324,6 @@ class AgentRunDetailTest extends TestCase
         $this->assertStringContainsString('data-testid="flow-loop"', $html);
         $this->assertStringContainsString('flow-loop', $html);
         $this->assertStringContainsString('↻ 2 vòng', $html);
-        $this->assertStringContainsString('"kind":"loop"', $html);
 
         $w = $this->run_('held', [['guard', 'ok'], ['risk', 'ok'], ['checkpoint', 'warn', ['waiting' => true]]]);
         $html = $this->page($w);
