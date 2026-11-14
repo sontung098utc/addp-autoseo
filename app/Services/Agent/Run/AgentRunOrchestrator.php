@@ -484,7 +484,9 @@ final class AgentRunOrchestrator
             }
             $new = $this->penalty($candidateReport);
             $newScore = RunScorer::score($candidateReport);
-            if ($new < $penalty) { // tốt hơn: nhận bản mới
+            // Điểm phạt bằng nhau nhưng bản mới sửa được nhiều lỗi VIẾT LẠI ĐƯỢC hơn (từ khóa, bố cục...; không tính nhóm lỗi nguồn/trích dẫn vốn phụ thuộc kho) thì vẫn là tiến bộ: trước đây bị loại nên lỗi từ khóa nằm mãi.
+            $better = $new < $penalty || ($new === $penalty && $this->fixableLoad($candidateReport) < $this->fixableLoad($report));
+            if ($better) { // tốt hơn: nhận bản mới
                 $attrs = $candidate;
                 $report = $candidateReport;
                 $this->decision($run, 'fix_accepted', "Nhận bản sửa lần {$round}: còn ".count($report->failed()).' mục chưa đạt', "Điểm phạt giảm từ {$penalty} xuống {$new}.", ['penalty_before' => $penalty, 'penalty_after' => $new, 'score_before' => $score, 'score_after' => $newScore]);
@@ -1474,6 +1476,20 @@ final class AgentRunOrchestrator
             'ai_provider' => $r['model'] ?? 'ai-engine', 'ai_model' => $r['model'] ?? 'unknown', 'prompt_version' => $r['prompt_version'] ?? 'v1.0',
             'tokens_used' => (int) ($r['tokens_used'] ?? 0), 'cost_vnd' => (float) ($r['cost_vnd'] ?? 0),
         ];
+    }
+
+    /** Các mục lỗi người viết sửa được bằng cách viết lại (loại các mục phụ thuộc nguồn trong kho: bằng chứng, trích dẫn, nguồn AI nêu). */
+    private function fixableLoad(QualityReport $r): int
+    {
+        $w = ['P0' => 100, 'P1' => 10, 'P2' => 3];
+        $sum = 0;
+        foreach ($r->failed() as $x) {
+            if (! in_array($x->code, ['EVID01', 'CITE01', 'CITE02', 'SRC01'], true)) {
+                $sum += $w[$x->severity] ?? 1;
+            }
+        }
+
+        return $sum;
     }
 
     /** Chấm lại bản đã lắp ráp; ghi một bước chấm "bản giao" (điểm cuối của phiên lấy từ đây). Còn lỗi chặn thì không coi là đạt. */
