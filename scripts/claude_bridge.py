@@ -18,7 +18,7 @@ Cách dùng:
   Nhà cung cấp: loại "OpenAI-tương thích", base URL http://172.17.0.1:8771/v1, model: opus | sonnet | haiku (hoặc tên đầy đủ)
   Thêm 172.17.0.1:8771 vào AI_PRIVATE_BASE_URL_ALLOWLIST trong .env của ứng dụng.
 
-Biến môi trường: CLAUDE_BRIDGE_HOST, CLAUDE_BRIDGE_PORT (8771), CLAUDE_BIN (claude), CLAUDE_BRIDGE_PARALLEL (2), CLAUDE_BRIDGE_TIMEOUT (600 giây).
+Biến môi trường: CLAUDE_BRIDGE_SEARCH_MODEL (haiku, model cho /v1/search), CLAUDE_BRIDGE_HOST, CLAUDE_BRIDGE_PORT (8771), CLAUDE_BIN (claude), CLAUDE_BRIDGE_PARALLEL (2), CLAUDE_BRIDGE_TIMEOUT (600 giây).
 """
 import hmac
 import json
@@ -42,6 +42,7 @@ MAX_BODY = 4 * 1024 * 1024
 MAX_ARG = 100_000  # tránh vượt giới hạn một đối số của hệ điều hành (~128 KB)
 MODEL_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 KNOWN_MODELS = ["opus", "sonnet", "haiku"]
+SEARCH_MODEL = os.environ.get("CLAUDE_BRIDGE_SEARCH_MODEL", "haiku")  # tìm web là việc nhẹ: dùng model nhỏ để dành hạn mức cho việc viết
 LIMIT_HINTS = ("rate limit", "usage limit", "session limit", "hit your", "overloaded", "429", "quota", "too many requests", "limit reached", "resets ")
 
 slots = threading.BoundedSemaphore(PARALLEL)
@@ -135,7 +136,7 @@ def run_search(query: str, max_results: int, include, exclude):
         ask += "\nƯu tiên các tên miền: " + ", ".join(include[:20]) + "."
     if exclude:
         ask += "\nBỏ qua các tên miền: " + ", ".join(exclude[:20]) + "."
-    args = [CLAUDE, "-p", "--model", "sonnet", "--output-format", "json", "--tools", "WebSearch,WebFetch",
+    args = [CLAUDE, "-p", "--model", SEARCH_MODEL, "--output-format", "json", "--tools", "WebSearch,WebFetch",
             "--allowedTools", "WebSearch,WebFetch", "--no-session-persistence", "--disable-slash-commands", "--setting-sources", "",
             "--system-prompt=" + SEARCH_SYSTEM]
     with tempfile.TemporaryDirectory(prefix="claude-bridge-") as cwd, slots:

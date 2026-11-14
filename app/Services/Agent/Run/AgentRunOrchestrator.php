@@ -574,7 +574,7 @@ final class AgentRunOrchestrator
             $designer = null;
             $briefs = [];
             $this->imageDesign = null;
-            $dai = $this->roleOff('strategist') ? null : $this->strategistAi();
+            $dai = $this->roleOff('strategist') ? null : $this->lightAi();
             if ($dai !== null) {
                 // Họa viên làm việc như người thiết kế: yêu cầu ảnh phải nêu mục đích và giá trị, rồi mới thiết kế (lỗi AI thì dùng kế hoạch theo luật như cũ).
                 $designer = new \App\Services\Images\ImageDesigner(new AiJson($dai, $this->sleep)); // thử lại như các bước AI khác: lỗi tạm thời của nhà cung cấp không được làm mất thiết kế ảnh
@@ -964,7 +964,7 @@ final class AgentRunOrchestrator
      */
     private function coordinateKnowledge(AgentRun $run, Article $article, string $risk): void
     {
-        $ai = $this->roleOff('strategist') ? null : $this->strategistAi();
+        $ai = $this->roleOff('strategist') ? null : $this->lightAi();
         if ($ai === null || $this->spent($run) >= $this->policy->budgetVnd) {
             return;
         }
@@ -1092,6 +1092,33 @@ final class AgentRunOrchestrator
         }
 
         return $added;
+    }
+
+    /**
+     * AI cho việc PHỤ TRỢ nhẹ (phân loại chủ đề cho kho, đặt yêu cầu và thiết kế ảnh): ưu tiên model rẻ/hạn mức riêng của vai trò Điều phối và Biên tập (vd. agy),
+     * rồi mới đến model chiến lược (Claude). Hết hạn mức ở model nhẹ thì tự chuyển sang model kế tiếp, không dừng phiên.
+     */
+    private function lightAi(): ?\App\Services\Ai\FailoverStructuredAi
+    {
+        $chain = [];
+        if ($this->router) {
+            foreach (['coordinator', 'summary'] as $task) {
+                $ai = $this->router->target($task)?->ai;
+                if ($ai instanceof \App\Contracts\StructuredAiInterface) {
+                    $chain[] = $ai;
+                }
+                $fb = $this->router->fallback($task)?->ai;
+                if ($fb instanceof \App\Contracts\StructuredAiInterface) {
+                    $chain[] = $fb;
+                }
+            }
+        }
+        if (($s = $this->strategistAi()) !== null) {
+            $chain[] = $s;
+        }
+        $f = new \App\Services\Ai\FailoverStructuredAi($chain);
+
+        return $f->isEmpty() ? null : $f;
     }
 
     /** AI có cấu trúc cho bước tổng hợp: route lập dàn ý (Chiến lược), rồi các route viết/sửa/tóm tắt; không có router thì chính nhà cung cấp của phiên nếu hỗ trợ. */
