@@ -1,5 +1,5 @@
 @props(['n' => null, 'label', 'desc' => null, 'state' => 'idle', 'kind' => 'rule', 'avatar' => null, 'who' => null, 'tier' => null, 'planned' => false, 'human' => false, 'selected' => false, 'tag' => 'button',
-    'last' => false, 'link' => null, 'when' => null, 'loop' => null, 'stateLabel' => null, 'stateIcon' => null])
+    'last' => false, 'link' => null, 'when' => null, 'loop' => null, 'stateLabel' => null, 'stateIcon' => null, 'parallel' => null])
 {{--
     Một bước của luồng, vẽ thành thẻ lớn: số bước, loại (luật/AI/người), biểu tượng trạng thái, tên, mô tả một dòng, avatar nhân sự, chỗ cho chip và số liệu (slot).
     state: done|running|warn|failed|blocked|stale|waiting|pending|idle|skipped. kind: rule|llm|human. link: done|live|dashed|null (đường nối sang bước kế; bỏ qua ở bước cuối).
@@ -19,6 +19,7 @@
             @if ($stateIcon)<x-filament::icon :icon="$stateIcon" class="fl-stico" :title="$stateLabel" />@endif
         </span>
         <span class="fl-name">{{ $label }}</span>
+        @if ($parallel)<span class="fl-chip" data-testid="flow-parallel" title="Chạy cùng lúc, không chờ bước này xong">∥ song song với «{{ $parallel }}»</span>@endif
         @if ($desc)<span class="fl-desc" title="{{ $desc }}">{{ $desc }}</span>@endif
         <span class="fl-foot">
             @if ($avatar)<span class="fl-av" data-avatar title="{{ $who }}">{{ $avatar }}</span>@endif

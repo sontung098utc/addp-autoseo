@@ -63,7 +63,7 @@ class AgentStudioPageTest extends TestCase
         $this->login('admin');
         $pos = collect(AgentStudioData::positions('strategist'))->firstWhere('id', 'article_write');
         $mine = array_column(array_filter($pos['steps'], fn ($s) => $s['mine']), 'id');
-        $this->assertSame(['synthesize', 'brief'], $mine);
+        $this->assertSame(['synthesize', 'brief', 'image_design'], $mine);
         $w = collect(AgentStudioData::positions('writer'))->firstWhere('id', 'article_write');
         $this->assertContains('write', array_column(array_filter($w['steps'], fn ($s) => $s['mine']), 'id'));
 

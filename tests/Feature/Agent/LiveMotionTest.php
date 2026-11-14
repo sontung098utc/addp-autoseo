@@ -56,14 +56,14 @@ class LiveMotionTest extends TestCase
     public function test_chang_dang_chay_suy_tu_buoc_cuoi(): void
     {
         $cases = [
-            [[], 'guard'], [['guard'], 'risk'], [['guard', 'risk'], 'brief'], [['guard', 'risk', 'brief'], 'write'],
+            [[], 'guard'], [['guard'], 'risk'], [['guard', 'risk'], 'sources'], [['guard', 'risk', 'brief'], 'write'],
             [['guard', 'risk', 'brief', 'write'], 'grade'],
             [['guard', 'risk', 'brief', 'write', ['grade', 'ok']], 'handoff'],
             [['guard', 'risk', 'brief', 'write', ['grade', 'blocked']], 'repair'],
             [['guard', 'risk', 'brief', 'write', ['grade', 'blocked'], 'repair'], 'grade'],
             [['guard', 'risk', 'brief', ['retry', 'warn']], 'write'],
             // AI thử lại/chuyển model lúc LẬP DÀN Ý: vẫn là chặng dàn ý, không phải Viết.
-            [['guard', 'risk', ['retry', 'warn'], ['retry', 'warn'], ['failover', 'warn']], 'brief'],
+            [['guard', 'risk', ['retry', 'warn'], ['retry', 'warn'], ['failover', 'warn']], 'sources'],
             [['guard', 'risk', 'brief', 'research', ['retry', 'warn']], 'write'],
             [['guard', 'risk', 'brief', 'write', ['grade', 'blocked'], ['retry', 'warn']], 'repair'],
             [['guard', 'risk', 'brief', 'write', 'grade', 'handoff'], null],

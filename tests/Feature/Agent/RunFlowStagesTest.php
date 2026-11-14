@@ -13,7 +13,7 @@ class RunFlowStagesTest extends TestCase
     public function test_trang_bai_hien_du_tam_nhan_dung_thu_tu(): void
     {
         $this->assertSame(
-            ['guard' => 'Kiểm điều kiện', 'risk' => 'Xét rủi ro', 'synthesize' => 'Tổng hợp nguồn', 'brief' => 'Lập dàn ý', 'research' => 'Nghiên cứu', 'write' => 'Viết', 'images' => 'Tạo ảnh', 'edit' => 'Biên tập', 'grade' => 'Chấm điểm', 'repair' => 'Sửa', 'assemble' => 'Lắp ráp', 'handoff' => 'Bàn giao'],
+            ['guard' => 'Kiểm điều kiện', 'risk' => 'Xét rủi ro', 'sources' => 'Kho và nguồn', 'synthesize' => 'Tổng hợp nguồn', 'brief' => 'Lập dàn ý', 'image_design' => 'Yêu cầu và thiết kế ảnh', 'research' => 'Nghiên cứu', 'write' => 'Viết', 'images' => 'Tạo ảnh', 'edit' => 'Biên tập', 'grade' => 'Chấm điểm', 'repair' => 'Sửa', 'assemble' => 'Lắp ráp', 'learn' => 'Học vào kho', 'handoff' => 'Bàn giao'],
             ViewArticle::runStages(),
         );
     }

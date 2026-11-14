@@ -69,28 +69,53 @@ final class RunActivity
     public static function currentStage(Collection $steps): ?string
     {
         // 'retry'/'failover' là lần thử lại CÙNG chặng kế tiếp (không phải một chặng mới): bỏ ra, chặng hiện tại suy từ bước thật cuối cùng.
-        // Trước đây retry luôn được coi là "Viết", nên AI đang thử lại lúc lập dàn ý mà giao diện vẫn báo "Đang ở: Viết".
         $steps = $steps->reject(fn ($s) => in_array($s->stage, ['retry', 'failover'], true))->values();
         $last = $steps->last();
         if (! $last) {
             return 'guard';
         }
+        // Quyết định tự động đứng giữa vòng chấm/sửa: nhìn quyết định để biết bước kế, còn lại lấy bước thật liền trước.
+        if ($last->stage === 'decision') {
+            $code = (string) (((array) $last->data)['decision'] ?? '');
+            if ($code === 'fix_plan') {
+                return 'repair';
+            }
+            if (in_array($code, ['fix_accepted', 'fix_rejected'], true)) {
+                return 'grade'; // sau khi chấm lại: còn lỗi thì vòng tiếp theo do điều phối quyết định; đang đứng ở chấm
+            }
+            if (in_array($code, ['no_improvement', 'max_rounds', 'budget_exhausted', 'repair_failed', 'repair_route_missing'], true)) {
+                return $steps->contains('stage', 'images') ? 'assemble' : 'handoff';
+            }
+            $prev = $steps->slice(0, -1)->reverse()->first(fn ($s) => $s->stage !== 'decision');
 
-        // 'research' ghi hai lần: bài rủi ro cao tự chuẩn bị kiến thức TRƯỚC dàn ý, và "Chuẩn bị tài liệu" SAU dàn ý. Chưa có dàn ý thì đang lập dàn ý, có rồi thì đang viết.
-        if ($last->stage === 'research') {
-            return $steps->contains('stage', 'brief') ? 'write' : 'brief';
+            return $prev ? self::currentStage(collect($steps->slice(0, -1)->values()->all())) : 'handoff';
         }
+        $seg = RunFlow::segmentOf($last);
+        // Sau chấm: bản đầu → biên tập (nếu có), còn mục chưa đạt → điều phối/sửa, đạt → lắp ráp.
+        if ($seg === 'grade') {
+            $failedP = (int) (((array) $last->data)['counts']['P0'] ?? 0) + (int) (((array) $last->data)['counts']['P1'] ?? 0);
+            if (! $steps->contains('stage', 'edit') && (int) (((array) $last->data)['round'] ?? 0) === 0 && ! empty(((array) $last->data)['edit_next'])) {
+                return 'edit';
+            }
 
-        return match ($last->stage) {
+            return ($failedP > 0 || $last->status !== 'ok') ? 'repair' : ($steps->contains('stage', 'images') ? 'assemble' : 'handoff'); // lắp ráp chỉ có khi bài có kế hoạch ảnh
+        }
+        $d = (array) ($last->data ?? []);
+        $next = match ($seg) {
             'guard' => 'risk',
-            'risk' => 'brief',
-            'brief' => 'write',
-            'write' => 'grade',
-            'grade' => $last->status === 'ok' ? 'handoff' : 'repair',
-            'repair' => 'grade',
-            'decision' => 'handoff',
+            'risk' => 'sources',
+            // Kho và nguồn gồm nhiều bước (điều phối kho, rồi tìm tài liệu): tìm xong mới sang tổng hợp.
+            'sources' => in_array((string) ($d['purpose'] ?? ''), ['references', 'references_gap'], true) ? 'synthesize' : 'sources',
+            'synthesize' => 'brief',
+            'brief' => ! empty($d['image_design']) ? 'image_design' : 'write', // yêu cầu/thiết kế ảnh chỉ khi bước dàn ý ghi cờ đã có
+            'image_design', 'images', 'research' => 'write',
+            'write', 'edit', 'repair' => 'grade',
+            'assemble' => 'learn',
+            'learn' => 'handoff',
             default => null,
         };
+
+        return $next;
     }
 
     /**

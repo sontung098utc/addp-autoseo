@@ -657,7 +657,7 @@ final class AgentRunOrchestrator
     {
         $c = $this->imageCtx;
 
-        return ['image_plan' => ['plan' => $c['plan'] ?? null, 'skip_code' => $c['skip_code'] ?? null, 'skipped_reason' => $c['skipped_reason'] ?? null, 'generator' => $c['generator'] ?? null]];
+        return ['image_plan' => ['plan' => $c['plan'] ?? null, 'skip_code' => $c['skip_code'] ?? null, 'skipped_reason' => $c['skipped_reason'] ?? null, 'generator' => $c['generator'] ?? null], 'image_design' => $this->imageDesign !== null];
     }
 
     /** Ghi bước yêu cầu + thiết kế ảnh của họa viên (mục đích, giá trị, ý tưởng từng ảnh) kèm chi phí AI; không có thì bỏ qua. */
@@ -929,6 +929,9 @@ final class AgentRunOrchestrator
             .count((array) $plan['conflicts']).' mâu thuẫn giữa nguồn; góc tiếp cận: '.mb_substr((string) $plan['angle'], 0, 160).'; độ dài mục tiêu ~'.(int) $plan['length_words'].' từ.'.$extra
             .($plan['gaps'] !== [] ? ' Còn thiếu căn cứ: '.implode('; ', array_slice((array) $plan['gaps'], 0, 3)).'.' : ''),
             ['plan' => $plan, 'sources' => $r['sources'], 'kb_items' => count($kb), 'web_references' => count($this->references)], $r['model'], $tokens, $cost);
+        $this->decision($run, 'synthesis', 'Điều phối: chốt hướng nội dung từ '.count($this->references).' tài liệu web và '.count($kb).' mục kho',
+            'Dùng chắc '.($use['dung'] ?? 0).' luận điểm, dùng thận trọng '.($use['than_trong'] ?? 0).', bỏ '.($use['bo'] ?? 0).'; góc tiếp cận: '.mb_substr((string) $plan['angle'], 0, 140).'.'.($extra !== '' ? $extra : '').($plan['gaps'] !== [] ? ' Còn thiếu căn cứ cho: '.implode('; ', array_slice((array) $plan['gaps'], 0, 3)).'.' : ''),
+            ['sources' => $r['sources']]);
     }
 
     /**
@@ -1012,7 +1015,9 @@ final class AgentRunOrchestrator
             if ($covered >= self::KB_ENOUGH) {
                 $this->step($run, 'research', 'system', 'ok', 'Kho đã đủ cho chủ đề này', 'Chủ đề thuộc Trí tuệ «'.$name.'» ('.$r['field'].'), kho đã có '.$covered.' mục đã duyệt khớp nên không nạp thêm.', $base + ['brain_name' => $name], $r['model'], $r['tokens'], $r['cost']);
 
-                return;
+                $this->decision($run, 'kb_coordination', 'Điều phối kho: đủ kiến thức, không nạp thêm', 'Chủ đề thuộc Trí tuệ «'.$name.'» ('.$r['field'].') và kho đã có '.$covered.' mục đã duyệt khớp (đủ từ '.self::KB_ENOUGH.' mục) nên không nạp thêm trước khi viết.', ['covered' => $covered, 'brain' => $name]);
+
+            return;
             }
             $this->topUpBrain($run, $article, $r['brain_id'], $name, $covered, $base, $r);
 
@@ -1030,9 +1035,12 @@ final class AgentRunOrchestrator
                 'Chủ đề chưa thuộc Trí tuệ nào đang có và lĩnh vực rộng này («'.$r['field'].'»'.($r['covers'] !== [] ? ', bao quát: '.implode('; ', array_slice($r['covers'], 0, 6)) : '').') sẽ còn lặp lại: nên lập Trí tuệ riêng để các bài sau có nền kiến thức duyệt sẵn. Hệ thống KHÔNG tự lập kho; việc này do người dùng quyết định (đã ghi vào Gợi ý cho kho). Bài này vẫn viết từ các nguồn tìm được. '.$r['reason'],
                 $base + ['suggestion' => ['type' => 'new_brain', 'field' => $r['field'], 'covers' => $r['covers'], 'sensitive' => $r['sensitive']]], $r['model'], $r['tokens'], $r['cost']);
 
+            $this->decision($run, 'kb_coordination', 'Điều phối kho: chưa có Trí tuệ phù hợp, đề xuất lập «'.$r['field'].'»', 'Chủ đề không thuộc Trí tuệ nào đang gắn với website nhưng lĩnh vực rộng «'.$r['field'].'» sẽ còn lặp lại, nên hệ thống KHÔNG tự xây kho mà ghi đề xuất để bạn quyết định lập Trí tuệ; bài vẫn viết từ các nguồn tìm được.', ['field' => $r['field']]);
+
             return;
         }
         $this->step($run, 'research', 'system', 'ok', 'Chủ đề lẻ: không cần lập kho', 'Chủ đề thuộc «'.($r['field'] !== '' ? $r['field'] : 'lĩnh vực khác').'», không thuộc Trí tuệ nào và không đủ lớn để đáng lập kho. Bài dùng các nguồn tìm được. '.$r['reason'], $base, $r['model'], $r['tokens'], $r['cost']);
+        $this->decision($run, 'kb_coordination', 'Điều phối kho: chủ đề lẻ, không lập kho', 'Chủ đề thuộc «'.($r['field'] !== '' ? $r['field'] : 'lĩnh vực khác').'», không thuộc Trí tuệ nào và không đủ lớn để đáng có kho riêng nên không xây kho; bài dùng các nguồn tìm được.', ['field' => $r['field']]);
     }
 
     /**
@@ -1129,6 +1137,9 @@ final class AgentRunOrchestrator
                     ? 'Kho đã đủ cho chủ đề này nhưng các mảng định hướng của kho còn chưa có kiến thức; điều phối nạp dần theo định hướng TRƯỚC khi viết: '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.'
                     : 'Kho mới có '.$covered.' mục khớp chủ đề nên điều phối chạy luồng nạp TRƯỚC khi viết: '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.',
                 $base + $this->kbStepData($imp, $brainId) + ['imported' => $imp['imported'], 'items_auto' => $imp['items_auto'], 'items_proposed' => $imp['items_proposed'], 'build_run_id' => $imp['run_id']], $cl['model'], $cl['tokens'], $cl['cost'] + (float) $imp['cost_vnd']);
+            $this->decision($run, 'kb_coordination', $topics !== null ? 'Điều phối kho: nạp theo mảng định hướng còn trống' : 'Điều phối kho: kho thiếu, nạp thêm nguồn tin cậy',
+                ($topics !== null ? 'Kho «'.$name.'» đủ cho chủ đề này nhưng mảng '.implode(', ', array_slice($topics, 0, 2)).' còn trống nên nạp dần theo định hướng' : 'Kho «'.$name.'» mới có '.$covered.' mục khớp chủ đề (cần từ '.self::KB_ENOUGH.') nên nạp thêm nguồn tin cậy').': được '.$imp['imported'].' nguồn mới, '.$imp['items_auto'].' mục tự nhận, '.$imp['items_proposed'].' mục chờ duyệt.',
+                ['brain' => $name, 'covered' => $covered, 'imported' => $imp['imported']]);
         } catch (Throwable $e) {
             report($e);
             $this->step($run, 'research', 'system', 'warn', 'Chưa nạp được kho «'.$name.'»', ErrorMasker::short($e->getMessage(), 160).' Bài vẫn viết từ các nguồn tìm được.', $base, $cl['model'], $cl['tokens'], $cl['cost']);
@@ -1470,7 +1481,7 @@ final class AgentRunOrchestrator
         $score = RunScorer::score($report);
         $this->step($run, 'grade', 'editor', $block === [] ? 'ok' : 'warn', $title,
             "Điểm {$score}/100 (tham khảo, mốc ".RunScorer::REFERENCE_THRESHOLD.'). '.($block === [] ? "Đạt mọi luật bắt buộc (còn {$c['P1']} mục P1, {$c['P2']} mục P2 chỉ nên xem)." : 'Trượt luật bắt buộc: '.implode(', ', $block).'. Quyết định do luật, không do AI.').($note !== '' ? ' '.$note : ''),
-            ['blocking' => $block, 'counts' => $c, 'score' => $score, 'round' => $round, 'threshold' => RunScorer::REFERENCE_THRESHOLD, 'penalty' => $this->penalty($report), 'failed' => $failed, 'playbook' => $this->pbData($editorPb)] + ($judge['data'] !== [] ? ['citation_support' => $judge['data']] : []),
+            ['blocking' => $block, 'counts' => $c, 'score' => $score, 'round' => $round, 'threshold' => RunScorer::REFERENCE_THRESHOLD, 'penalty' => $this->penalty($report), 'edit_next' => $round === 0 && $title === 'Chấm bản đầu' && $this->editorAi() !== null && ! $this->roleOff('editor'), 'failed' => $failed, 'playbook' => $this->pbData($editorPb)] + ($judge['data'] !== [] ? ['citation_support' => $judge['data']] : []),
             $judge['model'], $judge['tokens'], $judge['cost']);
 
         return $report;

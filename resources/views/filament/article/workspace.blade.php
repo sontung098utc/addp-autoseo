@@ -321,7 +321,7 @@
                                             $link = $n['state'] === 'running' ? 'live' : ($n['state'] === 'done' ? 'done' : (($next && in_array($next['state'], ['idle', 'pending', 'skipped'], true)) ? 'dashed' : null));
                                         @endphp
                                         <x-flow.node tag="div" :n="$loop->iteration" :label="$n['title']" :desc="$rf['blueprint'][$n['code']]['what'] ?? null" :state="$n['state']" :kind="$n['kind']" :human="$n['code'] === 'checkpoint'" :avatar="$n['who']['avatar']" :who="$n['who']['title']"
-                                            :state-label="$stLabel" :state-icon="$stIcon" :last="$loop->last" :link="$link" :loop="$isLoop ? $next['count'].' vòng' : null" data-stage="{{ $n['code'] }}" data-state="{{ $n['state'] }}">
+                                            :state-label="$stLabel" :state-icon="$stIcon" :parallel="$n['parallel'] ?? null" :last="$loop->last" :link="$link" :loop="$isLoop ? $next['count'].' vòng' : null" data-stage="{{ $n['code'] }}" data-state="{{ $n['state'] }}">
                                             <span class="fl-state">
                                                 @if ($n['state'] === 'running')<x-studio.running size="sm" label="Đang chạy" />
                                                 @elseif ($n['state'] === 'waiting')<span class="fl-wait-pill"><x-filament::icon icon="heroicon-m-user" style="width:.9rem;height:.9rem" /> Chờ bạn</span>

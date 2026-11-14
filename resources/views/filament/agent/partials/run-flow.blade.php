@@ -23,7 +23,7 @@
                                         $link = $n['state'] === 'running' ? 'live' : ($n['state'] === 'done' ? 'done' : (($next && in_array($next['state'], ['idle', 'pending', 'skipped'], true)) ? 'dashed' : null));
                                     @endphp
                                     <x-flow.node :n="$loop->iteration" :label="$n['title']" :desc="$blueprint[$n['code']]['what'] ?? null" :state="$n['state']" :kind="$n['kind']" :human="$n['code'] === 'checkpoint'" :avatar="$n['who']['avatar']" :who="$n['who']['title']"
-                                        :state-label="$stLabel" :state-icon="$stIcon" :last="$loop->last" :link="$link" :loop="$isLoop ? $next['count'].' vòng' : null"
+                                        :state-label="$stLabel" :state-icon="$stIcon" :parallel="$n['parallel'] ?? null" :last="$loop->last" :link="$link" :loop="$isLoop ? $next['count'].' vòng' : null"
                                         data-stage="{{ $n['code'] }}" data-state="{{ $n['state'] }}" :data-live-stage="$n['state'] === 'running' ? $n['code'] : null"
                                         x-on:click="sel = '{{ $n['code'] }}'" x-bind:class="{ 'is-sel': sel === '{{ $n['code'] }}' }">
                                         <span class="fl-state">

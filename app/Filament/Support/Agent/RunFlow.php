@@ -45,6 +45,26 @@ final class RunFlow
         'risk_level' => 'Hạng rủi ro', 'task' => 'Tác vụ', 'cost_vnd' => 'Chi phí lần gọi (₫)', 'cap_vnd' => 'Trần mỗi lần (₫)',
     ];
 
+    /** Mục đích ghi ở dữ kiện bước 'research' cho các việc Kho và nguồn. */
+    private const SOURCE_PURPOSES = ['kb_coordination', 'kb_topup', 'web_discover', 'gap', 'references', 'references_gap'];
+
+    /**
+     * Mã chặng HIỂN THỊ của một bước thật. Một số stage ghi nhiều lần ở những pha khác nhau của phiên (research: Kho và nguồn / Chuẩn bị tài liệu / Học vào kho;
+     * brief: dàn ý / yêu cầu và thiết kế ảnh) nên tách thành chặng riêng để luồng vẽ đúng thứ tự thật thay vì gộp một ô.
+     */
+    public static function segmentOf($step): string
+    {
+        $purpose = (string) (((array) ($step->data ?? []))['purpose'] ?? '');
+        if ($step->stage === 'research') {
+            return $purpose === 'kb_learn' ? 'learn' : (in_array($purpose, self::SOURCE_PURPOSES, true) ? 'sources' : 'research');
+        }
+        if ($step->stage === 'brief' && $purpose === 'image_brief') {
+            return 'image_design';
+        }
+
+        return (string) $step->stage;
+    }
+
     public static function stateOf(?string $worst): string
     {
         return match ($worst) {
@@ -75,6 +95,7 @@ final class RunFlow
         $codes = self::withCheckpoint($codes, $steps);
         $registryLabels = JobTypeRegistry::stageLabels((string) ($run->job_type ?: 'article_write'), true);
         $jobDef = collect(JobTypeRegistry::find((string) ($run->job_type ?: 'article_write'))['steps'] ?? [])->keyBy('id');
+        $jobLabels = $jobDef->map(fn ($d) => $d['label'] ?? '')->all();
 
         // Thời lượng mỗi bước: khoảng cách giữa mốc ghi của bước này và bước trước (bước đầu: từ lúc bắt đầu phiên). Chỉ là ước lượng theo mốc ghi.
         $prev = VnTime::fromRaw($run, 'started_at') ?? VnTime::fromRaw($run, 'created_at');
@@ -107,7 +128,8 @@ final class RunFlow
                 continue;
             }
             if ($pendingInc !== []) {
-                $target = in_array($s->stage, $codes, true) ? $s->stage : $codes[0] ?? 'write';
+                $seg = self::segmentOf($s);
+                $target = in_array($seg, $codes, true) ? $seg : $codes[0] ?? 'write';
                 $incidents[$target] = array_merge($incidents[$target] ?? [], $pendingInc);
                 $pendingInc = [];
             }
@@ -120,7 +142,7 @@ final class RunFlow
         foreach ($codes as $code) {
             $b = $blueprint[$code] ?? ['title' => $code, 'role' => ''];
             $b['title'] = $labels[$code] ?? ($code === 'checkpoint' ? 'Điểm dừng' : (isset($blueprint[$code]) ? $b['title'] : ($registryLabels[$code] ?? $code)));
-            $ran = $steps->where('stage', $code)->values();
+            $ran = $steps->filter(fn ($x) => self::segmentOf($x) === $code)->values();
             $isNow = $live && $currentStage === $code;
             $isStale = $stale && $currentStage === $code;
             $def = $jobDef[$code] ?? [];
@@ -158,6 +180,7 @@ final class RunFlow
                 'who' => $isCheckpoint ? ['key' => 'human', 'name' => 'Bạn', 'title' => 'Bạn', 'avatar' => 'B'] : PipelineVisual::profile((string) ($def['role'] ?? 'system')),
                 'steps' => $ran->all(),
                 'waiting' => $waiting,
+                'parallel' => isset($def['parallel']) ? (string) ($jobLabels[$def['parallel']] ?? $def['parallel']) : null,
             ];
         }
 
