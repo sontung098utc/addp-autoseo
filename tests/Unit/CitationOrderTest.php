@@ -32,4 +32,31 @@ class CitationOrderTest extends TestCase
         $this->assertSame('', CitationOrder::normalize(''));
         $this->assertSame('<p>x</p>', CitationOrder::normalize('<p>x</p>'));
     }
+
+    public function test_gioi_han_chu_thich_web_theo_do_dai_bai_uu_tien_cau_co_so_lieu(): void
+    {
+        $this->assertSame(3, CitationOrder::allowance(100));
+        $this->assertSame(5, CitationOrder::allowance(1100));
+        $this->assertSame(12, CitationOrder::allowance(9000));
+        $filler = str_repeat('Lời khuyên chung dễ hiểu cho người đọc hằng ngày. ', 12);
+        $paras = '';
+        for ($i = 1; $i <= 8; $i++) {
+            $paras .= '<p>'.$filler.($i % 2 === 0 ? 'Mốc là 90/60 mmHg.' : 'Một nhận xét thông thường.').$this->sup($i).'</p>';
+        }
+        $out = CitationOrder::normalize($paras.'<div class="autoseo-refs"><ol>'.implode('', array_map(fn ($i) => '<li id="nguon-'.$i.'">N'.$i.'</li>', range(1, 8))).'</ol></div>');
+        $kept = substr_count(explode('<div class="autoseo-refs">', $out)[0], 'autoseo-cite');
+        $this->assertSame(4, $kept, 'Bài khoảng 800 từ chỉ được khoảng 4 chú thích web.');
+        $this->assertLessThan(8, $kept, 'Không câu nào cũng chú thích.');
+        $this->assertStringContainsString('Mốc là 90/60 mmHg.<sup', $out, 'Câu có số liệu được giữ chú thích.');
+    }
+
+    public function test_chu_thich_kho_khong_bi_cat_theo_han_muc(): void
+    {
+        $paras = '';
+        for ($i = 1; $i <= 6; $i++) {
+            $paras .= '<p>Đoạn ngắn số '.$i.'.'.$this->sup($i, (string) (10 + $i)).'</p>';
+        }
+        $out = CitationOrder::normalize($paras);
+        $this->assertSame(6, substr_count($out, 'data-kb='));
+    }
 }

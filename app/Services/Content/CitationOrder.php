@@ -34,6 +34,9 @@ final class CitationOrder
             return '<'.$m[1].$m[2].'>'.$inner.'</'.$m[1].'>';
         }, $html);
 
+        // 1b. Kiểu Wikipedia: chú thích web chỉ ở chỗ CẦN. Hạn mức theo độ dài bài (khoảng 1 chú thích mỗi 220 từ, từ 3 đến 12); vượt hạn mức thì giữ những câu có số liệu/mốc trước, rồi theo thứ tự xuất hiện.
+        $html = self::capWeb($html);
+
         // 2. Đánh số lại theo thứ tự xuất hiện.
         $map = [];
         preg_match_all(self::SUP, $html, $all, PREG_SET_ORDER);
@@ -65,5 +68,41 @@ final class CitationOrder
 
             return $m[1].implode('', $cited).implode('', $rest).$m[3];
         }, $html, 1);
+    }
+
+    /** Số chú thích web tối đa cho bài có $words từ. */
+    public static function allowance(int $words): int
+    {
+        return max(3, min(12, (int) round($words / 220)));
+    }
+
+    private static function capWeb(string $html): string
+    {
+        $body = (string) preg_replace('#<div class="autoseo-refs">.*#s', '', $html);
+        $words = count(preg_split('/\s+/u', trim(strip_tags($body)), -1, PREG_SPLIT_NO_EMPTY) ?: []);
+        $allowed = self::allowance($words);
+        if (! preg_match_all(self::SUP, $body, $m, PREG_OFFSET_CAPTURE)) {
+            return $html;
+        }
+        $web = [];
+        foreach ($m[0] as $i => [$tag, $off]) {
+            if (str_contains($tag, 'data-kb=')) {
+                continue; // chú thích kho do chính sách của Trí tuệ yêu cầu: không cắt
+            }
+            $before = mb_substr(strip_tags(substr($body, max(0, $off - 400), min(400, $off))), -220);
+            $score = preg_match('/\d/u', $before) ? 2 : 1;
+            $web[] = ['off' => $off, 'len' => strlen($tag), 'score' => $score, 'i' => $i];
+        }
+        if (count($web) <= $allowed) {
+            return $html;
+        }
+        usort($web, fn ($a, $b) => [$b['score'], $a['i']] <=> [$a['score'], $b['i']]);
+        $drop = array_slice($web, $allowed);
+        usort($drop, fn ($a, $b) => $b['off'] <=> $a['off']);
+        foreach ($drop as $d) {
+            $html = substr($html, 0, $d['off']).substr($html, $d['off'] + $d['len']);
+        }
+
+        return $html;
     }
 }
