@@ -150,7 +150,7 @@ class CitationSupportTest extends TestCase
 
         $run = (new AgentRunOrchestrator($ai, policy: new RunPolicy))->run($this->article, null);
 
-        $this->assertSame(1, $run->repair_rounds);
+        $this->assertGreaterThanOrEqual(1, $run->repair_rounds);
         $fb = (array) $ai->options[1]['feedback'];
         $this->assertTrue(collect($fb)->contains(fn ($f) => str_starts_with($f, 'CITE02:') && str_contains($f, 'mục chỉ nói về học phí chung')), 'phản hồi vòng sửa nêu đoạn và lý do');
         $grades = $run->steps->where('stage', 'grade')->values();

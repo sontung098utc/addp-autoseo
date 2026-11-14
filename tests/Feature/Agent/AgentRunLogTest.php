@@ -243,12 +243,15 @@ class AgentRunLogTest extends TestCase
         [$run] = $this->go($this->provider([$this->bad()]));
 
         $d = $run->steps->where('stage', 'decision')->values();
-        $this->assertCount(1, $d);
-        $this->assertSame('no_improvement', $d[0]->data['decision']);
-        $this->assertArrayHasKey('score_before', $d[0]->data);
-        $this->assertArrayHasKey('score_after', $d[0]->data);
-        $this->assertSame($d[0]->data['penalty_before'], $d[0]->data['penalty_after']);
-        $this->assertStringContainsString('không cải thiện', $d[0]->detail);
+        $codes = $d->pluck('data.decision')->all();
+        $this->assertContains('fix_plan', $codes, 'điều phối in ra kế hoạch sửa mỗi vòng');
+        $this->assertContains('fix_rejected', $codes, 'bản sửa không tốt hơn bị bỏ, giữ bản trước');
+        $stop = $d->firstWhere('data.decision', 'no_improvement');
+        $this->assertNotNull($stop, 'hai lần liên tiếp không tiến bộ thì dừng');
+        $this->assertArrayHasKey('score_before', $stop->data);
+        $this->assertArrayHasKey('score_after', $stop->data);
+        $this->assertSame($stop->data['penalty_before'], $stop->data['penalty_after']);
+        $this->assertStringContainsString('không cải thiện', $stop->detail);
     }
 
     public function test_ghi_quyet_dinh_khi_het_ngan_sach(): void

@@ -149,6 +149,14 @@ final class AgentRunOrchestrator
     /** Số mục đã duyệt khớp chủ đề coi là "kho đã đủ" cho một bài; ít hơn thì điều phối cân nhắc nạp thêm. */
     public const KB_ENOUGH = 4;
 
+    /** Số vòng hoàn thiện tối đa khi còn mục chưa đạt (mục tiêu là đạt mọi tiêu chí; vẫn dừng sớm nếu 2 vòng liên tiếp không tiến bộ hoặc hết ngân sách). */
+    public const QUALITY_ROUNDS = 8;
+
+    /** Luật mà người viết sửa bằng chữ không giải quyết được (ảnh được lắp sau khi chấm): không kích hoạt vòng sửa. */
+    private const NOT_TEXT_FIXABLE = ['IMG01', 'IMG02'];
+
+    private bool $extraSearched = false;
+
     /** kho vẫn chưa có mục đã duyệt khớp sau khi tự chuẩn bị, chủ đề rủi ro cao: bài cần chuyên gia xem lại sau khi viết */
     private bool $needsExpert = false;
 
@@ -166,6 +174,7 @@ final class AgentRunOrchestrator
         $this->contentPlanText = null;
         $this->kbTitlesVi = [];
         $this->matchedBrainId = null;
+        $this->extraSearched = false;
         $this->markT = microtime(true);
         $this->aiMs = 0.0;
         $this->trigger = $trigger;
@@ -442,16 +451,16 @@ final class AgentRunOrchestrator
         $report = $this->grade($run, $article, $attrs, 'Chấm bản đầu', 0, $editorPb, $editorNote);
         // Biên tập viên (AI) đọc bài như người thật: bắt chỗ nói vòng, chung chung, thiếu ý mà luật hình thức không thấy; có điểm nghiêm trọng thì sửa trực tiếp bản đang có.
         [$attrs, $report, $editRounds] = $this->editorialPass($run, $article, $outline['outline'] ?? [], $attrs, $report, (string) $assess->level, $editorPb);
-        $maxRounds = $this->policy->maxRepairRounds + $editRounds;
+        // Mục tiêu là ĐẠT MỌI TIÊU CHÍ (không chỉ lỗi chặn): số vòng không phải mối bận tâm chính, chỉ cần có tiến bộ. Dừng khi đạt, hết ngân sách, hoặc 2 vòng liên tiếp không tốt hơn.
+        $maxRounds = max($this->policy->maxRepairRounds, self::QUALITY_ROUNDS) + $editRounds;
         $penalty = $this->penalty($report);
         $score = RunScorer::score($report);
 
-        // 6. Vòng sửa có giới hạn.
+        // 6. Vòng hoàn thiện: chấm → điều phối nhìn lỗi và quyết định → người viết sửa ĐÚNG các chỗ chưa đạt (giữ nguyên phần đã tốt) → chấm lại. Luôn giữ bản TỐT NHẤT từ trước tới giờ.
         $reason = null;
         $round = $editRounds;
-        // Vòng sửa chạy khi còn lỗi CHẶN, hoặc (Trí tuệ bắt buộc nguồn) còn đoạn khẳng định chưa có dấu trích dẫn [KB#id] (CITE01, P1): lỗi sau không chặn bàn giao nhưng được sửa.
-        // Lỗi MỀM (thiếu dấu trích, trích không hỗ trợ) chỉ được sửa tối đa 1 vòng sau biên tập: sửa mãi chỉ làm dấu trích rơi vào chỗ không hợp và bài kém đi.
-        while ($this->needsRepair($report) && $round < $maxRounds && ($report->hasBlocking() || $report->layoutGaps() !== [] || $report->leakGaps() !== [] || $round - $editRounds < 1)) {
+        $stale = 0;
+        while ($this->needsRepair($report) && $round < $maxRounds) {
             if ($this->spent($run) >= $this->policy->budgetVnd) {
                 $reason = 'Hết ngân sách cho phiên chạy ('.number_format($this->policy->budgetVnd, 0, ',', '.').' ₫) nên dừng sửa.';
                 $this->decision($run, 'budget_exhausted', 'Dừng sửa vì hết ngân sách', $reason, ['spent_vnd' => $this->spent($run), 'budget_vnd' => $this->policy->budgetVnd, 'score' => $score]);
@@ -464,7 +473,7 @@ final class AgentRunOrchestrator
                 $this->decision($run, 'repair_route_missing', 'Dừng sửa vì thiếu cấu hình AI', $reason, ['task' => 'repair']);
                 break;
             }
-            $feedback = $this->ruleFeedback($report);
+            $feedback = $this->coordinateFix($run, $article, $report, $round);
             try {
                 $candidate = $this->write($run, $article, $outline['outline'] ?? [], $feedback, 'repair', "Sửa lần {$round}", $editorPb, (string) ($attrs['html_content'] ?? ''));
                 $candidateReport = $this->grade($run, $article, $candidate, "Chấm lại sau lần sửa {$round}", $round, $editorPb, '');
@@ -473,23 +482,27 @@ final class AgentRunOrchestrator
                 $this->decision($run, 'repair_failed', 'Giữ bản nháp hiện tại vì lần sửa lỗi', $reason, ['round' => $round, 'error' => class_basename($e), 'score' => $score]);
                 break;
             }
-            $attrs = $candidate;
-            $report = $candidateReport;
-            $new = $this->penalty($report);
-            $newScore = RunScorer::score($report);
-            if ($this->needsRepair($report) && $new >= $penalty) {
-                // Các con số (điểm, điểm phạt trước → sau) hiện ở khối cặp số của quyết định; lời giải thích không nhắc lại để khỏi lặp.
-                $reason = 'Sửa không cải thiện (điểm phạt không giảm) nên dừng, tránh tốn thêm chi phí.';
-                $this->decision($run, 'no_improvement', 'Dừng sửa vì không cải thiện', $reason, ['penalty_before' => $penalty, 'penalty_after' => $new, 'score_before' => $score, 'score_after' => $newScore]);
+            $new = $this->penalty($candidateReport);
+            $newScore = RunScorer::score($candidateReport);
+            if ($new < $penalty) { // tốt hơn: nhận bản mới
+                $attrs = $candidate;
+                $report = $candidateReport;
+                $this->decision($run, 'fix_accepted', "Nhận bản sửa lần {$round}: còn ".count($report->failed()).' mục chưa đạt', "Điểm phạt giảm từ {$penalty} xuống {$new}.", ['penalty_before' => $penalty, 'penalty_after' => $new, 'score_before' => $score, 'score_after' => $newScore]);
                 $penalty = $new;
                 $score = $newScore;
-                break;
+                $stale = 0;
+            } else { // không tốt hơn: GIỮ bản trước (không để bản sửa tệ hơn ghi đè), thử lại với chỉ dẫn mới
+                $stale++;
+                $this->decision($run, 'fix_rejected', "Bỏ bản sửa lần {$round}: không tốt hơn bản đang giữ", "Điểm phạt {$new} không thấp hơn {$penalty} nên giữ bản trước và thử lại ({$stale}/2 lần liên tiếp không tiến bộ).", ['penalty_before' => $penalty, 'penalty_after' => $new, 'score_before' => $score, 'score_after' => $newScore]);
+                if ($stale >= 2) {
+                    $reason = 'Hai lần sửa liên tiếp không cải thiện (không tốt hơn bản đang giữ) nên dừng, tránh tốn thêm chi phí.';
+                    $this->decision($run, 'no_improvement', 'Dừng sửa vì không cải thiện', $reason, ['penalty_before' => $penalty, 'penalty_after' => $new, 'score_before' => $score, 'score_after' => $newScore]);
+                    break;
+                }
             }
-            $penalty = $new;
-            $score = $newScore;
         }
-        if ($reason === null && $report->hasBlocking() && $round >= $maxRounds) {
-            $this->decision($run, 'max_rounds', 'Dừng sửa vì hết số vòng cho phép', "Đã sửa {$round}/{$maxRounds} vòng, còn lỗi chặn nên không sửa thêm.", ['rounds' => $round, 'max_rounds' => $maxRounds, 'score' => $score]);
+        if ($reason === null && $this->needsRepair($report) && $round >= $maxRounds) {
+            $this->decision($run, 'max_rounds', 'Dừng sửa vì hết số vòng cho phép', "Đã sửa {$round}/{$maxRounds} vòng, còn ".count($report->failed()).' mục chưa đạt nên không sửa thêm.', ['rounds' => $round, 'max_rounds' => $maxRounds, 'score' => $score]);
         }
         $run->update(['repair_rounds' => $round]);
 
@@ -1284,7 +1297,66 @@ final class AgentRunOrchestrator
     /** Còn việc phải sửa không: lỗi chặn, đoạn thiếu dấu trích (CHỈ khi kho có mục để trích), trích dẫn không hỗ trợ, lỗi bố cục. */
     private function needsRepair(QualityReport $report): bool
     {
-        return $report->hasBlocking() || ($this->kbHasItems() && $report->citationGaps() !== []) || $report->layoutGaps() !== [] || $report->supportGaps() !== [] || $report->leakGaps() !== [];
+        $failedP1 = array_filter($report->failed(), fn ($r) => in_array($r->severity, ['P0', 'P1'], true) && ! in_array($r->code, self::NOT_TEXT_FIXABLE, true));
+
+        return $report->hasBlocking() || $failedP1 !== [] || ($this->kbHasItems() && $report->citationGaps() !== []) || $report->layoutGaps() !== [] || $report->supportGaps() !== [] || $report->leakGaps() !== [];
+    }
+
+    /**
+     * ĐIỀU PHỐI sau khi chấm: nhìn các mục chưa đạt, quyết định cần làm gì (sửa đúng chỗ nào; có cần tìm thêm nguồn không), IN RA ở phần Quyết định tự động rồi trả chỉ dẫn cho người viết.
+     * Lỗi thiếu căn cứ (khẳng định chưa có nguồn) thì tìm thêm tài liệu cho đúng các câu đó MỘT LẦN mỗi phiên, tài liệu mới vào danh sách nguồn của người viết.
+     *
+     * @return list<string> chỉ dẫn sửa cho người viết
+     */
+    private function coordinateFix(AgentRun $run, Article $article, QualityReport $report, int $round): array
+    {
+        $failed = array_filter($report->failed(), fn ($r) => in_array($r->severity, ['P0', 'P1'], true) && ! in_array($r->code, self::NOT_TEXT_FIXABLE, true));
+        $asks = [];
+        foreach ($failed as $r) {
+            $asks[$r->code.' '.$r->label] = true;
+        }
+        $feedback = $this->ruleFeedback($report);
+        foreach ($failed as $r) { // mọi mục chưa đạt đều được nêu, kể cả loại không có chỗ cụ thể (từ khóa, tiêu đề, độ dài...)
+            $line = $r->code.': '.$r->label.' — '.mb_substr($r->message, 0, 220);
+            if (! array_filter($feedback, fn ($f) => str_starts_with($f, $r->code.':'))) {
+                $feedback[] = $line;
+            }
+        }
+        $searchNote = '';
+        $evidence = array_filter($failed, fn ($r) => in_array($r->code, ['EVID01', 'FACT01', 'CITE01', 'CITE02'], true));
+        if ($evidence !== [] && ! $this->extraSearched && $this->spent($run) < $this->policy->budgetVnd && ($web = (new \App\Services\Search\WebSearchResolver)->availability())['ok'] && ! $web['demo']) {
+            $this->extraSearched = true;
+            $topics = array_map(fn ($g) => trim(mb_substr((string) $article->primary_keyword, 0, 60).' '.mb_substr(preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', (string) $g) ?? '', 0, 80)), array_slice(array_merge($report->citationGaps(), $report->supportGaps()), 0, 2));
+            $added = $topics === [] ? 0 : $this->mergeReferences($topics, $article);
+            $searchNote = $added > 0 ? " Đã tìm thêm {$added} tài liệu cho các câu thiếu căn cứ và đưa vào danh sách nguồn của người viết." : ' Đã thử tìm thêm tài liệu cho các câu thiếu căn cứ nhưng chưa có kết quả mới.';
+        }
+        $this->decision($run, 'fix_plan', 'Điều phối: chấm xong còn '.count($failed)." mục chưa đạt, yêu cầu người viết sửa (lần {$round})",
+            'Cần sửa: '.implode('; ', array_slice(array_keys($asks), 0, 6)).'. Người viết chỉ sửa đúng các chỗ này trên bản đang giữ, giữ nguyên phần đã tốt.'.$searchNote,
+            ['round' => $round, 'failed_codes' => array_values(array_unique(array_map(fn ($r) => $r->code, $failed))), 'search_more' => $searchNote !== '']);
+
+        return $feedback;
+    }
+
+    /** Tìm thêm tài liệu theo các chủ đề cụ thể và hợp vào danh sách nguồn của người viết (tối đa MAX+4). @param list<string> $topics @return int số tài liệu mới */
+    private function mergeReferences(array $topics, Article $article): int
+    {
+        try {
+            $more = (new \App\Services\Content\ReferenceDossier)->gather($article->website, (string) $article->primary_keyword, $topics, $this->neutralSourcesOk((string) $article->primary_keyword));
+        } catch (Throwable $e) {
+            report($e);
+
+            return 0;
+        }
+        $have = array_column($this->references, 'url');
+        $added = 0;
+        foreach ($more['references'] as $ref) {
+            if (! in_array($ref['url'], $have, true) && count($this->references) < \App\Services\Content\ReferenceDossier::MAX + 4) {
+                $this->references[] = $ref;
+                $added++;
+            }
+        }
+
+        return $added;
     }
 
     /** Kho kiến thức đã nạp được ít nhất một mục (không tính quy tắc/sản phẩm) cho bài đang chạy. */

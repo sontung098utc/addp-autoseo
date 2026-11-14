@@ -70,11 +70,17 @@ class CitationRepairLoopTest extends TestCase
         };
     }
 
+    /** CITE01 còn trượt ở BẢN ĐƯỢC GIỮ (bản cuối đã lưu) không: chấm lại bản lưu thay vì đọc bước chấm cuối (có thể là của bản sửa đã bị bỏ). */
     private function cite01(\App\Models\AgentRun $run): ?array
     {
-        $g = $run->steps->where('stage', 'grade')->last();
+        $report = (new \App\Services\Content\Quality\ContentQualityChecker)->check($run->finalVersion, $run->article, null);
+        foreach ($report->failed() as $r) {
+            if ($r->code === 'CITE01') {
+                return ['code' => $r->code, 'message' => $r->message];
+            }
+        }
 
-        return collect((array) (((array) $g->data)['failed'] ?? []))->firstWhere('code', 'CITE01');
+        return null;
     }
 
     public function test_doan_thieu_trich_dan_duoc_gui_vao_vong_sua_va_bai_sau_sua_dat_cite01(): void
@@ -83,8 +89,8 @@ class CitationRepairLoopTest extends TestCase
         $run = (new AgentRunOrchestrator($ai, policy: new RunPolicy))->run($this->article, null);
 
         $this->assertSame('ready_for_review', $run->status);
-        $this->assertSame(1, $run->repair_rounds, 'CITE01 chỉ là P1 nhưng vẫn kích hoạt một vòng sửa');
-        $this->assertCount(2, $ai->options);
+        $this->assertGreaterThanOrEqual(1, $run->repair_rounds, 'CITE01 chỉ là P1 nhưng vẫn kích hoạt vòng sửa');
+        $this->assertGreaterThanOrEqual(2, count($ai->options));
         $fb = (array) $ai->options[1]['feedback'];
         $this->assertTrue(collect($fb)->contains(fn ($f) => str_contains($f, 'CITE01') && str_contains($f, 'học bổng toàn phần miễn 100%')), 'phản hồi nêu đúng đoạn thiếu dấu');
         $this->assertTrue(collect($fb)->contains(fn ($f) => str_contains($f, 'không bịa mã')));
@@ -103,7 +109,7 @@ class CitationRepairLoopTest extends TestCase
         $run = (new AgentRunOrchestrator($ai, policy: new RunPolicy))->run($this->article, null);
 
         $this->assertSame('ready_for_review', $run->status, 'CITE01 là P1: không chặn, bài vẫn vào hàng chờ người có chuyên môn');
-        $this->assertSame(1, $run->repair_rounds, 'sửa không cải thiện thì dừng sớm, không đốt thêm chi phí');
+        $this->assertSame(2, $run->repair_rounds, 'hai lần sửa liên tiếp không cải thiện thì dừng, không đốt thêm chi phí');
         $this->assertNotNull($this->cite01($run));
         $this->assertTrue($run->steps->where('stage', 'decision')->contains(fn ($s) => ($s->data['decision'] ?? '') === 'no_improvement'));
     }
@@ -114,8 +120,10 @@ class CitationRepairLoopTest extends TestCase
         $ai = $this->ai(false);
         $run = (new AgentRunOrchestrator($ai, policy: new RunPolicy))->run($this->article, null);
 
-        $this->assertSame(0, $run->repair_rounds);
-        $this->assertCount(1, $ai->options);
+        $this->assertFalse(collect($run->steps->where('stage', 'decision'))->contains(fn ($s) => in_array('CITE01', (array) ($s->data['failed_codes'] ?? []), true)), 'Trí tuệ thường không có CITE01 nên không có vòng sửa vì lý do này');
+        foreach ($ai->options as $o) {
+            $this->assertStringNotContainsString('CITE01', implode(' ', (array) ($o['feedback'] ?? [])), 'Không có vòng sửa nào vì CITE01 khi Trí tuệ không bắt buộc nguồn.');
+        }
     }
 
     public function test_khoi_kien_thuc_cho_nguoi_viet_chua_du_12_muc_va_nhac_trich_dan_tung_doan(): void

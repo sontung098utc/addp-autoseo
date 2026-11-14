@@ -128,7 +128,7 @@ class AgentRunOrchestratorTest extends TestCase
         $run = $this->go($a, $ai);
 
         $this->assertSame('held', $run->status);
-        $this->assertSame(2, $ai->writes, 'chỉ sửa một lần rồi dừng vì không cải thiện, không đốt thêm chi phí');
+        $this->assertSame(3, $ai->writes, '1 lần viết + 2 lần sửa liên tiếp không tốt hơn thì dừng (không đốt thêm chi phí)');
         $this->assertStringContainsString('không cải thiện', (string) $run->outcome_reason);
         $this->assertSame('drafting', $run->finalVersion->review_status, 'bản giữ nháp không vào hàng chờ duyệt');
         $this->assertSame('drafting', $a->refresh()->workflow_status);
@@ -148,8 +148,8 @@ class AgentRunOrchestratorTest extends TestCase
         $ai = $this->fake($stages);
         $run = $this->go($a, $ai, new RunPolicy(maxRepairRounds: 2));
 
-        $this->assertLessThanOrEqual(3, $ai->writes, '1 lần viết + tối đa 2 lần sửa');
-        $this->assertLessThanOrEqual(2, $run->repair_rounds);
+        $this->assertLessThanOrEqual(1 + max(2, \App\Services\Agent\Run\AgentRunOrchestrator::QUALITY_ROUNDS), $ai->writes, '1 lần viết + tối đa số vòng hoàn thiện');
+        $this->assertLessThanOrEqual(\App\Services\Agent\Run\AgentRunOrchestrator::QUALITY_ROUNDS, $run->repair_rounds);
         $this->assertSame('held', $run->status);
     }
 
