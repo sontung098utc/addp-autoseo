@@ -3,6 +3,7 @@
 namespace App\Services\Content\Quality\Rules;
 
 use App\Models\Brain;
+use App\Models\KnowledgeItem;
 use App\Services\Brain\BrainContext;
 use App\Services\Brain\BrainSourceRegistry;
 use App\Services\Content\Quality\QualityContext;
@@ -40,7 +41,8 @@ class EvidenceRule implements QualityRule
             return [];
         }
         $registry = BrainSourceRegistry::forBrains($ids);
-        $cited = FactRule::sources($ctx->version->sources_cited);
+        // Nguồn gốc của các mục kho đã duyệt mà bài trích qua dấu [KB#id] cũng là bằng chứng (nguồn của mục đó được xếp bậc theo Sổ nguồn), không chỉ tên nguồn người viết tự nêu.
+        $cited = array_merge(FactRule::sources($ctx->version->sources_cited), $this->kbSources((string) $ctx->version->html_content, $ids));
         $blocked = [];
         $unknown = [];
         $strong = [];   // bậc 1–2, theo id nguồn
@@ -48,6 +50,14 @@ class EvidenceRule implements QualityRule
         foreach ($cited as $c) {
             $hit = $registry->classify($c);
             if ($hit === null) {
+                // Chưa có trong Sổ nguồn của Trí tuệ nhưng là địa chỉ thuộc danh sách tin cậy cố định (cơ quan y tế, nhà nước, giáo dục, tạp chí...): tính như bằng chứng bậc 2, không bắt người dùng nhập tay từng nguồn.
+                $host = BrainSourceRegistry::hostOf($c);
+                if ($host !== null && str_contains($c, '.') && ! $this->inBook($ids, $host) && \App\Services\Knowledge\Discover\SourceTrust::assess($c)['level'] === 'trusted') {
+                    $strong['host:'.$host] = true;
+                    $medium['host:'.$host] = true;
+
+                    continue;
+                }
                 $unknown[] = $c;
 
                 continue;
@@ -78,6 +88,42 @@ class EvidenceRule implements QualityRule
         }, $claims.' câu / '.count($strong + $medium).' nguồn xác nhận', '≥1 nguồn bậc 1–2 hoặc ≥2 nguồn bậc 2–3');
 
         return $out;
+    }
+
+    /** @param list<int> $brainIds @return list<string> địa chỉ hoặc tên nguồn của các mục kho đã duyệt được trích */
+    private function kbSources(string $html, array $brainIds): array
+    {
+        $ids = [];
+        if (preg_match_all('/\[KB#(\d+(?:\s*[,;]\s*(?:KB)?#?\d+)*)\]|data-kb="([\d,\s]+)"/u', $html, $m)) {
+            foreach (array_merge($m[1], $m[2]) as $grp) {
+                foreach (preg_split('/[^\d]+/', (string) $grp, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $n) {
+                    $ids[(int) $n] = true;
+                }
+            }
+        }
+        if ($ids === []) {
+            return [];
+        }
+        $out = [];
+        foreach (KnowledgeItem::query()->with('source')->whereIn('id', array_keys($ids))->where('status', 'approved')->whereIn('brain_id', $brainIds)->get() as $it) {
+            if ($it->source) {
+                $out[] = (string) ($it->source->url ?: $it->source->title);
+            }
+        }
+
+        return array_values(array_unique(array_filter($out)));
+    }
+
+    /** Tên miền đã có trong Sổ nguồn của Trí tuệ (kể cả mới là gợi ý chưa xác nhận): chủ Trí tuệ đã xem xét nên KHÔNG tự nâng thành bằng chứng. @param list<int> $brainIds */
+    private function inBook(array $brainIds, string $host): bool
+    {
+        return \App\Models\BrainSource::query()->whereIn('brain_id', $brainIds)->where(fn ($q) => $q->where('domain', $host)->orWhere('domain', 'like', '%.'.$host))->exists();
+    }
+
+    /** Có số liệu kèm đơn vị (liều, ngưỡng, tỷ lệ, mốc thời gian...). */
+    public static function hasFigure(string $text): bool
+    {
+        return preg_match(self::FIGURE, $text) === 1;
     }
 
     /** Câu có giống khẳng định kiểm chứng được không (số liệu có đơn vị hoặc từ khóa như "nghiên cứu", "khuyến cáo", "điều trị"...). */

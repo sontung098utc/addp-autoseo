@@ -13,8 +13,8 @@ use App\Services\Content\Quality\RuleResult;
  * Trích dẫn TỪNG KHẲNG ĐỊNH (Kho trí tuệ chuyên ngành). CHỈ chạy khi bài dùng Trí tuệ ở mức "Bắt buộc nguồn". Tất định, không dùng AI.
  *  - CITE01 (P0, nhãn "Trích dẫn trỏ đúng mục kho đã duyệt"): dấu [KB#id] trong bài phải trỏ tới mục kiến thức ĐÃ DUYỆT thuộc Trí tuệ của bài. Trỏ tới mục không tồn tại, chưa duyệt hoặc thuộc nơi khác
  *    là trích dẫn giả hoặc sai nguồn: chặn.
- *  - CITE01 (P1, nhãn "Mỗi khẳng định có dấu trích dẫn"): mỗi đoạn/mục danh sách có câu giống khẳng định kiểm chứng được (số liệu có đơn vị, "khuyến cáo", "điều trị"...) phải mang ít nhất một dấu
- *    [KB#id]. Thiếu: cờ P1 kèm đoạn mẫu, bài chỉ ở bản nháp chờ người có chuyên môn duyệt.
+ *  - CITE01 (P1, nhãn "Mỗi khẳng định có dấu trích dẫn"): chú thích THƯA: chỉ xét đoạn/mục danh sách có câu khẳng định VÀ có SỐ LIỆU KÈM ĐƠN VỊ (liều, ngưỡng, tỷ lệ, mốc...); ít nhất một nửa số đoạn đó phải mang dấu
+ *    [KB#id]. Đoạn giải thích chung không bắt buộc chú thích từng câu (không chú thích tràn lan). Thiếu: cờ P1 kèm đoạn mẫu, bài chỉ ở bản nháp chờ người có chuyên môn duyệt.
  * Bổ sung cho EVID01 (kiểm cả bài theo Căn cứ chuẩn mực): hai luật này nối từng đoạn với từng mục kho. Nhận khẳng định bằng từ khóa và số liệu nên có thể
  * bỏ sót hoặc báo nhầm; không xác minh nội dung câu có đúng với mục được trích hay không (việc của người duyệt).
  */
@@ -44,9 +44,10 @@ class CitationRule implements QualityRule
         $cited = [];
         $uncited = [];
         $claimBlocks = 0;
+        $figureBlocks = 0;
         $xp = $ctx->xpath();
-        $skip = "[not(ancestor-or-self::*[contains(concat(' ', normalize-space(@class), ' '), ' autoseo-refs ')])]";
-        foreach ($xp->query('//p'.$skip.'|//li'.$skip.'|//td'.$skip.'|//blockquote'.$skip) ?: [] as $node) {
+        $skip = "[not(ancestor-or-self::*[contains(concat(' ', normalize-space(@class), ' '), ' autoseo-refs ')])]"; // một BẢNG tính là một khối (dấu trích ở bất kỳ ô nào), không đếm từng ô
+        foreach ($xp->query('//p'.$skip.'|//li'.$skip.'|//table'.$skip.'|//blockquote'.$skip) ?: [] as $node) {
             $text = trim(preg_replace('/\s+/u', ' ', $node->textContent) ?? '');
             if ($text === '') {
                 continue;
@@ -77,13 +78,18 @@ class CitationRule implements QualityRule
             }
             if ($isClaim) {
                 $claimBlocks++;
-                if ($marks === []) {
-                    $uncited[] = QualityContext::excerpt($plain, 110);
+                // Chú thích THƯA (kiểu bách khoa): chỉ đoạn có SỐ LIỆU (liều, ngưỡng, tỷ lệ, mốc thời gian...) bắt buộc có dấu [KB#id]; đoạn giải thích chung không cần chú thích từng câu.
+                if (EvidenceRule::hasFigure($plain)) {
+                    $figureBlocks++;
+                    if ($marks === []) {
+                        $uncited[] = QualityContext::excerpt($plain, 110);
+                    }
                 }
             }
         }
 
         $cited = array_values(array_unique($cited));
+        $ok = $figureBlocks === 0 || count($uncited) / $figureBlocks <= 0.5; // chú thích thưa: ít nhất một nửa số đoạn có số liệu kèm đơn vị phải có dấu trích
         $valid = $cited === [] ? [] : KnowledgeItem::query()->whereIn('id', $cited)->where('status', 'approved')->whereIn('brain_id', $ids)->pluck('id')->map(fn ($i) => (int) $i)->all();
         $bad = array_values(array_diff($cited, $valid));
 
@@ -92,10 +98,10 @@ class CitationRule implements QualityRule
                 ? 'Mọi dấu [KB#id] trong bài trỏ tới mục kiến thức đã duyệt của Trí tuệ ('.count($cited).' mục được trích).'
                 : 'Bài trích '.count($bad).' mục không tồn tại, chưa duyệt hoặc không thuộc Trí tuệ của bài: KB#'.implode(', KB#', array_slice($bad, 0, 6)).'. Bỏ hoặc thay bằng mục kho đã duyệt.',
                 count($bad).' mục sai', '0 mục sai'),
-            new RuleResult('CITE01', RuleResult::P1, $uncited === [], 'Mỗi khẳng định có dấu trích dẫn', $uncited === []
+            new RuleResult('CITE01', RuleResult::P1, $ok, 'Mỗi khẳng định có dấu trích dẫn', $ok
                 ? ($claimBlocks === 0 ? 'Không phát hiện đoạn khẳng định cần trích dẫn (kiểm sơ bộ theo từ khóa và số liệu, không thay chuyên gia).' : 'Cả '.$claimBlocks.' đoạn có khẳng định đều mang dấu trích dẫn [KB#id].')
-                : 'Trí tuệ bắt buộc nguồn: '.count($uncited).'/'.$claimBlocks.' đoạn có khẳng định chưa có dấu [KB#id]. Thêm trích dẫn từ kho đã duyệt hoặc bỏ khẳng định. Ví dụ: "'.implode('"; "', array_slice($uncited, 0, 2)).'"',
-                count($uncited).'/'.$claimBlocks.' đoạn thiếu', '0 đoạn thiếu', $uncited[0] ?? null, array_slice($uncited, 0, self::MAX_DETAILS)),
+                : 'Trí tuệ bắt buộc nguồn: '.count($uncited).'/'.$figureBlocks.' đoạn có số liệu kèm đơn vị chưa có dấu [KB#id] (cần ít nhất một nửa số đoạn đó có dấu). Thêm trích dẫn từ kho đã duyệt hoặc bỏ khẳng định. Ví dụ: "'.implode('"; "', array_slice($uncited, 0, 2)).'"',
+                count($uncited).'/'.$figureBlocks.' đoạn có số liệu thiếu', '0 đoạn thiếu', $uncited[0] ?? null, array_slice($uncited, 0, self::MAX_DETAILS)),
         ];
     }
 }

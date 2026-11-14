@@ -70,9 +70,17 @@ class CitationRuleTest extends TestCase
 
         $this->assertArrayHasKey('CITE01:fail', $r);
         $this->assertSame('P1', $r['CITE01:fail']->severity);
-        $this->assertStringContainsString('1/2 đoạn', $r['CITE01:fail']->message);
+        $this->assertStringContainsString('1/1 đoạn có số liệu kèm đơn vị', $r['CITE01:fail']->message);
         $this->assertStringContainsString('HbA1c từ 6,5%', $r['CITE01:fail']->message);
         $this->assertArrayHasKey('CITE02:ok', $r);
+    }
+
+    public function test_chu_thich_thua_doan_giai_thich_chung_khong_so_lieu_khong_bi_co(): void
+    {
+        $i = $this->item();
+        $r = $this->codes("<p>Theo khuyến cáo, người bệnh nên theo dõi và điều trị theo chỉ định của bác sĩ điều trị.</p><p>Ngưỡng chẩn đoán là HbA1c từ 6,5% trở lên. [KB#{$i->id}]</p>");
+
+        $this->assertArrayHasKey('CITE01:ok', $r, 'Đoạn giải thích chung không có số liệu không cần dấu trích; đoạn có số liệu đã có dấu.');
     }
 
     public function test_dau_kb_gia_chua_duyet_hoac_thuoc_tri_tue_khac_bi_chan_p0(): void
