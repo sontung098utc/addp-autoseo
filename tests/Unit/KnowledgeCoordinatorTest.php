@@ -88,4 +88,15 @@ class KnowledgeCoordinatorTest extends TestCase
         $this->assertStringContainsString('Dinh dưỡng cho người tiểu đường', $prompt);
         $this->assertStringNotContainsString('ĐÃ được đề xuất', KnowledgeCoordinator::systemPrompt('n', 'k'));
     }
+
+    public function test_suy_nguoc_len_linh_vuc_rong_kem_cac_mang_kho_nen_bao_quat(): void
+    {
+        $prompt = KnowledgeCoordinator::systemPrompt('n', 'k');
+        $this->assertStringContainsString('SUY NGƯỢC', $prompt);
+        $this->assertStringContainsString('Công nghiệp dược', $prompt);
+        $this->assertStringContainsString('covers', $prompt);
+        $r = (new KnowledgeCoordinator(new AiJson($this->ai(['brain_id' => null, 'field' => 'Công nghiệp dược', 'recurring' => true, 'covers' => ['Thiết bị sản xuất', 'GMP và thẩm định', 'Thiết bị sản xuất', '', 'Kiểm soát chất lượng']]))))->classify('máy dập viên', []);
+        $this->assertSame('Công nghiệp dược', $r['field']);
+        $this->assertSame(['Thiết bị sản xuất', 'GMP và thẩm định', 'Kiểm soát chất lượng'], $r['covers'], 'Bỏ trùng và rỗng.');
+    }
 }

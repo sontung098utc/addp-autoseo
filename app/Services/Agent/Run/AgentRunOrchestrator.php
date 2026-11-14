@@ -1008,8 +1008,8 @@ final class AgentRunOrchestrator
                 report($e);
             }
             $this->step($run, 'research', 'system', 'warn', 'Đề xuất lập Trí tuệ cho lĩnh vực «'.$r['field'].'»',
-                'Chủ đề chưa thuộc Trí tuệ nào đang có và lĩnh vực này sẽ còn lặp lại: nên lập Trí tuệ riêng để các bài sau có nền kiến thức duyệt sẵn. Hệ thống KHÔNG tự lập kho; việc này do người dùng quyết định (đã ghi vào Gợi ý cho kho). Bài này vẫn viết từ các nguồn tìm được. '.$r['reason'],
-                $base + ['suggestion' => ['type' => 'new_brain', 'field' => $r['field']]], $r['model'], $r['tokens'], $r['cost']);
+                'Chủ đề chưa thuộc Trí tuệ nào đang có và lĩnh vực rộng này («'.$r['field'].'»'.($r['covers'] !== [] ? ', bao quát: '.implode('; ', array_slice($r['covers'], 0, 6)) : '').') sẽ còn lặp lại: nên lập Trí tuệ riêng để các bài sau có nền kiến thức duyệt sẵn. Hệ thống KHÔNG tự lập kho; việc này do người dùng quyết định (đã ghi vào Gợi ý cho kho). Bài này vẫn viết từ các nguồn tìm được. '.$r['reason'],
+                $base + ['suggestion' => ['type' => 'new_brain', 'field' => $r['field'], 'covers' => $r['covers']]], $r['model'], $r['tokens'], $r['cost']);
 
             return;
         }

@@ -58,10 +58,12 @@ class ArticleKbActivityTest extends TestCase
         $html = $this->get(ArticleResource::getUrl('view', ['record' => $this->article]))->getContent();
         $this->assertStringContainsString('chưa nạp hay tạo gì cho kho', $html);
 
-        $this->run_([['warn', 'Đề xuất lập Trí tuệ cho lĩnh vực «Máy dập viên»', ['purpose' => 'kb_coordination', 'suggestion' => ['type' => 'new_brain', 'field' => 'Máy dập viên']]]]);
+        $this->run_([['warn', 'Đề xuất lập Trí tuệ cho lĩnh vực «Máy dập viên»', ['purpose' => 'kb_coordination', 'suggestion' => ['type' => 'new_brain', 'field' => 'Máy dập viên', 'covers' => ['Thiết bị sản xuất', 'GMP và thẩm định']]]]]);
         $html2 = $this->get(ArticleResource::getUrl('view', ['record' => $this->article]))->getContent();
         $this->assertStringContainsString('Đề xuất lập Trí tuệ cho lĩnh vực «Máy dập viên»', $html2);
         $this->assertStringContainsString('data-testid="aw-kb-suggest"', $html2);
+        $this->assertStringContainsString('data-testid="aw-kb-create"', $html2);
+        $this->assertStringContainsString('nên bao quát: Thiết bị sản xuất · GMP và thẩm định', $html2);
     }
 
     public function test_nguon_ai_neu_co_lien_ket_khi_khop_va_canh_bao_khi_khong(): void

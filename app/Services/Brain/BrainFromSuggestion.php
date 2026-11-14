@@ -32,12 +32,13 @@ final class BrainFromSuggestion
     public function create(Website $site, string $field, ?Article $article, ?User $by): array
     {
         $field = trim(mb_substr(strip_tags($field), 0, 160));
-        $template = BrainTemplates::suggestFor($field);
+        $covers = $article ? $this->coversOf($article, $field) : [];
+        $template = BrainTemplates::suggestFor($field.' '.implode(' ', $covers));
         $brain = (new BrainService)->createFromTemplate($field, $template, [$site], $by);
 
         $refs = $article ? $this->referencesOf($article) : [];
         $plan = $article ? $this->planOf($article) : [];
-        $topics = $this->direction($brain, $article, $plan);
+        $topics = $this->direction($brain, $article, $plan, $covers);
 
         $res = ['brain' => $brain->fresh(), 'template' => $template, 'topics' => $topics, 'imported' => 0, 'items_auto' => 0, 'items_proposed' => 0, 'sources' => [], 'registered' => 0, 'seed_error' => null];
         $trusted = [];
@@ -93,6 +94,21 @@ final class BrainFromSuggestion
         return trim($t);
     }
 
+    /** Các mảng điều phối đề xuất kho nên bao quát cho lĩnh vực này (suy ngược từ chủ đề lên lĩnh vực), lấy từ bước điều phối của các phiên gần nhất. @return list<string> */
+    private function coversOf(Article $article, string $field): array
+    {
+        foreach (AgentRun::query()->where('article_id', $article->id)->with('steps')->orderByDesc('id')->limit(5)->get() as $run) {
+            foreach ($run->steps->where('stage', 'research') as $st) {
+                $sg = ((array) $st->data)['suggestion'] ?? null;
+                if (is_array($sg) && mb_strtolower((string) ($sg['field'] ?? '')) === mb_strtolower($field) && ! empty($sg['covers'])) {
+                    return array_values(array_filter(array_map(fn ($c) => trim(mb_substr((string) $c, 0, 60)), (array) $sg['covers'])));
+                }
+            }
+        }
+
+        return [];
+    }
+
     /** Tài liệu web (url, tiêu đề) mà các phiên gần nhất của bài đã tìm được. @return list<array{url:string,title:string}> */
     private function referencesOf(Article $article): array
     {
@@ -125,15 +141,22 @@ final class BrainFromSuggestion
     }
 
     /** Ghi định hướng xây kho vào Trí tuệ: mô tả, thiết lập và cây chủ đề từ dàn ý của bài. @return int số chủ đề đã tạo */
-    private function direction(Brain $brain, ?Article $article, array $plan): int
+    private function direction(Brain $brain, ?Article $article, array $plan, array $covers = []): int
     {
         if (! $article) {
             return 0;
         }
+        $made = 0;
+        foreach (array_slice($covers, 0, 10) as $c) { // định hướng của LĨNH VỰC: các mảng kho nên bao quát (không chỉ riêng chủ đề của bài)
+            if ($c !== '' && ! KnowledgeTopic::query()->where('brain_id', $brain->id)->whereNull('parent_id')->where('name', $c)->exists()) {
+                KnowledgeTopic::create(['brain_id' => $brain->id, 'name' => $c]);
+                $made++;
+            }
+        }
         $questions = array_values(array_filter(array_map('strval', array_slice((array) ($plan['questions'] ?? []), 0, 8))));
         $brain->update([
-            'description' => trim(mb_substr((string) $brain->description.' Lập từ gợi ý khi viết bài «'.$article->primary_keyword.'»'.(($plan['angle'] ?? '') !== '' ? ': '.$plan['angle'] : '.'), 0, 600)),
-            'settings' => array_merge((array) $brain->settings, ['build_direction' => ['article_id' => $article->id, 'keyword' => (string) $article->primary_keyword, 'angle' => (string) ($plan['angle'] ?? ''), 'questions' => $questions]]),
+            'description' => trim(mb_substr((string) $brain->description.($covers !== [] ? ' Bao quát: '.implode('; ', array_slice($covers, 0, 8)).'.' : '').' Lập từ gợi ý khi viết bài «'.$article->primary_keyword.'»'.(($plan['angle'] ?? '') !== '' ? ': '.$plan['angle'] : '.'), 0, 700)),
+            'settings' => array_merge((array) $brain->settings, ['build_direction' => ['covers' => $covers, 'article_id' => $article->id, 'keyword' => (string) $article->primary_keyword, 'angle' => (string) ($plan['angle'] ?? ''), 'questions' => $questions]]),
         ]);
         $heads = [];
         foreach ((array) ($article->versions()->orderByDesc('version')->first()?->outline ?? []) as $o) {
@@ -145,13 +168,13 @@ final class BrainFromSuggestion
         }
         $names = array_values(array_unique($heads !== [] ? $heads : array_map(fn ($q) => mb_substr($q, 0, 120), $questions)));
         if ($names === []) {
-            return 0;
+            return $made;
         }
         $top = KnowledgeTopic::create(['brain_id' => $brain->id, 'name' => mb_substr('Từ bài «'.$article->primary_keyword.'»', 0, 120)]);
         foreach (array_slice($names, 0, 10) as $n) {
             KnowledgeTopic::create(['brain_id' => $brain->id, 'parent_id' => $top->id, 'name' => $n]);
         }
 
-        return min(10, count($names));
+        return $made + min(10, count($names));
     }
 }

@@ -1,14 +1,3 @@
-                                            @if (! empty($e['suggestion']))
-                                                <div style="font-size:.85em;margin-top:.35rem">
-                                                    @if ($canManageBrains)
-                                                        <x-filament::button size="xs" wire:click="createBrainFromSuggestion({{ \Illuminate\Support\Js::from($e['suggestion']['field'] ?? '') }})" wire:loading.attr="disabled" data-testid="aw-kb-create">Tạo Trí tuệ «{{ $e['suggestion']['field'] ?? '' }}» và nạp các nguồn đã tìm</x-filament::button>
-                                                        <span class="aw-muted">Dùng định hướng của bài này (dàn ý, câu hỏi nền) và nạp sẵn các nguồn tin cậy bài đã tìm. Có thể mất 1–3 phút.</span>
-                                                    @else
-                                                        <span class="aw-muted">Cần quyền sửa Kho trí tuệ để tạo.</span>
-                                                    @endif
-                                                    @if ($buildPage)<a class="aw-link" data-testid="aw-kb-suggest" href="{{ \App\Filament\Pages\BrainBuildPage::getUrl() }}" style="margin-left:.5rem">hoặc tạo thủ công</a>@endif
-                                                </div>
-                                            @endif
 @php
     use App\Filament\Pages\BrainLibraryPage;
     use App\Filament\Pages\BrainPage;
@@ -538,8 +527,19 @@
                                                     </ul>
                                                 </details>
                                             @endif
-                                            @if (! empty($e['suggestion']) && $buildPage)
-                                                <div style="font-size:.85em"><a class="aw-link" data-testid="aw-kb-suggest" href="{{ \App\Filament\Pages\BrainBuildPage::getUrl() }}">Mở trang Xây kho để tạo Trí tuệ «{{ $e['suggestion']['field'] ?? '' }}»</a></div>
+                                            @if (! empty($e['suggestion']['covers']))
+                                                <div class="aw-muted" style="font-size:.85em" data-testid="aw-kb-covers">Lĩnh vực rộng này nên bao quát: {{ implode(' · ', array_slice($e['suggestion']['covers'], 0, 10)) }}</div>
+                                            @endif
+                                            @if (! empty($e['suggestion']))
+                                                <div style="font-size:.85em;margin-top:.35rem">
+                                                    @if ($canManageBrains)
+                                                        <x-filament::button size="xs" wire:click="createBrainFromSuggestion({{ \Illuminate\Support\Js::from($e['suggestion']['field'] ?? '') }})" wire:loading.attr="disabled" data-testid="aw-kb-create">Tạo Trí tuệ «{{ $e['suggestion']['field'] ?? '' }}» và nạp các nguồn đã tìm</x-filament::button>
+                                                        <span class="aw-muted">Dùng định hướng của bài này (dàn ý, câu hỏi nền) và nạp sẵn các nguồn tin cậy bài đã tìm. Có thể mất 1–3 phút.</span>
+                                                    @else
+                                                        <span class="aw-muted">Cần quyền sửa Kho trí tuệ để tạo.</span>
+                                                    @endif
+                                                    @if ($buildPage)<a class="aw-link" data-testid="aw-kb-suggest" href="{{ \App\Filament\Pages\BrainBuildPage::getUrl() }}" style="margin-left:.5rem">hoặc tạo thủ công</a>@endif
+                                                </div>
                                             @endif
                                         </li>
                                     @endforeach
