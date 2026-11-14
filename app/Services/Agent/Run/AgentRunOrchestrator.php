@@ -494,7 +494,7 @@ final class AgentRunOrchestrator
         $passed = ! $report->hasBlocking();
         // Dấu [KB#id] chỉ để máy kiểm tra: bản lưu cho người đọc dùng chú thích số + khối Nguồn tham khảo (vẫn mang data-kb để chấm lại được).
         if (isset($attrs['html_content']) && is_string($attrs['html_content'])) {
-            $attrs['html_content'] = ReferenceListRenderer::apply(CitationRenderer::render($attrs['html_content'], $this->kbTitlesVi), $this->references, $this->referencesForList());
+            $attrs['html_content'] = \App\Services\Content\CitationOrder::normalize(ReferenceListRenderer::apply(CitationRenderer::render($attrs['html_content'], $this->kbTitlesVi), $this->references, $this->referencesForList()));
         }
         $version = $this->persist($article, $attrs, $passed);
         $run->update(['final_version_id' => $version->id]);
