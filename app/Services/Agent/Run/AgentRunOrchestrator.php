@@ -577,7 +577,7 @@ final class AgentRunOrchestrator
             $dai = $this->roleOff('strategist') ? null : $this->strategistAi();
             if ($dai !== null) {
                 // Họa viên làm việc như người thiết kế: yêu cầu ảnh phải nêu mục đích và giá trị, rồi mới thiết kế (lỗi AI thì dùng kế hoạch theo luật như cũ).
-                $designer = new \App\Services\Images\ImageDesigner(new AiJson($dai, $this->sleep, 1));
+                $designer = new \App\Services\Images\ImageDesigner(new AiJson($dai, $this->sleep)); // thử lại như các bước AI khác: lỗi tạm thời của nhà cung cấp không được làm mất thiết kế ảnh
                 $maxInline = max(0, min((int) config('agent.images.max_inline', 2), 3));
                 $b = $designer->brief($article, \App\Services\Images\ImagePlanner::candidates($outline), $maxInline, $libraryCover, (string) ($this->contentPlan['angle'] ?? ''));
                 $this->imageDesign = ['brief' => $b];

@@ -119,7 +119,11 @@ final class ImagePlanner
             if (preg_match(self::SKIP_HEADINGS, Str::lower(Str::ascii($heading)))) {
                 continue;
             }
-            $usable[] = ['order' => $order, 'heading' => $heading, 'purpose' => is_array($o) ? trim((string) ($o['purpose'] ?? '')) : '', 'hint' => is_array($o) ? self::hint($o) : null];
+            $purpose = is_array($o) ? trim((string) ($o['purpose'] ?? '')) : '';
+            if ($purpose === '' && preg_match('/^(.{3,120}?)\s+[—–-]\s+(.+)$/u', $heading, $hm)) { // dàn ý dạng "Tiêu đề — một câu ý mục": tách để tiêu đề không dính câu ý
+                [$heading, $purpose] = [trim($hm[1]), trim($hm[2])];
+            }
+            $usable[] = ['order' => $order, 'heading' => $heading, 'purpose' => $purpose, 'hint' => $purpose !== '' ? $purpose : (is_array($o) ? self::hint($o) : null)];
         }
 
         return $usable;

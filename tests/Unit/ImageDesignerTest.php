@@ -104,4 +104,13 @@ class ImageDesignerTest extends TestCase
         $this->assertSame('not_run', (new ImageDesigner(new AiJson($ai, null, 0)))->brief($this->article(), ImagePlanner::candidates($this->outline), 2, false)['status']);
         $this->assertStringContainsString('no watermark', ImagePromptBuilder::finish('x'));
     }
+
+    public function test_dan_y_dang_tieu_de_gach_y_duoc_tach_de_tieu_de_khong_dinh_cau_y(): void
+    {
+        $c = ImagePlanner::candidates([['level' => 'H2', 'heading' => 'Máy một chày khác máy nhiều chày thế nào — Giải thích cơ chế nén của hai dòng máy cho người chọn mua.']]);
+        $this->assertSame('Máy một chày khác máy nhiều chày thế nào', $c[0]['heading']);
+        $this->assertStringStartsWith('Giải thích cơ chế nén', $c[0]['purpose']);
+        $plan = ImagePlanner::plan($this->article(), [['level' => 'H2', 'heading' => 'Uống nước — Lượng nước mỗi ngày.']], ['brand' => null]);
+        $this->assertSame('Uống nước', $plan['slots'][1]['section_heading']);
+    }
 }
