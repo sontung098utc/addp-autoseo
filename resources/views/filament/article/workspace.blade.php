@@ -535,22 +535,6 @@
                                 </ul>
                             @endif
                         </section>
-                        @if ($citedSources !== [])
-                            <section class="ss-review-card" data-testid="aw-cited-sources">
-                                <h2 class="ss-review-card__title">Nguồn AI nêu trong bài</h2>
-                                <ul class="aw-list">
-                                    @foreach ($citedSources as $c)
-                                        <li>
-                                            @if ($c['url'])
-                                                <a class="aw-link" href="{{ $c['url'] }}" target="_blank" rel="noopener noreferrer">{{ $c['name'] }}</a>
-                                            @else
-                                                {{ $c['name'] }} <span class="aw-muted" data-testid="aw-cited-nolink">· chưa có liên kết xác thực: AI nêu tên nhưng hệ thống chưa gắn được trang gốc, cần người xem kiểm tra</span>
-                                            @endif
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            </section>
-                        @endif
                         @if (! empty($webSources))
                             <section class="ss-review-card" data-testid="aw-web-sources">
                                 <h2 class="ss-review-card__title">Nguồn web đã đọc cho bài này</h2>
@@ -604,7 +588,19 @@
                         @if ($sources !== [] || $citable !== [])
                         <section class="ss-review-card" data-testid="aw-sources">
                             <h2 class="ss-review-card__title">Nguồn AI nêu trong bài @if ($sources !== [])<x-help tone="warning" title="Cần kiểm trước khi đăng"><p>Các nguồn này do AI tự nêu, hệ thống chưa kiểm chứng. Người duyệt cần kiểm trước khi đăng.</p></x-help>@endif</h2>
-                            @if ($sources !== [])
+                            @if ($citedSources !== [])
+                                <ul class="aw-list" data-testid="aw-cited-sources">
+                                    @foreach ($citedSources as $c)
+                                        <li>
+                                            @if ($c['url'])
+                                                <a class="aw-link" href="{{ $c['url'] }}" target="_blank" rel="noopener noreferrer">{{ $c['name'] }}</a>
+                                            @else
+                                                {{ $c['name'] }} <span class="aw-muted" data-testid="aw-cited-nolink">· chưa có liên kết xác thực: AI nêu tên nhưng hệ thống chưa gắn được trang gốc, cần người xem kiểm tra</span>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @elseif ($sources !== [])
                                 <ul class="aw-list">
                                     @foreach ($sources as $source)
                                         <li>{{ is_array($source) ? implode(' — ', array_map(fn ($v) => is_scalar($v) ? (string) $v : '', $source)) : (string) $source }}</li>
