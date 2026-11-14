@@ -155,7 +155,10 @@ final class AgentRunOrchestrator
     /** Luật mà người viết sửa bằng chữ không giải quyết được (ảnh được lắp sau khi chấm): không kích hoạt vòng sửa. */
     private const NOT_TEXT_FIXABLE = ['IMG01', 'IMG02'];
 
-    private bool $extraSearched = false;
+    /** Số lần tối đa điều phối cho tìm thêm tài liệu khi bài còn thiếu căn cứ (mỗi lần theo đúng các câu còn thiếu). */
+    private const MAX_EXTRA_SEARCHES = 3;
+
+    private int $extraSearches = 0;
 
     /** kho vẫn chưa có mục đã duyệt khớp sau khi tự chuẩn bị, chủ đề rủi ro cao: bài cần chuyên gia xem lại sau khi viết */
     private bool $needsExpert = false;
@@ -174,7 +177,7 @@ final class AgentRunOrchestrator
         $this->contentPlanText = null;
         $this->kbTitlesVi = [];
         $this->matchedBrainId = null;
-        $this->extraSearched = false;
+        $this->extraSearches = 0;
         $this->markT = microtime(true);
         $this->aiMs = 0.0;
         $this->trigger = $trigger;
@@ -1315,7 +1318,7 @@ final class AgentRunOrchestrator
 
     /**
      * ĐIỀU PHỐI sau khi chấm: nhìn các mục chưa đạt, quyết định cần làm gì (sửa đúng chỗ nào; có cần tìm thêm nguồn không), IN RA ở phần Quyết định tự động rồi trả chỉ dẫn cho người viết.
-     * Lỗi thiếu căn cứ (khẳng định chưa có nguồn) thì tìm thêm tài liệu cho đúng các câu đó MỘT LẦN mỗi phiên, tài liệu mới vào danh sách nguồn của người viết.
+     * Lỗi thiếu căn cứ (khẳng định chưa có nguồn) thì tìm thêm tài liệu cho đúng các câu đó tối đa 3 lần mỗi phiên, tài liệu mới vào danh sách nguồn của người viết.
      *
      * @return list<string> chỉ dẫn sửa cho người viết
      */
@@ -1335,15 +1338,15 @@ final class AgentRunOrchestrator
         }
         $searchNote = '';
         $evidence = array_filter($failed, fn ($r) => in_array($r->code, ['EVID01', 'FACT01', 'CITE01', 'CITE02'], true));
-        if ($evidence !== [] && ! $this->extraSearched && $this->spent($run) < $this->policy->budgetVnd && ($web = (new \App\Services\Search\WebSearchResolver)->availability())['ok'] && ! $web['demo']) {
-            $this->extraSearched = true;
+        if ($evidence !== [] && $this->extraSearches < self::MAX_EXTRA_SEARCHES && $this->spent($run) < $this->policy->budgetVnd && ($web = (new \App\Services\Search\WebSearchResolver)->availability())['ok'] && ! $web['demo']) {
+            $this->extraSearches++;
             $topics = array_map(fn ($g) => trim(mb_substr((string) $article->primary_keyword, 0, 60).' '.mb_substr(preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', (string) $g) ?? '', 0, 80)), array_slice(array_merge($report->citationGaps(), $report->supportGaps()), 0, 2));
             $added = $topics === [] ? 0 : $this->mergeReferences($topics, $article);
             $searchNote = $added > 0 ? " Đã tìm thêm {$added} tài liệu cho các câu thiếu căn cứ và đưa vào danh sách nguồn của người viết." : ' Đã thử tìm thêm tài liệu cho các câu thiếu căn cứ nhưng chưa có kết quả mới.';
         }
         $this->decision($run, 'fix_plan', 'Điều phối: chấm xong còn '.count($failed)." mục chưa đạt, yêu cầu người viết sửa (lần {$round})",
             'Cần sửa: '.implode('; ', array_slice(array_keys($asks), 0, 6)).'. Người viết chỉ sửa đúng các chỗ này trên bản đang giữ, giữ nguyên phần đã tốt.'.$searchNote,
-            ['round' => $round, 'failed_codes' => array_values(array_unique(array_map(fn ($r) => $r->code, $failed))), 'search_more' => $searchNote !== '']);
+            ['round' => $round, 'failed_codes' => array_values(array_unique(array_map(fn ($r) => $r->code, $failed))), 'search_more' => $searchNote !== '', 'routes' => $searchNote !== '' ? ['sources', 'writer'] : ['writer']]);
 
         return $feedback;
     }

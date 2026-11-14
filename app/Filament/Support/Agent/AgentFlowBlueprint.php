@@ -37,7 +37,7 @@ final class AgentFlowBlueprint
                 'what' => 'Lập dàn ý từ từ khóa và ý định tìm kiếm.',
                 'built' => 'Dùng generateOutline hiện có và nạp playbook brief (AG-K05) cho lượt thủ công; lượt tự động chỉ dùng playbook đã active. Vai trò Chiến lược tắt được ở tab Vai trò (bước này bị bỏ qua, chấm luật vẫn chạy).',
                 'dev1' => 'Playbook còn là bản nháp vì chưa chạy bộ mẫu với model thật; cần AiModelRouter chọn model theo loại việc (AG-B06).', 'task' => 'AG-B06'],
-            ['stage' => 'research', 'title' => 'Nghiên cứu', 'role' => 'Hệ thống', 'readiness' => 'in_development',
+            ['stage' => 'research', 'title' => 'Chuẩn bị tài liệu', 'role' => 'Hệ thống', 'readiness' => 'in_development',
                 'what' => 'Nạp kiến thức đã duyệt, ảnh, liên kết nội bộ, nguồn được trích và hồ sơ doanh nghiệp trước khi viết.',
                 'built' => 'Bước luật, không gọi AI; ghi số mục đã nạp và khoảng trống kiến thức. Kiểm ngân sách ngay sau bước này, trước bước viết.',
                 'dev1' => 'Chưa kiểm từng khẳng định có nguồn; luật kiểm nguồn nằm ở bước chấm.', 'task' => 'AG-G4'],

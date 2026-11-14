@@ -29,6 +29,10 @@
                     <div class="fg-group fg-group--{{ $grp['state'] }}" data-group="{{ $grp['id'] }}" style="left:{{ $grp['x'] }}px;top:{{ $grp['y'] }}px;width:{{ $grp['w'] }}px;height:{{ $grp['h'] }}px">
                         <div class="fg-group__head"><b>{{ $grp['title'] }}</b><small>{{ $grp['role'] }}</small><x-filament::icon :icon="$gIcon" class="fl-stico" :title="$gLabel" /></div>
                         @if ($grp['parallel'])<span class="fl-chip fg-par" data-testid="flow-parallel" title="Chạy cùng lúc, không chờ khối này xong">∥ song song với «{{ $grp['parallel'] }}»</span>@endif
+                        @foreach ($grp['items'] ?? [] as $line)
+                            <div class="fg-sub fg-sub--item" title="{{ $line }}"><x-filament::icon icon="heroicon-m-light-bulb" class="fl-ico" /><span class="fg-sub__name">{{ $line }}</span></div>
+                        @endforeach
+                        @if (($grp['total'] ?? 0) > 5)<div class="fg-more">+{{ $grp['total'] - 5 }} quyết định trước đó (xem phần Quyết định tự động)</div>@endif
                         @foreach ($grp['subs'] as $n)
                             @php
                                 [$stLabel, $stIcon] = RunFlow::STATE[$n['state']];
@@ -87,6 +91,10 @@
     .fg-sub__name{font-weight:600;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .fg-sub__st{font-size:.7rem;display:inline-flex;gap:.3rem;align-items:baseline;white-space:nowrap}.fg-sub__st em{font-style:normal;font-weight:500;opacity:.7}
     .fg-sub .fl-stico{width:1rem;height:1rem;flex:none}
+    .fg-sub--item{cursor:default;height:auto;min-height:30px;align-items:flex-start;padding-top:.3rem;padding-bottom:.3rem}.fg-sub--item .fg-sub__name{white-space:normal;line-height:1.25;font-weight:500;font-size:.76rem}.fg-sub--item:hover{background:transparent}
+    .fg-more{font-size:.66rem;opacity:.65;padding:.2rem .45rem}
+    .fg-group[data-group=coord]{border-color:#7c3aed;background:linear-gradient(180deg,rgba(124,58,237,.07),transparent 40%),var(--fl-card,#fff)}
+    .fg-group[data-group=coord] .fg-group__head b{color:#6d28d9}
     .fg-sub--idle,.fg-sub--pending,.fg-sub--skipped{opacity:.55}
     .fg-sub--done .fl-stico,.fg-sub--done .fl-state{color:#059669}.fg-sub--warn .fl-stico,.fg-sub--warn .fl-state{color:#d97706}.fg-sub--failed .fl-stico,.fg-sub--failed .fl-state{color:#dc2626}
     .fg-ping{margin-left:auto;width:.5rem;height:.5rem;border-radius:50%;background:#0284c7;animation:fl-ping 1.5s ease-out infinite}

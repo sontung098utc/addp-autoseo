@@ -17,7 +17,11 @@ final class FlowGraph
 
     private const IMG_W = 230;
 
-    private const LEFT = 84;
+    private const HUBX = 16;
+
+    private const HUB_W = 260;
+
+    private const LEFT = 430; // lề trái của trục chính (bên trái là khối Điều phối)
 
     private const TOP = 30;
 
@@ -69,13 +73,22 @@ final class FlowGraph
             $groups['checkpoint'] = self::group('checkpoint', 'Chờ bạn', 'Bạn', [$by['checkpoint']], self::LEFT + self::W + 120, $groups['prep']['y'], self::IMG_W);
         }
 
+        // ĐIỀU PHỐI: trung tâm nhận lỗi từ chấm rồi gọi người làm tiếp (sửa, tìm thêm nguồn). Liệt kê quyết định THẬT của phiên này.
+        $decisions = $steps->where('stage', 'decision')->sortBy('seq')->values();
+        $items = $decisions->slice(-5)->map(fn ($d) => trim(preg_replace('/^Điều phối( kho)?:\s*/u', '', (string) $d->title)))->values()->all();
+        $top = $groups['write']['y'];
+        $groups['coord'] = ['id' => 'coord', 'title' => 'Điều phối', 'role' => 'Quyết định của phiên', 'x' => self::HUBX, 'y' => $top, 'w' => self::HUB_W,
+            'h' => max($groups['review']['y'] + $groups['review']['h'] - $top, self::HEAD + max(1, count($items)) * self::ROW + self::PAD), 'state' => $decisions->isEmpty() ? 'idle' : 'done',
+            'ran' => $decisions->isNotEmpty(), 'subs' => [], 'items' => $items === [] ? ['Chưa có quyết định nào trong phiên này'] : $items, 'parallel' => null, 'total' => $decisions->count()];
+
         $ran = fn (string $g) => $groups[$g]['ran'];
         $moreSearch = $steps->contains(fn ($s) => $s->stage === 'decision' && (bool) (((array) $s->data)['search_more'] ?? false));
         $repairs = (int) ($by['repair']['count'] ?? 0);
         $spec = [
             ['prep', 'sources', null, 'main'], ['sources', 'strategy', null, 'main'], ['strategy', 'write', null, 'main'], ['strategy', 'images', 'song song', 'fork'],
-            ['write', 'review', null, 'main'], ['review', 'write', $repairs > 0 ? "chưa đạt · ↻ {$repairs} vòng sửa" : 'chưa đạt thì sửa lại', 'loop'],
-            ['review', 'finish', 'đạt', 'main'], ['images', 'finish', 'nhập lại', 'join'], ['review', 'sources', 'cần thêm nguồn', 'back'],
+            ['write', 'review', null, 'main'], ['review', 'coord', $repairs > 0 || $moreSearch ? 'báo lỗi chấm' : 'nếu chưa đạt: báo lỗi', 'loop'],
+            ['coord', 'write', $repairs > 0 ? "yêu cầu sửa · ↻ {$repairs} vòng" : 'yêu cầu sửa', 'loop'], ['coord', 'sources', 'bổ sung nguồn', 'back'],
+            ['review', 'finish', 'đạt', 'main'], ['images', 'finish', 'nhập lại', 'join'],
         ];
         if ($by->has('checkpoint')) {
             $spec[] = ['prep', 'checkpoint', 'chờ bạn', 'side'];
@@ -83,8 +96,8 @@ final class FlowGraph
         $edges = [];
         foreach ($spec as [$a, $b, $label, $kind]) {
             $state = match (true) {
-                $kind === 'back' => $moreSearch ? 'done' : 'idle',
-                $kind === 'loop' => $repairs > 0 ? 'loop' : 'idle',
+                $kind === 'back' => ($moreSearch || $decisions->contains(fn ($d) => (((array) $d->data)['decision'] ?? '') === 'kb_coordination')) ? 'done' : 'idle',
+                $kind === 'loop' => ($repairs > 0 || $moreSearch) ? 'loop' : 'idle',
                 $ran($a) && $ran($b) && $groups[$b]['state'] === 'running' => 'live',
                 $ran($a) && $ran($b) => 'done',
                 default => 'idle',
@@ -126,19 +139,20 @@ final class FlowGraph
         $acx = $A['x'] + $A['w'] / 2;
         $bcx = $B['x'] + $B['w'] / 2;
 
-        if ($kind === 'loop') { // Biên tập và chấm → Viết và sửa: đi vòng bên phải, vào mép phải khối Viết
-            $x = $A['x'] + $A['w'] + 38;
-            $ya = $A['y'] + $A['h'] / 2;
-            $yb = $B['y'] + $B['h'] / 2;
+        if ($kind === 'loop') { // Biên tập và chấm → Điều phối (báo lỗi) và Điều phối → Viết và sửa (yêu cầu sửa): hai đường ngang vào/ra mép trái trục chính
+            if ($A['id'] === 'review') {
+                $y = $A['y'] + $A['h'] - 22;
 
-            return ['d' => 'M'.($A['x'] + $A['w'])." {$ya}H{$x}V{$yb}H".($B['x'] + $B['w']), 'lx' => (int) $x, 'ly' => (int) (($ya + $yb) / 2)];
+                return ['d' => "M{$A['x']} {$y}H".($B['x'] + $B['w']), 'lx' => (int) (($A['x'] + $B['x'] + $B['w']) / 2), 'ly' => (int) $y - 14];
+            }
+            $y = $B['y'] + 26;
+
+            return ['d' => 'M'.($A['x'] + $A['w'])." {$y}H{$B['x']}", 'lx' => (int) (($A['x'] + $A['w'] + $B['x']) / 2), 'ly' => (int) $y - 14];
         }
-        if ($kind === 'back') { // lên khe giữa hai khối, sang lề trái, lên ngang Kho và nguồn rồi vào từ bên trái
-            $x0 = self::LEFT - 26;
-            $gapY = $A['y'] - self::GAP / 2;
+        if ($kind === 'back') { // Điều phối → Kho và nguồn: lên từ đỉnh khối điều phối rồi sang mép trái khối Kho và nguồn
             $yb = $B['y'] + $B['h'] / 2;
 
-            return ['d' => 'M'.($A['x'] + 40)." {$A['y']}V{$gapY}H{$x0}V{$yb}H{$B['x']}", 'lx' => (int) $x0 + 4, 'ly' => (int) (($gapY + $yb) / 2)];
+            return ['d' => 'M'.($A['x'] + $A['w'] / 2)." {$A['y']}V{$yb}H{$B['x']}", 'lx' => (int) (($A['x'] + $A['w'] / 2 + $B['x']) / 2), 'ly' => (int) $yb - 14];
         }
         if ($kind === 'fork') { // song song: từ mép phải khối chiến lược sang rồi xuống đỉnh khối ảnh
             $ya = $A['y'] + $A['h'] - 18;
