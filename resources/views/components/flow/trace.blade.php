@@ -13,17 +13,17 @@
         const svg = this.$refs.arcs; svg.querySelectorAll('.ft-arc').forEach(n => n.remove()); const items = []; const co = c.querySelector('[data-coord]'); if (!co) { this.items = []; return; }
         const xr = co.getBoundingClientRect().right - cr.left; const slot = {}; const occ = {}; let back = 0;
         const card = (g) => c.querySelector('[data-card=&quot;' + g + '&quot;]');
-        const mk = (d, kind) => { const el = document.createElementNS('http://www.w3.org/2000/svg', 'path'); el.setAttribute('d', d); el.setAttribute('fill', 'none'); el.setAttribute('class', 'ft-arc ft-arc--' + kind); el.setAttribute('marker-end', 'url(#ft-ar-' + kind + ')'); el.setAttribute('data-testid', 'flow-arc'); svg.appendChild(el); };
+        const mk = (d, kind, live) => { const el = document.createElementNS('http://www.w3.org/2000/svg', 'path'); el.setAttribute('d', d); el.setAttribute('fill', 'none'); el.setAttribute('class', 'ft-arc ft-arc--' + kind + (live ? ' ft-arc--live' : '')); el.setAttribute('marker-end', 'url(#ft-ar-' + kind + ')'); el.setAttribute('data-testid', 'flow-arc'); svg.appendChild(el); };
         E.forEach((e, idx) => {
             if (e.dir === 'give' || e.dir === 'report') { const cd = card(e.card); if (!cd) return; const r = cd.getBoundingClientRect(); const xl = r.left - cr.left;
                 const s = slot[e.card] = (slot[e.card] ?? -1) + 1; const y = r.top - cr.top + 50 + s * 24; const give = e.dir === 'give'; const kind = give ? 'give' : (['warn', 'failed', 'blocked'].includes(e.state) ? 'warn' : 'report');
-                mk(give ? ('M' + xr + ' ' + y + 'H' + (xl - 1)) : ('M' + xl + ' ' + y + 'H' + (xr + 1)), kind);
-                items.push({ k: idx, n: e.n, x: give ? xr + 16 : xl - 16, mx: xr + 34, y: y, label: (give ? 'giao: ' : 'báo: ') + e.label, kind: kind }); return; }
+                mk(give ? ('M' + xr + ' ' + y + 'H' + (xl - 1)) : ('M' + xl + ' ' + y + 'H' + (xr + 1)), kind, !!e.live);
+                items.push({ k: idx, n: e.n, x: give ? xr + 16 : xl - 16, mx: xr + 34, y: y, label: (give ? 'giao: ' : 'báo: ') + e.label, kind: kind, live: !!e.live }); return; }
             const A = card(e.from), B = card(e.to); if (!A || !B) return; const ar = A.getBoundingClientRect(), br = B.getBoundingClientRect();
             if (e.dir === 'direct') {
                 const order = [...c.querySelectorAll('[data-card]')].map(n => n.getAttribute('data-card')).filter(g => g !== 'images'); const ia = order.indexOf(e.from), ib = order.indexOf(e.to);
                 if (ib === ia + 1) { const key = e.from + '>' + e.to; const o = occ[key] = (occ[key] ?? -1) + 1; const x = ar.left - cr.left + ar.width / 2 + (((o + 1) >> 1) * 30) * (o % 2 ? 1 : -1); const y1 = ar.bottom - cr.top, y2 = br.top - cr.top;
-                    mk('M' + x + ' ' + y1 + 'V' + (y2 - 1), 'direct'); items.push({ k: idx, n: e.n, x: x, y: (y1 + y2) / 2, mx: x + 30, label: null, kind: 'direct' }); return; }
+                    mk('M' + x + ' ' + y1 + 'V' + (y2 - 1), 'direct', !!e.live); items.push({ k: idx, n: e.n, x: x, y: (y1 + y2) / 2, mx: x + 30, label: null, kind: 'direct', live: !!e.live }); return; }
                 /* Quay ngược hoặc nhảy cách: KHÔNG vẽ xuyên qua các thẻ ở giữa mà đi vòng ra lề phải, mỗi đường một làn riêng */
                 const lane = back++; const xm = Math.max(ar.right, br.right) - cr.left + 16 + lane * 17; const up = ib < ia;
                 const y1 = up ? ar.top - cr.top + 30 : ar.bottom - cr.top - 16, y2 = up ? br.bottom - cr.top - 16 : br.top - cr.top + 30;
@@ -44,7 +44,7 @@
         </defs>
     </svg>
     <template x-for="it in items" :key="'b' + it.k">
-        <span :class="'ft-badge ft-badge--' + it.kind" :style="'left:' + it.x + 'px;top:' + it.y + 'px'"><b x-text="it.n"></b></span>
+        <span :class="'ft-badge ft-badge--' + it.kind + (it.live ? ' ft-badge--live' : '')" :style="'left:' + it.x + 'px;top:' + it.y + 'px'"><b x-text="it.n"></b></span>
     </template>
     <template x-for="it in items.filter(i => i.label || i.sub)" :key="'l' + it.k">
         <span :class="'ft-chip ft-chip--' + it.kind" :style="'left:' + (it.kind === 'par' ? it.x - 40 : (it.kind === 'direct' ? it.x : it.mx)) + 'px;top:' + (it.kind === 'par' ? it.y - 16 : it.y) + 'px'" x-text="it.label || it.sub"></span>
@@ -76,7 +76,7 @@
                 @php [$gLabel, $gIcon] = RunFlow::STATE[$h['state']]; @endphp
                 <div class="ft-hop ft-hop--{{ $h['state'] }}" data-group="{{ $h['group'] }}" data-card="{{ $h['group'] }}" style="min-height:{{ $h['minh'] }}px;grid-column:{{ $h['group'] === 'images' ? 2 : 1 }};grid-row:{{ $rowOf[$h['group']] }}">
                     @if ($h['parallel'])<span class="fl-chip ft-par" data-testid="flow-parallel">∥ song song với «{{ $h['parallel'] }}»</span>@endif
-                    <div class="ft-hop__head"><b>{{ $h['title'] }}</b><small>{{ $h['role'] }}</small>@if ($h['visits'] > 1)<span class="ft-visits" title="Số lần điều phối giao việc cho bộ phận này">↻ {{ $h['visits'] }} lần</span>@endif<x-filament::icon :icon="$gIcon" class="fl-stico" :title="$gLabel" /></div>
+                    <div class="ft-hop__head"><b>{{ $h['title'] }}</b>@if ($h['state'] === 'running')<span class="fg-run fg-run--head"><i></i>ĐANG CHẠY</span>@endif<small>{{ $h['role'] }}</small>@if ($h['visits'] > 1)<span class="ft-visits" title="Số lần điều phối giao việc cho bộ phận này">↻ {{ $h['visits'] }} lần</span>@endif<x-filament::icon :icon="$gIcon" class="fl-stico" :title="$gLabel" /></div>
                     @foreach ($h['subs'] as $n)
                         @php
                             [$stLabel, $stIcon] = RunFlow::STATE[$n['state']];
@@ -89,7 +89,7 @@
                                 <x-filament::icon :icon="$icon" class="fl-ico" />
                                 <span class="fg-sub__name">{{ $n['title'] }}</span>
                                 @if ($n['state'] === 'waiting')<span class="fl-wait-pill" data-testid="flow-waiting">Chờ bạn</span>
-                                @elseif ($n['state'] === 'running')<span class="fg-ping"></span>
+                                @elseif ($n['state'] === 'running')<span class="fg-run"><i></i>Đang chạy</span>
                                 @else<span class="fg-sub__st fl-state">{{ $stLabel }}@if ($n['count'] > 1) ×{{ $n['count'] }}@endif @if ($n['seconds'] !== null)<em>{{ $n['seconds'] }}s</em>@endif</span><x-filament::icon :icon="$stIcon" class="fl-stico" :title="$stLabel" />@endif
                             </span>
                             @if ($n['summary'])<span class="fg-sub__sum" data-testid="step-summary">{{ $n['summary'] }}</span>@endif
@@ -143,6 +143,22 @@
     .fg-legend{display:flex;flex-wrap:wrap;gap:.9rem;margin-top:.8rem;font-size:.68rem;opacity:.75}
     .fg-legend span{display:inline-flex;align-items:center;gap:.3rem}
     .fg-sw{display:inline-block;width:1.3rem;height:0;border-top:3px solid #94a3b8}.fg-sw--done{border-color:#059669}.fg-sw--loop{border-color:#7c3aed}.fg-sw--back{border-color:#d97706}
+
+    /* Hiệu ứng ĐANG CHẠY: viền thẻ có vệt sáng chạy quanh, dòng bước nhấp nháy có nhãn, đường dẫn tới bước đang chạy có nét đứt chạy theo hướng mũi tên */
+    @property --fl-a{syntax:"<angle>";inherits:false;initial-value:0deg}
+    @keyframes ft-orbit{to{--fl-a:360deg}}
+    @keyframes ft-flow{to{stroke-dashoffset:-20}}
+    @keyframes ft-glow{0%,100%{box-shadow:0 0 0 0 rgba(2,132,199,.45)}50%{box-shadow:0 0 0 6px rgba(2,132,199,0)}}
+    @keyframes ft-blink{0%,100%{opacity:1}50%{opacity:.35}}
+    .ft-hop--running{border:2px solid transparent;background:linear-gradient(var(--fl-card,#fff),var(--fl-card,#fff)) padding-box,conic-gradient(from var(--fl-a),rgba(2,132,199,.12) 0,#0284c7 18%,rgba(2,132,199,.12) 40%,rgba(2,132,199,.12) 60%,#38bdf8 78%,rgba(2,132,199,.12) 100%) border-box;animation:ft-orbit 2.2s linear infinite}
+    .fg-sub--running{background:rgba(2,132,199,.10);box-shadow:inset 3px 0 0 #0284c7;animation:ft-glow 1.6s ease-out infinite}
+    .fg-run{margin-left:auto;display:inline-flex;align-items:center;gap:.35rem;font-size:.68rem;font-weight:800;color:#0369a1;white-space:nowrap}
+    .fg-run i{width:.55rem;height:.55rem;border-radius:50%;background:#0284c7;animation:ft-blink 1s ease-in-out infinite}
+    .ft-hop--running .ft-hop__head small{display:none}
+    .fg-run--head{margin-left:.4rem;padding:.02rem .5rem;border-radius:999px;background:rgba(2,132,199,.14)}
+    .ft-arc--live{stroke:#0284c7 !important;stroke-width:3.2;stroke-dasharray:9 7 !important;animation:ft-flow .55s linear infinite}
+    .ft-badge--live b{background:#0284c7 !important;animation:ft-glow 1.4s ease-out infinite}
+    @media (prefers-reduced-motion:reduce){.ft-hop--running,.fg-sub--running,.fg-run i,.ft-arc--live,.ft-badge--live b{animation:none}}
     @media (max-width:900px){.ft-cards{grid-template-columns:1fr}.ft-cards>*{grid-column:1 !important;grid-row:auto !important}.ft-grid{grid-template-columns:1fr}.ft-gap{display:none}.ft-coord__in{position:static;max-height:none}.ft-arcs,.ft-badge,.ft-chip{display:none}}
 </style>
 @endonce

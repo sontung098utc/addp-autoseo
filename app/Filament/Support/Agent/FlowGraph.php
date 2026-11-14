@@ -138,10 +138,10 @@ final class FlowGraph
             $b = $hops[$ib];
             if ($b['decisions'] !== []) { // có quyết định của điều phối giữa hai lượt: đi qua điều phối
                 $events[] = ['n' => ++$n, 'card' => $a['group'], 'dir' => 'report', 'label' => $info[$ia]['report'], 'state' => $info[$ia]['state'], 'hop' => $ia];
-                $events[] = ['n' => ++$n, 'card' => $b['group'], 'dir' => 'give', 'label' => self::short($b['decisions'][0]['title'], 40), 'state' => 'give', 'hop' => $ib];
+                $events[] = ['n' => ++$n, 'card' => $b['group'], 'dir' => 'give', 'label' => self::short($b['decisions'][0]['title'], 40), 'state' => 'give', 'hop' => $ib, 'live' => (bool) $b['running']];
                 $giveNo[$ib] = $n;
             } else {
-                $events[] = ['n' => ++$n, 'from' => $a['group'], 'to' => $b['group'], 'dir' => 'direct', 'label' => null, 'state' => $info[$ib]['state'], 'hop' => $ib];
+                $events[] = ['n' => ++$n, 'from' => $a['group'], 'to' => $b['group'], 'dir' => 'direct', 'label' => null, 'state' => $info[$ib]['state'], 'hop' => $ib, 'live' => (bool) $b['running']];
             }
             if ($hasImages && ! $parDone && $b['group'] === 'write') { // Tạo ảnh bắt đầu cùng lúc với Viết
                 $events[] = ['n' => ++$n, 'from' => 'write', 'to' => 'images', 'dir' => 'par', 'label' => 'chạy cùng lúc', 'state' => 'done', 'hop' => $ib];
