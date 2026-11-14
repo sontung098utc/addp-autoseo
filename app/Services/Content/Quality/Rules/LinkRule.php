@@ -28,7 +28,7 @@ class LinkRule implements QualityRule
         $foreign = [];
         $unknown = [];
         $validInternal = 0;
-        foreach ($ctx->xpath()->query('//a[@href]') ?: [] as $a) {
+        foreach ($ctx->xpath()->query("//a[@href][not(ancestor::*[contains(@class,'autoseo-refs')])]") ?: [] as $a) {
             $href = trim((string) $a->getAttribute('href'));
             if ($href === '' || str_starts_with($href, '#') || preg_match('#^(mailto|tel):#i', $href)) {
                 continue;

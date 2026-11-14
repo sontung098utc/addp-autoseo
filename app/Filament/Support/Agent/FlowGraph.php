@@ -5,172 +5,219 @@ namespace App\Filament\Support\Agent;
 use Illuminate\Support\Collection;
 
 /**
- * Sơ đồ luồng của phiên viết bài, vẽ theo VIỆC CỦA TỪNG VAI TRÒ chứ không theo từng bước kỹ thuật:
- * - Chiến lược nội dung gồm Tổng hợp nguồn, Dàn ý, Yêu cầu và thiết kế ảnh, Nghiên cứu;
- * - Viết và sửa là một khối (sửa lại là phần việc của người viết), vòng lặp chạy giữa "Biên tập và chấm" và khối này;
- * - Tạo ảnh chạy song song với Viết rồi nhập lại ở Hoàn tất; đường "cần thêm nguồn" quay về Kho và nguồn.
- * Mỗi bước thật vẫn là một dòng bấm được trong khối (mở ngăn chi tiết riêng). Trạng thái đường nối lấy từ dữ liệu thật của phiên.
+ * Sơ đồ luồng của MỘT phiên viết bài, dựng từ ĐƯỜNG ĐI THẬT chứ không từ khuôn dựng sẵn: chỉ những chặng đã chạy (và chặng đang chạy) mới xuất hiện, theo đúng thứ tự đã diễn ra.
+ * Giữa hai chặng là quyết định của người điều phối (nếu có): chấm xong chưa đạt → yêu cầu sửa, thiếu nguồn → bổ sung nguồn, kho thiếu → nạp thêm... Phiên nào đi đường nào thì sơ đồ ra đường đó;
+ * vòng lặp xuất hiện thành các chặng lặp lại, chặng không chạy thì không có. Tạo ảnh chạy song song với Viết nên nằm cạnh khối Viết.
  */
 final class FlowGraph
 {
-    public const W = 320;
+    /** Chặng → khối vai trò. Các chặng liền nhau thuộc cùng khối gộp thành một khối. */
+    private const GROUP_OF = [
+        'guard' => 'prep', 'risk' => 'prep', 'sources' => 'sources',
+        'synthesize' => 'strategy', 'brief' => 'strategy', 'image_design' => 'strategy', 'research' => 'strategy',
+        'write' => 'write', 'repair' => 'write', 'edit' => 'review', 'grade' => 'review',
+        'assemble' => 'finish', 'learn' => 'finish', 'handoff' => 'finish', 'checkpoint' => 'checkpoint',
+    ];
 
-    private const IMG_W = 230;
-
-    private const HUBX = 16;
-
-    private const HUB_W = 260;
-
-    private const LEFT = 430; // lề trái của trục chính (bên trái là khối Điều phối)
-
-    private const TOP = 30;
-
-    private const GAP = 52;
-
-    public const HEAD = 36;
-
-    public const ROW = 30;
-
-    private const PAD = 10;
-
-    /** id => [tiêu đề, vai trò, các chặng]. Thứ tự là thứ tự dọc của trục chính. */
-    private const GROUPS = [
-        'prep' => ['Kiểm tra đầu vào', 'Hệ thống', ['guard', 'risk']],
-        'sources' => ['Kho và nguồn', 'Điều phối kho', ['sources']],
-        'strategy' => ['Chiến lược nội dung', 'Trưởng phòng chiến lược', ['synthesize', 'brief', 'image_design', 'research']],
-        'write' => ['Viết và sửa', 'Người viết', ['write', 'repair']],
-        'review' => ['Biên tập và chấm', 'Biên tập viên', ['edit', 'grade']],
-        'finish' => ['Hoàn tất', 'Hệ thống · Bạn', ['assemble', 'learn', 'handoff']],
+    private const GROUP_TITLE = [
+        'prep' => ['Kiểm tra đầu vào', 'Hệ thống'], 'sources' => ['Kho và nguồn', 'Điều phối kho'], 'strategy' => ['Chiến lược nội dung', 'Trưởng phòng chiến lược'],
+        'write' => ['Viết', 'Người viết'], 'review' => ['Biên tập và chấm', 'Biên tập viên'], 'finish' => ['Hoàn tất', 'Hệ thống · Bạn'], 'checkpoint' => ['Chờ bạn', 'Bạn'],
+        'images' => ['Tạo ảnh', 'Họa viên ảnh'],
     ];
 
     /**
-     * @param  list<array<string,mixed>>  $nodes  RunFlow::build()['nodes']
-     * @param  Collection<int, mixed>  $steps
-     * @return array{width:int,height:int,groups:list<array<string,mixed>>,edges:list<array<string,mixed>>}|null
+     * @param  array<string, mixed>  $flow  kết quả RunFlow::build()
+     * @param  Collection<int, mixed>  $steps  các bước của phiên
+     * @return array{cards: list<array<string,mixed>>, back: list<array<string,mixed>>, trailing: list<array<string,mixed>>, next: bool}|null  null nếu không phải phiên viết bài
      */
-    public static function build(array $nodes, Collection $steps): ?array
+    public static function trace(array $flow, Collection $steps, bool $live, ?string $current): ?array
     {
-        $by = collect($nodes)->keyBy('code');
-        foreach (self::GROUPS as [, , $codes]) {
-            foreach ($codes as $c) {
-                if (! $by->has($c)) {
-                    return null; // loại việc khác (không phải viết bài): dùng lưới cũ
-                }
-            }
-        }
-        if (! $by->has('images')) {
+        $by = collect($flow['nodes'])->keyBy('code');
+        if (! $by->has('write') || ! $by->has('images') || ! $by->has('grade')) {
             return null;
         }
-        $groups = [];
-        $y = self::TOP;
-        foreach (self::GROUPS as $id => [$title, $role, $codes]) {
-            $groups[$id] = self::group($id, $title, $role, array_map(fn ($c) => $by[$c], $codes), self::LEFT, $y, self::W);
-            $y += $groups[$id]['h'] + self::GAP;
+        $durations = $flow['durations'] ?? [];
+
+        $hops = [];
+        $imageSteps = [];
+        $pending = [];
+        foreach ($steps->sortBy('seq') as $s) {
+            if (in_array($s->stage, ['retry', 'failover'], true)) {
+                continue;
+            }
+            if ($s->stage === 'decision') {
+                $pending[] = self::decision($s);
+
+                continue;
+            }
+            $code = RunFlow::segmentOf($s);
+            if ($code === 'images') {
+                $imageSteps[] = $s;
+
+                continue;
+            }
+            $group = self::GROUP_OF[$code] ?? null;
+            if ($group === null) {
+                continue;
+            }
+            $last = $hops === [] ? null : array_key_last($hops);
+            if ($last === null || $hops[$last]['group'] !== $group || $pending !== []) {
+                $hops[] = ['group' => $group, 'steps' => [], 'decisions' => $pending];
+                $pending = [];
+                $last = array_key_last($hops);
+            }
+            $hops[$last]['steps'][$code][] = $s;
         }
-        $mainBottom = $y - self::GAP;
-        $groups['images'] = self::group('images', 'Tạo ảnh', 'Họa viên ảnh', [$by['images']], self::LEFT + self::W + 120, $groups['write']['y'], self::IMG_W);
-        if ($by->has('checkpoint')) { // điểm dừng chờ người (không phải phiên nào cũng có): bên phải khối đầu vào
-            $groups['checkpoint'] = self::group('checkpoint', 'Chờ bạn', 'Bạn', [$by['checkpoint']], self::LEFT + self::W + 120, $groups['prep']['y'], self::IMG_W);
+        $trailing = $pending;
+
+        $runningCode = $live ? $current : null;
+        if ($runningCode !== null && isset(self::GROUP_OF[$runningCode])) {
+            $g = self::GROUP_OF[$runningCode];
+            $lastHop = $hops === [] ? null : array_key_last($hops);
+            if ($lastHop === null || $hops[$lastHop]['group'] !== $g || $trailing !== []) {
+                $hops[] = ['group' => $g, 'steps' => [], 'decisions' => $trailing];
+                $trailing = [];
+                $lastHop = array_key_last($hops);
+            }
+            $hops[$lastHop]['steps'][$runningCode] ??= [];
         }
 
-        // ĐIỀU PHỐI: trung tâm nhận lỗi từ chấm rồi gọi người làm tiếp (sửa, tìm thêm nguồn). Liệt kê quyết định THẬT của phiên này.
-        $decisions = $steps->where('stage', 'decision')->sortBy('seq')->values();
-        $items = $decisions->slice(-5)->map(fn ($d) => trim(preg_replace('/^Điều phối( kho)?:\s*/u', '', (string) $d->title)))->values()->all();
-        $top = $groups['write']['y'];
-        $groups['coord'] = ['id' => 'coord', 'title' => 'Điều phối', 'role' => 'Quyết định của phiên', 'x' => self::HUBX, 'y' => $top, 'w' => self::HUB_W,
-            'h' => max($groups['review']['y'] + $groups['review']['h'] - $top, self::HEAD + max(1, count($items)) * self::ROW + self::PAD), 'state' => $decisions->isEmpty() ? 'idle' : 'done',
-            'ran' => $decisions->isNotEmpty(), 'subs' => [], 'items' => $items === [] ? ['Chưa có quyết định nào trong phiên này'] : $items, 'parallel' => null, 'total' => $decisions->count()];
-
-        $ran = fn (string $g) => $groups[$g]['ran'];
-        $moreSearch = $steps->contains(fn ($s) => $s->stage === 'decision' && (bool) (((array) $s->data)['search_more'] ?? false));
-        $repairs = (int) ($by['repair']['count'] ?? 0);
-        $spec = [
-            ['prep', 'sources', null, 'main'], ['sources', 'strategy', null, 'main'], ['strategy', 'write', null, 'main'], ['strategy', 'images', 'song song', 'fork'],
-            ['write', 'review', null, 'main'], ['review', 'coord', $repairs > 0 || $moreSearch ? 'báo lỗi chấm' : 'nếu chưa đạt: báo lỗi', 'loop'],
-            ['coord', 'write', $repairs > 0 ? "yêu cầu sửa · ↻ {$repairs} vòng" : 'yêu cầu sửa', 'loop'], ['coord', 'sources', 'bổ sung nguồn', 'back'],
-            ['review', 'finish', 'đạt', 'main'], ['images', 'finish', 'nhập lại', 'join'],
-        ];
-        if ($by->has('checkpoint')) {
-            $spec[] = ['prep', 'checkpoint', 'chờ bạn', 'side'];
+        // Gộp theo khối: quay lại một khối đã có (vòng chấm ↔ sửa, bổ sung nguồn) KHÔNG tạo thẻ mới mà tăng số lần vào khối và vẽ thành mũi tên quay lại.
+        $cards = [];
+        $seq = [];
+        $lastIndex = $hops === [] ? null : array_key_last($hops);
+        foreach ($hops as $i => $h) {
+            $g = $h['group'];
+            $same = $seq !== [] && end($seq) === $g;
+            if (! $same) {
+                $seq[] = $g;
+            }
+            $cards[$g] ??= ['group' => $g, 'steps' => [], 'decisions' => [], 'visits' => 0];
+            $cards[$g]['visits'] += $same ? 0 : 1;
+            $cards[$g]['decisions'] = array_merge($cards[$g]['decisions'], $h['decisions']);
+            foreach ($h['steps'] as $code => $list) {
+                $cards[$g]['steps'][$code] = array_merge($cards[$g]['steps'][$code] ?? [], $list);
+            }
         }
-        $edges = [];
-        foreach ($spec as [$a, $b, $label, $kind]) {
-            $state = match (true) {
-                $kind === 'back' => ($moreSearch || $decisions->contains(fn ($d) => (((array) $d->data)['decision'] ?? '') === 'kb_coordination')) ? 'done' : 'idle',
-                $kind === 'loop' => ($repairs > 0 || $moreSearch) ? 'loop' : 'idle',
-                $ran($a) && $ran($b) && $groups[$b]['state'] === 'running' => 'live',
-                $ran($a) && $ran($b) => 'done',
-                default => 'idle',
-            };
-            $edges[] = ['from' => $a, 'to' => $b, 'label' => $label, 'kind' => $kind, 'state' => $state] + self::route($groups[$a], $groups[$b], $kind);
+        $order = array_keys($cards);
+        $pos = array_flip($order);
+        $pairs = [];
+        for ($i = 1; $i < count($seq); $i++) {
+            $k = $seq[$i - 1].'>'.$seq[$i];
+            $pairs[$k] = ($pairs[$k] ?? 0) + 1;
         }
 
-        return [
-            'width' => self::LEFT + self::W + 120 + self::IMG_W + 16,
-            'height' => $mainBottom + 24,
-            'groups' => array_values($groups),
-            'edges' => $edges,
-        ];
+        $anyRunning = false;
+        $out = [];
+        foreach ($cards as $g => $c) {
+            $subs = [];
+            foreach ($c['steps'] as $code => $list) {
+                $running = $runningCode === $code && isset($hops[$lastIndex]['steps'][$code]) && $hops[$lastIndex]['group'] === $g;
+                $subs[] = self::sub($by[$code], $list, $durations, $running);
+                $anyRunning = $anyRunning || $running;
+            }
+            [$title, $role] = self::GROUP_TITLE[$g];
+            if ($g === 'write' && isset($c['steps']['repair'])) {
+                $title = 'Viết và sửa';
+            }
+            $out[] = ['group' => $g, 'title' => $title, 'role' => $role, 'subs' => $subs, 'state' => self::groupState($subs), 'visits' => $c['visits'], 'decisions' => $c['decisions'], 'side' => null,
+                'in' => null];
+        }
+        // Đường vào mỗi thẻ (mũi tên dọc giữa hai thẻ liền nhau theo thứ tự xuất hiện): nhãn và số lần đi.
+        foreach ($out as $i => &$card) {
+            if ($i === 0) {
+                continue;
+            }
+            $prevG = $out[$i - 1]['group'];
+            $n = $pairs[$prevG.'>'.$card['group']] ?? 0;
+            $label = $card['group'] === 'finish' ? 'đạt' : null;
+            if ($n > 1) {
+                $label = trim(($label ? $label.' · ' : '').'đã đi '.$n.' lần');
+            }
+            $card['in'] = ['label' => $label, 'count' => $n];
+        }
+        unset($card);
+
+        // Mũi tên quay lại (từ khối sau về khối trước): vòng sửa, bổ sung nguồn...
+        $back = [];
+        foreach ($pairs as $k => $n) {
+            [$from, $to] = explode('>', $k);
+            if (($pos[$to] ?? 0) < ($pos[$from] ?? 0)) {
+                $label = match (true) {
+                    $from === 'review' && $to === 'write' => "chưa đạt → yêu cầu sửa · ↻ {$n} vòng",
+                    $to === 'sources' => "thiếu nguồn → bổ sung · {$n} lần",
+                    default => "quay lại · {$n} lần",
+                };
+                $back[] = ['from' => $from, 'to' => $to, 'label' => $label, 'count' => $n, 'kind' => $to === 'sources' ? 'back' : 'loop', 'lane' => count($back)];
+            }
+        }
+
+        // Tạo ảnh song song: nằm cạnh khối Viết.
+        if ($imageSteps !== []) {
+            $sub = self::sub($by['images'], $imageSteps, $durations, false);
+            $side = ['group' => 'images', 'title' => 'Tạo ảnh', 'role' => 'Họa viên ảnh', 'parallel' => (string) ($by['images']['parallel'] ?? 'Viết'), 'state' => self::groupState([$sub]), 'subs' => [$sub]];
+            $wi = $pos['write'] ?? null;
+            if ($wi !== null) {
+                $out[$wi]['side'] = $side;
+            } else {
+                $out[] = ['group' => 'images', 'title' => 'Tạo ảnh', 'role' => 'Họa viên ảnh', 'subs' => [$sub], 'state' => $side['state'], 'visits' => 1, 'decisions' => [], 'side' => null, 'in' => ['label' => null, 'count' => 1]];
+            }
+        }
+
+        return ['cards' => $out, 'back' => $back, 'trailing' => $trailing, 'next' => $live && ! $anyRunning && $out !== []];
     }
 
-    /** @param list<array<string,mixed>> $subs @return array<string,mixed> */
-    private static function group(string $id, string $title, string $role, array $subs, int $x, int $y, int $w): array
+    /** @param list<mixed> $list @param array<int|string,float|int|null> $durations @return array<string,mixed> */
+    private static function sub(array $node, array $list, array $durations, bool $running): array
+    {
+        $last = $list === [] ? null : end($list);
+        $status = collect($last ? [$last] : [])->pluck('status'); // trạng thái là của LẦN CUỐI (các lần trước đã được sửa ở vòng sau)
+        $state = match (true) {
+            $running => 'running',
+            $node['state'] === 'waiting' => 'waiting',
+            $status->contains('failed') => 'failed',
+            $status->contains('blocked') => 'blocked',
+            $status->contains('warn') => 'warn',
+            $last !== null && $status->every(fn ($x) => $x === 'skipped') => 'skipped',
+            default => 'done',
+        };
+        $sec = $list === [] ? null : round((float) collect($list)->sum(fn ($x) => $durations[$x->id] ?? 0), 1);
+        $summary = null;
+        if ($last !== null) {
+            $scores = collect($list)->map(fn ($x) => ((array) $x->data)['score'] ?? null)->filter(fn ($v) => $v !== null)->values();
+            $summary = $scores->isNotEmpty() ? 'Điểm '.$scores->implode(' → ').'/100' : trim((string) $last->title);
+            $d = trim(preg_replace('/\s+/u', ' ', strip_tags((string) $last->detail)) ?? '');
+            if ($scores->isEmpty() && $d !== '') {
+                $summary .= ' — '.mb_substr($d, 0, 110).(mb_strlen($d) > 110 ? '…' : '');
+            } elseif ($scores->isNotEmpty() && $d !== '') {
+                $summary .= '. '.mb_substr(preg_replace('/^Điểm \d+\/100 \([^)]*\)\.\s*/u', '', $d) ?? '', 0, 100);
+            }
+        }
+
+        return ['code' => $node['code'], 'title' => $node['title'], 'kind' => $node['kind'], 'state' => $state, 'count' => count($list), 'seconds' => $sec, 'summary' => $summary];
+    }
+
+    /** @param list<array<string,mixed>> $subs */
+    private static function groupState(array $subs): string
     {
         $states = array_column($subs, 'state');
-        $state = 'done';
         foreach (['running', 'waiting', 'failed', 'blocked', 'stale', 'warn'] as $s) {
             if (in_array($s, $states, true)) {
-                $state = $s;
-                break;
+                return $s;
             }
         }
-        $ran = array_sum(array_column($subs, 'count')) > 0;
-        if (! $ran && $state === 'done') {
-            $state = in_array('pending', $states, true) ? 'pending' : 'idle';
-        }
 
-        return ['id' => $id, 'title' => $title, 'role' => $role, 'x' => $x, 'y' => $y, 'w' => $w, 'h' => self::HEAD + count($subs) * self::ROW + self::PAD, 'state' => $state, 'ran' => $ran, 'subs' => $subs,
-            'parallel' => collect($subs)->pluck('parallel')->filter()->first()];
+        return 'done';
     }
 
-    /** Đường gấp khúc vuông góc giữa hai khối + vị trí nhãn. @return array{d:string,lx:int,ly:int} */
-    private static function route(array $A, array $B, string $kind): array
+    /** @return array{title:string,detail:string,routes:list<string>,code:?string} */
+    private static function decision($s): array
     {
-        $acx = $A['x'] + $A['w'] / 2;
-        $bcx = $B['x'] + $B['w'] / 2;
+        $d = (array) ($s->data ?? []);
+        $routes = array_map(fn ($r) => match ($r) {
+            'sources' => 'Kho và nguồn', 'writer' => 'Người viết', default => (string) $r,
+        }, (array) ($d['routes'] ?? []));
 
-        if ($kind === 'loop') { // Biên tập và chấm → Điều phối (báo lỗi) và Điều phối → Viết và sửa (yêu cầu sửa): hai đường ngang vào/ra mép trái trục chính
-            if ($A['id'] === 'review') {
-                $y = $A['y'] + $A['h'] - 22;
-
-                return ['d' => "M{$A['x']} {$y}H".($B['x'] + $B['w']), 'lx' => (int) (($A['x'] + $B['x'] + $B['w']) / 2), 'ly' => (int) $y - 14];
-            }
-            $y = $B['y'] + 26;
-
-            return ['d' => 'M'.($A['x'] + $A['w'])." {$y}H{$B['x']}", 'lx' => (int) (($A['x'] + $A['w'] + $B['x']) / 2), 'ly' => (int) $y - 14];
-        }
-        if ($kind === 'back') { // Điều phối → Kho và nguồn: lên từ đỉnh khối điều phối rồi sang mép trái khối Kho và nguồn
-            $yb = $B['y'] + $B['h'] / 2;
-
-            return ['d' => 'M'.($A['x'] + $A['w'] / 2)." {$A['y']}V{$yb}H{$B['x']}", 'lx' => (int) (($A['x'] + $A['w'] / 2 + $B['x']) / 2), 'ly' => (int) $yb - 14];
-        }
-        if ($kind === 'fork') { // song song: từ mép phải khối chiến lược sang rồi xuống đỉnh khối ảnh
-            $ya = $A['y'] + $A['h'] - 18;
-
-            return ['d' => 'M'.($A['x'] + $A['w'])." {$ya}H{$bcx}V{$B['y']}", 'lx' => (int) (($A['x'] + $A['w'] + $B['x']) / 2) + 10, 'ly' => (int) $ya - 14];
-        }
-        if ($kind === 'join') { // nhập lại: từ đáy khối ảnh xuống ngang Hoàn tất rồi sang mép phải
-            $yb = $B['y'] + 28;
-
-            return ['d' => "M{$acx} ".($A['y'] + $A['h'])."V{$yb}H".($B['x'] + $B['w']), 'lx' => (int) $acx, 'ly' => (int) $yb - 14];
-        }
-        if ($kind === 'side') { // ngang sang phải
-            $y = $A['y'] + 20;
-
-            return ['d' => 'M'.($A['x'] + $A['w'])." {$y}H{$B['x']}", 'lx' => (int) (($A['x'] + $A['w'] + $B['x']) / 2), 'ly' => (int) $y - 13];
-        }
-        $y1 = $A['y'] + $A['h'];
-
-        return ['d' => "M{$acx} {$y1}V{$B['y']}", 'lx' => (int) $acx + 30, 'ly' => (int) (($y1 + $B['y']) / 2)];
+        return ['title' => trim((string) preg_replace('/^Điều phối( kho)?:\s*/u', '', (string) $s->title)), 'detail' => mb_substr((string) $s->detail, 0, 260), 'routes' => $routes, 'code' => $d['decision'] ?? null];
     }
 }

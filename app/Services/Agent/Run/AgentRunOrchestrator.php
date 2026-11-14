@@ -521,6 +521,8 @@ final class AgentRunOrchestrator
         $this->assets?->attachFeatured($version); // AG-S25
         // 6b. Lắp ráp: đợi ảnh (chạy song song với bước viết), gắn vào phiên bản và chèn vào nội dung theo kế hoạch.
         $this->assembleImages($run, $article, $version);
+        // 6c. Chấm lại BẢN GIAO: nội dung người đọc thấy đã khác bản đã chấm (thêm khối nguồn, chú thích số, ảnh), nên điểm cuối phải là điểm của chính bản giao, không phải của bản nháp trước đó.
+        $passed = $this->gradeDelivered($run, $article, $version, $passed);
         $this->learnFromReferences($run, $article); // tài liệu tin cậy bài đã dùng được học vào kho cho các bài sau
 
         if ($passed && $assess->level === 'high') {
@@ -1472,6 +1474,28 @@ final class AgentRunOrchestrator
             'ai_provider' => $r['model'] ?? 'ai-engine', 'ai_model' => $r['model'] ?? 'unknown', 'prompt_version' => $r['prompt_version'] ?? 'v1.0',
             'tokens_used' => (int) ($r['tokens_used'] ?? 0), 'cost_vnd' => (float) ($r['cost_vnd'] ?? 0),
         ];
+    }
+
+    /** Chấm lại bản đã lắp ráp; ghi một bước chấm "bản giao" (điểm cuối của phiên lấy từ đây). Còn lỗi chặn thì không coi là đạt. */
+    private function gradeDelivered(AgentRun $run, Article $article, ArticleVersion $version, bool $passed): bool
+    {
+        $fresh = ArticleVersion::query()->find($version->id) ?? $version;
+        $report = $this->checker->check($fresh, $article, $this->brainCtx->ids() ?: null, array_map(fn ($r) => ['title' => (string) ($r['title'] ?? ''), 'url' => (string) ($r['url'] ?? ''), 'domain' => (string) ($r['domain'] ?? '')], $this->references));
+        $c = $report->counts();
+        $block = $report->blockingCodes();
+        $score = RunScorer::score($report);
+        $failed = array_map(fn ($r) => ['code' => $r->code, 'severity' => $r->severity, 'message' => $r->message], array_slice($report->failed(), 0, 8));
+        $left = $c['P1'] + $c['P2'];
+        $this->step($run, 'grade', 'editor', $block === [] ? 'ok' : 'warn', 'Chấm lại bản giao',
+            "Điểm {$score}/100 trên đúng nội dung người đọc sẽ thấy (đã gắn nguồn và ảnh). ".($block === [] ? ($left === 0 ? 'Đạt mọi tiêu chí.' : "Đạt luật bắt buộc, còn {$c['P1']} mục P1 và {$c['P2']} mục P2 chưa đạt.") : 'Trượt luật bắt buộc: '.implode(', ', $block).'.'),
+            ['blocking' => $block, 'counts' => $c, 'score' => $score, 'round' => (int) $run->repair_rounds + 1, 'threshold' => RunScorer::REFERENCE_THRESHOLD, 'failed' => $failed, 'penalty' => $this->penalty($report), 'delivered' => true]);
+        if ($block !== [] && $passed) {
+            $this->decision($run, 'delivered_check_failed', 'Bản giao trượt luật bắt buộc sau khi lắp ráp', 'Bản nháp đạt nhưng sau khi gắn nguồn và ảnh còn lỗi chặn: '.implode(', ', $block).'. Không coi là đạt, giữ cho người xem.', ['score' => $score]);
+
+            return false;
+        }
+
+        return $passed;
     }
 
     private function grade(AgentRun $run, Article $article, array $attrs, string $title, int $round, ?Playbook $editorPb = null, string $note = ''): QualityReport

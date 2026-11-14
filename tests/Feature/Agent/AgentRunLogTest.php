@@ -137,13 +137,14 @@ class AgentRunLogTest extends TestCase
         [$run] = $this->go($this->provider([$this->bad(), $this->good()]));
 
         $grades = $run->steps->where('stage', 'grade')->values();
-        $this->assertCount(2, $grades);
+        $this->assertCount(3, $grades, 'bản đầu, sau 1 vòng sửa, và chấm lại bản giao');
+        $this->assertTrue($grades[2]->data['delivered'], 'lần chấm cuối là của bản đã lắp ráp');
         $this->assertSame(0, $grades[0]->data['round']);
         $this->assertSame(1, $grades[1]->data['round']);
         $this->assertLessThan(100, $grades[0]->data['score']);
         $this->assertGreaterThan($grades[0]->data['score'], $grades[1]->data['score']);
         $this->assertSame(RunScorer::REFERENCE_THRESHOLD, $grades[0]->data['threshold']);
-        $this->assertSame('v1 '.$grades[0]->data['score'].' → sửa 1 '.$grades[1]->data['score'], RunScorer::format(RunScorer::timeline($run->steps)));
+        $this->assertSame('v1 '.$grades[0]->data['score'].' → sửa 1 '.$grades[1]->data['score'].' → bản giao '.$grades[2]->data['score'], RunScorer::format(RunScorer::timeline($run->steps)));
     }
 
     public function test_diem_cao_khong_cuu_bai_con_loi_p0_luat_van_quyet_dinh(): void

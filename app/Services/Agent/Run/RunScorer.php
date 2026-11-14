@@ -43,7 +43,7 @@ final class RunScorer
                 continue;
             }
             $round = (int) ($s->data['round'] ?? count($out));
-            $out[] = ['label' => $round === 0 ? 'v1' : "sửa {$round}", 'score' => (int) $s->data['score']];
+            $out[] = ['label' => ! empty($s->data['delivered']) ? 'bản giao' : ($round === 0 ? 'v1' : "sửa {$round}"), 'score' => (int) $s->data['score']];
         }
 
         return $out;

@@ -13,9 +13,9 @@
                     </div>
 
                     <div class="rvx-pane rvx-flowpane" data-testid="stage-rail">
-                        @php $graph = \App\Filament\Support\Agent\FlowGraph::build($nodes, $run->steps); @endphp
+                        @php $graph = \App\Filament\Support\Agent\FlowGraph::trace($flow, $run->steps, (bool) ($live ?? false), $currentStage ?? null); @endphp
                         @if ($graph)
-                            <x-flow.graph :g="$graph" />
+                            <x-flow.trace :t="$graph" />
                         @else
                         <div class="fl-wrap">
                             <div class="fl-grid">

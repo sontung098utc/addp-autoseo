@@ -89,9 +89,13 @@ class AgentRunDetailTest extends TestCase
         $this->assertStringContainsString('v1 62 → sửa 1 78 → sửa 2 91', $html);
         $this->assertStringContainsString('▲ +16', $html);
         $this->assertStringContainsString('▲ +13', $html);
-        foreach (['guard', 'risk', 'brief', 'write', 'grade', 'repair', 'handoff'] as $s) {
+        foreach (['guard', 'risk', 'brief', 'write', 'repair', 'handoff'] as $s) {
             $this->assertSame('done', $this->state($html, $s), $s);
         }
+        // Quay lại một khối không thêm thẻ: chỉ một dòng Chấm, trạng thái là của lần chấm cuối, kèm số lần.
+        preg_match_all('/data-stage="grade" data-state="([a-z]+)"/', $html, $gm);
+        $this->assertSame(['done'], $gm[1]);
+        $this->assertStringContainsString('×3', $html);
         $this->assertStringContainsString('H1_01', $html);
         $this->assertStringContainsString('Thiếu H1', $html);
     }
@@ -110,8 +114,7 @@ class AgentRunDetailTest extends TestCase
         $html = $this->page($r);
         $this->assertSame('warn', $this->state($html, 'risk'));
         $this->assertSame('warn', $this->state($html, 'grade'));
-        $this->assertSame('idle', $this->state($html, 'repair'));
-        $this->assertStringContainsString('không chạy', $html);
+        $this->assertSame('missing', $this->state($html, 'repair'), 'Chặng không chạy thì không có trong sơ đồ.');
         $this->assertStringContainsString('data-testid="decision"', $html);
         $this->assertStringContainsString('(trước → sau)', $html);
     }
@@ -121,8 +124,8 @@ class AgentRunDetailTest extends TestCase
         $r = $this->run_('failed', [['guard', 'ok'], ['risk', 'ok'], ['brief', 'ok'], ['handoff', 'failed']]);
         $html = $this->page($r);
         $this->assertSame('failed', $this->state($html, 'handoff'));
-        $this->assertSame('idle', $this->state($html, 'write'));
-        $this->assertSame('idle', $this->state($html, 'grade'));
+        $this->assertSame('missing', $this->state($html, 'write'));
+        $this->assertSame('missing', $this->state($html, 'grade'));
     }
 
     public function test_phien_bi_chan_o_guard(): void
@@ -130,7 +133,7 @@ class AgentRunDetailTest extends TestCase
         $r = $this->run_('blocked', [['guard', 'blocked']]);
         $html = $this->page($r);
         $this->assertSame('blocked', $this->state($html, 'guard'));
-        $this->assertSame('idle', $this->state($html, 'risk'));
+        $this->assertSame('missing', $this->state($html, 'risk'));
         $this->assertStringNotContainsString('data-testid="score-timeline"', $html);
     }
 
@@ -139,7 +142,7 @@ class AgentRunDetailTest extends TestCase
         $r = $this->run_('running', [['guard', 'ok'], ['risk', 'ok'], ['brief', 'ok']]);
         $html = $this->page($r);
         $this->assertSame('running', $this->state($html, 'write'));
-        $this->assertSame('pending', $this->state($html, 'handoff'));
+        $this->assertSame('missing', $this->state($html, 'handoff'), 'Chặng sau chưa tới thì chưa vẽ: điều phối chưa quyết định.');
         $this->assertSame('done', $this->state($html, 'brief'));
         $this->assertStringContainsString('data-live-stage="write"', $html);
     }
@@ -222,10 +225,10 @@ class AgentRunDetailTest extends TestCase
         $r = $this->run_('failed', [['guard', 'ok'], ['risk', 'ok'], ['brief', 'failed']], ['outcome_reason' => 'Nhà cung cấp lỗi', 'cost_vnd' => 1500]);
         $html = $this->page($r);
         preg_match_all('/data-stage="([a-z_]+)" data-state="/', $html, $m);
-        $this->assertEqualsCanonicalizing(RunFlow::main(), $m[1], "Mỗi chặng đúng một lần (khối vai trò gom các chặng nên thứ tự vẽ không còn bằng thứ tự chạy).");
+        $this->assertSame(['guard', 'risk', 'brief'], $m[1], 'Sơ đồ chỉ vẽ các chặng đã chạy, theo thứ tự chạy.');
         $this->assertSame('done', $this->state($html, 'guard'));
         $this->assertSame('failed', $this->state($html, 'brief'));
-        $this->assertSame('idle', $this->state($html, 'write'));
+        $this->assertSame('missing', $this->state($html, 'write'));
         $alert = substr(strstr($html, 'data-testid="run-alert"'), 0, 900);
         $this->assertStringContainsString('Lỗi ở «Dàn ý»', $alert);
         $this->assertStringContainsString('Nhà cung cấp lỗi', $alert);
@@ -240,7 +243,7 @@ class AgentRunDetailTest extends TestCase
         $g = fn (int $round, int $score) => ['grade', $score >= 80 ? 'ok' : 'warn', ['score' => $score, 'round' => $round, 'threshold' => 80]];
         $r = $this->run_('ready_for_review', [['guard', 'ok'], ['write', 'ok'], $g(0, 60), ['repair', 'ok'], $g(1, 70), ['repair', 'ok'], $g(2, 90), ['handoff', 'ok']], ['repair_rounds' => 2]);
         $html = $this->page($r);
-        $this->assertStringContainsString('data-loop', $html);
+        $this->assertStringContainsString('flow-loop', $html);
         $this->assertStringContainsString('↻ 2 vòng', $html);
     }
 
@@ -318,9 +321,9 @@ class AgentRunDetailTest extends TestCase
         $r = $this->run_('ready_for_review', [['guard', 'ok'], ['write', 'ok'], $g(0, 60), ['repair', 'ok'], $g(1, 70), ['repair', 'ok'], $g(2, 90), ['handoff', 'ok']], ['repair_rounds' => 2]);
         $html = $this->page($r);
         $this->assertStringContainsString('data-testid="flow-loop"', $html);
-        $this->assertStringContainsString('data-loop', $html);
+        $this->assertStringContainsString('flow-loop', $html);
         $this->assertStringContainsString('↻ 2 vòng', $html);
-        $this->assertStringContainsString('fg-edge--loop', $html);
+        $this->assertStringContainsString('"kind":"loop"', $html);
 
         $w = $this->run_('held', [['guard', 'ok'], ['risk', 'ok'], ['checkpoint', 'warn', ['waiting' => true]]]);
         $html = $this->page($w);

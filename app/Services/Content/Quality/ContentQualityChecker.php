@@ -76,10 +76,28 @@ class ContentQualityChecker
      * @param  list<int>|null  $brainIds  Trí tuệ do chiến dịch chọn (AG-B3); null = suy từ website của bài
      * @param  list<array{title?: string, url?: string, domain?: string}>  $knownSources  nguồn có thật hệ thống đã tìm thấy khi viết bài (cho SRC01)
      */
+    /** @return list<array{title:string,url:string,domain:string}> */
+    private static function refsOf(string $html): array
+    {
+        if (! str_contains($html, 'autoseo-refs')) {
+            return [];
+        }
+        $out = [];
+        if (preg_match('#<div class="autoseo-refs">(.*)#s', $html, $m) && preg_match_all('#<a\s[^>]*href="([^"]+)"[^>]*>(.*?)</a>#s', $m[1], $all, PREG_SET_ORDER)) {
+            foreach ($all as $a) {
+                $host = strtolower((string) preg_replace('#^www\.#', '', (string) (parse_url(html_entity_decode($a[1]), PHP_URL_HOST) ?: '')));
+                $out[] = ['title' => trim(strip_tags($a[2])), 'url' => html_entity_decode($a[1]), 'domain' => $host];
+            }
+        }
+
+        return $out;
+    }
+
     public function check(ArticleVersion $version, ?Article $article = null, ?array $brainIds = null, array $knownSources = []): QualityReport
     {
         $ctx = new QualityContext($version, $article ?? $version->article, $brainIds);
-        $ctx->knownSources = $knownSources;
+        // Bản đã lắp ráp có khối "Nguồn tham khảo" gồm các tài liệu hệ thống đã tìm thấy thật: dùng làm nguồn đã biết khi người gọi không truyền (chấm lại bản giao, trang duyệt).
+        $ctx->knownSources = $knownSources !== [] ? $knownSources : self::refsOf((string) $version->html_content);
         $results = [];
         foreach ($this->rules as $rule) {
             foreach ($rule->evaluate($ctx) as $r) {

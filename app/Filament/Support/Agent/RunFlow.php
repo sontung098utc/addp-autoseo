@@ -194,7 +194,7 @@ final class RunFlow
             $score = (int) $g->data['score'];
             $round = (int) ($g->data['round'] ?? count($rounds));
             $rounds[] = [
-                'label' => $round === 0 ? 'Bản đầu' : "Sửa {$round}",
+                'label' => ! empty($g->data['delivered']) ? 'Bản giao' : ($round === 0 ? 'Bản đầu' : "Sửa {$round}"),
                 'score' => $score,
                 'delta' => $prevScore === null ? null : $score - $prevScore,
                 'threshold' => (int) ($g->data['threshold'] ?? RunScorer::REFERENCE_THRESHOLD),
