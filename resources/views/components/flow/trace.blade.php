@@ -11,7 +11,7 @@
 <div class="ft" data-testid="flow-graph" x-ref="ft"
     x-data="{ items: [], draw() { const c = this.$refs.ft; const cr = c.getBoundingClientRect(); let E = []; try { E = JSON.parse(this.$refs.events.textContent || '[]'); } catch (e) {}
         const svg = this.$refs.arcs; svg.querySelectorAll('.ft-arc').forEach(n => n.remove()); const items = []; const co = c.querySelector('[data-coord]'); if (!co) { this.items = []; return; }
-        const xr = co.getBoundingClientRect().right - cr.left; const slot = {}; const occ = {};
+        const xr = co.getBoundingClientRect().right - cr.left; const slot = {}; const occ = {}; let back = 0;
         const card = (g) => c.querySelector('[data-card=&quot;' + g + '&quot;]');
         const mk = (d, kind) => { const el = document.createElementNS('http://www.w3.org/2000/svg', 'path'); el.setAttribute('d', d); el.setAttribute('fill', 'none'); el.setAttribute('class', 'ft-arc ft-arc--' + kind); el.setAttribute('marker-end', 'url(#ft-ar-' + kind + ')'); el.setAttribute('data-testid', 'flow-arc'); svg.appendChild(el); };
         E.forEach((e, idx) => {
@@ -20,8 +20,14 @@
                 mk(give ? ('M' + xr + ' ' + y + 'H' + (xl - 1)) : ('M' + xl + ' ' + y + 'H' + (xr + 1)), kind);
                 items.push({ k: idx, n: e.n, x: give ? xr + 16 : xl - 16, mx: xr + 34, y: y, label: (give ? 'giao: ' : 'báo: ') + e.label, kind: kind }); return; }
             const A = card(e.from), B = card(e.to); if (!A || !B) return; const ar = A.getBoundingClientRect(), br = B.getBoundingClientRect();
-            if (e.dir === 'direct') { const key = e.from + '>' + e.to; const o = occ[key] = (occ[key] ?? -1) + 1; const x = ar.left - cr.left + ar.width / 2 + (((o + 1) >> 1) * 30) * (o % 2 ? 1 : -1); const y1 = ar.bottom - cr.top, y2 = br.top - cr.top;
-                mk('M' + x + ' ' + y1 + 'V' + (y2 - 1), 'direct'); items.push({ k: idx, n: e.n, x: x, y: (y1 + y2) / 2, mx: x + 30, label: null, kind: 'direct' }); return; }
+            if (e.dir === 'direct') {
+                const order = [...c.querySelectorAll('[data-card]')].map(n => n.getAttribute('data-card')).filter(g => g !== 'images'); const ia = order.indexOf(e.from), ib = order.indexOf(e.to);
+                if (ib === ia + 1) { const key = e.from + '>' + e.to; const o = occ[key] = (occ[key] ?? -1) + 1; const x = ar.left - cr.left + ar.width / 2 + (((o + 1) >> 1) * 30) * (o % 2 ? 1 : -1); const y1 = ar.bottom - cr.top, y2 = br.top - cr.top;
+                    mk('M' + x + ' ' + y1 + 'V' + (y2 - 1), 'direct'); items.push({ k: idx, n: e.n, x: x, y: (y1 + y2) / 2, mx: x + 30, label: null, kind: 'direct' }); return; }
+                /* Quay ngược hoặc nhảy cách: KHÔNG vẽ xuyên qua các thẻ ở giữa mà đi vòng ra lề phải, mỗi đường một làn riêng */
+                const lane = back++; const xm = Math.max(ar.right, br.right) - cr.left + 16 + lane * 17; const up = ib < ia;
+                const y1 = up ? ar.top - cr.top + 30 : ar.bottom - cr.top - 16, y2 = up ? br.bottom - cr.top - 16 : br.top - cr.top + 30;
+                mk('M' + (ar.right - cr.left) + ' ' + y1 + 'H' + xm + 'V' + y2 + 'H' + (br.right - cr.left + 2), 'back'); items.push({ k: idx, n: e.n, x: xm, y: (y1 + y2) / 2, mx: xm, label: null, kind: 'back' }); return; }
             if (e.dir === 'par') { const x1 = ar.right - cr.left, x2 = br.left - cr.left, y = ar.top - cr.top + 50;
                 mk('M' + x1 + ' ' + y + 'H' + (x2 - 1), 'par'); items.push({ k: idx, n: e.n, x: (x1 + x2) / 2, y: y, mx: (x1 + x2) / 2, label: null, kind: 'par', sub: e.label }); return; }
             if (e.dir === 'join') { const x1 = br.right - cr.left, xs = ar.left - cr.left + ar.width / 2, y1 = ar.bottom - cr.top, y2 = br.top - cr.top + 40;
@@ -32,7 +38,7 @@
     @if ($repairs > 0)<span data-testid="flow-loop" class="sr-only">↻ {{ $repairs }} vòng sửa</span>@endif
     <svg class="ft-arcs" x-ref="arcs" aria-hidden="true">
         <defs>
-            @foreach (['give' => '#7c3aed', 'report' => '#059669', 'warn' => '#d97706', 'direct' => '#059669', 'par' => '#0284c7'] as $k => $col)
+            @foreach (['give' => '#7c3aed', 'report' => '#059669', 'warn' => '#d97706', 'direct' => '#059669', 'back' => '#059669', 'par' => '#0284c7'] as $k => $col)
                 <marker id="ft-ar-{{ $k }}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{{ $col }}"/></marker>
             @endforeach
         </defs>
@@ -101,10 +107,10 @@
     .ft{position:relative;width:100%;max-width:1180px;margin:0 auto;padding:.2rem 0 .4rem}
     .ft-grid{display:grid;grid-template-columns:210px 270px minmax(0,1fr);align-items:stretch}
     .ft-arcs{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2}
-    .ft-arc{stroke-width:2.2;stroke-linejoin:round}.ft-arc--direct{stroke:#059669}.ft-arc--par{stroke:#0284c7;stroke-dasharray:6 4}.ft-arc--give{stroke:#7c3aed}.ft-arc--report{stroke:#059669}.ft-arc--warn{stroke:#d97706}
+    .ft-arc{stroke-width:2.2;stroke-linejoin:round}.ft-arc--direct{stroke:#059669}.ft-arc--back{stroke:#059669;stroke-dasharray:6 4}.ft-arc--par{stroke:#0284c7;stroke-dasharray:6 4}.ft-arc--give{stroke:#7c3aed}.ft-arc--report{stroke:#059669}.ft-arc--warn{stroke:#d97706}
     .ft-badge{position:absolute;z-index:4;transform:translate(-50%,-50%);pointer-events:none}
     .ft-badge b{min-width:1.3rem;height:1.3rem;padding:0 .25rem;border-radius:999px;color:#fff;font-size:.66rem;font-weight:800;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--fl-card,#fff)}
-    .ft-badge--direct b{background:#059669}.ft-badge--par b{background:#0284c7}.ft-badge--give b{background:#7c3aed}.ft-badge--report b{background:#059669}.ft-badge--warn b{background:#d97706}
+    .ft-badge--direct b,.ft-badge--back b{background:#059669}.ft-badge--par b{background:#0284c7}.ft-badge--give b{background:#7c3aed}.ft-badge--report b{background:#059669}.ft-badge--warn b{background:#d97706}
     .ft-chip{position:absolute;z-index:3;transform:translate(0,-50%);font-size:.66rem;font-weight:700;padding:.02rem .5rem;border-radius:999px;white-space:nowrap;background:var(--fl-card,#fff);border:1px solid rgba(100,116,139,.4);color:#475569;pointer-events:none;max-width:215px;overflow:hidden;text-overflow:ellipsis}
     .ft-chip--par{border-color:#0284c7;color:#0369a1}.ft-chip--give{border-color:#7c3aed;color:#6d28d9}.ft-chip--report{border-color:#059669;color:#047857}.ft-chip--warn{border-color:#d97706;color:#b45309}
     .dark .ft-chip{color:#cbd5e1}
@@ -115,7 +121,7 @@
     .ft-dec{display:flex;gap:.4rem;align-items:flex-start;font-size:.72rem;line-height:1.3;padding:.25rem .3rem;border-radius:.5rem;background:rgba(124,58,237,.07)}
     .ft-dec__n{flex:none;min-width:1.2rem;height:1.2rem;border-radius:999px;background:#7c3aed;color:#fff;font-size:.62rem;font-weight:800;display:inline-flex;align-items:center;justify-content:center}.ft-dec__n--x{background:rgba(124,58,237,.35)}
     .ft-dec__t{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-    .ft-cards{display:grid;grid-template-columns:minmax(0,1fr) 215px;column-gap:2.6rem;row-gap:3.6rem;align-items:start}
+    .ft-cards{display:grid;grid-template-columns:minmax(0,1fr) 215px;column-gap:5.6rem;row-gap:3.6rem;align-items:start}
     .ft-hop{position:relative;display:flex;flex-direction:column;background:var(--fl-card,#fff);border:1.5px solid var(--fl-line,rgba(100,116,139,.35));border-radius:.9rem;box-shadow:var(--fl-shadow,0 1px 3px rgba(15,23,42,.08));padding:0 .45rem .45rem}
     .ft-hop--done{border-color:#059669}.ft-hop--warn,.ft-hop--stale{border-color:#d97706}.ft-hop--failed,.ft-hop--blocked{border-color:#dc2626}.ft-hop--running{border-color:#0284c7;box-shadow:0 0 0 3px rgba(2,132,199,.18)}.ft-hop--waiting{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.2)}
     .ft-visits{font-size:.64rem;font-weight:800;padding:.02rem .45rem;border-radius:999px;background:rgba(124,58,237,.14);color:#6d28d9;align-self:center;white-space:nowrap}
