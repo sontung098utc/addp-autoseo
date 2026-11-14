@@ -12,7 +12,9 @@ use App\Filament\Support\Review\ReviewWorkflow;
 use App\Filament\Support\Schedule\RescheduleAction;
 use App\Models\AgentRun;
 use App\Models\Article;
+use App\Models\KnowledgeGap;
 use App\Models\ArticleVersion;
+use App\Services\Knowledge\Suggest\KnowledgeSuggestions;
 use App\Models\KnowledgeItem;
 use App\Models\Brain;
 use App\Models\BrandProfile;
@@ -420,6 +422,31 @@ class ViewArticle extends EditArticle
         return \App\Services\Content\CitedSourceLinks::resolve(\App\Services\Content\Quality\Rules\FactRule::sources($latest->sources_cited), $candidates);
     }
 
+    /**
+     * Nút "Tạo Trí tuệ và nạp nguồn đã tìm" ở tab Nghiên cứu và nguồn (gợi ý lập Trí tuệ của điều phối): tạo Trí tuệ theo định hướng của chính bài này, gắn vào website,
+     * nạp sẵn các nguồn tin cậy đã tìm được. Cần quyền sửa Kho trí tuệ và gợi ý còn mở.
+     */
+    public function createBrainFromSuggestion(string $field): void
+    {
+        $article = $this->refreshRecord();
+        $field = trim(mb_substr(strip_tags($field), 0, 160));
+        $open = KnowledgeGap::query()->where('website_id', $article->website_id)->where('status', 'open')
+            ->where('query', mb_substr(KnowledgeSuggestions::BRAIN_PREFIX.$field, 0, 190))->exists();
+        if ($field === '' || ! $open || ! \App\Services\Brain\BrainService::canManage(auth()->user())) {
+            Notification::make()->title('Chưa tạo được Trí tuệ')->body($open ? 'Bạn chưa có quyền sửa Kho trí tuệ.' : 'Gợi ý không còn hiệu lực.')->danger()->send();
+
+            return;
+        }
+        try {
+            $r = (new \App\Services\Brain\BrainFromSuggestion)->create($article->website, $field, $article, auth()->user());
+        } catch (\Throwable $e) {
+            Notification::make()->title('Chưa tạo được Trí tuệ')->body(mb_substr($e->getMessage(), 0, 200))->danger()->send();
+
+            return;
+        }
+        Notification::make()->title('Đã tạo Trí tuệ «'.$r['brain']->name.'» và gắn vào '.$article->website->name)->body(\App\Services\Brain\BrainFromSuggestion::summary($r))->success()->persistent()->send();
+    }
+
     protected function getViewData(): array
     {
         /** @var Article $article */
@@ -505,6 +532,7 @@ class ViewArticle extends EditArticle
             'brand' => BrandProfile::query()->where('website_id', $article->website_id)->first(),
             'outline' => array_values(array_filter((array) ($briefStep?->data['outline'] ?? []), 'is_string')),
             'research' => (array) ($researchStep?->data ?? []) + (array) ($writeStep?->data ?? []),
+            'canManageBrains' => \App\Services\Brain\BrainService::canManage(auth()->user()),
             'kbActivity' => $this->kbActivity($runs),
             'kbItems' => $this->kbItemsFor($runs),
             'citedSources' => $this->citedSources($latest, $runs),

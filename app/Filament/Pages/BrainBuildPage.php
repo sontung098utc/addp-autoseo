@@ -300,16 +300,15 @@ class BrainBuildPage extends Page
 
             return;
         }
+        $article = $sg['article_id'] ? \App\Models\Article::find($sg['article_id']) : null;
         try {
-            $tpl = \App\Services\Brain\BrainTemplates::suggestFor((string) $sg['query']);
-            $brain = (new \App\Services\Brain\BrainService)->createFromTemplate((string) $sg['query'], $tpl, [$site], Auth::user());
+            $r = (new \App\Services\Brain\BrainFromSuggestion)->create($site, (string) $sg['query'], $article, Auth::user());
         } catch (KnowledgeError|\InvalidArgumentException $e) {
             Notification::make()->title('Chưa tạo được Trí tuệ')->body($e->getMessage())->danger()->send();
 
             return;
         }
-        \App\Models\KnowledgeGap::query()->where('website_id', $site->id)->where('query', mb_substr(KnowledgeSuggestions::BRAIN_PREFIX.$sg['query'], 0, 190))->update(['status' => 'filled', 'filled_at' => now()]);
-        Notification::make()->title('Đã tạo Trí tuệ «'.$brain->name.'» và gắn vào '.$site->name)->body('Bài kế tiếp thuộc lĩnh vực này sẽ tự nạp kho từ nguồn tin cậy trước khi viết. Mẫu dùng: '.$tpl.'. Bạn có thể chỉnh Hồ sơ lĩnh vực ở trang Trí tuệ.')->success()->send();
+        Notification::make()->title('Đã tạo Trí tuệ «'.$r['brain']->name.'» và gắn vào '.$site->name)->body(\App\Services\Brain\BrainFromSuggestion::summary($r))->success()->send();
     }
 
     public function dismissSuggestion(string $key): void
