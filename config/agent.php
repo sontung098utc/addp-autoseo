@@ -14,7 +14,7 @@ return [
         'medical' => (bool) env('AGENT_IMAGES_MEDICAL', true),
         // Trần chi phí ảnh = tỉ lệ này của ngân sách phiên.
         'budget_share' => 0.10,
-        'default_budget_vnd' => 50000.0,
+        'default_budget_vnd' => 100000.0,
         // Ước tính giá một ảnh khi provider không khai pricing['image_vnd']. Chưa đo thật.
         'cost_vnd_per_image' => (float) env('AGENT_IMAGES_COST_VND', 1000),
         // Chèn <figure> vào thân bài sau mục H2 tương ứng. Tắt thì chỉ gắn vào phiên bản (ảnh bìa + danh sách ảnh).

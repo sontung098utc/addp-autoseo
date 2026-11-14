@@ -172,7 +172,7 @@ class AgentRunDetailTest extends TestCase
 
     public function test_chi_phi_so_voi_ngan_sach_va_thanh_tien_do(): void
     {
-        $r = $this->run_('ready_for_review', [['guard', 'ok']], ['cost_vnd' => 25000, 'tokens_used' => 3000]);
+        $r = $this->run_('ready_for_review', [['guard', 'ok']], ['cost_vnd' => 50000, 'tokens_used' => 3000]);
         $flow = RunFlow::build($r, $r->steps, false, false, null);
         $this->assertSame(50, $flow['budgetPct']);
         $html = $this->page($r);

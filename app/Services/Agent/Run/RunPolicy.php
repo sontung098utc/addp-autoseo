@@ -7,7 +7,7 @@ final class RunPolicy
 {
     public function __construct(
         public readonly int $maxRepairRounds = 3,
-        public readonly float $budgetVnd = 50000.0,
+        public readonly float $budgetVnd = 100000.0,
         public readonly string $trustTier = 'T1',
         /** Số lần THỬ LẠI sau lần gọi đầu khi nhà cung cấp lỗi tạm thời (tổng tối đa 1 + 3 lần gọi). */
         public readonly int $maxRetries = 3,
