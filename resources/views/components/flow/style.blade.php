@@ -60,8 +60,12 @@
     .fl-node--done{border-color:var(--fl-done);background:linear-gradient(180deg,rgba(5,150,105,.08),transparent 55%),var(--fl-card)}
     .fl-node--warn,.fl-node--stale{border-color:var(--fl-warn);background:linear-gradient(180deg,rgba(217,119,6,.10),transparent 55%),var(--fl-card)}
     .fl-node--failed,.fl-node--blocked{border-color:var(--fl-fail);background:linear-gradient(180deg,rgba(220,38,38,.09),transparent 55%),var(--fl-card)}
-    .fl-node--running{border-color:var(--fl-run);background:linear-gradient(105deg,transparent 30%,rgba(125,211,252,.5) 50%,transparent 70%) -70% 0/55% 100% no-repeat,linear-gradient(180deg,rgba(2,132,199,.10),transparent 55%) 0 0/100% 100% no-repeat,var(--fl-card);box-shadow:0 0 0 3px rgba(2,132,199,.16),var(--fl-shadow);animation:fl-sweep 2s ease-in-out infinite}
-    .fl-node--running::after{content:"";position:absolute;inset:-4px;border-radius:calc(.85rem + 4px);border:2px solid var(--fl-run);opacity:0;pointer-events:none;animation:fl-ring 2.2s ease-out infinite;will-change:transform,opacity}
+    /* Bước đang chạy: thẻ phẳng, viền xanh mảnh, nền xanh rất nhạt; chấm "đang phát" nhấp nháy ở góc (thay cho biểu tượng xoay) và một vạch sáng mảnh trượt ở mép trên. Không quầng sáng, không phóng to. */
+    .fl-node--running{border-color:var(--fl-run);background:linear-gradient(0deg,rgba(2,132,199,.05),rgba(2,132,199,.05)),var(--fl-card);box-shadow:var(--fl-shadow);overflow:hidden}
+    .fl-node--running::before{content:"";position:absolute;left:0;top:0;width:100%;height:2px;background:linear-gradient(90deg,transparent,var(--fl-run),transparent) -60% 0/45% 100% no-repeat;animation:fl-bar 1.8s ease-in-out infinite;pointer-events:none}
+    .fl-node--running .fl-stico{display:none}
+    .fl-node--running .fl-node__head::after{content:"";margin-left:auto;flex:none;width:.55rem;height:.55rem;margin-right:.2rem;border-radius:50%;background:var(--fl-run);animation:fl-ping 1.5s ease-out infinite}
+    .fl-node--running .fl-state svg{display:none}
     .fl-node--waiting{border-color:var(--fl-wait);border-width:2px;background:linear-gradient(180deg,rgba(124,58,237,.14),transparent 65%),var(--fl-card);box-shadow:0 0 0 4px rgba(124,58,237,.18),var(--fl-shadow)}
     .fl-node.is-sel{box-shadow:0 0 0 3px var(--fl-run),var(--fl-shadow)}
     .fl-node--done .fl-stico{color:var(--fl-done)}.fl-node--warn .fl-stico,.fl-node--stale .fl-stico{color:var(--fl-warn)}
@@ -79,12 +83,11 @@
     .fl-end ul{margin:0;padding-left:1rem;list-style:disc}
     .fl-end a{font-size:.74rem;text-decoration:underline;text-underline-offset:2px;color:inherit;font-weight:600}
     @keyframes fl-beat{0%,100%{box-shadow:0 0 0 0 rgba(2,132,199,.45)}50%{box-shadow:0 0 0 7px rgba(2,132,199,0)}}
-    /* Bước đang chạy: vệt sáng xoẹt ngang qua thẻ (lặp), cùng vòng sáng nhịp thở có sẵn. */
-    @keyframes fl-sweep{0%{background-position:-70% 0,0 0}65%,100%{background-position:170% 0,0 0}}
-    @keyframes fl-ring{0%{opacity:.55;transform:scale(.985)}70%,100%{opacity:0;transform:scale(1.035)}}
+    @keyframes fl-ping{0%{box-shadow:0 0 0 0 rgba(2,132,199,.55)}75%,100%{box-shadow:0 0 0 .5rem rgba(2,132,199,0)}}
+    @keyframes fl-bar{0%{background-position:-60% 0}100%{background-position:160% 0}}
     @keyframes fl-march{to{background-position:14px 0}}
     @keyframes fl-march-v{to{background-position:0 14px}}
-    @media (prefers-reduced-motion:reduce){.fl-node--running{animation:none}.fl-node--running::after{animation:none;opacity:0}.fl-link--live{animation:none}button.fl-node:hover{transform:none}}
+    @media (prefers-reduced-motion:reduce){.fl-node--running::before,.fl-node--running .fl-node__head::after{animation:none}.fl-link--live{animation:none}button.fl-node:hover{transform:none}}
     /* Hình minh họa */
     .fl-illu{color:#64748b}
     .fl-illu svg{display:block;width:100%;height:100%}

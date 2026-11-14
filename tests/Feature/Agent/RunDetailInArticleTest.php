@@ -134,11 +134,16 @@ class RunDetailInArticleTest extends TestCase
         $detail = substr($html, strpos($html, 'data-testid="aw-run-detail"'));
         $this->assertMatchesRegularExpression('/studioTabs\\([\'"]dien-bien/', $detail, 'tab lồng trong phiên mặc định là Diễn biến, kể cả phiên đã xong');
 
-        // Bước đang chạy: vệt sáng xoẹt ngang (CSS) và tắt khi người dùng chọn giảm chuyển động.
+        // Bước đang chạy: thẻ phẳng, chấm "đang phát" nhấp nháy ở góc và vạch sáng mảnh trượt ở mép trên (CSS); tắt khi người dùng chọn giảm chuyển động.
         $css = (string) file_get_contents(resource_path('views/components/flow/style.blade.php'));
-        $this->assertStringContainsString('@keyframes fl-sweep', $css);
-        $this->assertMatchesRegularExpression('/\.fl-node--running\{[^}]*animation:fl-sweep/', $css);
-        $this->assertMatchesRegularExpression('/prefers-reduced-motion:reduce\)\{\.fl-node--running\{animation:none\}/', $css);
+        $this->assertStringContainsString('@keyframes fl-ping', $css);
+        $this->assertStringContainsString('@keyframes fl-bar', $css);
+        $this->assertMatchesRegularExpression('/\.fl-node--running::before\{[^}]*animation:fl-bar/', $css);
+        $this->assertMatchesRegularExpression('/\.fl-node--running \.fl-node__head::after\{[^}]*animation:fl-ping/', $css);
+        $this->assertMatchesRegularExpression('/prefers-reduced-motion:reduce\)\{\.fl-node--running::before,\.fl-node--running \.fl-node__head::after\{animation:none\}/', $css);
+        foreach (['@keyframes fl-ring', '@keyframes fl-sweep', '@keyframes fl-breathe'] as $old) {
+            $this->assertStringNotContainsString($old, $css, 'Bỏ các hiệu ứng cũ trông rối (vòng phóng to, vệt xoẹt chéo, quầng thở).');
+        }
     }
 
     public function test_khong_lap_noi_dung_trong_trang_bai(): void
