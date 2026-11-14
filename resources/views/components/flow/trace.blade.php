@@ -20,7 +20,7 @@
                 mk(give ? ('M' + xr + ' ' + y + 'H' + (xl - 1)) : ('M' + xl + ' ' + y + 'H' + (xr + 1)), kind);
                 items.push({ k: idx, n: e.n, x: give ? xr + 16 : xl - 16, mx: (xr + xl) / 2, y: y, label: (give ? 'giao: ' : 'báo: ') + e.label, kind: kind }); return; }
             const A = card(e.from), B = card(e.to); if (!A || !B) return; const ar = A.getBoundingClientRect(), br = B.getBoundingClientRect();
-            if (e.dir === 'direct') { const key = e.from + '>' + e.to; const o = occ[key] = (occ[key] ?? -1) + 1; const x = ar.left - cr.left + ar.width / 2 + (((o + 1) >> 1) * 24) * (o % 2 ? 1 : -1); const y1 = ar.bottom - cr.top, y2 = br.top - cr.top;
+            if (e.dir === 'direct') { const key = e.from + '>' + e.to; const o = occ[key] = (occ[key] ?? -1) + 1; const x = ar.left - cr.left + ar.width / 2 + (((o + 1) >> 1) * 30) * (o % 2 ? 1 : -1); const y1 = ar.bottom - cr.top, y2 = br.top - cr.top;
                 mk('M' + x + ' ' + y1 + 'V' + (y2 - 1), 'direct'); items.push({ k: idx, n: e.n, x: x, y: (y1 + y2) / 2, mx: x + 30, label: null, kind: 'direct' }); return; }
             if (e.dir === 'par') { const x1 = ar.right - cr.left, x2 = br.left - cr.left, y = ar.top - cr.top + 50;
                 mk('M' + x1 + ' ' + y + 'H' + (x2 - 1), 'par'); items.push({ k: idx, n: e.n, x: (x1 + x2) / 2, y: y, mx: (x1 + x2) / 2, label: null, kind: 'par', sub: e.label }); return; }
@@ -99,13 +99,13 @@
 @once
 <style>
     .ft{position:relative;width:100%;max-width:1180px;margin:0 auto;padding:.2rem 0 .4rem}
-    .ft-grid{display:grid;grid-template-columns:230px 214px minmax(0,1fr);align-items:stretch}
+    .ft-grid{display:grid;grid-template-columns:210px 270px minmax(0,1fr);align-items:stretch}
     .ft-arcs{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2}
     .ft-arc{stroke-width:2.2;stroke-linejoin:round}.ft-arc--direct{stroke:#059669}.ft-arc--par{stroke:#0284c7;stroke-dasharray:6 4}.ft-arc--give{stroke:#7c3aed}.ft-arc--report{stroke:#059669}.ft-arc--warn{stroke:#d97706}
     .ft-badge{position:absolute;z-index:4;transform:translate(-50%,-50%);pointer-events:none}
     .ft-badge b{min-width:1.3rem;height:1.3rem;padding:0 .25rem;border-radius:999px;color:#fff;font-size:.66rem;font-weight:800;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--fl-card,#fff)}
     .ft-badge--direct b{background:#059669}.ft-badge--par b{background:#0284c7}.ft-badge--give b{background:#7c3aed}.ft-badge--report b{background:#059669}.ft-badge--warn b{background:#d97706}
-    .ft-chip{position:absolute;z-index:3;transform:translate(-50%,-50%);font-size:.66rem;font-weight:700;padding:.02rem .5rem;border-radius:999px;white-space:nowrap;background:var(--fl-card,#fff);border:1px solid rgba(100,116,139,.4);color:#475569;pointer-events:none;max-width:204px;overflow:hidden;text-overflow:ellipsis}
+    .ft-chip{position:absolute;z-index:3;transform:translate(-50%,-50%);font-size:.66rem;font-weight:700;padding:.02rem .5rem;border-radius:999px;white-space:nowrap;background:var(--fl-card,#fff);border:1px solid rgba(100,116,139,.4);color:#475569;pointer-events:none;max-width:262px;overflow:hidden;text-overflow:ellipsis}
     .ft-chip--par{border-color:#0284c7;color:#0369a1}.ft-chip--give{border-color:#7c3aed;color:#6d28d9}.ft-chip--report{border-color:#059669;color:#047857}.ft-chip--warn{border-color:#d97706;color:#b45309}
     .dark .ft-chip{color:#cbd5e1}
     .ft-coord{position:relative;border:1.5px solid #7c3aed;border-radius:.9rem;background:linear-gradient(180deg,rgba(124,58,237,.08),transparent 30%),var(--fl-card,#fff);padding:0}

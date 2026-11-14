@@ -135,7 +135,7 @@ final class FlowGraph
             $b = $hops[$ib];
             if ($b['decisions'] !== []) { // có quyết định của điều phối giữa hai lượt: đi qua điều phối
                 $events[] = ['n' => ++$n, 'card' => $a['group'], 'dir' => 'report', 'label' => $info[$ia]['report'], 'state' => $info[$ia]['state'], 'hop' => $ia];
-                $events[] = ['n' => ++$n, 'card' => $b['group'], 'dir' => 'give', 'label' => self::short($b['decisions'][0]['title'], 28), 'state' => 'give', 'hop' => $ib];
+                $events[] = ['n' => ++$n, 'card' => $b['group'], 'dir' => 'give', 'label' => self::short($b['decisions'][0]['title'], 40), 'state' => 'give', 'hop' => $ib];
                 $giveNo[$ib] = $n;
             } else {
                 $events[] = ['n' => ++$n, 'from' => $a['group'], 'to' => $b['group'], 'dir' => 'direct', 'label' => null, 'state' => $info[$ib]['state'], 'hop' => $ib];

@@ -381,9 +381,6 @@ final class AgentRunOrchestrator
             ($assess->reasons === [] && $brainRaise === '' ? 'Chủ đề thường, không chạm nhóm nhạy cảm.' : implode(' ', $assess->reasons).$brainRaise).($assess->level === 'high' ? ' Bài cần người có chuyên môn duyệt.' : ''),
             ['level' => $assess->level] + ($brainRaise !== '' ? ['raised_by_brain' => true] : []) + $this->brainCtx->stepData());
 
-        // 2b. AI tự chuẩn bị kiến thức (không có cổng dừng).
-        $this->prepareKnowledge($run, $article, $assess);
-
         if ($this->router) {
             foreach (($this->roleOff('strategist') ? ['write'] : ['outline', 'write']) as $task) {
                 if (($why = $this->router->why($task)) !== null) {
@@ -885,9 +882,12 @@ final class AgentRunOrchestrator
     {
         $risk = (string) $assess->level;
         $this->coordinateKnowledge($run, $article, $risk); // kho (xây/nạp thêm hoặc đề xuất) luôn chạy TRƯỚC khi lấy nguồn, tổng hợp, dàn ý và viết
+        $this->prepareKnowledge($run, $article, $assess); // dự phòng: rủi ro cao mà điều phối kho xong vẫn chưa có mục đã duyệt khớp thì mới tự đọc website (trước đây chạy TRƯỚC điều phối kho nên hai cơ chế đè nhau)
         $this->gatherReferences($run, $article, $risk);
         $ai = $this->roleOff('strategist') ? null : $this->strategistAi();
         if ($ai === null || $this->spent($run) >= $this->policy->budgetVnd) {
+            $this->step($run, 'synthesize', 'strategist', 'skipped', 'Bỏ qua tổng hợp nguồn', $ai === null ? 'Vai trò Chiến lược đang tắt hoặc chưa có AI hỗ trợ JSON có cấu trúc nên không tổng hợp nguồn; dàn ý và bài viết đi tiếp như cũ.' : 'Đã dùng hết ngân sách phiên nên không tổng hợp nguồn; dàn ý và bài viết đi tiếp như cũ.');
+
             return;
         }
         $planner = new \App\Services\Content\ContentPlanner(new AiJson($ai, $this->sleep));

@@ -152,7 +152,7 @@ class ContentSynthesisTest extends TestCase
         $article = Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'so sánh máy dập viên', 'workflow_status' => 'planned']);
         $run = (new AgentRunOrchestrator($plain, sleep: fn () => null))->run($article);
         $this->assertArrayNotHasKey('content_plan', $plain->opts[0]);
-        $this->assertNull($run->steps->firstWhere('stage', 'synthesize'));
+        $this->assertSame('skipped', $run->steps->firstWhere('stage', 'synthesize')?->status, 'không có AI cấu trúc thì ghi rõ là bỏ qua, không im lặng');
         $this->assertSame('ready_for_review', $run->status);
 
         SynthSearch::$rows = [];
