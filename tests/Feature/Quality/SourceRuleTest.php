@@ -75,6 +75,16 @@ class SourceRuleTest extends TestCase
         $this->assertNotContains('SRC01', $rep->blockingCodes());
     }
 
+    public function test_unmatched_tra_ve_dung_cac_nguon_chua_kiem_duoc(): void
+    {
+        [, , $a] = $this->world();
+        $v = QualityFixtures::version($a, ++$this->ver, 'needs_review', ['html_content' => QualityFixtures::goodHtml(), 'sources_cited' => ['Tạp chí không có thật XYZ', 'https://who.int/a']]);
+        $ctx = new \App\Services\Content\Quality\QualityContext($v, $a, null);
+        $ctx->knownSources = [['title' => 'WHO', 'url' => 'https://who.int/a', 'domain' => 'who.int']];
+
+        $this->assertSame(['Tạp chí không có thật XYZ'], (new SourceRule)->unmatched($ctx, ['Tạp chí không có thật XYZ', 'https://who.int/a']));
+    }
+
     public function test_khong_sources_cited_khong_co(): void
     {
         [, , $a] = $this->world();

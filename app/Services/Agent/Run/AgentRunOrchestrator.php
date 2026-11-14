@@ -507,6 +507,7 @@ final class AgentRunOrchestrator
             $this->decision($run, 'max_rounds', 'Dừng sửa vì hết số vòng cho phép', "Đã sửa {$round}/{$maxRounds} vòng, còn ".count($report->failed()).' mục chưa đạt nên không sửa thêm.', ['rounds' => $round, 'max_rounds' => $maxRounds, 'score' => $score]);
         }
         $run->update(['repair_rounds' => $round]);
+        $attrs = $this->pruneUnverifiedSources($run, $article, $attrs);
 
         // 7. Bàn giao: chỉ tạo BẢN NHÁP. Không bao giờ xuất bản ở bậc T1.
         $passed = ! $report->hasBlocking();
@@ -1476,6 +1477,37 @@ final class AgentRunOrchestrator
             'ai_provider' => $r['model'] ?? 'ai-engine', 'ai_model' => $r['model'] ?? 'unknown', 'prompt_version' => $r['prompt_version'] ?? 'v1.0',
             'tokens_used' => (int) ($r['tokens_used'] ?? 0), 'cost_vnd' => (float) ($r['cost_vnd'] ?? 0),
         ];
+    }
+
+    /**
+     * Gỡ khỏi danh sách nguồn các nguồn AI TỰ NÊU mà hệ thống không kiểm được (không khớp kho, Căn cứ chuẩn mực, website hay tài liệu web đã tìm thấy): không đưa nguồn chưa kiểm vào bài giao.
+     * Viết lại nhiều lần vẫn không loại được vì người viết cứ nhớ ra một nguồn khác theo trí nhớ; tất định, có ghi quyết định.
+     *
+     * @param  array<string, mixed>  $attrs
+     * @return array<string, mixed>
+     */
+    private function pruneUnverifiedSources(AgentRun $run, Article $article, array $attrs): array
+    {
+        try {
+            $cited = \App\Services\Content\Quality\Rules\FactRule::sources($attrs['sources_cited'] ?? []);
+            if ($cited === []) {
+                return $attrs;
+            }
+            $ctx = new \App\Services\Content\Quality\QualityContext(new ArticleVersion($attrs), $article, $this->brainCtx->ids() ?: null);
+            $ctx->knownSources = array_map(fn ($r) => ['title' => (string) ($r['title'] ?? ''), 'url' => (string) ($r['url'] ?? ''), 'domain' => (string) ($r['domain'] ?? '')], $this->references);
+            $bad = (new \App\Services\Content\Quality\Rules\SourceRule)->unmatched($ctx, $cited);
+            if ($bad === []) {
+                return $attrs;
+            }
+            $attrs['sources_cited'] = array_values(array_filter((array) ($attrs['sources_cited'] ?? []), function ($x) use ($bad) {
+                return array_intersect(\App\Services\Content\Quality\Rules\FactRule::sources([$x]), $bad) === [];
+            }));
+            $this->decision($run, 'sources_pruned', 'Gỡ '.count($bad).' nguồn chưa kiểm được khỏi danh sách nguồn', 'Các nguồn do AI tự nêu nhưng không khớp kho, Căn cứ chuẩn mực hay tài liệu đã tìm thấy nên không đưa vào bài giao: '.implode('; ', array_map(fn ($u) => '«'.mb_substr($u, 0, 90).'»', array_slice($bad, 0, 4))).'.', ['count' => count($bad)]);
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return $attrs;
     }
 
     /** Các mục lỗi người viết sửa được bằng cách viết lại (loại các mục phụ thuộc nguồn trong kho: bằng chứng, trích dẫn, nguồn AI nêu). */

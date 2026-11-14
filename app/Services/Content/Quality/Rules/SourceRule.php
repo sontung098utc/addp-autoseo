@@ -35,6 +35,25 @@ class SourceRule implements QualityRule
         if ($cited === []) {
             return [];
         }
+        $unmatched = $this->unmatched($ctx, $cited);
+        if ($unmatched === []) {
+            return [new RuleResult('SRC01', RuleResult::P1, true, $label, 'Mọi nguồn AI nêu đều khớp kho kiến thức, Căn cứ chuẩn mực hoặc website (chỉ đối chiếu tên/tên miền, không kiểm nội dung nguồn).', count($cited).' nguồn')];
+        }
+        $list = implode('; ', array_map(fn ($u) => '"'.mb_substr($u, 0, 80).'"', array_slice($unmatched, 0, 3)));
+
+        return [new RuleResult('SRC01', RuleResult::P1, false, $label,
+            count($unmatched).'/'.count($cited).' nguồn không khớp kho kiến thức, Căn cứ chuẩn mực hay website: '.$list.'. AI tự nêu, chưa kiểm: hãy xác minh nguồn có thật trước khi duyệt, hoặc thêm vào Căn cứ chuẩn mực nếu đúng.',
+            count($unmatched).' nguồn chưa kiểm', '0 nguồn không khớp')];
+    }
+
+    /**
+     * Các nguồn AI tự nêu mà KHÔNG khớp kho, Căn cứ chuẩn mực, website hay tài liệu web hệ thống đã tìm thấy.
+     *
+     * @param  list<string>  $cited
+     * @return list<string>
+     */
+    public function unmatched(QualityContext $ctx, array $cited): array
+    {
         $article = $ctx->article;
         $site = $article?->website;
         $ids = $article ? array_values(array_unique(array_merge(BrainContext::forArticle($article)->ids(), array_map('intval', $ctx->brainIds ?? [])))) : [];
@@ -81,14 +100,7 @@ class SourceRule implements QualityRule
                 $unmatched[] = $c;
             }
         }
-        if ($unmatched === []) {
-            return [new RuleResult('SRC01', RuleResult::P1, true, $label, 'Mọi nguồn AI nêu đều khớp kho kiến thức, Căn cứ chuẩn mực hoặc website (chỉ đối chiếu tên/tên miền, không kiểm nội dung nguồn).', count($cited).' nguồn')];
-        }
-        $list = implode('; ', array_map(fn ($u) => '"'.mb_substr($u, 0, 80).'"', array_slice($unmatched, 0, 3)));
-
-        return [new RuleResult('SRC01', RuleResult::P1, false, $label,
-            count($unmatched).'/'.count($cited).' nguồn không khớp kho kiến thức, Căn cứ chuẩn mực hay website: '.$list.'. AI tự nêu, chưa kiểm: hãy xác minh nguồn có thật trước khi duyệt, hoặc thêm vào Căn cứ chuẩn mực nếu đúng.',
-            count($unmatched).' nguồn chưa kiểm', '0 nguồn không khớp')];
+        return $unmatched;
     }
 
     /** @param array<string,true> $names @param array<string,true> $domains */
