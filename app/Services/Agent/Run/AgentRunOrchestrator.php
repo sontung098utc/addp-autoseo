@@ -438,7 +438,7 @@ final class AgentRunOrchestrator
         $round = $editRounds;
         // Vòng sửa chạy khi còn lỗi CHẶN, hoặc (Trí tuệ bắt buộc nguồn) còn đoạn khẳng định chưa có dấu trích dẫn [KB#id] (CITE01, P1): lỗi sau không chặn bàn giao nhưng được sửa.
         // Lỗi MỀM (thiếu dấu trích, trích không hỗ trợ) chỉ được sửa tối đa 1 vòng sau biên tập: sửa mãi chỉ làm dấu trích rơi vào chỗ không hợp và bài kém đi.
-        while ($this->needsRepair($report) && $round < $maxRounds && ($report->hasBlocking() || $report->layoutGaps() !== [] || $round - $editRounds < 1)) {
+        while ($this->needsRepair($report) && $round < $maxRounds && ($report->hasBlocking() || $report->layoutGaps() !== [] || $report->leakGaps() !== [] || $round - $editRounds < 1)) {
             if ($this->spent($run) >= $this->policy->budgetVnd) {
                 $reason = 'Hết ngân sách cho phiên chạy ('.number_format($this->policy->budgetVnd, 0, ',', '.').' ₫) nên dừng sửa.';
                 $this->decision($run, 'budget_exhausted', 'Dừng sửa vì hết ngân sách', $reason, ['spent_vnd' => $this->spent($run), 'budget_vnd' => $this->policy->budgetVnd, 'score' => $score]);
@@ -946,7 +946,7 @@ final class AgentRunOrchestrator
     /** Còn việc phải sửa không: lỗi chặn, đoạn thiếu dấu trích (CHỈ khi kho có mục để trích), trích dẫn không hỗ trợ, lỗi bố cục. */
     private function needsRepair(QualityReport $report): bool
     {
-        return $report->hasBlocking() || ($this->kbHasItems() && $report->citationGaps() !== []) || $report->layoutGaps() !== [] || $report->supportGaps() !== [];
+        return $report->hasBlocking() || ($this->kbHasItems() && $report->citationGaps() !== []) || $report->layoutGaps() !== [] || $report->supportGaps() !== [] || $report->leakGaps() !== [];
     }
 
     /** Kho kiến thức đã nạp được ít nhất một mục (không tính quy tắc/sản phẩm) cho bài đang chạy. */
@@ -967,6 +967,9 @@ final class AgentRunOrchestrator
         }
         foreach (array_slice($report->layoutGaps(), 0, 6) as $gap) {
             $feedback[] = 'LAY01: '.$gap;
+        }
+        foreach (array_slice($report->leakGaps(), 0, 8) as $gap) {
+            $feedback[] = 'PROC01: câu «'.$gap.'» nói về việc tìm/đối chiếu nguồn. CẤM trong thân bài (kiểu "chúng tôi đối chiếu", "một nguồn nêu", "các nguồn đồng thuận", "bài này không đưa..."). Viết lại thành khẳng định trực tiếp, đúng mức chắc chắn, giữ nguyên nội dung hữu ích.';
         }
 
         if (array_filter($feedback, fn ($f) => str_starts_with($f, 'CITE') || str_starts_with($f, 'EVID') || str_starts_with($f, 'SRC'))) {
@@ -1451,7 +1454,7 @@ final class AgentRunOrchestrator
         $c = $r->counts();
         // Ngoài số luật còn trượt, tính cả SỐ CHỖ còn lệch (đoạn thiếu trích dẫn, trích dẫn không hỗ trợ câu, khối bố cục lạm dụng): sửa 11 chỗ còn 2 chỗ là tiến bộ thật
         // dù luật vẫn trượt. Trước đây chỉ đếm luật nên vòng sửa dừng nhầm với lý do "không cải thiện".
-        $gaps = count($r->citationGaps()) + count($r->supportGaps()) + count($r->layoutGaps());
+        $gaps = count($r->citationGaps()) + count($r->supportGaps()) + count($r->layoutGaps()) + count($r->leakGaps());
 
         return $c['P0'] * 10 + $c['P1'] * 3 + $c['P2'] + $gaps;
     }

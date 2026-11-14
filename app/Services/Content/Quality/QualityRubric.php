@@ -97,6 +97,8 @@ final class QualityRubric
                 'max_callouts' => 2, 'callout_max_words' => 60, 'toc_min_words' => 1200, 'toc_min_h2' => 4, 'summary_min_words' => 800,
             ], 'heuristic',
                 'Hộp trang trí đặt bừa làm bài rối và loãng ý chính; mỗi khối phải có lý do nội dung.', 'internal', [], 'Ngưỡng là heuristic của hệ thống (kỹ năng writer/article-layout), chưa có nghiên cứu chứng minh. Không chặn nhưng đưa vào vòng sửa.'),
+            'PROC01' => self::entry('PROC01', 'Thân bài không lộ quá trình tìm/đối chiếu nguồn', 'Cờ P1 khi thân bài có câu nói về việc tìm hay đối chiếu nguồn ("chúng tôi đối chiếu...", "một nguồn nêu...", "các nguồn đồng thuận...", "bài này không đưa... vì chưa có căn cứ"). Khối Nguồn tham khảo cuối bài không bị xét.', [], 'internal',
+                'Người đọc cần kiến thức nói thẳng, không cần biết hệ thống tìm nguồn thế nào; câu như vậy làm bài nghe né tránh và thiếu tự tin.', 'internal', [], 'Quy tắc nội bộ dạng mẫu câu, tất định; có thể bỏ sót cách diễn đạt khác. Không chặn nhưng đưa vào vòng sửa.'),
             'IMG02' => self::entry('IMG02', 'Ô ảnh giữ chỗ không có ảnh', 'Cờ P1 khi khối ảnh (figure) chỉ có chú thích mà không có ảnh, hoặc thẻ img không có src.', [], 'internal',
                 'Ô trống/chú thích mồ côi làm bài trông dở dang.', 'internal', [], 'Quy tắc nội bộ, tất định; không kiểm ảnh có tải được hay không. Không chặn.'),
             'INT01' => self::entry('INT01', 'Độ cụ thể theo ý định (giá / so sánh)', 'Cờ P1 "thiếu cụ thể" khi từ khóa là báo giá mà bài không có mức giá, hoặc là so sánh mà bài không có bảng (≥ 3 hàng) hay tên cụ thể của ≥ 3 đối tượng.', [

@@ -91,6 +91,22 @@ final class QualityReport
         return [];
     }
 
+    /**
+     * Các câu lộ quá trình tìm/đối chiếu nguồn trong thân bài (PROC01) để đưa vào vòng sửa.
+     *
+     * @return list<string>
+     */
+    public function leakGaps(): array
+    {
+        foreach ($this->results as $r) {
+            if ($r->code === 'PROC01' && ! $r->passed && $r->details !== []) {
+                return $r->details;
+            }
+        }
+
+        return [];
+    }
+
     /** @return list<string> mã luật P0 chưa đạt (duy nhất) */
     public function blockingCodes(): array
     {

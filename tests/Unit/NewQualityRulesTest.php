@@ -10,6 +10,7 @@ use App\Services\Content\Quality\Rules\HeadingLeakRule;
 use App\Services\Content\Quality\Rules\ImagePlaceholderRule;
 use App\Services\Content\Quality\Rules\IntentSpecificityRule;
 use App\Services\Content\Quality\Rules\PaddingRule;
+use App\Services\Content\Quality\Rules\ProcessLeakRule;
 use App\Services\Content\Quality\Rules\TextGlitchRule;
 use Tests\TestCase;
 
@@ -64,6 +65,16 @@ class NewQualityRulesTest extends TestCase
         $this->assertSame('LEAK01', $f[0]->code);
         $this->assertStringContainsString('2 tiêu đề', $f[0]->message);
         $this->assertSame([], $this->check(new HeadingLeakRule, '<h2>H2O trong thuốc tiêm</h2><h2>Bước 1: Chuẩn bị</h2>'));
+    }
+
+    public function test_than_bai_khong_duoc_lo_qua_trinh_tim_doi_chieu_nguon(): void
+    {
+        $bad = '<p>Huyết áp thấp là dưới 90/60. Những tài liệu y khoa chúng tôi đối chiếu không nêu thực phẩm nào.</p><p>Một nguồn nêu uống nước trước bữa ăn có thể giúp. Bài này không đưa danh sách món vì chưa có căn cứ.</p><ul><li>Các nguồn đồng thuận rằng nước quan trọng.</li></ul>';
+        $f = $this->check(new ProcessLeakRule, $bad);
+        $this->assertSame('PROC01', $f[0]->code);
+        $this->assertStringContainsString('4 câu', $f[0]->message);
+        $ok = '<p>Huyết áp thấp là dưới khoảng 90/60 mmHg. Uống nước trước bữa ăn có thể giúp giảm tụt huyết áp sau ăn.</p><div class="autoseo-refs"><p>Một nguồn nêu</p></div>';
+        $this->assertSame([], $this->check(new ProcessLeakRule, $ok));
     }
 
     public function test_o_anh_giu_cho_khong_co_anh(): void
