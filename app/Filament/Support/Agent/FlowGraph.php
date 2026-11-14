@@ -41,6 +41,8 @@ final class FlowGraph
         $hops = [];
         $imageSteps = [];
         $pending = [];
+        $ord = []; // số thứ tự của từng bước thật từ đầu tới cuối phiên (không tính quyết định, thử lại)
+        $counter = 0;
         foreach ($steps->sortBy('seq') as $s) {
             if (in_array($s->stage, ['retry', 'failover'], true)) {
                 continue;
@@ -51,15 +53,16 @@ final class FlowGraph
                 continue;
             }
             $code = RunFlow::segmentOf($s);
+            if ($code !== 'images' && ! isset(self::GROUP_OF[$code])) {
+                continue;
+            }
+            $ord[$s->id] = ++$counter;
             if ($code === 'images') {
                 $imageSteps[] = $s;
 
                 continue;
             }
-            $group = self::GROUP_OF[$code] ?? null;
-            if ($group === null) {
-                continue;
-            }
+            $group = self::GROUP_OF[$code];
             $last = $hops === [] ? null : array_key_last($hops);
             if ($last === null || $hops[$last]['group'] !== $group || $pending !== []) {
                 $hops[] = ['group' => $group, 'steps' => [], 'decisions' => $pending];
@@ -82,15 +85,21 @@ final class FlowGraph
             $hops[$lastHop]['steps'][$runningCode] ??= [];
         }
 
-        // Gộp theo khối: quay lại một khối đã có (vòng chấm ↔ sửa, bổ sung nguồn) KHÔNG tạo thẻ mới mà tăng số lần vào khối và vẽ thành mũi tên quay lại.
+        // Gộp theo khối: quay lại một khối đã có KHÔNG tạo thẻ mới. Mỗi lần đi từ khối này sang khối kia là MỘT ĐƯỜNG riêng, đánh số theo thứ tự bước trong phiên.
         $cards = [];
         $seq = [];
         $lastIndex = $hops === [] ? null : array_key_last($hops);
         foreach ($hops as $i => $h) {
             $g = $h['group'];
-            $same = $seq !== [] && end($seq) === $g;
+            $firstStep = collect($h['steps'])->flatten()->first();
+            $firstN = $firstStep ? ($ord[$firstStep->id] ?? null) : $counter + 1;
+            foreach ($h['decisions'] as &$dd) {
+                $dd['to_n'] = $firstN;
+            }
+            unset($dd);
+            $same = $seq !== [] && end($seq)['g'] === $g;
             if (! $same) {
-                $seq[] = $g;
+                $seq[] = ['g' => $g, 'n' => $firstN];
             }
             $cards[$g] ??= ['group' => $g, 'steps' => [], 'decisions' => [], 'visits' => 0];
             $cards[$g]['visits'] += $same ? 0 : 1;
@@ -101,11 +110,6 @@ final class FlowGraph
         }
         $order = array_keys($cards);
         $pos = array_flip($order);
-        $pairs = [];
-        for ($i = 1; $i < count($seq); $i++) {
-            $k = $seq[$i - 1].'>'.$seq[$i];
-            $pairs[$k] = ($pairs[$k] ?? 0) + 1;
-        }
 
         $anyRunning = false;
         $out = [];
@@ -113,58 +117,55 @@ final class FlowGraph
             $subs = [];
             foreach ($c['steps'] as $code => $list) {
                 $running = $runningCode === $code && isset($hops[$lastIndex]['steps'][$code]) && $hops[$lastIndex]['group'] === $g;
-                $subs[] = self::sub($by[$code], $list, $durations, $running);
+                $sub = self::sub($by[$code], $list, $durations, $running);
+                $sub['ords'] = self::ranges(array_map(fn ($x) => $ord[$x->id] ?? 0, $list));
+                $subs[] = $sub;
                 $anyRunning = $anyRunning || $running;
             }
             [$title, $role] = self::GROUP_TITLE[$g];
             if ($g === 'write' && isset($c['steps']['repair'])) {
                 $title = 'Viết và sửa';
             }
-            $out[] = ['group' => $g, 'title' => $title, 'role' => $role, 'subs' => $subs, 'state' => self::groupState($subs), 'visits' => $c['visits'], 'decisions' => $c['decisions'], 'side' => null,
-                'in' => null];
+            $out[] = ['group' => $g, 'title' => $title, 'role' => $role, 'subs' => $subs, 'state' => self::groupState($subs), 'visits' => $c['visits'], 'decisions' => $c['decisions'], 'side' => null];
         }
-        // Đường vào mỗi thẻ (mũi tên dọc giữa hai thẻ liền nhau theo thứ tự xuất hiện): nhãn và số lần đi.
-        foreach ($out as $i => &$card) {
-            if ($i === 0) {
-                continue;
-            }
-            $prevG = $out[$i - 1]['group'];
-            $n = $pairs[$prevG.'>'.$card['group']] ?? 0;
-            $label = $card['group'] === 'finish' ? 'đạt' : null;
-            if ($n > 1) {
-                $label = trim(($label ? $label.' · ' : '').'đã đi '.$n.' lần');
-            }
-            $card['in'] = ['label' => $label, 'count' => $n];
-        }
-        unset($card);
 
-        // Mũi tên quay lại (từ khối sau về khối trước): vòng sửa, bổ sung nguồn...
-        $back = [];
-        foreach ($pairs as $k => $n) {
-            [$from, $to] = explode('>', $k);
-            if (($pos[$to] ?? 0) < ($pos[$from] ?? 0)) {
+        // Đường đi: mỗi lần chuyển khối là một đường, số = số thứ tự của bước đầu tiên ở khối đích.
+        $edges = [];
+        $occ = [];
+        for ($i = 1; $i < count($seq); $i++) {
+            $from = $seq[$i - 1]['g'];
+            $to = $seq[$i]['g'];
+            $key = $from.'>'.$to;
+            $k = $occ[$key] = ($occ[$key] ?? 0) + 1;
+            $dist = ($pos[$to] ?? 0) - ($pos[$from] ?? 0);
+            $kind = $dist === 1 ? 'fwd' : ($to === 'sources' ? 'back' : ($dist < 0 ? 'loop' : 'skip'));
+            $label = null;
+            if ($k === 1) {
                 $label = match (true) {
-                    $from === 'review' && $to === 'write' => "chưa đạt → yêu cầu sửa · ↻ {$n} vòng",
-                    $to === 'sources' => "thiếu nguồn → bổ sung · {$n} lần",
-                    default => "quay lại · {$n} lần",
+                    $to === 'finish' => 'đạt',
+                    $from === 'review' && $to === 'write' => 'chưa đạt → yêu cầu sửa',
+                    $from === 'write' && $to === 'review' && $kind === 'fwd' => null,
+                    $to === 'sources' && $kind === 'back' => 'thiếu nguồn → bổ sung',
+                    default => null,
                 };
-                $back[] = ['from' => $from, 'to' => $to, 'label' => $label, 'count' => $n, 'kind' => $to === 'sources' ? 'back' : 'loop', 'lane' => count($back)];
             }
+            $edges[] = ['from' => $from, 'to' => $to, 'n' => $seq[$i]['n'], 'kind' => $kind, 'occ' => $k - 1, 'label' => $label];
         }
 
         // Tạo ảnh song song: nằm cạnh khối Viết.
         if ($imageSteps !== []) {
             $sub = self::sub($by['images'], $imageSteps, $durations, false);
+            $sub['ords'] = self::ranges(array_map(fn ($x) => $ord[$x->id] ?? 0, $imageSteps));
             $side = ['group' => 'images', 'title' => 'Tạo ảnh', 'role' => 'Họa viên ảnh', 'parallel' => (string) ($by['images']['parallel'] ?? 'Viết'), 'state' => self::groupState([$sub]), 'subs' => [$sub]];
             $wi = $pos['write'] ?? null;
             if ($wi !== null) {
                 $out[$wi]['side'] = $side;
             } else {
-                $out[] = ['group' => 'images', 'title' => 'Tạo ảnh', 'role' => 'Họa viên ảnh', 'subs' => [$sub], 'state' => $side['state'], 'visits' => 1, 'decisions' => [], 'side' => null, 'in' => ['label' => null, 'count' => 1]];
+                $out[] = ['group' => 'images', 'title' => 'Tạo ảnh', 'role' => 'Họa viên ảnh', 'subs' => [$sub], 'state' => $side['state'], 'visits' => 1, 'decisions' => [], 'side' => null];
             }
         }
 
-        return ['cards' => $out, 'back' => $back, 'trailing' => $trailing, 'next' => $live && ! $anyRunning && $out !== []];
+        return ['cards' => $out, 'back' => $edges, 'trailing' => $trailing, 'next' => $live && ! $anyRunning && $out !== []];
     }
 
     /** @param list<mixed> $list @param array<int|string,float|int|null> $durations @return array<string,mixed> */
@@ -195,6 +196,24 @@ final class FlowGraph
         }
 
         return ['code' => $node['code'], 'title' => $node['title'], 'kind' => $node['kind'], 'state' => $state, 'count' => count($list), 'seconds' => $sec, 'summary' => $summary];
+    }
+
+    /** Gom các số liền nhau thành khoảng: [3,4,5,9] → "#3–5 · #9". @param list<int> $nums */
+    private static function ranges(array $nums): string
+    {
+        sort($nums);
+        $parts = [];
+        $i = 0;
+        while ($i < count($nums)) {
+            $j = $i;
+            while ($j + 1 < count($nums) && $nums[$j + 1] === $nums[$j] + 1) {
+                $j++;
+            }
+            $parts[] = $i === $j ? '#'.$nums[$i] : '#'.$nums[$i].'–'.$nums[$j];
+            $i = $j + 1;
+        }
+
+        return implode(' · ', $parts);
     }
 
     /** @param list<array<string,mixed>> $subs */

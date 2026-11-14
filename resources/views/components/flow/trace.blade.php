@@ -5,35 +5,39 @@
 --}}
 @php use App\Filament\Support\Agent\RunFlow; @endphp
 <div class="ft" data-testid="flow-graph" x-ref="ft"
-    x-data="{ paths: [], draw() { const c = this.$refs.ft; const cr = c.getBoundingClientRect(); const out = []; let E = []; try { E = JSON.parse(this.$refs.edges.textContent || '[]'); } catch (e) {}
-        for (const e of E) { const a = c.querySelector('[data-card=&quot;' + e.from + '&quot;]'), b = c.querySelector('[data-card=&quot;' + e.to + '&quot;]'); if (!a || !b) continue;
-            const ar = a.getBoundingClientRect(), br = b.getBoundingClientRect(); const x1 = ar.right - cr.left, x2 = br.right - cr.left; const xm = Math.max(x1, x2) + 18 + e.lane * 24;
-            const y1 = ar.top - cr.top + ar.height * 0.62, y2 = br.top - cr.top + br.height * 0.78;
-            out.push({ d: 'M' + x1 + ' ' + y1 + 'H' + xm + 'V' + y2 + 'H' + (x2 + 2), lx: xm, ly: (y1 + y2) / 2, label: e.label, kind: e.kind, k: e.from + '>' + e.to }); }
-        this.paths = out;
-        const svg = this.$refs.arcs; svg.querySelectorAll('.ft-arc').forEach(n => n.remove());
-        for (const p of out) { const el = document.createElementNS('http://www.w3.org/2000/svg', 'path'); el.setAttribute('d', p.d); el.setAttribute('fill', 'none'); el.setAttribute('class', 'ft-arc ft-arc--' + p.kind); el.setAttribute('marker-end', 'url(#ft-ar-' + p.kind + ')'); el.setAttribute('data-testid', 'flow-arc'); svg.appendChild(el); } } }"
-    x-init="$nextTick(() => draw()); if (window.ResizeObserver) new ResizeObserver(() => draw()).observe($refs.ft)" x-on:resize.window.debounce.100ms="draw()">
-    <script type="application/json" x-ref="edges" @if ($t['back'] !== []) data-testid="flow-loop" @endif>{!! json_encode($t['back'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) !!}</script>
+    x-data="{ items: [], draw() { const c = this.$refs.ft; const cr = c.getBoundingClientRect(); let E = []; try { E = JSON.parse(this.$refs.edges.textContent || '[]'); } catch (e) {}
+        const svg = this.$refs.arcs; svg.querySelectorAll('.ft-arc').forEach(n => n.remove()); const items = [];
+        const mk = (d, kind) => { const el = document.createElementNS('http://www.w3.org/2000/svg', 'path'); el.setAttribute('d', d); el.setAttribute('fill', 'none'); el.setAttribute('class', 'ft-arc ft-arc--' + kind); el.setAttribute('marker-end', 'url(#ft-ar-' + kind + ')'); el.setAttribute('data-testid', 'flow-arc'); svg.appendChild(el); };
+        let arcLane = 0;
+        E.forEach((e, idx) => { const a = c.querySelector('[data-card=&quot;' + e.from + '&quot;]'), b = c.querySelector('[data-card=&quot;' + e.to + '&quot;]'); if (!a || !b) return;
+            const ar = a.getBoundingClientRect(), br = b.getBoundingClientRect(); const acx = ar.left - cr.left + ar.width / 2;
+            if (e.kind === 'fwd') { const off = ((e.occ + 1) >> 1) * 22 * (e.occ % 2 ? 1 : -1); const x = acx + off; const y1 = ar.bottom - cr.top, y2 = br.top - cr.top;
+                mk('M' + x + ' ' + y1 + 'V' + (y2 - 1), 'fwd'); items.push({ n: e.n, x: x, y: (y1 + y2) / 2, label: e.label, kind: 'fwd', k: idx }); }
+            else { const lane = arcLane++; const x1 = ar.right - cr.left, x2 = br.right - cr.left; const xm = Math.max(x1, x2) + 22 + lane * 22;
+                const y1 = ar.top - cr.top + 34 + lane * 6, y2 = br.top - cr.top + 46 + lane * 6;
+                mk('M' + x1 + ' ' + y1 + 'H' + xm + 'V' + y2 + 'H' + (x2 + 2), e.kind === 'back' ? 'back' : 'loop'); items.push({ n: e.n, x: xm, y: (y1 + y2) / 2, label: e.label, kind: e.kind === 'back' ? 'back' : 'loop', k: idx }); } });
+        this.items = items; } }"
+    x-init="$nextTick(() => draw()); if (window.ResizeObserver) new ResizeObserver(() => draw()).observe($refs.ft); document.fonts && document.fonts.ready.then(() => draw())" x-on:resize.window.debounce.100ms="draw()">
+    <script type="application/json" x-ref="edges" @if ($t['back'] !== []) data-testid="flow-edges" @endif>{!! json_encode($t['back'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) !!}</script>
+    @if (collect($t['back'])->contains(fn ($e) => $e['kind'] === 'loop'))<span data-testid="flow-loop" class="sr-only">↻ {{ collect($t['back'])->where('kind', 'loop')->count() }} vòng</span>@endif
     <svg class="ft-arcs" x-ref="arcs" aria-hidden="true">
         <defs>
-            <marker id="ft-ar-loop" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#7c3aed"/></marker>
-            <marker id="ft-ar-back" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d97706"/></marker>
+            @foreach (['fwd' => '#059669', 'loop' => '#7c3aed', 'back' => '#d97706'] as $k => $col)
+                <marker id="ft-ar-{{ $k }}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{{ $col }}"/></marker>
+            @endforeach
         </defs>
     </svg>
-    <template x-for="p in paths" :key="'l' + p.k"><span :class="'ft-arclabel ft-arclabel--' + p.kind" :style="'left:' + p.lx + 'px;top:' + p.ly + 'px'" x-text="p.label"></span></template>
+    <template x-for="it in items" :key="'b' + it.k"><span :class="'ft-badge ft-badge--' + it.kind" :style="'left:' + it.x + 'px;top:' + it.y + 'px'"><b x-text="it.n"></b><i x-show="it.label" x-text="it.label"></i></span></template>
 
     @foreach ($t['cards'] as $i => $h)
         @php [$gLabel, $gIcon] = RunFlow::STATE[$h['state']]; @endphp
         @if ($i > 0)
-            <div class="ft-row ft-row--edge"><div></div>
-                <div class="ft-link ft-link--main @if ($h['state'] === 'running') ft-link--live @endif">@if ($h['in']['label'])<span class="ft-elabel">{{ $h['in']['label'] }}</span>@endif</div>
-                <div></div></div>
+            <div class="ft-row ft-row--edge"><div></div><div></div><div></div></div>
         @endif
         <div class="ft-row">
             <div class="ft-dec">
                 @foreach ($h['decisions'] as $d)
-                    <div class="ft-card" data-testid="flow-decision"><b>{{ $d['title'] }}</b>@if ($d['detail'])<p>{{ $d['detail'] }}</p>@endif @if ($d['routes'])<span class="ft-routes">@foreach ($d['routes'] as $r)<i>→ {{ $r }}</i>@endforeach</span>@endif</div>
+                    <div class="ft-card" data-testid="flow-decision"><b>{{ $d['title'] }}</b>@if (! empty($d['to_n']))<em class="ft-tn">dẫn tới bước #{{ $d['to_n'] }}</em>@endif @if ($d['detail'])<p>{{ $d['detail'] }}</p>@endif @if ($d['routes'])<span class="ft-routes">@foreach ($d['routes'] as $r)<i>→ {{ $r }}</i>@endforeach</span>@endif</div>
                 @endforeach
             </div>
             <div class="ft-hop ft-hop--{{ $h['state'] }}" data-group="{{ $h['group'] }}" data-card="{{ $h['group'] }}">
@@ -48,7 +52,7 @@
                         x-on:click="sel = '{{ $code }}'" x-bind:class="{ 'is-sel': sel === '{{ $code }}' }" title="{{ $n['title'] }} · {{ $stLabel }}">
                         <span class="fg-sub__top">
                             <x-filament::icon :icon="$icon" class="fl-ico" />
-                            <span class="fg-sub__name">{{ $n['title'] }}</span>
+                            <span class="fg-sub__name">{{ $n['title'] }}</span>@if (! empty($n['ords']))<span class="fg-ords" title="Thứ tự trong phiên">{{ $n['ords'] }}</span>@endif
                             @if ($n['state'] === 'waiting')<span class="fl-wait-pill" data-testid="flow-waiting">Chờ bạn</span>
                             @elseif ($n['state'] === 'running')<span class="fg-ping"></span>
                             @else<span class="fg-sub__st fl-state">{{ $stLabel }}@if ($n['count'] > 1) ×{{ $n['count'] }}@endif @if ($n['seconds'] !== null)<em>{{ $n['seconds'] }}s</em>@endif</span><x-filament::icon :icon="$stIcon" class="fl-stico" :title="$stLabel" />@endif
@@ -65,7 +69,7 @@
                         <span class="fl-chip ft-par" data-testid="flow-parallel">∥ song song với «{{ $sd['parallel'] }}»</span>
                         <div class="ft-hop__head"><b>{{ $sd['title'] }}</b><small>{{ $sd['role'] }}</small></div>
                         <button type="button" class="fg-sub fg-sub--{{ $n['state'] }}" data-stage="{{ $n['code'] }}" data-state="{{ $n['state'] }}" x-on:click="sel = '{{ $n['code'] }}'" x-bind:class="{ 'is-sel': sel === '{{ $n['code'] }}' }">
-                            <span class="fg-sub__top"><x-filament::icon icon="heroicon-m-cog-6-tooth" class="fl-ico" /><span class="fg-sub__name">{{ $n['title'] }}</span>
+                            <span class="fg-sub__top"><x-filament::icon icon="heroicon-m-cog-6-tooth" class="fl-ico" /><span class="fg-sub__name">{{ $n['title'] }}</span>@if (! empty($n['ords']))<span class="fg-ords">{{ $n['ords'] }}</span>@endif
                             <span class="fg-sub__st fl-state">{{ $stLabel }}@if ($n['seconds'] !== null) <em>{{ $n['seconds'] }}s</em>@endif</span><x-filament::icon :icon="$stIcon" class="fl-stico" :title="$stLabel" /></span>
                             @if ($n['summary'])<span class="fg-sub__sum" data-testid="step-summary">{{ $n['summary'] }}</span>@endif
                         </button>
@@ -88,7 +92,15 @@
 <style>
     .ft{position:relative;width:100%;max-width:1160px;margin:0 auto;padding:.2rem 0 .4rem}
     .ft-arcs{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2}
-    .ft-arc{stroke-width:2.5;stroke-linejoin:round}.ft-arc--loop{stroke:#7c3aed}.ft-arc--back{stroke:#d97706;stroke-dasharray:7 5}
+    .ft-arc{stroke-width:2.5;stroke-linejoin:round}.ft-arc--fwd{stroke:#059669}.ft-arc--loop{stroke:#7c3aed}.ft-arc--back{stroke:#d97706;stroke-dasharray:7 5}
+    .ft-badge{position:absolute;z-index:4;transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:.3rem;white-space:nowrap;pointer-events:none}
+    .ft-badge b{min-width:1.35rem;height:1.35rem;padding:0 .25rem;border-radius:999px;background:#059669;color:#fff;font-size:.68rem;font-weight:800;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--fl-card,#fff)}
+    .ft-badge--loop b{background:#7c3aed}.ft-badge--back b{background:#d97706}
+    .ft-badge i{font-style:normal;font-size:.66rem;font-weight:700;padding:.05rem .45rem;border-radius:999px;background:var(--fl-card,#fff);border:1px solid rgba(100,116,139,.4);color:#475569;position:absolute;left:1.5rem}
+    .ft-badge--fwd i{left:1.5rem}.ft-badge--loop i,.ft-badge--back i{left:1.5rem}
+    .fg-ords{font-size:.62rem;font-weight:700;padding:0 .35rem;border-radius:999px;background:rgba(100,116,139,.16);color:#475569;white-space:nowrap}
+    .ft-tn{display:block;font-style:normal;font-size:.62rem;font-weight:700;color:#7c3aed;opacity:.8}
+    .ft-row--edge{min-height:64px}
     .ft-arclabel{position:absolute;z-index:3;transform:translate(10px,-50%);font-size:.68rem;font-weight:700;padding:.1rem .5rem;border-radius:999px;white-space:nowrap;background:#7c3aed;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.18)}
     .ft-arclabel--back{background:#fff;color:#b45309;border:1.5px solid #d97706}
     .ft-visits{font-size:.64rem;font-weight:800;padding:.02rem .45rem;border-radius:999px;background:rgba(124,58,237,.14);color:#6d28d9;align-self:center;white-space:nowrap}
@@ -116,8 +128,8 @@
     .ft-hop__head b{font-size:.95rem;font-weight:800;white-space:nowrap}
     .ft-hop__head small{font-size:.68rem;opacity:.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
     .ft-hop__head .fl-stico{margin-left:auto;width:1.2rem;height:1.2rem;align-self:center;flex:none}
-    .ft-side{position:relative;display:flex;align-items:flex-start;gap:0;padding-left:3.4rem}.ft-side .ft-hop{flex:1 1 auto;min-width:0;max-width:250px}
-    .ft-hlink{position:absolute;left:-1.6rem;width:5rem;margin-top:1.1rem;border-top:3px solid #059669;position:relative}.ft-hlink::after{content:"";position:absolute;right:-1px;top:-7px;border:6px solid transparent;border-left:8px solid #059669;border-right:0}
+    .ft-side{position:relative;display:flex;align-items:flex-start;gap:0;padding-left:9.5rem}.ft-side .ft-hop{flex:1 1 auto;min-width:0;max-width:250px}
+    .ft-hlink{position:absolute;left:-1.6rem;width:11.1rem;margin-top:1.1rem;border-top:3px solid #059669;position:relative}.ft-hlink::after{content:"";position:absolute;right:-1px;top:-7px;border:6px solid transparent;border-left:8px solid #059669;border-right:0}
     .ft-par{position:absolute;top:-12px;left:.8rem;z-index:3;font-size:.64rem !important;white-space:nowrap;background:rgba(2,132,199,.14) !important;color:#0369a1}
     .ft-empty{text-align:center;opacity:.7;font-size:.85rem}
     .fg-sub{display:flex;flex-direction:column;align-items:stretch;gap:.1rem;min-height:30px;width:100%;padding:0 .45rem;border:0;border-radius:.5rem;background:transparent;font:inherit;font-size:.82rem;color:inherit;text-align:left;cursor:pointer}
