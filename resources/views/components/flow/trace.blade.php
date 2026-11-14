@@ -8,47 +8,54 @@
     use App\Filament\Support\Agent\RunFlow;
     $repairs = collect($t['cards'])->flatMap(fn ($c) => $c['subs'])->firstWhere('code', 'repair')['count'] ?? 0;
 @endphp
-<div class="ft" data-testid="flow-graph">
+<div class="ft" data-testid="flow-graph" x-ref="ft"
+    x-data="{ items: [], draw() { const c = this.$refs.ft; const cr = c.getBoundingClientRect(); let E = []; try { E = JSON.parse(this.$refs.events.textContent || '[]'); } catch (e) {}
+        const svg = this.$refs.arcs; svg.querySelectorAll('.ft-arc').forEach(n => n.remove()); const items = []; const co = c.querySelector('[data-coord]'); if (!co) { this.items = []; return; }
+        const xr = co.getBoundingClientRect().right - cr.left; const slot = {};
+        E.forEach((e, idx) => { const card = c.querySelector('[data-card=&quot;' + e.card + '&quot;]'); if (!card) return; const r = card.getBoundingClientRect(); const xl = r.left - cr.left;
+            const s = slot[e.card] = (slot[e.card] ?? -1) + 1; const y = r.top - cr.top + 50 + s * 22; const give = e.dir === 'give'; const kind = give ? 'give' : (['warn', 'failed', 'blocked'].includes(e.state) ? 'warn' : 'report');
+            const el = document.createElementNS('http://www.w3.org/2000/svg', 'path'); el.setAttribute('d', give ? ('M' + xr + ' ' + y + 'H' + (xl - 1)) : ('M' + xl + ' ' + y + 'H' + (xr + 1))); el.setAttribute('fill', 'none'); el.setAttribute('class', 'ft-arc ft-arc--' + kind); el.setAttribute('marker-end', 'url(#ft-ar-' + kind + ')'); el.setAttribute('data-testid', 'flow-arc'); svg.appendChild(el);
+            items.push({ k: idx, n: e.n, x: give ? xr + 16 : xl - 16, mx: (xr + xl) / 2, y: y, label: e.label, kind: kind, give: give }); });
+        this.items = items; } }"
+    x-init="$nextTick(() => draw()); if (window.ResizeObserver) new ResizeObserver(() => draw()).observe($refs.ft); document.fonts && document.fonts.ready.then(() => draw())" x-on:resize.window.debounce.100ms="draw()">
+    <script type="application/json" x-ref="events" @if ($t['events'] !== []) data-testid="flow-edges" @endif>{!! json_encode($t['events'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) !!}</script>
     @if ($repairs > 0)<span data-testid="flow-loop" class="sr-only">↻ {{ $repairs }} vòng sửa</span>@endif
-    @php
-        $cards = collect($t['cards'])->keyBy('group');
-        $order = ['prep', 'sources', 'strategy', 'write', 'review', 'finish', 'checkpoint'];
-        $rowsList = [];
-        foreach ($order as $g) {
-            if (! $cards->has($g)) { continue; }
-            $row = [$cards[$g]];
-            if ($g === 'write' && $cards->has('images')) { $row[] = $cards['images']; }
-            $rowsList[] = $row;
-        }
-        if (! $cards->has('write') && $cards->has('images')) { $rowsList[] = [$cards['images']]; }
-    @endphp
+    <svg class="ft-arcs" x-ref="arcs" aria-hidden="true">
+        <defs>
+            @foreach (['give' => '#7c3aed', 'report' => '#059669', 'warn' => '#d97706'] as $k => $col)
+                <marker id="ft-ar-{{ $k }}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{{ $col }}"/></marker>
+            @endforeach
+        </defs>
+    </svg>
+    <template x-for="it in items" :key="'b' + it.k">
+        <span :class="'ft-badge ft-badge--' + it.kind" :style="'left:' + it.x + 'px;top:' + it.y + 'px'"><b x-text="it.n"></b></span>
+    </template>
+    <template x-for="it in items" :key="'l' + it.k">
+        <span :class="'ft-chip ft-chip--' + it.kind" :style="'left:' + it.mx + 'px;top:' + it.y + 'px'" x-text="(it.give ? 'giao: ' : 'báo: ') + it.label"></span>
+    </template>
 
-    <details class="ft-coordbox" data-testid="flow-coordinator" @if (count($t['decisions']) > 0) open @endif>
-        <summary><b>Điều phối</b> điều khiển cả phiên · đã quyết định {{ count($t['decisions']) }} việc</summary>
-        @forelse ($t['decisions'] as $d)
-            <p data-testid="flow-decision" title="{{ $d['full'] }}">{{ $d['title'] }}</p>
-        @empty
-            <p class="ft-muted">Chưa có quyết định nào: các bước đi theo luồng mặc định.</p>
-        @endforelse
-        @if ($t['next'])<p class="ft-wait"><span class="fg-ping"></span> Đang quyết định bước tiếp theo…</p>@endif
-    </details>
-
-    @foreach ($rowsList as $ri => $row)
-        @if ($ri > 0)<div class="ft-down" aria-hidden="true">↓</div>@endif
-        <div class="ft-row @if (count($row) > 1) ft-row--two @endif">
-            @foreach ($row as $h)
+    <div class="ft-grid">
+        <aside class="ft-coord" data-coord data-testid="flow-coordinator">
+            <div class="ft-coord__in">
+                <div class="ft-coord__head"><b>Điều phối</b><small>mọi việc đi qua đây</small></div>
+                @forelse ($t['decisions'] as $d)
+                    <div class="ft-dec" data-testid="flow-decision" title="{{ $d['full'] }}">
+                        @if ($d['n'])<span class="ft-dec__n">{{ $d['n'] }}</span>@else<span class="ft-dec__n ft-dec__n--x">•</span>@endif
+                        <span class="ft-dec__t">{{ $d['title'] }}</span>
+                    </div>
+                @empty
+                    <p class="ft-coord__empty">Chưa có quyết định nào: các bước đi theo luồng mặc định.</p>
+                @endforelse
+                @if ($t['next'])<div class="ft-dec ft-dec--wait"><span class="fg-ping"></span><span class="ft-dec__t">Đang quyết định bước tiếp theo…</span></div>@endif
+            </div>
+        </aside>
+        <div class="ft-gap"></div>
+        <div class="ft-cards">
+            @foreach ($t['cards'] as $h)
                 @php [$gLabel, $gIcon] = RunFlow::STATE[$h['state']]; @endphp
-                <div class="ft-hop ft-hop--{{ $h['state'] }}" data-group="{{ $h['group'] }}" data-card="{{ $h['group'] }}">
-                    @if ($h['parallel'])<span class="fl-chip ft-par" data-testid="flow-parallel">∥ chạy cùng lúc với «{{ $h['parallel'] }}»</span>@endif
-                    <div class="ft-hop__head"><b>{{ $h['title'] }}</b><small>{{ $h['role'] }}</small><x-filament::icon :icon="$gIcon" class="fl-stico" :title="$gLabel" /></div>
-                    @if (count($h['rounds']) > 1)
-                        <div class="ft-rounds" title="Điều phối giao việc cho bộ phận này {{ count($h['rounds']) }} lần">
-                            <span class="ft-rounds__h">↻ Làm {{ count($h['rounds']) }} lần</span>
-                            @foreach ($h['rounds'] as $k => $r)
-                                <span class="ft-round ft-round--{{ $r['state'] }}"><i>{{ $k + 1 }}</i>{{ $r['ask'] }}@if ($r['result']) → <b>{{ $r['result'] }}</b>@endif</span>
-                            @endforeach
-                        </div>
-                    @endif
+                <div class="ft-hop ft-hop--{{ $h['state'] }}" data-group="{{ $h['group'] }}" data-card="{{ $h['group'] }}" style="min-height:{{ $h['minh'] }}px">
+                    @if ($h['parallel'])<span class="fl-chip ft-par" data-testid="flow-parallel">∥ song song với «{{ $h['parallel'] }}»</span>@endif
+                    <div class="ft-hop__head"><b>{{ $h['title'] }}</b><small>{{ $h['role'] }}</small>@if ($h['visits'] > 1)<span class="ft-visits" title="Số lần điều phối giao việc cho bộ phận này">↻ {{ $h['visits'] }} lần</span>@endif<x-filament::icon :icon="$gIcon" class="fl-stico" :title="$gLabel" /></div>
                     @foreach ($h['subs'] as $n)
                         @php
                             [$stLabel, $stIcon] = RunFlow::STATE[$n['state']];
@@ -70,25 +77,30 @@
                 </div>
             @endforeach
         </div>
-    @endforeach
+    </div>
     @if ($t['cards'] === [])<p class="ft-empty">Phiên chưa có bước nào chạy.</p>@endif
+    <div class="fg-legend"><span><i class="fg-sw fg-sw--loop"></i>điều phối giao việc</span><span><i class="fg-sw fg-sw--done"></i>bộ phận báo kết quả</span><span><i class="fg-sw fg-sw--back"></i>báo kết quả cần chú ý</span><span>Số là thứ tự thật trong phiên; quay lại một bộ phận thì thêm một cặp giao/báo, không thêm thẻ.</span></div>
 </div>
 @once
 <style>
-    .ft{position:relative;width:100%;max-width:980px;margin:0 auto;padding:.2rem 0 .4rem}
-    .ft-coordbox{border:1.5px solid #7c3aed;border-radius:.8rem;padding:.5rem .8rem;margin-bottom:.8rem;background:linear-gradient(180deg,rgba(124,58,237,.07),transparent),var(--fl-card,#fff);font-size:.8rem}
-    .ft-coordbox summary{cursor:pointer;list-style:none}.ft-coordbox summary b{color:#6d28d9;font-size:.9rem;margin-right:.4rem}.dark .ft-coordbox summary b{color:#c4b5fd}
-    .ft-coordbox p{margin:.3rem 0 0;padding-left:.7rem;border-left:3px solid #c4b5fd;line-height:1.35}
-    .ft-muted{opacity:.7}.ft-wait{display:flex;gap:.4rem;align-items:center}
-    .ft-down{text-align:center;color:#059669;font-size:1.3rem;font-weight:800;line-height:1.5}
-    .ft-row{display:grid;grid-template-columns:1fr;gap:1rem}
-    .ft-row--two{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}
-    @media (max-width:760px){.ft-row--two{grid-template-columns:1fr}}
-    .ft-rounds{display:flex;flex-direction:column;gap:.25rem;margin:.1rem .3rem .5rem;padding:.4rem .5rem;border-radius:.6rem;background:rgba(124,58,237,.07);font-size:.74rem}
-    .ft-rounds__h{font-weight:800;color:#6d28d9}.dark .ft-rounds__h{color:#c4b5fd}
-    .ft-round{display:flex;gap:.4rem;align-items:flex-start;line-height:1.3}
-    .ft-round i{font-style:normal;flex:none;min-width:1.15rem;height:1.15rem;border-radius:999px;background:#7c3aed;color:#fff;font-size:.62rem;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
-    .ft-round--done b{color:#047857}.ft-round--warn b,.ft-round--failed b{color:#b45309}
+    .ft{position:relative;width:100%;max-width:1180px;margin:0 auto;padding:.2rem 0 .4rem}
+    .ft-grid{display:grid;grid-template-columns:250px 330px minmax(0,1fr);align-items:stretch}
+    .ft-arcs{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2}
+    .ft-arc{stroke-width:2.2;stroke-linejoin:round}.ft-arc--give{stroke:#7c3aed}.ft-arc--report{stroke:#059669}.ft-arc--warn{stroke:#d97706}
+    .ft-badge{position:absolute;z-index:4;transform:translate(-50%,-50%);pointer-events:none}
+    .ft-badge b{min-width:1.3rem;height:1.3rem;padding:0 .25rem;border-radius:999px;color:#fff;font-size:.66rem;font-weight:800;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--fl-card,#fff)}
+    .ft-badge--give b{background:#7c3aed}.ft-badge--report b{background:#059669}.ft-badge--warn b{background:#d97706}
+    .ft-chip{position:absolute;z-index:3;transform:translate(-50%,-50%);font-size:.66rem;font-weight:700;padding:.02rem .5rem;border-radius:999px;white-space:nowrap;background:var(--fl-card,#fff);border:1px solid rgba(100,116,139,.4);color:#475569;pointer-events:none;max-width:250px;overflow:hidden;text-overflow:ellipsis}
+    .ft-chip--give{border-color:#7c3aed;color:#6d28d9}.ft-chip--report{border-color:#059669;color:#047857}.ft-chip--warn{border-color:#d97706;color:#b45309}
+    .dark .ft-chip{color:#cbd5e1}
+    .ft-coord{position:relative;border:1.5px solid #7c3aed;border-radius:.9rem;background:linear-gradient(180deg,rgba(124,58,237,.08),transparent 30%),var(--fl-card,#fff);padding:0}
+    .ft-coord__in{position:sticky;top:5rem;padding:.55rem .6rem .7rem;display:flex;flex-direction:column;gap:.3rem;max-height:calc(100vh - 7rem);overflow:auto}
+    .ft-coord__head{display:flex;flex-direction:column;margin-bottom:.2rem}.ft-coord__head b{font-size:1rem;font-weight:800;color:#6d28d9}.dark .ft-coord__head b{color:#c4b5fd}.ft-coord__head small{font-size:.66rem;opacity:.65}
+    .ft-coord__empty{font-size:.72rem;opacity:.7;margin:0}
+    .ft-dec{display:flex;gap:.4rem;align-items:flex-start;font-size:.72rem;line-height:1.3;padding:.25rem .3rem;border-radius:.5rem;background:rgba(124,58,237,.07)}
+    .ft-dec__n{flex:none;min-width:1.2rem;height:1.2rem;border-radius:999px;background:#7c3aed;color:#fff;font-size:.62rem;font-weight:800;display:inline-flex;align-items:center;justify-content:center}.ft-dec__n--x{background:rgba(124,58,237,.35)}
+    .ft-dec__t{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+    .ft-cards{display:flex;flex-direction:column;gap:1.6rem}
     .ft-hop{position:relative;display:flex;flex-direction:column;background:var(--fl-card,#fff);border:1.5px solid var(--fl-line,rgba(100,116,139,.35));border-radius:.9rem;box-shadow:var(--fl-shadow,0 1px 3px rgba(15,23,42,.08));padding:0 .45rem .45rem}
     .ft-hop--done{border-color:#059669}.ft-hop--warn,.ft-hop--stale{border-color:#d97706}.ft-hop--failed,.ft-hop--blocked{border-color:#dc2626}.ft-hop--running{border-color:#0284c7;box-shadow:0 0 0 3px rgba(2,132,199,.18)}.ft-hop--waiting{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.2)}
     .ft-visits{font-size:.64rem;font-weight:800;padding:.02rem .45rem;border-radius:999px;background:rgba(124,58,237,.14);color:#6d28d9;align-self:center;white-space:nowrap}
@@ -110,5 +122,6 @@
     .fg-legend{display:flex;flex-wrap:wrap;gap:.9rem;margin-top:.8rem;font-size:.68rem;opacity:.75}
     .fg-legend span{display:inline-flex;align-items:center;gap:.3rem}
     .fg-sw{display:inline-block;width:1.3rem;height:0;border-top:3px solid #94a3b8}.fg-sw--done{border-color:#059669}.fg-sw--loop{border-color:#7c3aed}.fg-sw--back{border-color:#d97706}
+    @media (max-width:900px){.ft-grid{grid-template-columns:1fr}.ft-gap{display:none}.ft-coord__in{position:static;max-height:none}.ft-arcs,.ft-badge,.ft-chip{display:none}}
 </style>
 @endonce
