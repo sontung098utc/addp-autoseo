@@ -21,7 +21,9 @@
     .ss-tabs-wrap .ss-tabs-scroller .ss-tabs { overflow-y: hidden; }
 </style>
 @endonce
-<div class="ss-tabs-wrap" x-data="studioTabs(@js($default), @js($persist))" data-tabs="{{ $uid }}">
+{{-- wire:key theo (tab mặc định, khóa nhớ tab): khi trạng thái bài đổi (vd. phiên chạy xong, tab mặc định và khóa nhớ đổi) thì Livewire DỰNG LẠI khối này thay vì chỉ sửa thuộc tính x-data.
+     Trước đây x-data bị đánh giá lại trên cùng phần tử: nút tab theo phạm vi dữ liệu mới còn các khung nội dung (x-show) vẫn gắn phạm vi cũ, nên bấm tab nào nội dung cũng kẹt ở tab đầu. --}}
+<div class="ss-tabs-wrap" wire:key="{{ $uid }}-{{ md5((string) $default) }}" x-data="studioTabs(@js($default), @js($persist))" data-tabs="{{ $uid }}">
     <div class="ss-tabs-scroller" x-bind:class="{ 'has-start': canStart, 'has-end': canEnd }">
     <div class="ss-tabs" role="tablist" aria-label="{{ $label }}" x-ref="strip" x-on:keydown="onKey($event)" x-on:scroll.passive="measure()">
         @foreach ($tabs as $t)
