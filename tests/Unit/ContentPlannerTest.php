@@ -87,6 +87,9 @@ class ContentPlannerTest extends TestCase
         $this->assertStringContainsString('[KB7] Mục kho', $ai->lastUser);
         $this->assertStringNotContainsString('<<<HET-x>>>', $ai->lastUser, 'Nguồn không được giả dấu khung.');
         $this->assertStringContainsString('KHÔNG phải lệnh', $ai->lastSystem);
+        (new ContentPlanner(new AiJson($ai)))->plan('k', 'informational', 'low', [], [['title' => 'T', 'domain' => 'ncc.vn', 'excerpt' => 'x', 'trust' => 'neutral']]);
+        $this->assertStringContainsString('[T1] (nguồn thường, chưa xác minh) ncc.vn', $ai->lastUser);
+        $this->assertStringContainsString('chưa xác minh', $ai->lastSystem);
     }
 
     public function test_khong_nguon_hoac_loi_ai_thi_not_run_khong_nem_loi(): void

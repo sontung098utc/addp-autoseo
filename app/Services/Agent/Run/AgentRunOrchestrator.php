@@ -842,6 +842,19 @@ final class AgentRunOrchestrator
             ['plan' => $plan, 'sources' => $r['sources'], 'kb_items' => count($kb), 'web_references' => count($this->references)], $r['model'], $tokens, $cost);
     }
 
+    /**
+     * Chủ đề của CHÍNH từ khóa không nhạy cảm (hạng thấp theo luật, không thuộc lĩnh vực sức khỏe): cho phép dùng cả nguồn thường làm tư liệu đọc/đối chiếu.
+     * Không xét hạng đã bị Trí tuệ nâng lên; nguồn thường vẫn KHÔNG được tự nạp vào kho.
+     */
+    private function neutralSourcesOk(string $keyword): bool
+    {
+        try {
+            return $this->risk->assess($keyword)->level === 'low' && \App\Services\Knowledge\Discover\SourceDiscoveryService::fieldFor($keyword) === null;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
     /** Mục kiến thức đã duyệt khớp chủ đề để tổng hợp (ngữ cảnh riêng, không chiếm lượt truy xuất theo dàn ý của bước nghiên cứu). @return list<array<string,mixed>> */
     private function kbForPlanner(Article $article): array
     {
@@ -867,7 +880,7 @@ final class AgentRunOrchestrator
     {
         $added = 0;
         try {
-            $more = (new \App\Services\Content\ReferenceDossier)->gather($article->website, (string) $article->primary_keyword, $topics);
+            $more = (new \App\Services\Content\ReferenceDossier)->gather($article->website, (string) $article->primary_keyword, $topics, $this->neutralSourcesOk((string) $article->primary_keyword));
             $have = array_column($this->references, 'url');
             foreach ($more['references'] as $ref) {
                 if (! in_array($ref['url'], $have, true) && count($this->references) < \App\Services\Content\ReferenceDossier::MAX + 4) {
@@ -929,7 +942,7 @@ final class AgentRunOrchestrator
         }
         try {
             $kw = (string) $article->primary_keyword;
-            $r = (new \App\Services\Content\ReferenceDossier)->gather($article->website, $kw, $risk === 'low' && $this->brainCtx->reliance() !== 'must_cite' ? [$kw] : null); // chủ đề thường: một góc tìm; còn lại: nhiều góc
+            $r = (new \App\Services\Content\ReferenceDossier)->gather($article->website, $kw, $risk === 'low' && $this->brainCtx->reliance() !== 'must_cite' ? [$kw] : null, $this->neutralSourcesOk($kw)); // chủ đề thường: một góc tìm; còn lại: nhiều góc
         } catch (Throwable $e) {
             report($e);
 

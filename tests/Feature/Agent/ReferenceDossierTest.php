@@ -62,6 +62,17 @@ class ReferenceDossierTest extends TestCase
         $this->assertSame(1, $domains['moh.gov.vn']);
     }
 
+    public function test_chu_de_khong_nhay_cam_nhan_ca_nguon_thuong_co_nhan_trust(): void
+    {
+        FakeSearch::$rows = [$this->row('https://blog-nha-cung-cap.vn/may', $this->long('Máy dập viên một chày dùng cho lô nhỏ')), $this->row('https://www.facebook.com/c', $this->long())];
+        $strict = (new ReferenceDossier)->gather($this->site, 'máy dập viên');
+        $this->assertSame('none', $strict['status'], 'Mặc định chỉ nhận nguồn tin cậy.');
+        $open = (new ReferenceDossier)->gather($this->site, 'máy dập viên', null, true);
+        $this->assertSame('found', $open['status']);
+        $this->assertSame('neutral', $open['references'][0]['trust']);
+        $this->assertNotContains('facebook.com', array_column($open['references'], 'domain'), 'Mạng xã hội vẫn bị chặn.');
+    }
+
     public function test_chi_lay_nguon_tin_cay_du_noi_dung(): void
     {
         FakeSearch::$rows = [

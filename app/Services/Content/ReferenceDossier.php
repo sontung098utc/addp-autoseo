@@ -31,16 +31,17 @@ final class ReferenceDossier
 
     /**
      * @param  list<string>|null  $topics  chủ đề tìm cụ thể (vd. các khoảng trống kiến thức); null = từ khóa theo ANGLES
-     * @return array{status: string, references: list<array{title: string, domain: string, url: string, excerpt: string}>, reason: ?string, cost_vnd: float, provider: ?string, query: ?string}
+     * @param  bool  $allowNeutral  chủ đề KHÔNG nhạy cảm (máy móc, phần mềm...): nhận cả nguồn thường chưa thuộc danh sách tin cậy (nhãn trust=neutral để bước tổng hợp đối chiếu thận trọng)
+     * @return array{status: string, references: list<array{title: string, domain: string, url: string, excerpt: string, trust?: string}>, reason: ?string, cost_vnd: float, provider: ?string, query: ?string}
      */
-    public function gather(Website $site, string $keyword, ?array $topics = null): array
+    public function gather(Website $site, string $keyword, ?array $topics = null, bool $allowNeutral = false): array
     {
         $topics ??= array_map(fn ($a) => trim($keyword.$a), self::ANGLES);
         $out = ['status' => 'none', 'references' => [], 'reason' => null, 'cost_vnd' => 0.0, 'provider' => null, 'query' => null];
         $seen = [];
         $perDomain = [];
         foreach ($topics as $i => $topic) {
-            $r = $this->attempt($site, $topic);
+            $r = $this->attempt($site, $topic, $allowNeutral);
             $out['cost_vnd'] += $r['cost_vnd'];
             $out['provider'] ??= $r['provider'];
             $out['query'] ??= $r['query'];
@@ -62,7 +63,7 @@ final class ReferenceDossier
                 break;
             }
             if ($i === 0 && $out['references'] === [] && count($topics) === 1) { // kết quả tìm web thay đổi giữa các lần gọi: thử thêm một lần
-                $again = $this->attempt($site, $topic);
+                $again = $this->attempt($site, $topic, $allowNeutral);
                 $out['cost_vnd'] += $again['cost_vnd'];
                 foreach ($again['references'] as $ref) {
                     $out['references'][] = $ref;
@@ -76,8 +77,8 @@ final class ReferenceDossier
         return $out;
     }
 
-    /** @return array{status: string, references: list<array{title: string, domain: string, url: string, excerpt: string}>, reason: ?string, cost_vnd: float, provider: ?string, query: ?string} */
-    private function attempt(Website $site, string $keyword): array
+    /** @return array{status: string, references: list<array{title: string, domain: string, url: string, excerpt: string, trust?: string}>, reason: ?string, cost_vnd: float, provider: ?string, query: ?string} */
+    private function attempt(Website $site, string $keyword, bool $allowNeutral = false): array
     {
         $out = ['status' => 'none', 'references' => [], 'reason' => null, 'cost_vnd' => 0.0, 'provider' => null, 'query' => null];
         try {
@@ -97,10 +98,11 @@ final class ReferenceDossier
         }
         foreach ($d['candidates'] as $c) {
             $excerpt = self::clean((string) $c['snippet']);
-            if (($c['trust']['level'] ?? '') !== 'trusted' || mb_strlen($excerpt) < self::MIN_SNIPPET_CHARS) {
+            $level = (string) ($c['trust']['level'] ?? '');
+            if (! ($level === 'trusted' || ($allowNeutral && $level === 'neutral')) || mb_strlen($excerpt) < self::MIN_SNIPPET_CHARS) {
                 continue;
             }
-            $out['references'][] = ['title' => self::clean((string) $c['title'], 160), 'domain' => (string) $c['domain'], 'url' => (string) $c['url'], 'excerpt' => mb_substr($excerpt, 0, self::EXCERPT_CHARS)];
+            $out['references'][] = ['title' => self::clean((string) $c['title'], 160), 'domain' => (string) $c['domain'], 'url' => (string) $c['url'], 'excerpt' => mb_substr($excerpt, 0, self::EXCERPT_CHARS), 'trust' => $level];
         }
         $out['status'] = $out['references'] === [] ? 'none' : 'found';
 
