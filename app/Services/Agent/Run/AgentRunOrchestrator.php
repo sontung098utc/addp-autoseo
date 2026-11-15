@@ -1463,7 +1463,7 @@ final class AgentRunOrchestrator
         $options += \App\Services\Audit\RefreshOptions::for($article); // AG-S26: bài làm mới từ lỗi Audit
         [$kbData, $kbNote] = $this->kb->stepInfo();
         $r = $this->callAi($run, $stage, $title, fn (AiProviderInterface $ai) => $ai->generateArticle($article, $outline, $options));
-        $html = NoteRenderer::apply(HtmlSanitizer::clean($r['html_content'] ?? ''), (array) ($r['notes'] ?? [])); // ghi chú thật (định nghĩa, khái niệm) khác với chú thích nguồn
+        $html = CitationRenderer::splitMixed(NoteRenderer::apply(HtmlSanitizer::clean($r['html_content'] ?? ''), (array) ($r['notes'] ?? []))); // ghi chú thật (định nghĩa, khái niệm) khác với chú thích nguồn
         $disclaimerAdded = false;
         if (! empty($options['medical'])) {
             [$html, $disclaimerAdded] = MedicalDisclaimer::ensure($html); // AI quên câu lưu ý y tế thì hệ thống tự thêm (MED01)

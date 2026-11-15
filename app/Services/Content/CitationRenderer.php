@@ -12,9 +12,24 @@ final class CitationRenderer
 {
     private const MARK = '/\s*\[KB#(\d+(?:\s*[,;]\s*(?:KB)?#?\d+)*)\]/u';
 
+    /**
+     * Người viết đôi khi gộp mã kho và mã tài liệu web trong một ngoặc ("[KB#976, T2]"): hai bộ đổi dấu chỉ hiểu từng loại riêng nên dấu gộp lọt nguyên văn vào bài giao. Tách thành "[KB#976][T2]".
+     */
+    public static function splitMixed(string $html): string
+    {
+        return (string) preg_replace_callback('/\[((?:KB#\d+|T\d+)(?:\s*[,;]\s*(?:KB#\d+|T\d+))+)\]/u', function (array $m): string {
+            if (! preg_match('/(?<![A-Z])T\d/', $m[1]) || ! str_contains($m[1], 'KB#')) {
+                return $m[0]; // chỉ tách dấu pha trộn kho + web; nhóm thuần một loại để bộ đổi dấu cũ xử lý
+            }
+
+            return implode('', array_map(fn ($x) => '['.trim($x).']', preg_split('/\s*[,;]\s*/', $m[1]) ?: []));
+        }, $html);
+    }
+
     /** @param array<int,string> $titlesVi giải nghĩa tiếng Việt cho tiêu đề nguồn tiếng nước ngoài, theo id mục kho */
     public static function render(string $html, array $titlesVi = []): string
     {
+        $html = self::splitMixed($html);
         if ($html === '' || ! preg_match_all(self::MARK, $html, $all)) {
             return $html;
         }
