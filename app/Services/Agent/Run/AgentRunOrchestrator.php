@@ -508,6 +508,7 @@ final class AgentRunOrchestrator
         }
         $run->update(['repair_rounds' => $round]);
         $attrs = $this->pruneUnverifiedSources($run, $article, $attrs);
+        $attrs = $this->pruneUnsupportedCitations($run, $attrs);
 
         // 7. Bàn giao: chỉ tạo BẢN NHÁP. Không bao giờ xuất bản ở bậc T1.
         $passed = ! $report->hasBlocking();
@@ -1513,6 +1514,63 @@ final class AgentRunOrchestrator
                 return array_intersect(\App\Services\Content\Quality\Rules\FactRule::sources([$x]), $bad) === [];
             }));
             $this->decision($run, 'sources_pruned', 'Gỡ '.count($bad).' nguồn chưa kiểm được khỏi danh sách nguồn', 'Các nguồn do AI tự nêu nhưng không khớp kho, Căn cứ chuẩn mực hay tài liệu đã tìm thấy nên không đưa vào bài giao: '.implode('; ', array_map(fn ($u) => '«'.mb_substr($u, 0, 90).'»', array_slice($bad, 0, 4))).'.', ['count' => count($bad)]);
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return $attrs;
+    }
+
+    /**
+     * Gỡ dấu [KB#id] khỏi đoạn mà số liệu (có đơn vị) KHÔNG có trong mục kho được trích: đó là trích dẫn sai chỗ (thường là ví dụ tự tính), không phải căn cứ. Gỡ dấu thì đoạn không còn
+     * "giả vờ" có căn cứ; nội dung giữ nguyên. Tất định; viết lại nhiều lần không loại được vì người viết cứ gắn lại dấu cho đoạn ví dụ.
+     *
+     * @param  array<string, mixed>  $attrs
+     * @return array<string, mixed>
+     */
+    private function pruneUnsupportedCitations(AgentRun $run, array $attrs): array
+    {
+        $html = (string) ($attrs['html_content'] ?? '');
+        if ($html === '' || ! preg_match_all('/\[KB#(\d+(?:\s*[,;]\s*(?:KB)?#?\d+)*)\]/u', $html, $all)) {
+            return $attrs;
+        }
+        try {
+            $ids = [];
+            foreach ($all[1] as $grp) {
+                foreach (preg_split('/[^\d]+/', $grp, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $n) {
+                    $ids[(int) $n] = true;
+                }
+            }
+            $texts = \App\Models\KnowledgeItem::query()->whereIn('id', array_keys($ids))->where('status', 'approved')->get()
+                ->mapWithKeys(fn ($i) => [$i->id => \App\Services\Content\Quality\Rules\CitationFigureRule::norm($i->title.' '.$i->body)])->all();
+            $pruned = 0;
+            $new = preg_replace_callback('~<(p|li|td)\b[^>]*>.*?</\1>~su', function ($m) use ($texts, &$pruned) {
+                $block = $m[0];
+                if (! preg_match_all('/\[KB#(\d+(?:\s*[,;]\s*(?:KB)?#?\d+)*)\]/u', $block, $mm)) {
+                    return $block;
+                }
+                $blobIds = [];
+                foreach ($mm[1] as $grp) {
+                    foreach (preg_split('/[^\d]+/', $grp, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $n) {
+                        $blobIds[] = (int) $n;
+                    }
+                }
+                $blob = implode(' ', array_map(fn ($id) => $texts[$id] ?? '', $blobIds));
+                $plain = preg_replace('/\[KB#[^\]]*\]/u', ' ', strip_tags($block)) ?? '';
+                foreach (\App\Services\Content\Quality\Rules\CitationFigureRule::figures($plain) as $f) {
+                    if (! str_contains($blob, \App\Services\Content\Quality\Rules\CitationFigureRule::norm($f))) {
+                        $pruned++;
+
+                        return preg_replace('/\s*\[KB#[^\]]*\]/u', '', $block) ?? $block;
+                    }
+                }
+
+                return $block;
+            }, $html);
+            if ($new !== null && $pruned > 0) {
+                $attrs['html_content'] = $new;
+                $this->decision($run, 'citations_pruned', 'Gỡ dấu trích dẫn sai chỗ ở '.$pruned.' đoạn', 'Số liệu trong các đoạn này (thường là ví dụ tự tính) không có trong mục kho được trích, nên dấu [KB#id] bị gỡ để không đưa căn cứ không khớp vào bài; nội dung đoạn giữ nguyên.', ['count' => $pruned]);
+            }
         } catch (Throwable $e) {
             report($e);
         }

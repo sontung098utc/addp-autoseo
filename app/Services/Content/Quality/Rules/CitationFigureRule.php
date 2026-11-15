@@ -25,14 +25,14 @@ class CitationFigureRule implements QualityRule
     }
 
     /** @return list<string> */
-    private static function figures(string $text): array
+    public static function figures(string $text): array
     {
         preg_match_all('/(?<![\d.,])\d+(?:[.,]\d+)?\s?(?:%|mg\/dL|mmol\/L|mmol|mg|g\/dL|kg|mmHg)/u', $text, $m);
 
         return array_values(array_unique($m[0]));
     }
 
-    private static function norm(string $s): string
+    public static function norm(string $s): string
     {
         return str_replace([' ', '.'], ['', ','], mb_strtolower($s));
     }
