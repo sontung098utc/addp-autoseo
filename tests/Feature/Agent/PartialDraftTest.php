@@ -62,7 +62,7 @@ class PartialDraftTest extends TestCase
         $o = $this->orchestrator();
         $p = new \ReflectionProperty($o, 'bestAttrs');
         $p->setAccessible(true);
-        $p->setValue($o, QualityFixtures::goodAttrs($article->primary_keyword));
+        $p->setValue($o, QualityFixtures::goodAttrs($article->primary_keyword) + ['article_id' => $article->id]);
 
         $r = $this->invokePrivate($o, 'finishKeepingDraft', [$run, $article, 'Hết hạn mức theo ngày. Chưa có bản nháp nào được tạo.']);
 
