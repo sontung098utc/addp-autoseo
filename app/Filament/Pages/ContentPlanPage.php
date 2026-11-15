@@ -18,7 +18,9 @@ use App\Models\Article;
 use App\Models\Campaign;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Planning\CampaignProposer;
 use App\Services\Planning\ContentPlanner;
+use App\Services\Planning\GscSignals;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
@@ -272,6 +274,67 @@ class ContentPlanPage extends Page
         if ($site && $c) {
             $this->runCreate($site, $c, $this->suggestPick, null, (string) ($this->planFixedTarget() ?? $this->planTarget));
         }
+    }
+
+    /** Chủ đề nhập để đề xuất chiến dịch, đề xuất đang xem, các vệ tinh được chọn, tên chiến dịch. */
+    public string $campaignSeed = '';
+
+    public ?array $campaignProposal = null;
+
+    /** @var list<string> */
+    public array $campaignPick = [];
+
+    public string $campaignName = '';
+
+    /** Chỉ TÍNH đề xuất (không ghi gì). Cần approver vì có thể tốn phí tra SERP. */
+    public function proposeCampaign(): void
+    {
+        abort_unless(Auth::user()?->isApprover() ?? false, 403);
+        $site = $this->site();
+        if (! $site) {
+            return;
+        }
+        try {
+            $why = null;
+            $p = (new CampaignProposer)->propose($site, $this->campaignSeed, GscSignals::forWebsite($site, 28, $why));
+        } catch (InvalidArgumentException $e) {
+            Notification::make()->title('Chưa đề xuất được chiến dịch')->body($e->getMessage())->danger()->send();
+
+            return;
+        }
+        $this->campaignProposal = $p;
+        $this->campaignPick = array_column($p['satellites'], 'keyword');
+        $this->campaignName = 'Chiến dịch: '.$p['seed'];
+        Notification::make()->title($p['satellites'] === [] ? 'Chưa tìm được bài vệ tinh nào' : 'Đã đề xuất 1 bài trụ + '.count($p['satellites']).' bài vệ tinh')
+            ->body('Chi phí tra SERP ước tính '.number_format($p['cost_vnd'], 0, ',', '.').' đ. Chưa tạo gì: bạn xem và duyệt.')->{$p['satellites'] === [] ? 'warning' : 'success'}()->send();
+    }
+
+    public function discardCampaignProposal(): void
+    {
+        $this->campaignProposal = null;
+        $this->campaignPick = [];
+    }
+
+    /** Người duyệt bấm tạo: chiến dịch ở trạng thái TẠM DỪNG, bài ở "Đã lên kế hoạch"; chưa gọi AI viết. */
+    public function createCampaignFromProposal(): void
+    {
+        abort_unless(Auth::user()?->isApprover() ?? false, 403);
+        $site = $this->site();
+        if (! $site || $this->campaignProposal === null) {
+            return;
+        }
+        try {
+            $r = (new CampaignProposer)->create(Auth::user(), $site, $this->campaignProposal, $this->campaignPick, $this->campaignName);
+        } catch (InvalidArgumentException $e) {
+            Notification::make()->title('Chưa tạo được chiến dịch')->body($e->getMessage())->danger()->send();
+
+            return;
+        }
+        $n = Notification::make()->title('Đã tạo chiến dịch (tạm dừng) với '.$r['created'].' bài')
+            ->body($r['skipped'] ? 'Bỏ qua: '.implode('; ', $r['skipped']) : 'Chiến dịch chưa chạy. Mở chiến dịch để bật khi bạn sẵn sàng.');
+        $r['skipped'] ? $n->warning() : $n->success();
+        $n->send();
+        $this->discardCampaignProposal();
     }
 
     protected function planSite(): ?Website

@@ -26,11 +26,12 @@ final class SerpClusterer
     /**
      * @param  list<string>  $keywords  thứ tự ưu tiên (từ khóa quan trọng trước, vd. lượt tìm cao)
      * @param  ?float  $budgetVnd  trần chi phí tra SERP (null = không giới hạn)
+     * @param  ?string  $forcePillar  từ khóa luôn được chọn làm trụ của cụm chứa nó (vd. chủ đề của chiến dịch)
      * @return array{groups:list<array{name:string,pillar:string,keywords:list<string>,same_post:list<array{keyword:string,shared:int}>,evidence:list<array{a:string,b:string,shared:int,urls:list<string>}>}>, interlinks:list<array{from:string,to:string,shared:int}>, unprocessed:list<array{keyword:string,reason:string}>, cost_vnd:float, providers:list<string>, stopped:?string}
      *
      * @throws SerpUnavailable khi chưa có nguồn SERP nào
      */
-    public function cluster(array $keywords, SerpInsights $serp, ?float $budgetVnd = null): array
+    public function cluster(array $keywords, SerpInsights $serp, ?float $budgetVnd = null, ?string $forcePillar = null): array
     {
         $keywords = array_slice(array_values(array_unique(array_filter(array_map(fn ($k) => CsvKeywordParser::normalizeKeyword((string) $k), $keywords), fn ($k) => $k !== ''))), 0, self::MAX_KEYWORDS);
         $res = ['groups' => [], 'interlinks' => [], 'unprocessed' => [], 'cost_vnd' => 0.0, 'providers' => [], 'stopped' => null];
@@ -89,6 +90,10 @@ final class SerpClusterer
         }
         $order = $ok;
         usort($order, fn ($a, $b) => [$degree[$b], array_search($a, $ok, true)] <=> [$degree[$a], array_search($b, $ok, true)]);
+        if ($forcePillar !== null && ($fi = array_search(CsvKeywordParser::normalizeKeyword($forcePillar), $order, true)) !== false) {
+            array_splice($order, (int) $fi, 1);
+            array_unshift($order, CsvKeywordParser::normalizeKeyword($forcePillar));
+        }
         $assigned = [];
         $leftover = [];
         foreach ($order as $seed) {
