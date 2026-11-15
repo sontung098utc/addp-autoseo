@@ -43,3 +43,10 @@ Schedule::command('agent:reap-stale')
     ->timezone('Asia/Ho_Chi_Minh')
     ->withoutOverlapping()
     ->runInBackground();
+
+// Xu hướng miễn phí: mỗi ngày ghi lại gợi ý tự động của Google cho chủ đề các chiến dịch, để sau vài ngày so được cụm nào mới nổi. Gọi Google rất nhẹ, nghỉ 1 giây giữa các chủ đề.
+Schedule::command('trends:snapshot')
+    ->dailyAt('03:30')
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->withoutOverlapping()
+    ->runInBackground();

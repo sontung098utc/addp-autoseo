@@ -270,5 +270,14 @@ class TrendSignalsTest extends TestCase
         $this->artisan('trends:snapshot', ['seed' => ['x'], '--pause' => 0])->assertFailed();
         $this->artisan('trends:snapshot', ['--pause' => 0])->expectsOutputToContain('Không có chủ đề')->assertSuccessful();
     }
+
+    public function test_lenh_ghi_lich_su_goi_y_da_len_lich_hang_ngay(): void
+    {
+        $e = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())->first(fn ($ev) => str_contains((string) $ev->command, 'trends:snapshot'));
+        $this->assertNotNull($e, 'phải có trong lịch');
+        $this->assertSame('30 3 * * *', $e->expression);
+        $this->assertSame('Asia/Ho_Chi_Minh', (string) $e->timezone);
+        $this->assertTrue($e->withoutOverlapping);
+    }
 }
 
