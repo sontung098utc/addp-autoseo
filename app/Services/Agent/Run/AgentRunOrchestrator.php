@@ -1027,6 +1027,8 @@ final class AgentRunOrchestrator
             return;
         }
         $base = ['purpose' => 'kb_coordination', 'field' => $r['field'], 'brain_id' => $r['brain_id'], 'covered' => $covered, 'recurring' => $r['recurring']];
+        // Chỉ dùng kiến thức của Trí tuệ ĐÃ XÁC ĐỊNH khớp chủ đề (hoặc không dùng kho nếu không có Trí tuệ nào khớp): kho của lĩnh vực khác (vd. Sức khỏe trẻ em trong bài dược công nghiệp) không được lọt vào trích dẫn.
+        $this->narrowBrainScope($r['brain_id'] !== null ? [(int) $r['brain_id']] : []);
         if ($r['brain_id'] !== null) {
             $this->matchedBrainId = $r['brain_id'];
             $name = (string) (collect($brains)->firstWhere('id', $r['brain_id'])['name'] ?? 'Trí tuệ');
@@ -1759,6 +1761,16 @@ final class AgentRunOrchestrator
         $n = BrandProfileData::forPrompt($this->brandProfile)['fields_used'] ?? 0;
 
         return $n > 0 ? ['brand_profile_fields' => $n] + ($this->brandSource() ? ['brand_source' => $this->brandSource()] : []) : [];
+    }
+
+    /** Thu hẹp phạm vi Trí tuệ của bài sau khi điều phối kho đã phân loại. @param list<int> $ids rỗng = không dùng Trí tuệ nào. */
+    private function narrowBrainScope(array $ids): void
+    {
+        if ($this->brainCtx === null || count($this->brainCtx->ids()) <= 1 && $ids !== [] && $this->brainCtx->ids() === $ids) {
+            return;
+        }
+        $this->brainCtx = $this->brainCtx->only($ids);
+        $this->kb = (new KnowledgeContext())->scopeToBrains($ids === [] ? [0] : $this->writerBrainScope($ids)); // [0] = không có Trí tuệ nào (chỉ atom của website)
     }
 
     /** Agent Studio: nếu admin cấp quyền Trí tuệ cho Người viết thì chỉ truy xuất kiến thức trong giao của quyền đó và Trí tuệ đã gắn; rỗng = như cũ. @param list<int> $ids @return list<int> */

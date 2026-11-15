@@ -46,6 +46,12 @@ final class BrainContext
         return new self($brains->values()->all());
     }
 
+    /** Chỉ giữ các Trí tuệ có id này (điều phối kho đã xác định bài thuộc Trí tuệ nào; các Trí tuệ khác của website không liên quan tới chủ đề). @param list<int> $ids */
+    public function only(array $ids): self
+    {
+        return new self(array_values(array_filter($this->brains, fn (Brain $b) => in_array($b->id, $ids, true))));
+    }
+
     public function isEmpty(): bool
     {
         return $this->brains === [];

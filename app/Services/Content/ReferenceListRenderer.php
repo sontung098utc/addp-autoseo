@@ -72,6 +72,9 @@ final class ReferenceListRenderer
             $host = (string) (preg_replace('/^www\./', '', (string) parse_url($url, PHP_URL_HOST)) ?: ($r['domain'] ?? ''));
             $title = self::readableTitle(trim(strip_tags((string) ($r['title'] ?? ''))), (string) $host);
             $vi = trim(strip_tags((string) ($r['title_vi'] ?? '')));
+            if (! isset($r['_n']) && ($title === '' || preg_match('/\p{Lu}/u', $title) !== 1 || preg_match('/\p{L}{3,}/u', $title) !== 1)) {
+                continue; // nguồn chưa được trích mà tiêu đề rác (không đọc được): không liệt kê cho đủ số
+            }
             if ($title !== '' && self::looksTruncated($title)) { // tiêu đề gốc bị cắt: dùng giải nghĩa tiếng Việt làm tên hiển thị, không có thì thêm dấu … cho trung thực
                 $title = $vi !== '' ? $vi : rtrim($title, ' —-').'…';
                 $vi = '';
