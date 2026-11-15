@@ -158,6 +158,9 @@ final class AgentRunOrchestrator
     /** Số lần tối đa điều phối cho tìm thêm tài liệu khi bài còn thiếu căn cứ (mỗi lần theo đúng các câu còn thiếu). */
     private const MAX_EXTRA_SEARCHES = 3;
 
+    /** Số vòng tối đa điều phối cho tìm thêm nguồn sau khi Tổng hợp báo thiếu căn cứ. */
+    private const MAX_GAP_ROUNDS = 2;
+
     private int $extraSearches = 0;
 
     /** kho vẫn chưa có mục đã duyệt khớp sau khi tự chuẩn bị, chủ đề rủi ro cao: bài cần chuyên gia xem lại sau khi viết */
@@ -908,23 +911,58 @@ final class AgentRunOrchestrator
         $tokens = $r['tokens'];
         $extra = '';
         $gaps = (array) $plan['gaps'];
-        if ($gaps !== [] && $this->spent($run) + $cost < $this->policy->budgetVnd) {
-            // Luồng nạp bổ sung: chỉ cho phần còn thiếu căn cứ.
-            $topics = array_map(fn ($g) => str_word_count(preg_replace('/[^\p{L}\p{N}\s]/u', ' ', (string) $g), 0, 'àáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ') >= 3 ? trim((string) $g) : trim((string) $article->primary_keyword.' '.$g), array_slice($gaps, 0, 3)); // cụm tìm kiếm đủ cụ thể thì tìm riêng, ngắn quá thì ghép với từ khóa
+        // ĐIỀU PHỐI SAU TỔNG HỢP: Tổng hợp báo còn thiếu căn cứ → điều phối quyết định BỎ QUA (nêu chung chung), TÌM THÊM NGUỒN (tối đa 2 vòng, dừng khi số khoảng trống không giảm) hay CHUYỂN NGƯỜI CHUYÊN MÔN.
+        $round = 0;
+        $skipped = false;
+        if ($gaps !== []) { // bước báo cáo của Tổng hợp: ghi lại để sơ đồ thấy "Tổng hợp báo thiếu" trước quyết định của điều phối
+            $this->step($run, 'synthesize', 'strategist', 'warn', 'Tổng hợp nguồn: còn thiếu căn cứ cho '.count($gaps).' ý',
+                'Còn thiếu: '.implode('; ', array_slice(array_map(fn ($g) => mb_substr((string) $g, 0, 100), $gaps), 0, 3)).'. Báo cho điều phối quyết định.',
+                ['plan' => $plan, 'gaps' => $gaps, 'sources' => $r['sources'], 'interim' => true], $r['model'], $tokens, $cost);
+            $cost = 0.0;
+            $tokens = 0;
+        }
+        while ($gaps !== [] && $round < self::MAX_GAP_ROUNDS) {
+            [$verdict, $why] = $this->judgeGaps($gaps, $risk, $round, $this->spent($run));
+            if ($verdict === 'skip') {
+                $skipped = true;
+                $this->decision($run, 'gap_skip', 'Điều phối: bỏ qua '.count($gaps).' khoảng trống, viết nêu chung chung', $why, ['gaps' => array_slice($gaps, 0, 4), 'risk' => $risk, 'routes' => []]);
+                break;
+            }
+            if ($verdict === 'escalate') {
+                $this->needsExpert = true;
+                $this->decision($run, 'gap_escalate', 'Điều phối: khoảng trống chưa lấp, giữ cho người chuyên môn', $why, ['gaps' => array_slice($gaps, 0, 4), 'risk' => $risk, 'routes' => []]);
+                break;
+            }
+            $topics = array_map(fn ($g) => str_word_count(preg_replace('/[^\p{L}\p{N}\s]/u', ' ', (string) $g), 0, 'àáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ') >= 3 ? trim((string) $g) : trim((string) $article->primary_keyword.' '.$g), array_slice($gaps, 0, 3));
+            $this->decision($run, 'gap_search', 'Điều phối: tìm thêm nguồn cho '.count($topics).' khoảng trống (vòng '.($round + 1).')', $why, ['gaps' => array_slice($gaps, 0, 4), 'risk' => $risk, 'round' => $round + 1, 'routes' => ['sources']]);
+            $round++;
             $added = $this->topUpEvidence($run, $article, $topics, $risk);
-            if ($added > 0) {
-                $kb = $this->kbForPlanner($article);
-                $r2 = $planner->plan((string) $article->primary_keyword, $intent, $risk, $kb, $this->references);
-                $cost += $r2['cost'];
-                $tokens += $r2['tokens'];
-                if ($r2['status'] === 'done') {
-                    $plan = $r2['plan'];
-                    $extra = ' Đã tìm thêm nguồn cho '.count($topics).' khoảng trống rồi tổng hợp lại.';
-                }
+            if ($added <= 0) {
+                $this->decision($run, 'gap_no_result', 'Điều phối: tìm thêm không có kết quả mới, dừng tìm', 'Không có tài liệu hay mục kho mới cho các khoảng trống nên không tìm tiếp để khỏi tốn chi phí.', ['routes' => []]);
+                break;
+            }
+            $kb = $this->kbForPlanner($article);
+            $r2 = $planner->plan((string) $article->primary_keyword, $intent, $risk, $kb, $this->references);
+            $cost += $r2['cost'];
+            $tokens += $r2['tokens'];
+            if ($r2['status'] !== 'done') {
+                break;
+            }
+            $before = count($gaps);
+            $plan = $r2['plan'];
+            $gaps = (array) $plan['gaps'];
+            $extra = ' Đã tìm thêm nguồn '.$round.' vòng rồi tổng hợp lại.';
+            if ($gaps !== [] && count($gaps) >= $before) {
+                $this->decision($run, 'gap_no_progress', 'Điều phối: số khoảng trống không giảm sau khi tìm thêm', 'Còn '.count($gaps).' khoảng trống (trước đó '.$before.') nên không tìm tiếp.', ['routes' => []]);
+                break;
             }
         }
+        if ($gaps !== [] && ! $skipped && $risk === 'high' && ! $this->needsExpert) {
+            $this->needsExpert = true;
+            $this->decision($run, 'gap_escalate', 'Điều phối: khoảng trống còn lại ở chủ đề rủi ro cao, giữ cho người chuyên môn', 'Còn '.count($gaps).' khoảng trống căn cứ sau khi đã tìm thêm; chủ đề rủi ro cao nên không tự viết cho qua.', ['gaps' => array_slice($gaps, 0, 4), 'routes' => []]);
+        }
         $this->contentPlan = $plan;
-        $this->contentPlanText = \App\Services\Content\ContentPlanner::render($plan);
+        $this->contentPlanText = \App\Services\Content\ContentPlanner::render($plan).($skipped ? "\nCÁC Ý CÒN THIẾU CĂN CỨ: điều phối đã quyết định bỏ qua; viết nêu chung chung, KHÔNG đưa số liệu hay khuyến cáo cụ thể cho các ý này." : '');
         foreach ((array) ($plan['titles_vi'] ?? []) as $code => $vi) { // giải nghĩa tiếng Việt cho tiêu đề nguồn tiếng nước ngoài (hiện ở mục Nguồn tham khảo)
             if (preg_match('/^T(\d+)$/', (string) $code, $m) && isset($this->references[(int) $m[1] - 1])) {
                 $this->references[(int) $m[1] - 1]['title_vi'] = $vi;
@@ -1519,6 +1557,30 @@ final class AgentRunOrchestrator
         }
 
         return $attrs;
+    }
+
+    /**
+     * Điều phối nhìn các khoảng trống căn cứ rồi chọn hướng. @param list<mixed> $gaps @return array{0:string,1:string} [skip|search|escalate, lý do]
+     */
+    private function judgeGaps(array $gaps, string $risk, int $round, float $spent): array
+    {
+        $figure = array_filter($gaps, fn ($g) => preg_match('/\d|liều|\bmg\b|\bml\b|%|ngưỡng|khuyến cáo|chống chỉ định|tối đa|tối thiểu|số liệu|thống kê|tỷ lệ|con số|bao nhiêu/iu', (string) $g) === 1);
+        $budget = $this->policy->budgetVnd;
+        if ($spent >= $budget * 0.5) {
+            return $risk === 'high'
+                ? ['escalate', 'Đã chi '.number_format($spent, 0, ',', '.').' ₫ (từ nửa ngân sách) mà chủ đề rủi ro cao còn khoảng trống: không tìm tiếp, chuyển người chuyên môn.']
+                : ['skip', 'Đã chi từ nửa ngân sách nên không tìm thêm; các ý thiếu căn cứ sẽ được nêu chung chung.'];
+        }
+        if ($risk === 'low' && $figure === []) {
+            return ['skip', 'Chủ đề rủi ro thấp và các khoảng trống không có số liệu hay khuyến cáo nhạy cảm: nêu chung chung, không đáng tốn thêm chi phí tìm nguồn.'];
+        }
+        if ($round >= 1 && $risk !== 'high') {
+            return ['skip', 'Đã tìm thêm '.$round.' vòng, chủ đề không ở mức rủi ro cao nên chấp nhận còn thiếu và nêu chung chung.'];
+        }
+
+        return ['search', $figure !== []
+            ? count($figure).' khoảng trống liên quan số liệu hoặc khuyến cáo (rủi ro '.$risk.'): cần nguồn cụ thể, giao Kho và nguồn tìm thêm.'
+            : 'Còn khoảng trống căn cứ (rủi ro '.$risk.'): giao Kho và nguồn tìm thêm trước khi viết.'];
     }
 
     /**

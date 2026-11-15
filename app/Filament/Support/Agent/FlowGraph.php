@@ -221,6 +221,12 @@ final class FlowGraph
                 return "điểm {$score}/100";
             }
         }
+        if (isset($steps['synthesize'])) {
+            $g = count((array) (((array) end($steps['synthesize'])->data)['gaps'] ?? []));
+            if ($g > 0) {
+                return "thiếu căn cứ {$g} ý";
+            }
+        }
         if (isset($steps['repair'])) {
             return $word.' · đã sửa';
         }
@@ -239,6 +245,15 @@ final class FlowGraph
             $p = $by['fix_plan'];
 
             return 'yêu cầu sửa'.($p['round'] ? ' lần '.$p['round'] : '').($p['failed'] ? ' · '.$p['failed'].' mục' : '');
+        }
+        if (isset($by['gap_search'])) {
+            return 'tìm thêm nguồn cho khoảng trống';
+        }
+        if (isset($by['gap_skip'])) {
+            return 'bỏ qua khoảng trống → lập dàn ý';
+        }
+        if (isset($by['gap_escalate'])) {
+            return 'khoảng trống chưa lấp → giữ cho người duyệt';
         }
         if (isset($by['synthesis'])) {
             return 'chốt hướng nội dung → lập dàn ý';
