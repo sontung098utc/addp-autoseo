@@ -13,6 +13,9 @@ use App\Services\Keywords\KeywordResearchService;
 use App\Services\Keywords\Serp\SerpClusterer;
 use App\Services\Keywords\Serp\SerpInsights;
 use App\Services\Keywords\Serp\SerpUnavailable;
+use App\Services\Keywords\Trends\SuggestionHistory;
+use App\Services\Keywords\Trends\TrendSignals;
+use App\Services\Knowledge\KnowledgeRetriever;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -22,7 +25,7 @@ use InvalidArgumentException;
  * TẠM DỪNG (không tự chạy) + các bài "Đã lên kế hoạch". Không có số liệu lượt tìm/SERP thì nói rõ "chưa có", không điền số giả.
  *
  * Nhãn nguồn: keyword (kho), competitor, gsc (Search Console thật), serp (Mọi người cũng hỏi / tìm kiếm liên quan), autocomplete, ai (từ khóa kho do AI đề xuất).
- * Điểm 0–100: lượt tìm ≤40, thứ hạng trong danh sách gợi ý ≤10 (chỉ là thứ tự Google liệt kê, không phải lượt tìm) (so với ứng viên có số liệu cao nhất), Search Console ≤25, độ đa nguồn ≤20 (câu hỏi người dùng thật +12), đã có trong kho +5; lệch lĩnh vực trừ 30.
+ * Điểm 0–100 (chất lượng trước, xu hướng sau): lượt tìm ≤40, kho có nguồn ≤12, xu hướng +8/−4 (chỉ khi đã có bằng chứng chất lượng), thứ hạng trong danh sách gợi ý ≤10 (chỉ là thứ tự Google liệt kê, không phải lượt tìm) (so với ứng viên có số liệu cao nhất), Search Console ≤25, độ đa nguồn ≤20 (câu hỏi người dùng thật +12), đã có trong kho +5; lệch lĩnh vực trừ 30.
  */
 final class CampaignProposer
 {
@@ -114,6 +117,23 @@ final class CampaignProposer
             $out['notes'][] = 'Chưa có dữ liệu SERP nên không có câu hỏi và gợi ý tìm kiếm thật: '.$e->getMessage();
         }
 
+        // Xu hướng MIỄN PHÍ: ghi lại gợi ý hôm nay để so với lần ghi cũ (tự làm, không cần khóa)
+        $trends = new TrendSignals;
+        $trendOn = TrendSignals::enabled();
+        $history = null;
+        if ($trendOn && $serpData !== null && $serpData['autocomplete'] !== []) {
+            try {
+                $hist = new SuggestionHistory;
+                $history = $hist->movers($seed, $serpData['autocomplete']);
+                $hist->record($seed, $serpData['autocomplete']);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+            if ($history !== null && ! $history['ready']) {
+                $out['notes'][] = 'Xu hướng từ lịch sử gợi ý: hôm nay đã được ghi lại, cần khoảng '.SuggestionHistory::MIN_AGE_DAYS.' ngày ghi nhận mới so sánh được.';
+            }
+        }
+
         foreach (array_keys($pool) as $key) {
             if (isset($taken[$key])) {
                 unset($pool[$key]); // đã có bài
@@ -123,12 +143,19 @@ final class CampaignProposer
         // Chấm điểm
         $maxVol = (int) collect($pool)->max('volume');
         $profile = \App\Services\Brand\BrandProfileData::forWebsite($site->id);
+        $retriever = new KnowledgeRetriever;
+        $khoOn = $this->khoHasItems($retriever, $site);
+        if (! $khoOn) {
+            $out['notes'][] = 'Kho kiến thức của website đang trống nên chưa kiểm được chủ đề nào đã có nguồn đáng tin để viết.';
+        }
         foreach ($pool as $key => &$c) {
             $parts = [];
             $parts['volume'] = $c['volume'] !== null && $maxVol > 0 ? (int) round(40 * $c['volume'] / $maxVol) : 0;
             $parts['gsc'] = $c['gsc'] !== null ? (int) min(GscSignals::MAX_POINTS, $c['gsc']['points']) : 0;
             $parts['sources'] = min(20, 8 * max(0, count($c['sources']) - 1) + ($c['question'] ? 12 : 0) + (count($c['sources']) === 1 && ! $c['question'] ? 4 : 0));
             $parts['kho'] = $c['in_kho'] ? 5 : 0;
+            $c['kho_n'] = $khoOn ? $this->khoMatches($retriever, $site, $c['keyword'], $seed) : null; // số mục kiến thức đã duyệt khớp chủ đề (chất lượng: có nguồn để viết đúng)
+            $parts['kho_nguon'] = $c['kho_n'] === null ? 0 : ($c['kho_n'] >= 2 ? 12 : ($c['kho_n'] === 1 ? 6 : 0));
             $parts['rank'] = $c['rank_ratio'] !== null ? (int) round(10 * $c['rank_ratio']) : 0; // thứ hạng gợi ý, KHÔNG phải lượt tìm
             $off = \App\Services\Brand\BrandProfileData::looksOffTopic($profile, $c['keyword']);
             $parts['off_topic'] = $off ? -30 : 0;
@@ -137,6 +164,20 @@ final class CampaignProposer
             $c['off_topic'] = $off;
         }
         unset($c);
+        // Xu hướng chỉ cộng/trừ khi ứng viên đã có bằng chứng chất lượng (Search Console, câu hỏi thật, trong kho, kho có nguồn): chất lượng trước, độ hot sau.
+        if ($trendOn) {
+            $order = array_keys($pool);
+            usort($order, fn ($a, $b) => $pool[$b]['score'] <=> $pool[$a]['score']);
+            foreach ($order as $i => $key) {
+                $c = $pool[$key];
+                $t = $trends->forKeyword($c['keyword'], $history, $i < 10); // tra Wikipedia cho 10 ứng viên đầu để tiết kiệm lượt gọi
+                $q = $c['gsc'] !== null || $c['question'] || $c['in_kho'] || ($c['kho_n'] ?? 0) > 0;
+                $pts = $q ? ($t['direction'] === 'up' ? 8 : ($t['direction'] === 'down' ? -4 : 0)) : 0;
+                $pool[$key]['trend'] = $t + ['scored' => $q];
+                $pool[$key]['score_parts']['trend'] = $pts;
+                $pool[$key]['score'] = max(0, min(100, $c['score'] + $pts));
+            }
+        }
         $ranked = array_values($pool);
         usort($ranked, fn ($a, $b) => [$a['off_topic'], $b['score'], $a['keyword']] <=> [$b['off_topic'], $a['score'], $b['keyword']]);
         $ranked = array_values(array_filter($ranked, fn ($c) => ! $c['off_topic']));
@@ -188,6 +229,8 @@ final class CampaignProposer
             'why' => 'Bài trụ bao quát chủ đề «'.$seed.'», các vệ tinh dẫn về đây.'.($pillarVol !== null ? ' Lượt tìm '.number_format($pillarVol, 0, ',', '.').' ('.($pillarKho->volume_source ?? 'kho').').' : ' Chưa có số liệu lượt tìm cho chủ đề này.'),
             'if_wrong' => 'Nếu top 10 của «'.$seed.'» phần lớn là trang bán hàng hoặc khác ý định (không phải bài hướng dẫn), bài trụ nên đổi hướng hoặc chọn từ khóa trụ khác.',
             'sources' => $pillarSources, 'volume' => $pillarVol, 'score' => null,
+            'trend' => $trendOn ? $trends->forKeyword($seed, $history, true) : null,
+            'kho_matches' => $khoOn ? $this->khoMatches($retriever, $site, $seed, $seed) : null,
         ];
         $seedGroupKeys = isset($groupOf[$seedKey]) ? array_flip(array_map(fn ($k) => Keyword::keyFor($k), $groupOf[$seedKey]['keywords'])) : [];
         foreach ($picked as $c) {
@@ -198,7 +241,7 @@ final class CampaignProposer
             }
             $out['satellites'][] = [
                 'keyword' => $c['keyword'], 'role' => 'spoke', 'score' => $c['score'], 'score_parts' => $c['score_parts'], 'volume' => $c['volume'], 'sources' => $sources, 'kho_id' => $c['kho_id'],
-                'secondary' => array_slice($c['also'] ?? [], 0, 4), 'facet' => $c['facet'] ?? null, 'serp_same_cluster' => $in, 'headline' => $this->headline($c),
+                'secondary' => array_slice($c['also'] ?? [], 0, 4), 'facet' => $c['facet'] ?? null, 'serp_same_cluster' => $in, 'headline' => $this->headline($c), 'trend' => $c['trend'] ?? null, 'kho_matches' => $c['kho_n'] ?? null,
                 'why' => $this->why($c, $seed, $out['serp_checked'], $in),
                 'if_wrong' => $this->ifWrong($c, $seed, $out['serp_checked'], $in),
             ];
@@ -369,6 +412,39 @@ final class CampaignProposer
         return array_values(array_unique(array_filter($w, fn ($x) => mb_strlen($x) >= 2 && ! in_array($x, self::STOP, true))));
     }
 
+    private function khoHasItems(KnowledgeRetriever $r, Website $site): bool
+    {
+        try {
+            return $r->searchable($site)->exists();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Số mục kiến thức đã duyệt khớp CHÍNH cụm này. Ngoài việc truy xuất theo từ khóa, mục phải chứa các từ riêng của cụm (ngoài từ của chủ đề):
+     * kho có "đường huyết cao" thì chưa đủ để coi "đường huyết thấp" có nguồn.
+     */
+    private function khoMatches(KnowledgeRetriever $r, Website $site, string $kw, string $seed): int
+    {
+        try {
+            $own = array_values(array_diff($this->wordsOf($kw), $this->wordsOf($seed), self::STOP));
+            $own = array_values(array_filter($own, fn ($x) => mb_strlen($x) >= 2));
+            $need = $own === [] ? 0 : (int) ceil(count($own) * 0.6);
+            $n = 0;
+            foreach ($r->search($site, $kw, 5) as $row) {
+                $text = Keyword::keyFor((string) $row['title'].' '.(string) $row['body']);
+                if (count(array_filter($own, fn ($w) => str_contains($text, $w))) >= $need) {
+                    $n++;
+                }
+            }
+
+            return $n;
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
     /** Một dòng tóm tắt bằng số liệu có thật của ứng viên (cho thẻ gọn); thiếu số liệu thì nói thẳng. */
     private function headline(array $c): string
     {
@@ -381,6 +457,11 @@ final class CampaignProposer
         }
         if ($c['volume'] !== null) {
             $h[] = number_format($c['volume'], 0, ',', '.').' lượt tìm/tháng';
+        }
+        if (($c['trend']['direction'] ?? 'unknown') === 'up') {
+            $h[] = '↑ đang tăng';
+        } elseif (($c['trend']['direction'] ?? 'unknown') === 'down') {
+            $h[] = '↓ đang giảm';
         }
         if ($h === [] && $c['in_kho']) {
             $h[] = 'Có trong kho từ khóa';
@@ -416,6 +497,12 @@ final class CampaignProposer
         }
         if (! empty($c['also'])) {
             $w[] = 'gộp thêm '.count($c['also']).' cụm cùng khía cạnh «'.$c['facet'].'» làm từ khóa phụ: '.implode('; ', array_slice($c['also'], 0, 4));
+        }
+        foreach (($c['trend']['evidence'] ?? []) as $e) {
+            $w[] = mb_strtolower(mb_substr($e['text'], 0, 1)).mb_substr($e['text'], 1).($c['trend']['scored'] ? '' : ' (chưa cộng điểm vì chưa có bằng chứng chất lượng khác)');
+        }
+        if (($c['kho_n'] ?? null) !== null) {
+            $w[] = $c['kho_n'] > 0 ? 'kho kiến thức có '.$c['kho_n'].' mục đã duyệt khớp để viết' : 'kho kiến thức CHƯA có nguồn khớp: nên bổ sung nguồn đáng tin trước khi viết';
         }
         if ($c['volume'] === null && $c['gsc'] === null) {
             $w[] = 'chưa có số liệu lượt tìm nên điểm chỉ dựa vào nguồn gợi ý';

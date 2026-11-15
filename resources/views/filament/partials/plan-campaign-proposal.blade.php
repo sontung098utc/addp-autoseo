@@ -1,7 +1,7 @@
 @php
     $p = $campaignProposal;
     $srcTone = ['keyword' => 'info', 'competitor' => 'accent', 'gsc' => 'ok', 'serp' => 'accent', 'autocomplete' => 'info', 'ai' => 'warn'];
-    $partLabels = ['volume' => 'Lượt tìm', 'gsc' => 'Search Console', 'sources' => 'Độ đa nguồn', 'kho' => 'Có trong kho', 'rank' => 'Thứ hạng gợi ý', 'off_topic' => 'Lệch lĩnh vực'];
+    $partLabels = ['volume' => 'Lượt tìm', 'gsc' => 'Search Console', 'sources' => 'Độ đa nguồn', 'kho' => 'Có trong kho', 'rank' => 'Thứ hạng gợi ý', 'kho_nguon' => 'Kho có nguồn', 'trend' => 'Xu hướng', 'off_topic' => 'Lệch lĩnh vực'];
     // Trạng thái các nguồn dữ liệu: bật = đã dùng thật trong đề xuất này; tắt = nói rõ cần gì để bật.
     $providers = $p['providers'] ?? [];
     $sources = $p ? [
@@ -128,6 +128,8 @@
                     <div class="cpz-chips">
                         @foreach ($s['sources'] as $src)<x-studio.badge :tone="$srcTone[$src['type']] ?? 'muted'">{{ $src['label'] }}</x-studio.badge>@endforeach
                         @if ($s['secondary'])<x-studio.badge tone="accent">+{{ count($s['secondary']) }} từ khóa phụ</x-studio.badge>@endif
+                        @if (($s['trend']['direction'] ?? 'unknown') === 'up')<span title="{{ implode('; ', array_column($s['trend']['evidence'], 'text')) }}"><x-studio.badge tone="ok">↑ Đang tăng</x-studio.badge></span>@elseif (($s['trend']['direction'] ?? 'unknown') === 'down')<span title="{{ implode('; ', array_column($s['trend']['evidence'], 'text')) }}"><x-studio.badge tone="warn">↓ Đang giảm</x-studio.badge></span>@endif
+                        @if (($s['kho_matches'] ?? null) === 0)<span title="Kho kiến thức chưa có mục đã duyệt khớp chủ đề này: nên bổ sung nguồn đáng tin trước khi viết."><x-studio.badge tone="warn">Kho chưa có nguồn</x-studio.badge></span>@elseif (($s['kho_matches'] ?? 0) > 0)<x-studio.badge tone="ok">Kho có nguồn</x-studio.badge>@endif
                     </div>
                     <details class="cpz-more">
                         <summary>Vì sao và cách kiểm tra</summary>

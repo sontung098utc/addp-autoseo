@@ -45,4 +45,17 @@ return [
         // Trần chi phí (VND) cho một lần gom cụm theo SERP (mỗi từ khóa một lượt tra).
         'cluster_budget_vnd' => (float) env('KEYWORDS_SERP_CLUSTER_BUDGET_VND', 40000),
     ],
+
+    // Xu hướng MIỄN PHÍ, chỉ dùng nguồn chính thức/công khai: lượt xem Wikipedia, nguồn cấp RSS Google Trends VN, lịch sử gợi ý tự ghi.
+    // (Không dùng giao diện Google Trends không chính thức: dễ bị chặn và vi phạm điều khoản.)
+    'trends' => [
+        'enabled' => (bool) env('TRENDS_ENABLED', true),
+        // Wikimedia yêu cầu User-Agent có cách liên hệ: đặt TRENDS_CONTACT (email hoặc URL) trong .env.
+        'user_agent' => 'autoseo-research/1.0 (SEO planning tool; contact: '.env('TRENDS_CONTACT', 'chua-dat').')',
+        // Từ đồng nghĩa dùng để tìm bài Wikipedia tương ứng (tên thường gọi => tên bài).
+        'synonyms' => ['tiểu đường' => 'đái tháo đường', 'huyết áp cao' => 'tăng huyết áp', 'mỡ máu' => 'rối loạn lipid máu'],
+        'wikipedia_api' => 'https://vi.wikipedia.org/w/api.php',
+        'wikipedia_pageviews' => 'https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/vi.wikipedia/all-access/user',
+        'rss' => 'https://trends.google.com/trending/rss?geo=VN',
+    ],
 ];
