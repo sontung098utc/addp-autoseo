@@ -122,12 +122,14 @@ final class EloquentKeywordRepository implements KeywordRepository
 
     public function proposalSource(): string
     {
-        return Cache::get($this->proposalKey().'.source') === 'ai' ? 'ai' : 'mock';
+        $v = Cache::get($this->proposalKey().'.source');
+
+        return in_array($v, ['ai', 'serp'], true) ? $v : 'mock';
     }
 
     public function saveProposalSource(string $source): void
     {
-        Cache::put($this->proposalKey().'.source', $source === 'ai' ? 'ai' : 'mock', now()->addDay());
+        Cache::put($this->proposalKey().'.source', in_array($source, ['ai', 'serp'], true) ? $source : 'mock', now()->addDay());
     }
 
     private function proposalKey(): string

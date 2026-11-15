@@ -9,6 +9,9 @@ use App\Models\Website;
 use App\Services\Agent\Run\JobRunRecorder;
 use App\Services\Keywords\KeywordAiResolver;
 use App\Services\Keywords\KeywordAiUnavailable;
+use App\Services\Keywords\Serp\SerpClusterer;
+use App\Services\Keywords\Serp\SerpInsights;
+use App\Services\Keywords\Serp\SerpUnavailable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
@@ -167,7 +170,7 @@ final class KeywordService
         return count($props);
     }
 
-    /** Lần đề xuất gần nhất do AI hay do bản minh họa (để giao diện gắn nhãn đúng). @return 'ai'|'mock' */
+    /** Lần đề xuất gần nhất do AI hay do bản minh họa (để giao diện gắn nhãn đúng). @return 'ai'|'serp'|'mock' */
     public function proposalSource(): string
     {
         return $this->repo->proposalSource();
@@ -219,6 +222,63 @@ final class KeywordService
         $reason = $out['stopped_reason'];
         $status = $failed ? 'failed' : ($reason === 'budget' ? 'blocked' : 'ready_for_review');
         JobRunRecorder::finish($run, $status, ['proposals' => $out['proposals']], $reason);
+
+        return $out;
+    }
+
+    /**
+     * Đề xuất gom cụm theo SERP THẬT (trùng top 10) cho các từ khóa chưa có cụm và chưa nằm trong đề xuất chờ. Không dùng AI, không tốn token;
+     * tốn chi phí tra SERP (ước tính theo config). Chưa có nguồn SERP: ném SerpUnavailable, không gom giả.
+     *
+     * @return array{proposals:int, cost_vnd:float, unprocessed:list<array{keyword:string,reason:string}>, interlinks:list<array{from:string,to:string,shared:int}>, stopped_reason:?string}
+     *
+     * @throws SerpUnavailable
+     */
+    public function proposeWithSerp(?SerpInsights $serp = null, ?float $budgetVnd = null): array
+    {
+        $serp ??= SerpInsights::fromConfig();
+        $props = $this->repo->proposals();
+        $pending = [];
+        foreach ($props as $p) {
+            foreach ($p['keywords'] as $k) {
+                $pending[Keyword::keyFor($k)] = true;
+            }
+        }
+        $all = $this->repo->all();
+        $intents = [];
+        $free = [];
+        foreach ($all as $r) {
+            $intents[$r['keyword']] = $r['intent'];
+            if ($r['cluster'] === null && ! isset($pending[Keyword::keyFor($r['keyword'])])) {
+                $free[] = $r;
+            }
+        }
+        usort($free, fn ($a, $b) => ($b['volume'] ?? -1) <=> ($a['volume'] ?? -1)); // từ khóa nhiều lượt tìm trước (null cuối): được tra SERP trước khi hết trần
+        $siteId = $this->repo instanceof EloquentKeywordRepository ? $this->repo->websiteId() : null;
+        $run = $siteId !== null ? JobRunRecorder::start('market_research', $siteId, ['task' => 'keyword_serp_cluster', 'keywords' => count($free)], Auth::user(), 'manual', 'real') : null;
+        $out = ['proposals' => count($props), 'cost_vnd' => 0.0, 'unprocessed' => [], 'interlinks' => [], 'stopped_reason' => null];
+        try {
+            $res = (new SerpClusterer)->cluster(array_column($free, 'keyword'), $serp, $budgetVnd ?? (float) config('keywords.serp.cluster_budget_vnd', 40000));
+        } catch (SerpUnavailable $e) {
+            if ($run) {
+                JobRunRecorder::step($run, 'guard', 'Chưa có nguồn SERP', 'blocked', [], null, 0, 0, 'Chưa tra SERP nên không tốn chi phí.');
+                JobRunRecorder::finish($run, 'blocked', null, mb_substr($e->getMessage(), 0, 190));
+            }
+            throw $e;
+        }
+        $nextId = (int) max([0, ...array_column($props, 'id')]) + 1;
+        foreach ($res['groups'] as $g) {
+            $props[] = ['id' => $nextId++, 'name' => $g['name'], 'intent' => self::mainIntent($g['keywords'], $intents), 'keywords' => $g['keywords'], 'serp' => ['pillar' => $g['pillar'], 'same_post' => $g['same_post'], 'evidence' => $g['evidence']]];
+        }
+        if ($res['groups'] !== []) {
+            $this->repo->saveProposals($props);
+            $this->repo->saveProposalSource('serp');
+        }
+        $out = ['proposals' => count($props), 'cost_vnd' => $res['cost_vnd'], 'unprocessed' => $res['unprocessed'], 'interlinks' => $res['interlinks'], 'stopped_reason' => $res['stopped']];
+        if ($run) {
+            JobRunRecorder::step($run, 'cluster', 'Gom cụm theo SERP trùng top 10', $res['groups'] !== [] ? 'completed' : 'skipped', ['groups' => count($res['groups']), 'unprocessed' => count($res['unprocessed']), 'providers' => $res['providers'], 'interlinks' => count($res['interlinks'])], null, 0, $res['cost_vnd'], null, 'strategist');
+            JobRunRecorder::finish($run, $res['groups'] !== [] ? 'ready_for_review' : 'blocked', ['proposals' => $out['proposals']], $res['stopped']);
+        }
 
         return $out;
     }

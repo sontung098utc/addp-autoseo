@@ -41,5 +41,7 @@ return [
         'autocomplete' => (bool) env('SERP_AUTOCOMPLETE', true),
         'autocomplete_endpoint' => 'https://suggestqueries.google.com/complete/search',
         'cache_days' => 7,
+        // Trần chi phí (VND) cho một lần gom cụm theo SERP (mỗi từ khóa một lượt tra).
+        'cluster_budget_vnd' => (float) env('KEYWORDS_SERP_CLUSTER_BUDGET_VND', 40000),
     ],
 ];

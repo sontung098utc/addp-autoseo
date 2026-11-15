@@ -68,6 +68,7 @@
                             {{ $this->fetchMetricsAction->color($isNext ? 'primary' : 'gray')->size('sm') }}
                         @elseif ($it['key'] === 'cluster')
                             <x-filament::button size="sm" :color="$isNext ? 'primary' : 'gray'" wire:click="propose" :disabled="$unclustered === 0">Gom cụm {{ $unclustered }} từ khóa</x-filament::button>
+                            <x-filament::button size="sm" color="gray" wire:click="proposeBySerp" :disabled="$unclustered === 0" title="Từ khóa nào Google xếp chung nhiều kết quả top 10 thì cùng cụm. Cần DataForSEO; tốn chi phí tra SERP.">Gom theo SERP</x-filament::button>
                             @if (count($proposals) > 0 || count($clusters) > 0)
                                 <x-filament::button size="sm" color="gray" type="button" onclick="kwOpenClusters()">{{ count($proposals) > 0 ? 'Duyệt '.count($proposals).' đề xuất' : 'Quản lý cụm' }}</x-filament::button>
                             @endif
@@ -108,7 +109,7 @@
                             <span class="ss-muted ss-text-xs" style="font-weight:400">{{ count($clusters) }} cụm @if (count($proposals) > 0)· {{ count($proposals) }} đề xuất chờ nhận @endif</span>
                         </button>
                         <div class="kw-fold__body" x-show="open" x-cloak>
-                            <div class="ss-card__h" style="margin-top:.25rem">Đề xuất gom cụm @if ($proposals !== []) @if ($proposalSource === 'ai')<x-studio.badge tone="accent">AI đề xuất</x-studio.badge>@else<x-studio.badge>Bản minh họa (theo luật, không phải AI)</x-studio.badge>@endif @endif</div>
+                            <div class="ss-card__h" style="margin-top:.25rem">Đề xuất gom cụm @if ($proposals !== []) @if ($proposalSource === 'ai')<x-studio.badge tone="accent">AI đề xuất</x-studio.badge>@elseif ($proposalSource === 'serp')<x-studio.badge tone="accent">Gom theo SERP thật (trùng top 10)</x-studio.badge>@else<x-studio.badge>Bản minh họa (theo luật, không phải AI)</x-studio.badge>@endif @endif</div>
                             @if ($proposals === [])
                                 <p class="ss-text-sm ss-muted">Chưa có đề xuất. Bấm "Gom cụm" ở bước ③ để AI nhóm các từ khóa chưa có cụm; bạn duyệt rồi mới nhận.</p>
                             @endif
@@ -117,6 +118,8 @@
                         <article class="kw-card {{ $mergeFrom === $p['id'] ? 'is-merge' : '' }}" wire:key="prop-{{ $p['id'] }}">
                             <input class="kw-in" style="width:100%" wire:model="proposalNames.{{ $p['id'] }}" placeholder="{{ $p['name'] }}" aria-label="Tên cụm {{ $p['name'] }}">
                             <div class="ss-muted ss-text-xs">từ {{ count($p['keywords']) }} từ khóa · ý định chính: {{ $intents[$p['intent']] ?? $p['intent'] }}</div>
+                            @if (! empty($p['serp']['same_post']))<div class="ss-text-xs" style="color:var(--ss-warn,#b45309)">Nên gộp vào một bài (7+ URL trùng): {{ implode(', ', array_column($p['serp']['same_post'], 'keyword')) }}</div>@endif
+                            @if (! empty($p['serp']['evidence']))<div class="ss-muted ss-text-xs">Bằng chứng: @foreach (array_slice($p['serp']['evidence'], 0, 2) as $ev)«{{ $ev['b'] }}» chung {{ $ev['shared'] }}/10 URL với «{{ $ev['a'] }}»; @endforeach</div>@endif
                             <div class="kw-chips">@foreach (array_slice($p['keywords'], 0, 6) as $k)<span class="ss-badge">{{ $k }}</span>@endforeach @if (count($p['keywords']) > 6)<span class="ss-muted ss-text-xs">+{{ count($p['keywords']) - 6 }}</span>@endif</div>
                             <div class="kw-bar">
                                 <x-filament::button size="sm" wire:click="acceptProposal({{ $p['id'] }})">Nhận cụm</x-filament::button>

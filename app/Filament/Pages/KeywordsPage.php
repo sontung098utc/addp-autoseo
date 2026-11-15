@@ -20,6 +20,7 @@ use App\Services\Keywords\KeywordMetricsEnricher;
 use App\Services\Keywords\KeywordMetricsResolver;
 use App\Services\Keywords\KeywordMetricsUnavailable;
 use App\Services\Keywords\KeywordResearchService;
+use App\Services\Keywords\Serp\SerpUnavailable;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -461,6 +462,24 @@ class KeywordsPage extends Page
         } else {
             Notification::make()->title("Đề xuất {$n} cụm bằng bản minh họa")->body('Chưa kết nối AI nên dùng gom cụm theo luật, không phải AI.')->warning()->send();
         }
+    }
+
+    /** Gom cụm theo SERP thật (trùng top 10). Chưa có nguồn SERP: báo "bị chặn", không gom giả. */
+    public function proposeBySerp(): void
+    {
+        $this->guard();
+        $this->proposalNames = [];
+        try {
+            $r = KeywordService::make()->proposeWithSerp();
+        } catch (SerpUnavailable $e) {
+            $this->fail('Chưa gom cụm theo SERP được', $e->getMessage());
+
+            return;
+        }
+        $body = 'Chi phí tra SERP ước tính '.number_format($r['cost_vnd'], 0, ',', '.').' đ.'
+            .($r['unprocessed'] !== [] ? ' '.count($r['unprocessed']).' từ khóa chưa tra được SERP nên chưa xếp cụm.' : '')
+            .($r['stopped_reason'] ? ' '.$r['stopped_reason'] : '');
+        Notification::make()->title($r['proposals'] > 0 ? 'Đề xuất '.$r['proposals'].' cụm theo SERP' : 'Chưa gom được cụm nào theo SERP')->body(trim($body))->{$r['proposals'] > 0 ? 'success' : 'warning'}()->send();
     }
 
     private function run(callable $fn): void
