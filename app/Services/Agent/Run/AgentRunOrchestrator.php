@@ -1341,6 +1341,16 @@ final class AgentRunOrchestrator
                 $feedback[] = $line;
             }
         }
+        // MỖI VÒNG MỘT NHÓM LỖI: sửa cùng lúc từ khóa/bố cục và trích dẫn thì người viết đụng vào chữ quanh dấu trích, lỗi cứ đổi chỗ qua lại (KW01 ↔ CITE01 ↔ CITE02). Lỗi viết-lại-được sửa trước, giữ nguyên mọi dấu trích;
+        // đến khi chỉ còn nhóm nguồn/trích dẫn mới sửa nhóm đó.
+        $citeCodes = ['EVID01', 'CITE01', 'CITE02', 'SRC01', 'FACT01'];
+        $structural = array_filter($failed, fn ($r) => ! in_array($r->code, $citeCodes, true));
+        if ($structural !== [] && count($structural) < count($failed)) {
+            $feedback = array_values(array_filter($feedback, fn ($f) => ! preg_match('/^(EVID01|CITE0[12]|SRC01|FACT01)\b/u', $f) && ! str_starts_with($f, 'LƯU Ý CHUNG KHI SỬA LỖI TRÍCH DẪN')));
+            $asks = array_filter($asks, fn ($k) => ! preg_match('/^(EVID01|CITE0[12]|SRC01|FACT01)\b/u', (string) $k), ARRAY_FILTER_USE_KEY);
+            $failed = $structural;
+            array_unshift($feedback, 'VÒNG NÀY CHỈ SỬA CÁC MỤC DƯỚI ĐÂY. Giữ NGUYÊN mọi dấu trích dẫn ([KB#…], [T…], [a]) và mọi đoạn không liên quan; chỉ thêm/đổi đúng chỗ cần cho mục được nêu.');
+        }
         $searchNote = '';
         $evidence = array_filter($failed, fn ($r) => in_array($r->code, ['EVID01', 'FACT01', 'CITE01', 'CITE02'], true));
         if ($evidence !== [] && $this->extraSearches < self::MAX_EXTRA_SEARCHES && $this->spent($run) < $this->policy->budgetVnd && ($web = (new \App\Services\Search\WebSearchResolver)->availability())['ok'] && ! $web['demo']) {
