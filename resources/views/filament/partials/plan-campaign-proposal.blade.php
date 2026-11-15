@@ -1,7 +1,7 @@
 @php
     $p = $campaignProposal;
     $srcTone = ['keyword' => 'info', 'competitor' => 'accent', 'gsc' => 'ok', 'serp' => 'accent', 'autocomplete' => 'info', 'ai' => 'warn'];
-    $partLabels = ['volume' => 'Lượt tìm', 'gsc' => 'Search Console', 'sources' => 'Độ đa nguồn', 'kho' => 'Có trong kho', 'rank' => 'Thứ hạng gợi ý', 'kho_nguon' => 'Kho có nguồn', 'trend' => 'Xu hướng', 'off_topic' => 'Lệch lĩnh vực'];
+    $partLabels = ['volume' => 'Lượt tìm', 'gsc' => 'Search Console', 'sources' => 'Độ đa nguồn', 'kho' => 'Có trong kho', 'rank' => 'Thứ hạng gợi ý', 'interest' => 'Mức quan tâm', 'autocomplete' => 'Gợi ý Google', 'ai' => 'AI đề xuất', 'kho_nguon' => 'Kho có nguồn', 'trend' => 'Xu hướng', 'off_topic' => 'Lệch lĩnh vực'];
     // Trạng thái các nguồn dữ liệu: bật = đã dùng thật trong đề xuất này; tắt = nói rõ cần gì để bật.
     $providers = $p['providers'] ?? [];
     $sources = $p ? [
@@ -72,7 +72,46 @@
             <span wire:loading.remove wire:target="proposeCampaign">Đề xuất chiến dịch</span>
             <span wire:loading wire:target="proposeCampaign">Đang tra gợi ý…</span>
         </x-filament::button>
+        <x-filament::button type="button" color="gray" wire:click="exploreTopics" wire:loading.attr="disabled" wire:target="exploreTopics" title="Chủ đề rộng (ví dụ: sức khỏe người cao tuổi)? AI chia thành các chủ đề con, hệ thống đo mức quan tâm thật bằng dữ liệu rồi xếp hạng. Có một lượt gọi AI.">
+            <span wire:loading.remove wire:target="exploreTopics">Khám phá chủ đề con</span>
+            <span wire:loading wire:target="exploreTopics">Đang khám phá…</span>
+        </x-filament::button>
     </form>
+
+    @if ($topicExplore)
+        @php $tx = $topicExplore; @endphp
+        <div class="cpz-sum" data-topic-explore>
+            <span><b>{{ count($tx['topics']) }}</b> chủ đề con của «{{ $tx['theme'] }}»</span>
+            <span>Chi phí AI: <b>{{ number_format($tx['cost_vnd'], 0, ',', '.') }} đ</b></span>
+        </div>
+        @if ($tx['notes'])
+            <div class="cpz-missing" role="note"><span aria-hidden="true">ⓘ</span><div><ul>@foreach ($tx['notes'] as $n)<li>{{ $n }}</li>@endforeach</ul></div></div>
+        @endif
+        <div class="cpz-grid">
+            @foreach ($tx['topics'] as $tp)
+                <article class="cpz-card" wire:key="tp-{{ md5($tp['topic']) }}" data-topic>
+                    <div class="cpz-card__kw">{{ $tp['topic'] }}</div>
+                    <div class="cpz-bar" title="Điểm 0–100: mức quan tâm, kho có nguồn, gợi ý tự động">
+                        <div class="cpz-bar__track"><div class="cpz-bar__fill" style="width: {{ max(3, (int) $tp['score']) }}%"></div></div>
+                        <span class="cpz-bar__num">{{ $tp['score'] }}/100</span>
+                    </div>
+                    <div class="cpz-head-line">
+                        @if ($tp['views28'] !== null)Wikipedia «{{ $tp['wiki_article'] }}»: {{ number_format($tp['views28'], 0, ',', '.') }} lượt xem/28 ngày
+                        @else Chưa có số lượt xem Wikipedia @endif
+                        @if ($tp['suggest_count'] !== null) · {{ $tp['suggest_count'] }} gợi ý Google @endif
+                    </div>
+                    <div class="cpz-chips">
+                        @if (($tp['trend']['direction'] ?? 'unknown') === 'up')<x-studio.badge tone="ok">↑ Đang tăng</x-studio.badge>@elseif (($tp['trend']['direction'] ?? 'unknown') === 'down')<x-studio.badge tone="warn">↓ Đang giảm</x-studio.badge>@endif
+                        @if (in_array('no_source', $tp['flags'], true))<span title="Kho kiến thức chưa có mục đã duyệt khớp chủ đề này: nên bổ sung nguồn đáng tin trước khi viết."><x-studio.badge tone="warn">Kho chưa có nguồn</x-studio.badge></span>@elseif (($tp['kho_matches'] ?? 0) > 0)<x-studio.badge tone="ok">Kho có nguồn</x-studio.badge>@endif
+                        @if (in_array('no_wikipedia', $tp['flags'], true))<x-studio.badge tone="muted">Không có bài Wikipedia</x-studio.badge>@endif
+                        @if (in_array('few_suggestions', $tp['flags'], true))<x-studio.badge tone="muted">Ít gợi ý Google</x-studio.badge>@endif
+                    </div>
+                    @if ($tp['why'])<p class="cpz-note" style="margin:0">AI đề xuất: {{ $tp['why'] }}</p>@endif
+                    <x-filament::button size="sm" color="gray" wire:click="pickTopic({{ \Illuminate\Support\Js::from($tp['topic']) }})">Đề xuất chiến dịch cho chủ đề này</x-filament::button>
+                </article>
+            @endforeach
+        </div>
+    @endif
 
     @if ($p)
         <div class="cpz-srcs" aria-label="Nguồn dữ liệu đã dùng">

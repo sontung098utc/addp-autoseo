@@ -38,7 +38,7 @@ final class WikipediaPageviews
     /** @return array<string,mixed> */
     private function compute(string $keyword): array
     {
-        $unknown = fn (string $why, ?string $article = null, bool $limited = false) => ['direction' => 'unknown', 'change_pct' => null, 'recent' => null, 'previous' => null, 'article' => $article, 'source' => 'wikipedia', 'reason' => $why, 'rate_limited' => $limited];
+        $unknown = fn (string $why, ?string $article = null, bool $limited = false, ?int $recent = null, ?int $previous = null) => ['direction' => 'unknown', 'change_pct' => null, 'recent' => $recent, 'previous' => $previous, 'article' => $article, 'source' => 'wikipedia', 'reason' => $why, 'rate_limited' => $limited];
         $query = self::withSynonym($keyword);
         $ua = (string) config('keywords.trends.user_agent', 'autoseo-research/1.0');
         try {
@@ -89,7 +89,7 @@ final class WikipediaPageviews
         $recent = $sum($end->copy()->subDays(self::WINDOW - 1), $end);
         $prev = $sum($end->copy()->subDays(self::WINDOW * 2 - 1), $end->copy()->subDays(self::WINDOW));
         if ($prev < self::MIN_VIEWS || $recent < self::MIN_VIEWS) {
-            return $unknown('Lượt xem bài «'.$title.'» quá thấp ('.$prev.' → '.$recent.') nên chưa kết luận được xu hướng.', $title);
+            return $unknown('Lượt xem bài «'.$title.'» quá thấp ('.$prev.' → '.$recent.') nên chưa kết luận được xu hướng.', $title, false, $recent, $prev);
         }
         $pct = (int) round(($recent - $prev) / $prev * 100);
         $dir = $pct >= self::THRESHOLD_PCT ? 'up' : ($pct <= -self::THRESHOLD_PCT ? 'down' : 'flat');

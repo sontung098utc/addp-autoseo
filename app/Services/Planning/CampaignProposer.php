@@ -31,7 +31,7 @@ final class CampaignProposer
 {
     public const MAX_SATELLITES = 8;
 
-    private const STOP = ['và', 'của', 'cho', 'là', 'các', 'những', 'một', 'có', 'để', 'trong', 'với', 'được', 'ở', 'tại', 'từ', 'như', 'thế', 'nào', 'bao', 'nhiêu', 'gì', 'không', 'hay', 'hoặc', 'ra', 'sao', 'thì', 'khi', 'the', 'a', 'of'];
+    public const STOP = ['và', 'của', 'cho', 'là', 'các', 'những', 'một', 'có', 'để', 'trong', 'với', 'được', 'ở', 'tại', 'từ', 'như', 'thế', 'nào', 'bao', 'nhiêu', 'gì', 'không', 'hay', 'hoặc', 'ra', 'sao', 'thì', 'khi', 'the', 'a', 'of'];
 
     private const LABEL = ['keyword' => 'Kho từ khóa', 'competitor' => 'Khoảng trống đối thủ', 'gsc' => 'Search Console', 'serp' => 'Mọi người cũng hỏi / tìm kiếm liên quan', 'autocomplete' => 'Gợi ý tự động', 'ai' => 'AI đề xuất (kho)'];
 
@@ -414,35 +414,12 @@ final class CampaignProposer
 
     private function khoHasItems(KnowledgeRetriever $r, Website $site): bool
     {
-        try {
-            return $r->searchable($site)->exists();
-        } catch (\Throwable) {
-            return false;
-        }
+        return (new KhoCoverage($r))->hasItems($site);
     }
 
-    /**
-     * Số mục kiến thức đã duyệt khớp CHÍNH cụm này. Ngoài việc truy xuất theo từ khóa, mục phải chứa các từ riêng của cụm (ngoài từ của chủ đề):
-     * kho có "đường huyết cao" thì chưa đủ để coi "đường huyết thấp" có nguồn.
-     */
     private function khoMatches(KnowledgeRetriever $r, Website $site, string $kw, string $seed): int
     {
-        try {
-            $own = array_values(array_diff($this->wordsOf($kw), $this->wordsOf($seed), self::STOP));
-            $own = array_values(array_filter($own, fn ($x) => mb_strlen($x) >= 2));
-            $need = $own === [] ? 0 : (int) ceil(count($own) * 0.6);
-            $n = 0;
-            foreach ($r->search($site, $kw, 5) as $row) {
-                $text = Keyword::keyFor((string) $row['title'].' '.(string) $row['body']);
-                if (count(array_filter($own, fn ($w) => str_contains($text, $w))) >= $need) {
-                    $n++;
-                }
-            }
-
-            return $n;
-        } catch (\Throwable) {
-            return 0;
-        }
+        return (new KhoCoverage($r))->matches($site, $kw, $seed);
     }
 
     /** Một dòng tóm tắt bằng số liệu có thật của ứng viên (cho thẻ gọn); thiếu số liệu thì nói thẳng. */

@@ -21,6 +21,7 @@ use App\Models\Website;
 use App\Services\Planning\CampaignProposer;
 use App\Services\Planning\ContentPlanner;
 use App\Services\Planning\GscSignals;
+use App\Services\Planning\TopicExplorer;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
@@ -285,6 +286,47 @@ class ContentPlanPage extends Page
     public array $campaignPick = [];
 
     public string $campaignName = '';
+
+    /** Kết quả "Khám phá chủ đề con" cho chủ đề rộng đang nhập (null = chưa chạy). */
+    public ?array $topicExplore = null;
+
+    /** Chia chủ đề rộng thành chủ đề con rồi xếp bằng dữ liệu thật. Chỉ TÍNH, không ghi gì; có một lượt gọi AI nên cần approver. */
+    public function exploreTopics(): void
+    {
+        abort_unless(Auth::user()?->isApprover() ?? false, 403);
+        $site = $this->site();
+        if (! $site) {
+            return;
+        }
+        $this->campaignProposal = null;
+        try {
+            $this->topicExplore = app(TopicExplorer::class)->explore($site, $this->campaignSeed);
+        } catch (InvalidArgumentException|\App\Services\Keywords\KeywordAiUnavailable $e) {
+            Notification::make()->title('Chưa khám phá được chủ đề con')->body($e->getMessage())->danger()->send();
+
+            return;
+        } catch (\Throwable $e) {
+            report($e);
+            Notification::make()->title('Chưa khám phá được chủ đề con')->body(\App\Filament\Support\Schedule\ErrorMasker::mask($e->getMessage()) ?: 'Lỗi AI, thử lại sau.')->danger()->send();
+
+            return;
+        }
+        $n = count($this->topicExplore['topics']);
+        Notification::make()->title($n > 0 ? "Đã tìm {$n} chủ đề con" : 'AI chưa đề xuất được chủ đề con nào')
+            ->body('Chi phí AI '.number_format($this->topicExplore['cost_vnd'], 0, ',', '.').' đ. Chọn một chủ đề để đề xuất chiến dịch; chưa tạo gì.')->{$n > 0 ? 'success' : 'warning'}()->send();
+    }
+
+    /** Chọn một chủ đề con (chỉ nhận chủ đề có trong kết quả vừa khám phá) rồi đề xuất chiến dịch cho nó. */
+    public function pickTopic(string $topic): void
+    {
+        abort_unless(Auth::user()?->isApprover() ?? false, 403);
+        if ($this->topicExplore === null || ! in_array($topic, array_column($this->topicExplore['topics'], 'topic'), true)) {
+            return;
+        }
+        $this->campaignSeed = $topic;
+        $this->topicExplore = null;
+        $this->proposeCampaign();
+    }
 
     /** Chỉ TÍNH đề xuất (không ghi gì). Cần approver vì có thể tốn phí tra SERP. */
     public function proposeCampaign(): void
