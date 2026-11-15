@@ -681,6 +681,8 @@ final class AgentRunOrchestrator
         if ($b['status'] !== 'done') {
             $this->step($run, 'brief', 'strategist', 'warn', 'Chưa đặt được yêu cầu ảnh theo mục đích và giá trị', ($b['reason'] ?? 'Lỗi AI.').' Dùng kế hoạch ảnh theo luật như cũ.', ['purpose' => 'image_brief', 'reason' => $b['reason']], $b['model'], $tokens, $cost);
 
+            $this->decision($run, 'attention_image_brief', 'Điều phối: nhận cảnh báo yêu cầu ảnh chưa đặt được, dùng kế hoạch ảnh theo luật', 'Bộ phận yêu cầu và thiết kế ảnh báo lỗi: '.mb_substr((string) ($b['reason'] ?? 'Lỗi AI.'), 0, 160).' Điều phối cho đi tiếp với kế hoạch ảnh theo luật; người duyệt nên xem lại ảnh.', ['routes' => []]);
+
             return;
         }
         $n = count($b['briefs']);
@@ -688,6 +690,9 @@ final class AgentRunOrchestrator
         $this->step($run, 'brief', 'strategist', $designed > 0 ? 'ok' : 'warn', 'Yêu cầu và thiết kế ảnh: '.$n.' ảnh, mỗi ảnh có mục đích và giá trị',
             'Người điều phối nội dung nêu mục đích và giá trị của '.$n.' ảnh, họa viên phân tích rồi thiết kế'.($designed > 0 ? ' ('.$designed.' bản thiết kế).' : ' nhưng chưa trả được thiết kế nên dùng mô tả theo luật.'),
             ['purpose' => 'image_brief', 'briefs' => $b['briefs'], 'designs' => $dg['designs'] ?? [], 'design_reason' => $dg['reason'] ?? null], $dg['model'] ?? $b['model'], $tokens, $cost);
+        if ($designed === 0) { // báo về điều phối: họa viên không trả được thiết kế
+            $this->decision($run, 'attention_image_design', 'Điều phối: họa viên chưa trả được thiết kế, dùng mô tả ảnh theo luật', 'Họa viên chưa trả được bản thiết kế cho '.$n.' ảnh'.(($dg['reason'] ?? null) ? ' ('.mb_substr((string) $dg['reason'], 0, 120).')' : '').'. Điều phối cho đi tiếp với mô tả ảnh theo luật; ảnh vẫn tạo theo kế hoạch.', ['routes' => []]);
+        }
     }
 
     /**
@@ -783,6 +788,9 @@ final class AgentRunOrchestrator
                 'Lắp ráp bài: '.$ins.' ảnh trong bài'.(collect($res['placements'])->contains('status', 'featured') ? ' + ảnh bìa' : ''),
                 'Ghép bài viết với ảnh theo kế hoạch: '.implode('; ', array_map(fn ($p) => ($p['role'] === 'featured' ? 'Ảnh bìa' : 'Ảnh '.$p['slot']).' — '.$p['note'], $res['placements'])).'.',
                 ['version_id' => $version->id, 'placements' => $res['placements']]);
+            if ($made === 0) { // báo về điều phối: không có ảnh nào để ghép
+                $this->decision($run, 'attention_images', 'Điều phối: không có ảnh nào để ghép, giữ bài không ảnh cho người duyệt', 'Họa viên không tạo được ảnh nào ('.(($errors[0] ?? null) ? mb_substr((string) (is_array($errors[0]) ? json_encode($errors[0], JSON_UNESCAPED_UNICODE) : $errors[0]), 0, 140) : 'nhà cung cấp ảnh lỗi hoặc hết hạn mức').'). Bài giao không có ảnh; người duyệt cần bổ sung ảnh hoặc chạy lại bước tạo ảnh.', ['routes' => []]);
+            }
         } catch (Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Lắp ráp ảnh lỗi, bỏ qua: '.class_basename($e));
         }

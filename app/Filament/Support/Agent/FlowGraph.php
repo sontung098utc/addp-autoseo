@@ -122,12 +122,14 @@ final class FlowGraph
                 $subs[] = self::sub($by[$code], $list, $durations, $h['running'] && $runningCode === $code);
             }
             $state = $h['running'] ? 'running' : self::groupState($subs);
-            $info[$i] = ['state' => $state, 'report' => self::reportLabel($h['group'], $h['steps'], $state)];
+            $info[$i] = ['state' => $state, 'report' => self::reportLabel($h['group'], $h['steps'], $state),
+                'attn' => array_values(array_map(fn ($x) => $x['title'], array_filter($subs, fn ($x) => in_array($x['state'], ['warn', 'failed', 'blocked'], true))))];
         }
         $main = array_values(array_filter(array_keys($hops), fn ($i) => $hops[$i]['group'] !== 'images'));
         $hasImages = collect($hops)->contains('group', 'images');
         $events = [];
         $giveNo = [];
+        $synth = [];
         $n = 0;
         $parDone = false;
         $joinDone = false;
@@ -140,7 +142,15 @@ final class FlowGraph
                 $events[] = ['n' => ++$n, 'from' => 'strategy', 'to' => 'images', 'dir' => 'par', 'label' => 'thiết kế ảnh xong → bắt đầu tạo ảnh', 'state' => 'done', 'hop' => $ib];
                 $parDone = true;
             }
-            if ($b['decisions'] !== []) { // có quyết định của điều phối giữa hai lượt: đi qua điều phối
+            $attn = $info[$ia]['attn'] ?? [];
+            if ($b['decisions'] === [] && $attn !== [] && $a['group'] !== 'images') {
+                // Bộ phận trước CẦN CHÚ Ý (cảnh báo/lỗi) mà chưa có quyết định nào: vẫn phải BÁO về điều phối; điều phối ghi nhận rồi cho đi tiếp (hiện chưa có xử lý riêng).
+                $first = $attn[0];
+                $events[] = ['n' => ++$n, 'card' => $a['group'], 'dir' => 'report', 'label' => 'cần chú ý: '.self::short((string) $first, 28), 'state' => $info[$ia]['state'], 'hop' => $ia];
+                $events[] = ['n' => ++$n, 'card' => $b['group'], 'dir' => 'give', 'label' => 'ghi nhận cảnh báo → đi tiếp', 'state' => 'give', 'hop' => $ib, 'live' => (bool) $b['running']];
+                $giveNo[$ib] = $n;
+                $synth[$ib][] = ['title' => 'Ghi nhận: «'.$first.'» cần chú ý, cho đi tiếp', 'full' => 'Bộ phận '.($a['group']).' báo «'.implode('», «', array_slice($attn, 0, 3)).'» cần chú ý; chưa có quyết định xử lý riêng nên điều phối ghi nhận và cho đi tiếp.', 'routes' => []];
+            } elseif ($b['decisions'] !== []) { // có quyết định của điều phối giữa hai lượt: đi qua điều phối
                 $codes = array_column($b['decisions'], 'code');
                 // Báo cáo của bộ phận trước kèm KẾT QUẢ điều phối vừa xử lý (nhận hay bỏ bản sửa)
                 $suffix = in_array('fix_accepted', $codes, true) ? ' · nhận bản sửa' : (in_array('fix_rejected', $codes, true) ? ' · bỏ bản sửa' : '');
@@ -172,6 +182,11 @@ final class FlowGraph
         foreach ($hops as $i => $h) {
             foreach ($h['decisions'] as $d) {
                 $decisions[] = ['n' => $giveNo[$i] ?? null, 'title' => self::short($d['title'], 90), 'full' => $d['title'].' — '.$d['detail'], 'routes' => $d['routes']];
+            }
+        }
+        foreach ($synth as $hop => $list) {
+            foreach ($list as $d) {
+                $decisions[] = ['n' => $giveNo[$hop] ?? null, 'title' => self::short($d['title'], 90), 'full' => $d['full'], 'routes' => $d['routes']];
             }
         }
         foreach ($trailing as $d) {
@@ -239,6 +254,15 @@ final class FlowGraph
             $p = $by['fix_plan'];
 
             return 'yêu cầu sửa'.($p['round'] ? ' lần '.$p['round'] : '').($p['failed'] ? ' · '.$p['failed'].' mục' : '');
+        }
+        if (isset($by['attention_image_brief'])) {
+            return 'chấp nhận cảnh báo → dùng kế hoạch ảnh theo luật';
+        }
+        if (isset($by['attention_image_design'])) {
+            return 'chưa có thiết kế ảnh → dùng mô tả theo luật';
+        }
+        if (isset($by['attention_images'])) {
+            return 'không có ảnh → giữ bài không ảnh';
         }
         if (isset($by['synthesis'])) {
             return 'chốt hướng nội dung → lập dàn ý';

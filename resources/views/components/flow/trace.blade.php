@@ -6,6 +6,7 @@
 --}}
 @php
     use App\Filament\Support\Agent\RunFlow;
+    $uid = 'ft'.\Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(6)); // mã riêng mỗi sơ đồ: trang có nhiều bản (tab ẩn) mà trùng mã thì mũi tên ở bản đang hiện bị mất
     $repairs = collect($t['cards'])->flatMap(fn ($c) => $c['subs'])->firstWhere('code', 'repair')['count'] ?? 0;
 @endphp
 <div class="ft" data-testid="flow-graph" x-ref="ft"
@@ -38,16 +39,16 @@
         const sig = JSON.stringify([specs, items.map(i => [i.n, i.x, i.y, i.label, i.live])]);
         if (sig === this.sig && svg.querySelectorAll('.ft-arc').length === specs.length) return;
         this.sig = sig; svg.querySelectorAll('.ft-arc').forEach(n => n.remove());
-        for (const sp of specs) { const el = document.createElementNS('http://www.w3.org/2000/svg', 'path'); el.setAttribute('d', sp.d); el.setAttribute('fill', 'none'); el.setAttribute('class', 'ft-arc ft-arc--' + sp.kind + (sp.live ? ' ft-arc--live' : '')); el.setAttribute('marker-end', 'url(#ft-ar-' + sp.kind + ')'); el.setAttribute('data-testid', 'flow-arc'); svg.appendChild(el); }
+        for (const sp of specs) { const el = document.createElementNS('http://www.w3.org/2000/svg', 'path'); el.setAttribute('d', sp.d); el.setAttribute('fill', 'none'); el.setAttribute('class', 'ft-arc ft-arc--' + sp.kind + (sp.live ? ' ft-arc--live' : '')); el.setAttribute('marker-end', 'url(#' + (svg.dataset.uid || 'ft') + '-' + sp.kind + ')'); el.setAttribute('data-testid', 'flow-arc'); svg.appendChild(el); }
         this.items = items; } }"
     x-init="$nextTick(() => draw()); if (window.ResizeObserver) new ResizeObserver(() => draw()).observe($refs.ft); document.fonts && document.fonts.ready.then(() => draw()); new MutationObserver(() => $nextTick(() => draw())).observe($refs.events, { childList: true, characterData: true, subtree: true })" x-on:resize.window.debounce.100ms="draw()">
     <script type="application/json" x-ref="events" @if ($t['events'] !== []) data-testid="flow-edges" @endif>{!! json_encode($t['events'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) !!}</script>
     @if ($repairs > 0)<span data-testid="flow-loop" class="sr-only">↻ {{ $repairs }} vòng sửa</span>@endif
     <div class="ft-overlay" wire:ignore>
-    <svg class="ft-arcs" x-ref="arcs" aria-hidden="true">
+    <svg class="ft-arcs" x-ref="arcs" data-uid="{{ $uid }}" aria-hidden="true">
         <defs>
             @foreach (['give' => '#7c3aed', 'report' => '#059669', 'warn' => '#d97706', 'direct' => '#059669', 'back' => '#059669', 'par' => '#0284c7'] as $k => $col)
-                <marker id="ft-ar-{{ $k }}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{{ $col }}"/></marker>
+                <marker id="{{ $uid }}-{{ $k }}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{{ $col }}"/></marker>
             @endforeach
         </defs>
     </svg>
