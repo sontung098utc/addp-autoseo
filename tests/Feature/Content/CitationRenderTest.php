@@ -35,6 +35,20 @@ class CitationRenderTest extends TestCase
         $this->assertStringContainsString('<ol>', $kept);
     }
 
+    public function test_hai_muc_kho_cung_mot_trang_nguon_chi_mot_dong_va_mot_so(): void
+    {
+        $brain = Brain::create(['name' => 'Y', 'slug' => 'y2', 'domain_key' => 'y2', 'language' => 'vi', 'status' => 'active', 'description' => '']);
+        $src = \App\Models\KnowledgeSource::create(['brain_id' => $brain->id, 'kind' => 'url', 'title' => 'Liều paracetamol | Vinmec', 'url' => 'https://www.vinmec.com/a', 'status' => 'approved']);
+        $a = KnowledgeItem::create(['brain_id' => $brain->id, 'source_id' => $src->id, 'type' => 'fact', 'title' => 'Liều 10-15 mg/kg', 'body' => 'x', 'status' => 'approved']);
+        $b = KnowledgeItem::create(['brain_id' => $brain->id, 'source_id' => $src->id, 'type' => 'fact', 'title' => 'Cách 4-6 giờ', 'body' => 'y', 'status' => 'approved']);
+
+        $out = CitationRenderer::render("<p>Liều thuốc [KB#{$a->id}].</p><p>Khoảng cách [KB#{$b->id}].</p>");
+
+        $this->assertSame(1, substr_count($out, '<li id='), 'một trang nguồn chỉ một dòng, không lặp');
+        $this->assertSame(2, substr_count($out, 'href="#nguon-1"'), 'cả hai chú thích trỏ cùng một số');
+        $this->assertStringNotContainsString('nguon-2', $out);
+    }
+
     public function test_html_without_markers_is_unchanged(): void
     {
         $this->assertSame('<p>abc</p>', CitationRenderer::render('<p>abc</p>'));

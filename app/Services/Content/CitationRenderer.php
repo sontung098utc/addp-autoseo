@@ -41,15 +41,18 @@ final class CitationRenderer
         }
         $items = KnowledgeItem::query()->with('source')->whereIn('id', array_keys($ids))->get()->keyBy('id');
         $number = [];
-        $html = (string) preg_replace_callback(self::MARK, function (array $m) use ($items, &$number): string {
+        $srcNo = []; // một NGUỒN (địa chỉ) chỉ một số: nhiều mục kho cùng một trang không được liệt kê lặp
+        $html = (string) preg_replace_callback(self::MARK, function (array $m) use ($items, &$number, &$srcNo): string {
             $out = '';
             foreach (preg_split('/[^\d]+/', $m[1], -1, PREG_SPLIT_NO_EMPTY) ?: [] as $n) {
                 $id = (int) $n;
                 if (! $items->has($id)) {
                     return $m[0];
                 }
-                $number[$id] ??= count($number) + 1;
                 $it = $items[$id];
+                $key = (string) ($it->source?->final_url ?: $it->source?->url) ?: 'src'.($it->source_id ?: 'item'.$id);
+                $srcNo[$key] ??= count($srcNo) + 1;
+                $number[$id] = $srcNo[$key];
                 $srcT = $it->source ? trim((string) $it->source->title) : '';
                 $url0 = (string) ($it->source?->final_url ?: $it->source?->url);
                 $host0 = preg_match('#^https?://#i', $url0) ? preg_replace('/^www\./', '', (string) parse_url($url0, PHP_URL_HOST)) : '';
@@ -65,7 +68,12 @@ final class CitationRenderer
         }
         asort($number);
         $li = '';
+        $listed = [];
         foreach (array_keys($number) as $id) {
+            if (isset($listed[$number[$id]])) {
+                continue; // đã có dòng cho nguồn này
+            }
+            $listed[$number[$id]] = true;
             $it = $items[$id];
             $src = $it->source;
             $url = (string) ($src?->final_url ?: $src?->url);
