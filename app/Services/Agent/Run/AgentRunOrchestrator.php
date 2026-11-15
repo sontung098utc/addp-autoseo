@@ -2023,8 +2023,39 @@ final class AgentRunOrchestrator
     }
 
     /** Ghi một quyết định hệ thống tự đưa ra kèm dữ kiện trước/sau. */
+    /**
+     * Mỗi quyết định của điều phối kèm VÌ SAO (tín hiệu dựa vào) và NẾU SAI THÌ THẤY GÌ (cách kiểm chứng), để không có quyết định "đặt cược vô hình" (học claude-seo:
+     * mỗi đề xuất có dòng "how would we know this failed"). Lời mặc định theo mã quyết định; nơi gọi có thể tự đặt `why` / `if_wrong` trong dữ kiện.
+     */
+    private const DECISION_NOTES = [
+        'kb_coordination' => ['Dựa vào số mục kho ĐÃ DUYỆT khớp chủ đề và Trí tuệ đang gắn với website.', 'Bài thiếu căn cứ (bước Tổng hợp báo khoảng trống) hoặc nạp nhầm Trí tuệ; xem mục Kho và nguồn.'],
+        'synthesis' => ['Dựa vào các đoạn trích tài liệu web và mục kho đã tìm được, đối chiếu rồi chốt luận điểm dùng/bỏ.', 'Người viết dùng ý không có trong nguồn (CITE/EVID báo lỗi) hoặc bỏ sót ý quan trọng ở lần chấm.'],
+        'fix_plan' => ['Dựa vào các mục chưa đạt ở lần chấm vừa rồi; giao đúng nhóm lỗi cho người viết.', 'Điểm không tăng ở lần chấm sau: bản sửa bị bỏ, dừng sau 2 lần liên tiếp không cải thiện.'],
+        'fix_accepted' => ['Điểm phạt của bản sửa thấp hơn bản đang giữ.', 'Lần chấm tiếp theo lại tăng lỗi: bản sau sẽ bị bỏ, vẫn giữ bản tốt nhất.'],
+        'fix_rejected' => ['Điểm phạt không thấp hơn bản đang giữ nên giữ bản cũ.', 'Hai lần liên tiếp bị bỏ thì dừng sửa; người duyệt thấy mục còn lại.'],
+        'no_improvement' => ['Hai lần sửa liên tiếp không tốt hơn.', 'Bài còn lỗi nhưng đã dừng: danh sách mục chưa đạt hiện ở báo cáo cho người duyệt.'],
+        'max_rounds' => ['Đã hết số vòng sửa cho phép.', 'Bài còn mục chưa đạt; người duyệt xem danh sách và sửa tay hoặc giao làm lại.'],
+        'budget_exhausted' => ['Chi phí phiên chạm ngân sách.', 'Bài chưa được sửa hết; người duyệt xem mục còn lại.'],
+        'budget_exhausted_before_write' => ['Chi phí phiên đã chạm ngân sách trước khi viết.', 'Không có bản nháp; nâng ngân sách hoặc chạy lại.'],
+        'repair_failed' => ['Lần sửa gặp lỗi AI nên giữ bản nháp hiện tại.', 'Bản nháp còn lỗi chưa sửa; chạy lại phần sửa khi nhà cung cấp ổn định.'],
+        'high_risk_expert_review' => ['Chủ đề rủi ro cao: luật đạt không đủ để coi là xong.', 'Người chuyên môn phát hiện sai số liệu hay khuyến cáo trong bài; khi đó phải sửa hoặc từ chối.'],
+        'brain_must_cite_review' => ['Trí tuệ đặt mức dựa vào AI là Bắt buộc nguồn.', 'Người chuyên môn thấy khẳng định chưa có căn cứ trong kho; thêm nguồn hoặc bỏ khẳng định.'],
+        'sources_pruned' => ['Nguồn do AI tự nêu không khớp kho, Sổ nguồn hay tài liệu đã tìm thấy: không kiểm được.', 'Một nguồn thật bị gỡ nhầm; người duyệt thêm lại nguồn vào Sổ nguồn của Trí tuệ.'],
+        'citations_pruned' => ['Số liệu trong đoạn không có trong mục kho được trích: dấu trích sai chỗ.', 'Đoạn mất dấu trích dù mục kho đúng nghĩa; người duyệt kiểm lại đoạn đó.'],
+        'delivered_check_failed' => ['Chấm lại bản giao (đã gắn nguồn, ảnh) còn lỗi chặn.', 'Bản giao có lỗi mà bản nháp không có; xem mã lỗi ở bước chấm bản giao.'],
+        'edit_rejected' => ['Bản sau biên tập trượt luật bắt buộc trong khi bản đầu đạt.', 'Góp ý của biên tập viên bị bỏ nên chỗ nói vòng hoặc thiếu ý còn nguyên; người duyệt đọc kỹ.'],
+        'attention_image_brief' => ['Bộ phận yêu cầu ảnh báo lỗi AI.', 'Ảnh sai mục đích hoặc thừa; người duyệt xem ảnh và thay.'],
+        'attention_image_design' => ['Họa viên không trả được thiết kế ảnh.', 'Ảnh tạo ra không đúng ý; người duyệt xem lại ảnh.'],
+        'attention_images' => ['Không có ảnh nào tạo được (nhà cung cấp ảnh lỗi hoặc hết hạn mức).', 'Bài đăng không có ảnh; bổ sung ảnh hoặc chạy lại bước tạo ảnh.'],
+        'partial_saved' => ['Phiên bị cắt giữa chừng nhưng đã có bản nháp.', 'Bản lưu có thể thiếu các bước chấm bản giao, gắn nguồn, ảnh; người duyệt xem kỹ trước khi dùng.'],
+    ];
+
     private function decision(AgentRun $run, string $code, string $title, string $detail, array $facts): void
     {
+        $notes = self::DECISION_NOTES[$code] ?? null;
+        if ($notes !== null) {
+            $facts += ['why' => $notes[0], 'if_wrong' => $notes[1]];
+        }
         $this->step($run, 'decision', 'system', 'ok', $title, $detail, ['decision' => $code] + $facts);
     }
 

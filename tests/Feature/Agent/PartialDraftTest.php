@@ -71,7 +71,10 @@ class PartialDraftTest extends TestCase
         $this->assertSame(1, $article->versions()->count());
         $this->assertStringContainsString('Đã lưu bản nháp tốt nhất', (string) $r->outcome_reason);
         $this->assertStringNotContainsString('Chưa có bản nháp nào được tạo', (string) $r->outcome_reason);
-        $this->assertTrue($r->steps->contains(fn ($s) => $s->stage === 'decision' && ($s->data['decision'] ?? '') === 'partial_saved'));
+        $d = $r->steps->first(fn ($s) => $s->stage === 'decision' && ($s->data['decision'] ?? '') === 'partial_saved');
+        $this->assertNotNull($d);
+        $this->assertNotSame('', (string) ($d->data['why'] ?? ''), 'mỗi quyết định kèm vì sao');
+        $this->assertNotSame('', (string) ($d->data['if_wrong'] ?? ''), 'và nếu sai thì thấy gì');
     }
 
     public function test_chua_co_ban_nhap_thi_that_bai_nhu_cu(): void

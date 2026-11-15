@@ -118,6 +118,8 @@
                             <div class="rv-decision rv-decision--{{ $d['status'] }}" data-testid="decision">
                                 <div class="rv-decision__title"><x-filament::icon icon="heroicon-m-bolt" style="width:1.1rem;height:1.1rem" /> {{ $d['title'] }}</div>
                                 <div class="rv-decision__body">{{ $d['detail'] }}</div>
+                                @if ($d['why'])<div class="rv-small" data-testid="decision-why"><b>Vì sao:</b> {{ $d['why'] }}</div>@endif
+                                @if ($d['if_wrong'])<div class="rv-small" data-testid="decision-if-wrong"><b>Nếu sai thì thấy:</b> {{ $d['if_wrong'] }}</div>@endif
                                 @foreach ($d['pairs'] as $p)
                                     <div class="rv-ba"><span>{{ $p['label'] }}</span> <b class="rv-ba__before">{{ $p['before'] }}</b> <i aria-hidden="true">→</i> <b class="rv-ba__after">{{ $p['after'] }}</b> <small>(trước → sau)</small></div>
                                 @endforeach

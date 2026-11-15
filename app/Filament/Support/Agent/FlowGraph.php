@@ -339,6 +339,6 @@ final class FlowGraph
             'sources' => 'Kho và nguồn', 'writer' => 'Người viết', default => (string) $r,
         }, (array) ($d['routes'] ?? []));
 
-        return ['title' => trim((string) $s->title), 'detail' => mb_substr((string) $s->detail, 0, 260), 'routes' => $routes, 'code' => $d['decision'] ?? null, 'round' => $d['round'] ?? null, 'failed' => isset($d['failed_codes']) ? count((array) $d['failed_codes']) : null];
+        return ['title' => trim((string) $s->title), 'detail' => mb_substr((string) $s->detail, 0, 260).(is_string($d['why'] ?? null) ? ' Vì sao: '.$d['why'] : '').(is_string($d['if_wrong'] ?? null) ? ' Nếu sai thì thấy: '.$d['if_wrong'] : ''), 'routes' => $routes, 'code' => $d['decision'] ?? null, 'round' => $d['round'] ?? null, 'failed' => isset($d['failed_codes']) ? count((array) $d['failed_codes']) : null];
     }
 }

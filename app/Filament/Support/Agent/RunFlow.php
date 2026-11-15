@@ -286,7 +286,7 @@ final class RunFlow
             }
         }
 
-        return ['title' => $s->title, 'detail' => $s->detail, 'status' => $s->status, 'code' => $d['decision'] ?? null, 'pairs' => $pairs, 'facts' => $facts];
+        return ['title' => $s->title, 'detail' => $s->detail, 'status' => $s->status, 'code' => $d['decision'] ?? null, 'pairs' => $pairs, 'facts' => $facts, 'why' => is_string($d['why'] ?? null) ? $d['why'] : null, 'if_wrong' => is_string($d['if_wrong'] ?? null) ? $d['if_wrong'] : null];
     }
 
     /** Chặng 'checkpoint' (dừng chờ người) do bộ điều phối ghi; chưa có trong sổ loại việc thì chèn ngay sau chặng đã chạy liền trước nó (theo seq). @param list<string> $codes @return list<string> */
