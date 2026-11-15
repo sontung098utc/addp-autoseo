@@ -41,5 +41,8 @@ return [
         'shopee.vn', 'lazada.vn', 'tiki.vn', 'sendo.vn', 'amazon.com', 'ebay.com', 'alibaba.com', 'aliexpress.com',
         'medium.com', 'blogspot.com', 'wordpress.com', 'wixsite.com', 'tumblr.com', 'linkedin.com',
         'accesstrade.vn', 'ecomobi.com', 'masoffer.com',
+        // Chuỗi bán lẻ và trang đặt dịch vụ: trang bán hàng/quảng bá, không dùng làm nguồn tham khảo cho bài
+        'dienmayxanh.com', 'bachhoaxanh.com', 'thegioididong.com', 'viettelstore.vn', 'sapo.vn', 'mytour.vn', 'cellphones.com.vn', 'fptshop.com.vn', 'nguyenkim.com', 'hoanghamobile.com', 'mediamart.vn', 'pico.vn',
+        'nhathuoclongchau.com.vn', 'pharmacity.vn', 'nhathuocankhang.com',
     ],
 ];

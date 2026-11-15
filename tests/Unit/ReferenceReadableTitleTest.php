@@ -19,6 +19,8 @@ class ReferenceReadableTitleTest extends TestCase
         $this->assertSame('', ReferenceListRenderer::readableTitle('bi quyet pha ca phe phin ngon dam da thu thiet 03383', 'dienmayxanh.com'));
         $this->assertSame('', ReferenceListRenderer::readableTitle('Stage | Number Tested | Acceptance Criteria |', 'drugfuture.com'));
         $this->assertSame('', ReferenceListRenderer::readableTitle('dissolutiontech.com', 'dissolutiontech.com'));
+        $this->assertSame('', ReferenceListRenderer::readableTitle('cach pha ca phe phin dung cach thom ngon dam da', 'viettelstore.vn'));
         $this->assertSame('', ReferenceListRenderer::readableTitle('', 'x.vn'));
+        $this->assertSame("What's the Right Grind for Vietnamese Coffee?", ReferenceListRenderer::readableTitle('What&#039;s the Right Grind for Vietnamese Coffee?', 'cafely.com'));
     }
 }

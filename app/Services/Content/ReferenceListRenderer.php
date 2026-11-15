@@ -16,15 +16,15 @@ final class ReferenceListRenderer
      */
     public static function readableTitle(string $title, string $host): string
     {
-        $t = trim(preg_replace('/\s+/u', ' ', $title) ?? '');
+        $t = trim(preg_replace('/\s+/u', ' ', html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '');
         if ($t === '' || strcasecmp($t, $host) === 0 || strcasecmp(preg_replace('#^www\.#i', '', $t) ?? '', $host) === 0) {
             return '';
         }
         if (substr_count($t, '|') >= 2 || str_ends_with($t, '|')) {
             return ''; // mảnh bảng hoặc đoạn trích, không phải tiêu đề
         }
-        if (preg_match('/^[a-z0-9 \-_]{20,}$/', $t) === 1 && preg_match('/\d{3,}/', $t) === 1 && substr_count($t, ' ') >= 3) {
-            return ''; // tên đường dẫn viết thường không dấu kèm mã số
+        if (preg_match('/^[a-z0-9 \-_]{20,}$/', $t) === 1 && (preg_match('/\d{3,}/', $t) === 1 ? substr_count($t, ' ') >= 3 : substr_count($t, ' ') >= 5)) {
+            return ''; // tên đường dẫn: toàn chữ thường không dấu (kèm mã số hoặc dài)
         }
 
         return $t;
