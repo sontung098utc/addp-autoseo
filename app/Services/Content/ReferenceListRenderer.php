@@ -10,6 +10,26 @@ namespace App\Services\Content;
 final class ReferenceListRenderer
 {
     /** Tiêu đề không có chữ cái tiếng Việt (dấu) và có chữ Latin: coi là tiếng nước ngoài, cần giải nghĩa. */
+    /**
+     * Tiêu đề nguồn người đọc thấy phải đọc được: tên trang kiểu đường dẫn ("bi quyet pha ca phe phin ngon 03383"), mảnh bảng ("Stage | Number Tested |") hoặc trùng tên miền
+     * không phải tiêu đề. Trả chuỗi rỗng để nơi gọi dùng tên miền thay thế.
+     */
+    public static function readableTitle(string $title, string $host): string
+    {
+        $t = trim(preg_replace('/\s+/u', ' ', $title) ?? '');
+        if ($t === '' || strcasecmp($t, $host) === 0 || strcasecmp(preg_replace('#^www\.#i', '', $t) ?? '', $host) === 0) {
+            return '';
+        }
+        if (substr_count($t, '|') >= 2 || str_ends_with($t, '|')) {
+            return ''; // mảnh bảng hoặc đoạn trích, không phải tiêu đề
+        }
+        if (preg_match('/^[a-z0-9 \-_]{20,}$/', $t) === 1 && preg_match('/\d{3,}/', $t) === 1 && substr_count($t, ' ') >= 3) {
+            return ''; // tên đường dẫn viết thường không dấu kèm mã số
+        }
+
+        return $t;
+    }
+
     public static function needsGloss(string $title): bool
     {
         return $title !== '' && preg_match('/[A-Za-z]{3,}\s+[A-Za-z]{2,}/', $title) === 1 && preg_match('/[àáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/iu', $title) !== 1;
@@ -29,9 +49,9 @@ final class ReferenceListRenderer
                 continue; // cùng một trang đã có trong khối nguồn (vd. từ kho): không liệt kê hai lần
             }
             $host = (string) (preg_replace('/^www\./', '', (string) parse_url($url, PHP_URL_HOST)) ?: ($r['domain'] ?? ''));
-            $title = trim(strip_tags((string) ($r['title'] ?? '')));
+            $title = self::readableTitle(trim(strip_tags((string) ($r['title'] ?? ''))), (string) $host);
             $vi = trim(strip_tags((string) ($r['title_vi'] ?? '')));
-            $items[$url] = (isset($r['_n']) ? '<!--n:'.(int) $r['_n'].'-->' : '').'<a href="'.e($url).'" rel="nofollow noopener">'.e($title !== '' ? $title : $host).'</a>'.($host !== '' ? ' — '.e($host) : '')
+            $items[$url] = (isset($r['_n']) ? '<!--n:'.(int) $r['_n'].'-->' : '').'<a href="'.e($url).'" rel="nofollow noopener">'.e($title !== '' ? $title : 'Trang trên '.$host).'</a>'.($host !== '' && $title !== '' ? ' — '.e($host) : '')
                 .(self::needsGloss($title) && $vi !== '' ? ' — <em>'.e($vi).'</em>' : ''); // tiêu đề tiếng nước ngoài kèm giải nghĩa tiếng Việt
         }
         if ($html === '' || $items === []) {
