@@ -30,6 +30,27 @@ final class ReferenceListRenderer
         return $t;
     }
 
+    /**
+     * Công cụ tìm web trả tiêu đề đã bị CẮT giữa chừng (vd "INTERNATIONAL CONFERENCE ON HARMONISATION OF TECHNICAL", "Guidance for I"): nhận diện theo từ cuối là từ nối/chữ cái lẻ hoặc cả tiêu đề viết hoa, dài vừa phải
+     * và không có dấu kết câu. Không chắc chắn tuyệt đối nên chỉ dùng để chọn cách hiển thị an toàn (ưu tiên phần giải nghĩa tiếng Việt, hoặc thêm dấu …), không bỏ nguồn.
+     */
+    public static function looksTruncated(string $title): bool
+    {
+        $t = trim($title);
+        $len = mb_strlen($t);
+        if ($len < 40 || $len > 90 || preg_match('/[.?!)\]»”"\'…]$/u', $t) === 1) {
+            return false;
+        }
+        $words = preg_split('/\s+/u', $t) ?: [];
+        $last = mb_strtolower((string) end($words));
+        $stop = ['of', 'for', 'to', 'the', 'and', 'in', 'on', 'at', 'with', 'by', 'a', 'an', 'or', 'vs', 'from', 'into', 'as', 'than', 'that', 'which'];
+        if (in_array($last, $stop, true) || (mb_strlen($last) === 1 && ctype_alpha($last))) {
+            return true;
+        }
+
+        return mb_strtoupper($t) === $t && substr_count($t, ' ') >= 4; // cả tiêu đề viết hoa dài: thường là đoạn đầu tiêu đề văn bản bị cắt
+    }
+
     public static function needsGloss(string $title): bool
     {
         return $title !== '' && preg_match('/[A-Za-z]{3,}\s+[A-Za-z]{2,}/', $title) === 1 && preg_match('/[àáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/iu', $title) !== 1;
@@ -51,6 +72,10 @@ final class ReferenceListRenderer
             $host = (string) (preg_replace('/^www\./', '', (string) parse_url($url, PHP_URL_HOST)) ?: ($r['domain'] ?? ''));
             $title = self::readableTitle(trim(strip_tags((string) ($r['title'] ?? ''))), (string) $host);
             $vi = trim(strip_tags((string) ($r['title_vi'] ?? '')));
+            if ($title !== '' && self::looksTruncated($title)) { // tiêu đề gốc bị cắt: dùng giải nghĩa tiếng Việt làm tên hiển thị, không có thì thêm dấu … cho trung thực
+                $title = $vi !== '' ? $vi : rtrim($title, ' —-').'…';
+                $vi = '';
+            }
             $items[$url] = (isset($r['_n']) ? '<!--n:'.(int) $r['_n'].'-->' : '').'<a href="'.e($url).'" rel="nofollow noopener">'.e($title !== '' ? $title : 'Trang trên '.$host).'</a>'.($host !== '' && $title !== '' ? ' — '.e($host) : '')
                 .(self::needsGloss($title) && $vi !== '' ? ' — <em>'.e($vi).'</em>' : ''); // tiêu đề tiếng nước ngoài kèm giải nghĩa tiếng Việt
         }

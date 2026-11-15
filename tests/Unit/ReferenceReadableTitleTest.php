@@ -23,4 +23,14 @@ class ReferenceReadableTitleTest extends TestCase
         $this->assertSame('', ReferenceListRenderer::readableTitle('', 'x.vn'));
         $this->assertSame("What's the Right Grind for Vietnamese Coffee?", ReferenceListRenderer::readableTitle('What&#039;s the Right Grind for Vietnamese Coffee?', 'cafely.com'));
     }
+
+    public function test_nhan_dien_tieu_de_bi_cat(): void
+    {
+        $this->assertTrue(ReferenceListRenderer::looksTruncated('INTERNATIONAL CONFERENCE ON HARMONISATION OF TECHNICAL'));
+        $this->assertTrue(ReferenceListRenderer::looksTruncated('Dissolution Testing and Acceptance Criteria for Immediate Release of'));
+        $this->assertTrue(ReferenceListRenderer::looksTruncated('Guidance for Industry Dissolution Testing and Immediate Release for I'));
+        $this->assertFalse(ReferenceListRenderer::looksTruncated('Ibuprofen for children: medicine for pain and high temperature - NHS'));
+        $this->assertFalse(ReferenceListRenderer::looksTruncated('Liều dùng paracetamol cho trẻ em'));
+        $this->assertFalse(ReferenceListRenderer::looksTruncated('Dissolution testing'));
+    }
 }
