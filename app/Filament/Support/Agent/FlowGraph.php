@@ -137,18 +137,28 @@ final class FlowGraph
             $a = $hops[$ia];
             $b = $hops[$ib];
             if ($b['decisions'] !== []) { // có quyết định của điều phối giữa hai lượt: đi qua điều phối
-                $events[] = ['n' => ++$n, 'card' => $a['group'], 'dir' => 'report', 'label' => $info[$ia]['report'], 'state' => $info[$ia]['state'], 'hop' => $ia];
-                $events[] = ['n' => ++$n, 'card' => $b['group'], 'dir' => 'give', 'label' => self::short($b['decisions'][0]['title'], 40), 'state' => 'give', 'hop' => $ib, 'live' => (bool) $b['running']];
+                $codes = array_column($b['decisions'], 'code');
+                // Báo cáo của bộ phận trước kèm KẾT QUẢ điều phối vừa xử lý (nhận hay bỏ bản sửa)
+                $suffix = in_array('fix_accepted', $codes, true) ? ' · nhận bản sửa' : (in_array('fix_rejected', $codes, true) ? ' · bỏ bản sửa' : '');
+                $events[] = ['n' => ++$n, 'card' => $a['group'], 'dir' => 'report', 'label' => $info[$ia]['report'].$suffix, 'state' => $info[$ia]['state'], 'hop' => $ia];
+                $events[] = ['n' => ++$n, 'card' => $b['group'], 'dir' => 'give', 'label' => self::giveLabel($b['decisions'], $b['group']), 'state' => 'give', 'hop' => $ib, 'live' => (bool) $b['running']];
                 $giveNo[$ib] = $n;
             } else {
-                $events[] = ['n' => ++$n, 'from' => $a['group'], 'to' => $b['group'], 'dir' => 'direct', 'label' => null, 'state' => $info[$ib]['state'], 'hop' => $ib, 'live' => (bool) $b['running']];
+                $edgeLabel = match (true) {
+                    $a['group'] === 'review' && $b['group'] === 'write' => 'biên tập viên yêu cầu sửa',
+                    $a['group'] === 'finish' && $b['group'] === 'review' => 'chấm lại bản giao',
+                    default => null,
+                };
+                $events[] = ['n' => ++$n, 'from' => $a['group'], 'to' => $b['group'], 'dir' => 'direct', 'label' => $edgeLabel, 'state' => $info[$ib]['state'], 'hop' => $ib, 'live' => (bool) $b['running']];
             }
             if ($hasImages && ! $parDone && $b['group'] === 'write') { // Tạo ảnh bắt đầu cùng lúc với Viết
                 $events[] = ['n' => ++$n, 'from' => 'write', 'to' => 'images', 'dir' => 'par', 'label' => 'chạy cùng lúc', 'state' => 'done', 'hop' => $ib];
                 $parDone = true;
             }
             if ($hasImages && ! $joinDone && $b['group'] === 'finish') { // ảnh nhập vào bài khi lắp ráp
-                $events[] = ['n' => ++$n, 'from' => 'images', 'to' => 'finish', 'dir' => 'join', 'label' => 'ảnh nhập vào bài', 'state' => 'done', 'hop' => $ib];
+                $imgHop = array_search('images', array_column($hops, 'group'), true);
+                $imgOk = $imgHop !== false && ($info[$imgHop]['state'] ?? '') === 'done';
+                $events[] = ['n' => ++$n, 'from' => 'images', 'to' => 'finish', 'dir' => 'join', 'label' => $imgOk ? 'ảnh nhập vào bài' : 'ảnh lỗi: chưa có ảnh để ghép', 'state' => $imgOk ? 'done' : 'warn', 'hop' => $ib];
                 $joinDone = true;
             }
         }
@@ -214,6 +224,35 @@ final class FlowGraph
         return $word;
     }
 
+    /** Việc điều phối GIAO cho bộ phận, chọn đúng quyết định mang chỉ dẫn (không phải quyết định kết quả). @param list<array<string,mixed>> $decisions */
+    private static function giveLabel(array $decisions, string $group): string
+    {
+        $by = [];
+        foreach ($decisions as $d) {
+            $by[$d['code'] ?? ''] = $d;
+        }
+        if (isset($by['fix_plan'])) {
+            $p = $by['fix_plan'];
+
+            return 'yêu cầu sửa'.($p['round'] ? ' lần '.$p['round'] : '').($p['failed'] ? ' · '.$p['failed'].' mục' : '');
+        }
+        if (isset($by['synthesis'])) {
+            return 'chốt hướng nội dung → lập dàn ý';
+        }
+        if (isset($by['kb_coordination'])) {
+            return 'kho đã xử lý → tìm tài liệu web';
+        }
+        if ($group === 'finish' && array_intersect(['no_improvement', 'budget_exhausted', 'max_rounds', 'repair_failed'], array_keys($by)) !== []) {
+            return 'dừng sửa → hoàn tất';
+        }
+        if (isset($by['high_risk_expert_review']) || isset($by['brain_must_cite_review'])) {
+            return 'giữ cho người có chuyên môn duyệt';
+        }
+        $last = end($decisions);
+
+        return self::short((string) ($last['title'] ?? ''), 40);
+    }
+
     private static function short(string $s, int $max = 60): string
     {
         $s = trim((string) preg_replace('/^Điều phối( kho)?:\s*/u', '', $s));
@@ -272,6 +311,6 @@ final class FlowGraph
             'sources' => 'Kho và nguồn', 'writer' => 'Người viết', default => (string) $r,
         }, (array) ($d['routes'] ?? []));
 
-        return ['title' => trim((string) $s->title), 'detail' => mb_substr((string) $s->detail, 0, 260), 'routes' => $routes, 'code' => $d['decision'] ?? null];
+        return ['title' => trim((string) $s->title), 'detail' => mb_substr((string) $s->detail, 0, 260), 'routes' => $routes, 'code' => $d['decision'] ?? null, 'round' => $d['round'] ?? null, 'failed' => isset($d['failed_codes']) ? count((array) $d['failed_codes']) : null];
     }
 }

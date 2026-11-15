@@ -23,11 +23,11 @@
             if (e.dir === 'direct') {
                 const order = [...c.querySelectorAll('[data-card]')].map(n => n.getAttribute('data-card')).filter(g => g !== 'images'); const ia = order.indexOf(e.from), ib = order.indexOf(e.to);
                 if (ib === ia + 1) { const key = e.from + '>' + e.to; const o = occ[key] = (occ[key] ?? -1) + 1; const x = ar.left - cr.left + ar.width / 2 + (((o + 1) >> 1) * 30) * (o % 2 ? 1 : -1); const y1 = ar.bottom - cr.top, y2 = br.top - cr.top;
-                    mk('M' + x + ' ' + y1 + 'V' + (y2 - 1), 'direct', !!e.live); items.push({ k: idx, n: e.n, x: x, y: (y1 + y2) / 2, mx: x + 30, label: null, kind: 'direct', live: !!e.live }); return; }
+                    mk('M' + x + ' ' + y1 + 'V' + (y2 - 1), 'direct', !!e.live); items.push({ k: idx, n: e.n, x: x, y: (y1 + y2) / 2, mx: x + 30, label: e.label || null, kind: 'direct', live: !!e.live }); return; }
                 /* Quay ngược hoặc nhảy cách: KHÔNG vẽ xuyên qua các thẻ ở giữa mà đi vòng ra lề phải, mỗi đường một làn riêng */
                 const lane = back++; const xm = Math.max(ar.right, br.right) - cr.left + 16 + lane * 17; const up = ib < ia;
                 const y1 = up ? ar.top - cr.top + 30 : ar.bottom - cr.top - 16, y2 = up ? br.bottom - cr.top - 16 : br.top - cr.top + 30;
-                mk('M' + (ar.right - cr.left) + ' ' + y1 + 'H' + xm + 'V' + y2 + 'H' + (br.right - cr.left + 2), 'back'); items.push({ k: idx, n: e.n, x: xm, y: (y1 + y2) / 2, mx: xm, label: null, kind: 'back' }); return; }
+                mk('M' + (ar.right - cr.left) + ' ' + y1 + 'H' + xm + 'V' + y2 + 'H' + (br.right - cr.left + 2), 'back'); items.push({ k: idx, n: e.n, x: xm, y: (y1 + y2) / 2, mx: xm, label: e.label || null, kind: 'back' }); return; }
             if (e.dir === 'par') { const x1 = ar.right - cr.left, x2 = br.left - cr.left, y = ar.top - cr.top + 50;
                 mk('M' + x1 + ' ' + y + 'H' + (x2 - 1), 'par'); items.push({ k: idx, n: e.n, x: (x1 + x2) / 2, y: y, mx: (x1 + x2) / 2, label: null, kind: 'par', sub: e.label }); return; }
             if (e.dir === 'join') { const x1 = br.right - cr.left, xs = ar.left - cr.left + ar.width / 2, y1 = ar.bottom - cr.top, y2 = br.top - cr.top + 40;
