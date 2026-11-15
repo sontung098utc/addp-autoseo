@@ -83,7 +83,7 @@ class CampaignStartTest extends TestCase
         $this->assertStringContainsString('tối đa 2 bài mỗi ngày', CampaignResource::startDescription($c));
 
         $this->app->detectEnvironment(fn () => 'local');
-        Livewire::test(ViewCampaign::class, ['record' => $c->id])->assertSee('Bắt đầu chạy')->assertDontSee('Giao 1 bài ngay')->assertDontSee('Chạy một nhịp')
+        Livewire::test(ViewCampaign::class, ['record' => $c->id])->assertSee('Bắt đầu chạy')->assertDontSee('Giao bài ngay')->assertDontSee('Chạy một nhịp')
             ->callAction('start')->assertHasNoActionErrors();
 
         $c->refresh();
@@ -109,11 +109,11 @@ class CampaignStartTest extends TestCase
     {
         $c = $this->campaign(['status' => 'active', 'last_tick_at' => now()]);
         $this->actingAs($this->user('approver'));
-        Livewire::test(ViewCampaign::class, ['record' => $c->id])->assertSee('Tạm dừng')->assertSee('Giao 1 bài ngay')->assertDontSee('Bắt đầu chạy')
+        Livewire::test(ViewCampaign::class, ['record' => $c->id])->assertSee('Tạm dừng')->assertSee('Giao bài ngay')->assertDontSee('Bắt đầu chạy')
             ->callAction('pause');
         $this->assertSame('paused', $c->refresh()->status);
 
-        Livewire::test(ViewCampaign::class, ['record' => $c->id])->assertSee('Bắt đầu chạy')->assertDontSee('Giao 1 bài ngay');
+        Livewire::test(ViewCampaign::class, ['record' => $c->id])->assertSee('Bắt đầu chạy')->assertDontSee('Giao bài ngay');
     }
 
     public function test_writer_khong_bat_duoc_chien_dich(): void

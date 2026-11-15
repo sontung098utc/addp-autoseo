@@ -4,6 +4,11 @@ return [
     // Bấm "Giao đội AI" khởi chạy phiên ở NỀN và chuyển sang trang luồng đang chạy (cần CSDL dùng chung được giữa hai tiến trình). Đặt false để chạy đồng bộ như trước.
     'background_runs' => (bool) env('AGENT_BACKGROUND_RUNS', true),
 
+    // Chiến dịch chạy SONG SONG: số bài một chiến dịch được viết cùng lúc (1–5; chiến dịch có thể đặt riêng ở Cấu hình) và trần số phiên đang chạy của cả hệ thống
+    // (bảo vệ hạn mức AI: mỗi bài chạy song song là thêm các lượt gọi AI cùng lúc, dễ gặp giới hạn tần suất).
+    'campaign_concurrency' => (int) env('AGENT_CAMPAIGN_CONCURRENCY', 3),
+    'max_parallel_runs' => (int) env('AGENT_MAX_PARALLEL_RUNS', 4),
+
     'images' => [
         // Tắt hẳn việc tự tạo ảnh. Mặc định bật; vẫn cần nhà cung cấp ảnh được cấu hình thì mới tạo.
         'enabled' => (bool) env('AGENT_IMAGES_ENABLED', true),

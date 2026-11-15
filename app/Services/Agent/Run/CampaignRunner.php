@@ -17,6 +17,7 @@ use App\Services\Agent\Refresh\AgentRunDispatcher;
 use App\Services\Agent\Settings\AgentAi;
 use App\Services\Publishing\EmergencyStopService;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -30,6 +31,9 @@ final class CampaignRunner
     public const AUTO_APPROVE_LABEL = 'Tự duyệt bởi đội AI (chế độ Toàn quyền)';
 
     public const SYSTEM_EMAIL = 'ai-auto@system.local';
+
+    /** Điểm thay thế khi kiểm thử: nhận (Article, campaignId) và trả AgentRun vừa khởi chạy (hoặc null). Mặc định chạy tiến trình nền thật. @var ?\Closure */
+    public static ?\Closure $spawner = null;
 
     /** @var list<string> việc Autopilot đã làm trong nhịp hiện tại (hiện ở kết quả nhịp). */
     private array $autopilotActions = [];
@@ -93,6 +97,10 @@ final class CampaignRunner
         $autopilot = (new AutopilotRunner)->tick($c, $now);
         $this->autopilotActions = $autopilot['actions'];
 
+        if (self::parallelAvailable()) { // nhiều bài chạy SONG SONG ở nền, lấp đầy chỗ trống của chiến dịch
+            return $this->tickParallel($c, $now, $today);
+        }
+
         $article = null;
         $keyword = null;
         if ($c->source === 'plan') {
@@ -128,6 +136,18 @@ final class CampaignRunner
             throw $e;
         }
 
+        return $this->completeRun($c, $run, $keyword, $now);
+    }
+
+    /**
+     * Hoàn tất MỘT bài đã chạy xong: gắn nhãn chế độ, ghi chỗ chờ khi thiếu kiến thức, dừng ở điểm dừng chờ người, tự duyệt (chế độ Toàn quyền).
+     * Dùng chung cho nhịp đồng bộ và cho tiến trình nền của từng bài song song.
+     *
+     * @return array{result: string, message: string, run: ?AgentRun}
+     */
+    public function completeRun(Campaign $c, AgentRun $run, string $keyword, ?CarbonImmutable $now = null): array
+    {
+        $now ??= CarbonImmutable::now();
         // Chỉ gắn nhãn chế độ; việc đẩy nháp lên CMS là AG-S04.
         $run->forceFill(['trust_mode' => $c->mode])->save();
 
@@ -262,6 +282,123 @@ final class CampaignRunner
         }
 
         return null;
+    }
+
+    /** Chạy song song ở nền khi có tiến trình nền (CSDL dùng chung được) hoặc đã gắn điểm thay thế khi kiểm thử. */
+    public static function parallelAvailable(): bool
+    {
+        return self::$spawner !== null || BackgroundRun::available();
+    }
+
+    /** Số bài chiến dịch được viết cùng lúc: cấu hình riêng của chiến dịch (settings.concurrency) hoặc mặc định hệ thống; 1–5. */
+    public static function concurrency(Campaign $c): int
+    {
+        $n = (int) (((array) $c->settings)['concurrency'] ?? config('agent.campaign_concurrency', 3));
+
+        return max(1, min(5, $n));
+    }
+
+    /** Số phiên đang chạy THẬT (chưa quá hạn treo) của chiến dịch. */
+    private function liveRuns(Campaign $c): int
+    {
+        return AgentRun::query()->where('campaign_id', $c->id)->where('status', 'running')->with('steps')->get()
+            ->filter(fn (AgentRun $r) => \App\Filament\Support\Agent\RunActivity::isLive($r))->count();
+    }
+
+    /**
+     * Nhịp SONG SONG: lấp đầy các chỗ trống (số bài song song − số bài đang chạy), mỗi bài chạy ở một tiến trình nền riêng, trong mọi giới hạn
+     * (bài/ngày, trần chi phí, trần bài nháp, trần phiên của cả hệ thống). Có khóa để hai nhịp cùng lúc (lịch và nối tiếp) không giao trùng.
+     *
+     * @return array{result: string, message: string, run: ?AgentRun}
+     */
+    private function tickParallel(Campaign $c, CarbonImmutable $now, int $today): array
+    {
+        if (($this->providerFactory)() === null) {
+            return $this->out('no_ai', 'Chưa cấu hình AI thật nên lượt tự động không chạy (không dùng bản giả lập một cách im lặng).');
+        }
+        $lock = Cache::lock('campaign-tick:'.$c->id, 120);
+        if (! $lock->get()) {
+            return $this->out('busy', 'Một lượt giao bài khác của chiến dịch đang chạy, bỏ qua lượt này.');
+        }
+        try {
+            $live = $this->liveRuns($c);
+            $cap = self::concurrency($c);
+            $room = min($cap - $live, (int) config('agent.max_parallel_runs', 4) - \App\Filament\Support\Agent\RunActivity::liveCount(), (int) $c->daily_limit - $today);
+            if ($room <= 0) {
+                return $this->out('busy', $live >= $cap
+                    ? "Đang viết {$live} bài (tối đa {$cap} bài song song), chờ có chỗ trống."
+                    : 'Hệ thống đang chạy đủ số phiên song song cho phép, chờ có chỗ trống.');
+            }
+            $started = [];
+            $firstRun = null;
+            $problem = null;
+            for ($i = 0; $i < $room; $i++) {
+                $next = $this->claimNext($c);
+                if ($next === null) {
+                    break;
+                }
+                $run = $this->spawn($next['article'], $c);
+                if ($run === null) {
+                    $problem = "Chưa khởi chạy được tiến trình nền cho \"{$next['keyword']}\"; bài giữ trạng thái đang soạn và tự trả về kế hoạch sau 10 phút nếu không chạy.";
+                    break;
+                }
+                $started[] = $next['keyword'];
+                $firstRun ??= $run;
+            }
+            if ($started === []) {
+                if ($problem !== null) {
+                    return $this->out('blocked', $problem);
+                }
+                self::raiseWait($c, 'no_keywords', $c->source === 'plan' ? 'Chưa có bài đã lên kế hoạch hoặc từ khóa để giao' : 'Danh sách từ khóa đã giao hết',
+                    'Thêm bài vào Kế hoạch nội dung hoặc thêm từ khóa cho chiến dịch. Chiến dịch không chặn việc khác; sau 24 giờ sẽ tự bỏ qua và ghi giới hạn.', $now);
+
+                return $this->out('no_keywords', 'Đã giao hết từ khóa trong danh sách.');
+            }
+            CampaignWait::query()->where('campaign_id', $c->id)->where('code', 'no_keywords')->where('status', 'open')->update(['status' => 'resolved']);
+
+            return ['result' => 'ran', 'message' => 'Đã giao '.count($started).' bài chạy song song: '.implode('; ', array_map(fn ($k) => "\"{$k}\"", $started)).'.'.($problem ? ' '.$problem : ''), 'run' => $firstRun];
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /** Lấy bài kế tiếp và ĐÁNH DẤU đang soạn ngay để lượt khác không lấy trùng; từ khóa nhập tay thì tạo bài rồi đánh dấu. @return ?array{article: Article, keyword: string} */
+    private function claimNext(Campaign $c): ?array
+    {
+        $article = $c->source === 'plan' ? $this->nextPlanned($c) : null;
+        if ($article === null && ($keyword = $this->nextKeyword($c)) !== null) {
+            $article = Article::create(['website_id' => $c->website_id, 'created_by' => $c->created_by, 'primary_keyword' => $keyword, 'workflow_status' => 'planned', 'origin' => 'keyword', 'campaign_id' => $c->id]);
+        }
+        if ($article === null) {
+            return null;
+        }
+        $article->forceFill(['campaign_id' => $c->id, 'workflow_status' => 'drafting'])->save();
+
+        return ['article' => $article, 'keyword' => (string) $article->primary_keyword];
+    }
+
+    private function spawn(Article $article, Campaign $c): ?AgentRun
+    {
+        $spawn = self::$spawner ?? fn (Article $a, int $campaignId) => BackgroundRun::start($a, null, 10, null, $campaignId);
+
+        return $spawn($article, $c->id);
+    }
+
+    /**
+     * Sau khi MỘT bài xong ở nền: lấp tiếp chỗ trống ngay (không chờ lịch 15 phút) để chiến dịch chạy liên tục tới khi hết hạn mức hoặc hết bài.
+     * Chỉ nối tiếp khi bài vừa xong chạy bình thường; bài lỗi/hết hạn mức AI thì dừng nối tiếp để không lặp lỗi liên hồi. Mọi giới hạn vẫn do nhịp kiểm.
+     *
+     * @param  array{result: string, message: string, run: ?AgentRun}  $res
+     * @return ?array{result: string, message: string, run: ?AgentRun}
+     */
+    public function continueAfter(Campaign $c, array $res): ?array
+    {
+        $ok = in_array($res['result'], ['ran', 'auto_approved', 'held_outline', 'blocked_gap'], true) && ! in_array($res['run']?->status, ['failed', 'held'], true);
+        if (! $ok || $c->status !== 'active') {
+            return null;
+        }
+
+        return $this->tick($c);
     }
 
     /** @return array{result: string, message: string, run: ?AgentRun} */

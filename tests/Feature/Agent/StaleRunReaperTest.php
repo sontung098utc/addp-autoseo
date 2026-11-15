@@ -41,6 +41,8 @@ class StaleRunReaperTest extends TestCase
         $alive = $this->article('c', 'drafting');
         $liveRun = $this->mkRun($alive, 'running', 5);
 
+        \App\Models\Article::whereIn('id', [$stuck->id, $withDraft->id])->update(['updated_at' => now()->subMinutes(11)]); // chỉ bài bị bỏ quên quá 10 phút mới được trả về
+
         $r = StaleRunReaper::reap();
 
         $this->assertSame(1, $r['runs']);

@@ -72,7 +72,7 @@
                     <dt class="ss-muted">Website</dt><dd>{{ $c->website?->name }}</dd>
                     <dt class="ss-muted">Nguồn từ khóa</dt><dd>{{ $c->source === 'plan' ? 'Kế hoạch nội dung (hết thì dùng danh sách nhập tay)' : 'Danh sách nhập tay' }} · còn {{ $left }} từ khóa nhập tay</dd>
                     <dt class="ss-muted">Chế độ</dt><dd>{{ CampaignResource::MODE_LABELS[$c->mode] ?? $c->mode }}</dd>
-                    <dt class="ss-muted">Hạn mức</dt><dd>{{ $c->daily_limit }} bài/ngày · tối đa {{ number_format((int) $c->daily_cost_cap_vnd, 0, ',', '.') }} đ/ngày · {{ $c->daily_draft_cap }} bản nháp/ngày</dd>
+                    <dt class="ss-muted">Hạn mức</dt><dd>{{ \App\Services\Agent\Run\CampaignRunner::concurrency($c) }} bài song song · {{ $c->daily_limit }} bài/ngày · tối đa {{ number_format((int) $c->daily_cost_cap_vnd, 0, ',', '.') }} đ/ngày · {{ $c->daily_draft_cap }} bản nháp/ngày</dd>
                     <dt class="ss-muted">Điểm dừng chờ người</dt>
                     <dd>{{ collect((array) $c->checkpoints)->map(fn ($k) => Campaign::CHECKPOINTS[$k] ?? $k)->implode(' · ') ?: 'Không có' }}</dd>
                 </dl>

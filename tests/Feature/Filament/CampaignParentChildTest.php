@@ -172,7 +172,7 @@ class CampaignParentChildTest extends TestCase
         Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'b', 'workflow_status' => 'needs_review', 'campaign_id' => $this->camp->id]);
         Livewire::actingAs($this->user('admin'))->test(ViewCampaign::class, ['record' => $this->camp->id])
             ->assertSee('Đã bật')->assertSee('Duyệt trước · cân bằng')->assertSee('Kế hoạch')->assertSee('Chờ duyệt')
-            ->assertSee('Giao 1 bài ngay')->assertSee('Thêm bài')->assertSee('Bài viết');
+            ->assertSee('Giao bài ngay')->assertSee('Thêm bài')->assertSee('Bài viết');
     }
 
     public function test_form_chien_dich_luu_checkpoints(): void

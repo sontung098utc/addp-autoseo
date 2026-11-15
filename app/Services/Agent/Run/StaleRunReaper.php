@@ -30,7 +30,8 @@ final class StaleRunReaper
         }
 
         $articles = 0;
-        foreach (Article::query()->where('workflow_status', 'drafting')->get() as $a) {
+        // Bài vừa được giao cho tiến trình nền có thể chưa kịp ghi phiên: chỉ trả về kế hoạch khi đã quá 10 phút không có phiên đang chạy.
+        foreach (Article::query()->where('workflow_status', 'drafting')->where('updated_at', '<', now()->subMinutes(10))->get() as $a) {
             if (AgentRun::query()->where('article_id', $a->id)->where('status', 'running')->exists()) {
                 continue;
             }

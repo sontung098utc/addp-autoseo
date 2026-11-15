@@ -127,6 +127,8 @@ class CampaignResource extends Resource
                 Forms\Components\Select::make('brain_ids')->label('Trí tuệ được dùng')->multiple()->options(fn () => Brain::query()->where('status', 'active')->orderBy('name')->pluck('name', 'id')->all())
                     ->hintIcon('heroicon-o-information-circle', 'Để trống: dùng các Trí tuệ của website theo thứ tự ưu tiên. Chọn nhiều thì thứ tự chọn là thứ tự ưu tiên; AI lấy giọng, khung bài và kiến thức từ các Trí tuệ này.')
                     ->columnSpanFull(),
+                Forms\Components\TextInput::make('settings.concurrency')->label('Số bài viết song song')->numeric()->minValue(1)->maxValue(5)->default((int) config('agent.campaign_concurrency', 3))
+                    ->hintIcon('heroicon-o-information-circle', 'Số bài đội AI viết CÙNG LÚC cho chiến dịch này (1–5). Nhiều hơn thì nhanh hơn nhưng tốn hạn mức AI nhanh hơn và dễ gặp giới hạn tần suất. Vẫn bị chặn bởi "Tối đa bài mỗi ngày" và trần chi phí.'),
                 Forms\Components\TextInput::make('daily_limit')->label('Tối đa bài mỗi ngày')->numeric()->minValue(1)->maxValue(50)->default(3)->required()
                     ->hintIcon('heroicon-o-information-circle', 'Chống sản xuất hàng loạt: quá giới hạn thì dừng giao bài tới ngày mai (giờ Việt Nam).'),
             ])->columns(2),
@@ -204,9 +206,9 @@ class CampaignResource extends Resource
                 Tables\Actions\Action::make('pause')->label('Tạm dừng')->icon('heroicon-o-pause')->color('gray')
                     ->visible(fn (Campaign $r) => $r->status === 'active' && static::allowed())
                     ->action(fn (Campaign $r) => static::pause($r)),
-                Tables\Actions\Action::make('tick')->label('Giao 1 bài ngay')->icon('heroicon-o-forward')->color('gray')
+                Tables\Actions\Action::make('tick')->label('Giao bài ngay')->icon('heroicon-o-forward')->color('gray')
                     ->visible(fn (Campaign $r) => $r->status === 'active' && static::allowed())
-                    ->requiresConfirmation()->modalDescription('Giao ngay bài kế tiếp của chiến dịch cho đội AI viết, không chờ lượt tự động. Vẫn trong giới hạn bài/ngày. Bài thường ở chế độ Toàn quyền được đội AI tự duyệt; còn lại là bản nháp chờ duyệt.')
+                    ->requiresConfirmation()->modalDescription('Lấp ngay các chỗ trống: giao các bài kế tiếp cho đội AI viết song song (tối đa theo cấu hình chiến dịch), không chờ lượt tự động. Vẫn trong giới hạn bài/ngày. Bài thường ở chế độ Toàn quyền được đội AI tự duyệt; còn lại là bản nháp chờ duyệt.')
                     ->action(fn (Campaign $r) => static::runTick($r)),
             ]);
     }
@@ -216,7 +218,7 @@ class CampaignResource extends Resource
     {
         $next = $c->source === 'plan' ? Article::query()->where('campaign_id', $c->id)->where('workflow_status', 'planned')->orderByDesc('priority')->orderBy('id')->value('primary_keyword') : null;
 
-        return 'Giao ngay '.($next ? 'bài «'.$next.'»' : 'bài kế tiếp').' cho đội AI viết. Sau đó hệ thống tự giao bài kế tiếp mỗi '.self::TICK_MINUTES.' phút, tối đa '.(int) $c->daily_limit.' bài mỗi ngày và trong trần chi phí AI '.number_format((int) $c->daily_cost_cap_vnd, 0, ',', '.').' đ/ngày. Bạn có thể tạm dừng bất cứ lúc nào. Chưa có gì tự đăng công khai.';
+        return 'Giao ngay '.($next ? 'bài «'.$next.'»' : 'bài kế tiếp').' cho đội AI viết, cùng lúc tối đa '.CampaignRunner::concurrency($c).' bài song song. Bài nào xong thì tự giao bài kế tiếp vào chỗ trống, tối đa '.(int) $c->daily_limit.' bài mỗi ngày và trong trần chi phí AI '.number_format((int) $c->daily_cost_cap_vnd, 0, ',', '.').' đ/ngày. Bạn có thể tạm dừng bất cứ lúc nào. Chưa có gì tự đăng công khai.';
     }
 
     /** Hệ thống tự giao một bài mỗi chừng này phút (khớp lịch agent:tick trong routes/console.php). */

@@ -74,10 +74,10 @@ class ViewCampaign extends Page
                     CampaignResource::start($c->refresh());
                     $this->record = $c->refresh();
                 }),
-            Action::make('tick')->label('Giao 1 bài ngay')->icon('heroicon-o-forward')->color('gray')
+            Action::make('tick')->label('Giao bài ngay')->icon('heroicon-o-forward')->color('gray')
                 ->visible(fn () => $c->status === 'active')
-                ->requiresConfirmation()->modalHeading('Giao 1 bài ngay')
-                ->modalDescription('Giao ngay bài kế tiếp của chiến dịch cho đội AI viết, không chờ lượt tự động. Vẫn trong giới hạn bài/ngày.')
+                ->requiresConfirmation()->modalHeading('Giao bài ngay')
+                ->modalDescription('Lấp ngay các chỗ trống: giao các bài kế tiếp cho đội AI viết song song (tối đa theo cấu hình chiến dịch), không chờ lượt tự động. Vẫn trong giới hạn bài/ngày.')
                 ->action(function () use ($c) {
                     CampaignResource::runTick($c->refresh());
                 }),
