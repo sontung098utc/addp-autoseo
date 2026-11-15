@@ -84,16 +84,20 @@ final class WikipediaPageviews
         if ($byDay === []) {
             return $unknown('Wikipedia chưa có dữ liệu lượt xem trong kỳ đo.', $title);
         }
-        $sum = function ($from, $to) use ($byDay) {
-            $t = 0;
+        // Trung vị theo ngày × số ngày thay cho tổng: một ngày đột biến (tin tức, bot lọt lưới) không làm lệch cả kỳ.
+        $level = function ($from, $to) use ($byDay) {
+            $days = [];
             for ($d = $from->copy(); $d->lte($to); $d->addDay()) {
-                $t += $byDay[$d->format('Ymd')] ?? 0;
+                $days[] = $byDay[$d->format('Ymd')] ?? 0;
             }
+            sort($days);
+            $n = count($days);
+            $median = $n % 2 ? $days[intdiv($n, 2)] : ($days[$n / 2 - 1] + $days[$n / 2]) / 2;
 
-            return $t;
+            return (int) round($median * $n);
         };
-        $recent = $sum($end->copy()->subDays(self::WINDOW - 1), $end);
-        $prev = $sum($end->copy()->subDays(self::WINDOW * 2 - 1), $end->copy()->subDays(self::WINDOW));
+        $recent = $level($end->copy()->subDays(self::WINDOW - 1), $end);
+        $prev = $level($end->copy()->subDays(self::WINDOW * 2 - 1), $end->copy()->subDays(self::WINDOW));
         if ($prev < self::MIN_VIEWS || $recent < self::MIN_VIEWS) {
             return $unknown('Lượt xem bài «'.$title.'» quá thấp ('.$prev.' → '.$recent.') nên chưa kết luận được xu hướng.', $title, false, $recent, $prev);
         }
@@ -116,12 +120,16 @@ final class WikipediaPageviews
         return $keyword;
     }
 
-    /** Tiêu đề bài khớp từ khóa khi có ít nhất 60% từ chính của từ khóa (tránh gán nhầm sang bài khác). */
+    /**
+     * Tiêu đề bài khớp từ khóa: từ khóa ngắn (tối đa 3 từ chính) phải có ĐỦ mọi từ trong tiêu đề, dài hơn cần ít nhất 80%.
+     * Lỏng hơn sẽ gán nhầm bài khác ("thiếu máu não" không được khớp "Thiếu máu do thiếu sắt").
+     */
     private function matches(string $keyword, string $title): bool
     {
         $w = fn (string $t) => array_values(array_unique(array_filter(preg_split('/[^\p{L}\p{N}]+/u', Keyword::keyFor($t), -1, PREG_SPLIT_NO_EMPTY) ?: [], fn ($x) => mb_strlen($x) >= 2)));
         $k = $w($keyword);
+        $need = count($k) <= 3 ? count($k) : (int) ceil(count($k) * 0.8);
 
-        return $k !== [] && count(array_intersect($k, $w($title))) >= (int) ceil(count($k) * 0.6);
+        return $k !== [] && count(array_intersect($k, $w($title))) >= $need;
     }
 }

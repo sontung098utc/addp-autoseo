@@ -279,5 +279,27 @@ class TrendSignalsTest extends TestCase
         $this->assertSame('Asia/Ho_Chi_Minh', (string) $e->timezone);
         $this->assertTrue($e->withoutOverlapping);
     }
+
+    public function test_khop_bai_chat_khong_gan_nham_bai_khac(): void
+    {
+        $this->fakeWiki('Thiếu máu do thiếu sắt', array_fill(0, 28, 50));
+        $r = (new WikipediaPageviews)->signal('thiếu máu não');
+        $this->assertSame('unknown', $r['direction']);
+        $this->assertStringContainsString('Không có bài Wikipedia khớp', $r['reason'], '"thiếu máu não" không được gán sang bài "Thiếu máu do thiếu sắt"');
+
+        Cache::flush();
+        $this->fakeWiki('Tai biến mạch máu não', array_fill(0, 28, 50));
+        $this->assertSame('flat', (new WikipediaPageviews)->signal('tai biến mạch máu não')['direction'], 'tên đầy đủ vẫn khớp');
+    }
+
+    public function test_mot_ngay_dot_bien_khong_lam_lech_ca_ky_nho_trung_vi(): void
+    {
+        $views = array_fill(0, 28, 20);
+        $views[20] = 5000; // một ngày đột biến ở kỳ gần nhất
+        $this->fakeWiki('Loãng xương', $views);
+        $r = (new WikipediaPageviews)->signal('loãng xương');
+        $this->assertSame([280, 280], [$r['previous'], $r['recent']], 'trung vị × 14 ngày, không bị 5000 kéo lên');
+        $this->assertSame('flat', $r['direction']);
+    }
 }
 
