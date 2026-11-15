@@ -27,8 +27,9 @@ final class ContentPlanner
     /** Cụm đã có 0/1/2/3+ bài → điểm độ phủ. */
     private const COVERAGE = [30, 20, 10, 0];
 
-    /** @return list<array{keyword_id:int,keyword:string,cluster:?string,volume:?int,volume_source:?string,priority:int,reasons:list<string>,off_topic:bool,sources:list<array{type:string,label:string}>}> */
-    public function propose(Website $site, int $limit = 10): array
+    /** @param  ?array<string,mixed>  $gsc  kết quả GscSignals::forWebsite() (null = không dùng Search Console)
+     * @return list<array{keyword_id:int,keyword:string,cluster:?string,volume:?int,volume_source:?string,priority:int,reasons:list<string>,off_topic:bool,sources:list<array{type:string,label:string}>}> */
+    public function propose(Website $site, int $limit = 10, ?array $gsc = null): array
     {
         $profile = BrandProfileData::forWebsite($site->id);
         $clusterPosts = Article::where('website_id', $site->id)->whereNotNull('cluster_id')
@@ -70,6 +71,13 @@ final class ContentPlanner
                 $sources[] = ['type' => 'competitor', 'label' => 'Khoảng trống đối thủ'];
             } elseif ($k->source === 'competitor') {
                 $sources[] = ['type' => 'competitor', 'label' => 'Khoảng trống đối thủ'];
+            }
+            $g = $gsc['queries'][Keyword::keyFor($k->keyword)] ?? null;
+            if ($g !== null) {
+                $score += $g['points'];
+                $reasons[] = 'Search Console ('.$gsc['period'].'): vị trí '.number_format($g['position'], 1, ',', '.').', '.number_format($g['impressions'], 0, ',', '.').' lượt hiển thị, '.number_format($g['clicks'], 0, ',', '.').' lượt nhấp'
+                    .($g['points'] > 0 ? ' — có cơ hội cải thiện' : '');
+                $sources[] = ['type' => 'gsc', 'label' => 'Search Console'.($g['reasons'] !== [] ? ' · '.$g['reasons'][0] : '')];
             }
             $off = BrandProfileData::looksOffTopic($profile, $k->keyword);
             if ($off) {

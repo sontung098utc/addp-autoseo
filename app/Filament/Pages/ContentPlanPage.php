@@ -377,7 +377,7 @@ class ContentPlanPage extends Page
         return [
             'clusterColumns' => $this->clusterColumns(), 'clusterRows' => $clusterRows,
             'undatedColumns' => $this->undatedColumns(), 'undatedRows' => $undatedRows,
-            'proposals' => $site ? (new ContentPlanner)->propose($site, 10) : [], 'pendingAudit' => $site ? (new ContentPlanner)->pendingAuditCount($site) : 0,
+            'proposals' => $site ? (new ContentPlanner)->propose($site, 10, \App\Services\Planning\GscSignals::forWebsite($site)) : [], 'pendingAudit' => $site ? (new ContentPlanner)->pendingAuditCount($site) : 0,
             'campaigns' => $campaigns, 'campaignFilter' => $filter, 'showTarget' => $filter === null,
             'demo' => $demo, 'demoOn' => DemoMode::enabled(), 'sites' => $sites, 'site' => $site, 'rows' => $rows, 'detail' => $detail,
             'allConflicts' => $allConflicts, 'byId' => $byId, 'days' => $days, 'weekCount' => $weekCount, 'undated' => $undated,

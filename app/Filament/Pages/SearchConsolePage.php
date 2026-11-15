@@ -73,7 +73,7 @@ BLADE));
     /** Trạng thái màn: production luôn "chưa kết nối" thật; ngoài production theo ?demo= hoặc cờ gsc.connected. */
     public function state(): string
     {
-        $default = DemoMode::enabled() && DemoStore::get('gsc.connected', true) ? 'ket-noi' : 'chua-ket-noi';
+        $default = (DemoMode::enabled() && DemoStore::get('gsc.connected', true)) || (! DemoMode::enabled() && \App\Filament\Support\Gsc\GoogleSearchConsoleSource::forWebsite($this->websiteId ? Website::find($this->websiteId) : null) !== null) ? 'ket-noi' : 'chua-ket-noi';
 
         return DemoMode::state($this->demo, self::STATES, $default);
     }
@@ -141,7 +141,7 @@ BLADE));
 
     public function report(): array
     {
-        return GscService::make()->report($this->days);
+        return GscService::forWebsite($this->websiteId ? Website::find($this->websiteId) : null)->report($this->days);
     }
 
     /** @param array<string, mixed> $d @return float|null chênh lệch để hiển thị (null nếu chưa có / mới) */
