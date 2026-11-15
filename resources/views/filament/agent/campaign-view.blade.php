@@ -20,8 +20,9 @@
     <div class="ss-page" data-campaign-view>
         <div class="ss-card" style="margin-bottom:.75rem"><div class="ss-card__b">
             <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
-                <x-studio.badge :tone="$active ? 'ok' : 'muted'">{{ $active ? 'Đang chạy' : 'Tạm dừng' }}</x-studio.badge>
-                @if ($live > 0)<x-studio.badge tone="info">Đang viết {{ $live }} bài</x-studio.badge>@endif
+                @php $stTone = ['success' => 'ok', 'warning' => 'warn', 'info' => 'info', 'gray' => 'muted'][$state['tone']] ?? 'muted'; @endphp
+                <x-studio.badge :tone="$stTone" data-campaign-state="{{ $state['key'] }}">{{ $state['label'] }}</x-studio.badge>
+                @if ($state['hint'])<span class="ss-muted ss-text-sm" data-state-hint>{{ $state['hint'] }}</span>@endif
                 <span class="ss-muted ss-text-sm">{{ $c->website?->name }} · hôm nay {{ $today }}/{{ $c->daily_limit }} bài</span>
             </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(7rem,1fr));gap:.5rem;margin-top:.75rem" data-progress>

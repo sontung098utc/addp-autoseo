@@ -17,7 +17,7 @@ class CampaignKeywordsRequiredTest extends TestCase
     {
         $w = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
         $this->actingAs(User::create(['name' => 'a', 'email' => 'a@x.vn', 'password' => 'secret123', 'role' => 'approver', 'is_active' => true]));
-        $base = ['name' => 'CD', 'website_id' => $w->id, 'daily_limit' => 3, 'status' => 'paused', 'mode' => 'balanced', 'daily_cost_cap_vnd' => 100000, 'daily_draft_cap' => 5];
+        $base = ['name' => 'CD', 'website_id' => $w->id, 'daily_limit' => 3, 'mode' => 'balanced', 'daily_cost_cap_vnd' => 100000, 'daily_draft_cap' => 5];
 
         Livewire::test(CreateCampaign::class)->fillForm($base + ['source' => 'plan', 'keywords' => []])->call('create')->assertHasNoFormErrors();
         Livewire::test(CreateCampaign::class)->fillForm($base + ['source' => 'keywords', 'keywords' => []])->call('create')->assertHasFormErrors(['keywords' => 'required']);

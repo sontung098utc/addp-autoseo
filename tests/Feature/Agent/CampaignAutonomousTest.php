@@ -160,7 +160,7 @@ class CampaignAutonomousTest extends TestCase
         $admin = $this->user('admin');
         $this->actingAs($admin);
         $w = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://b.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
-        $form = ['name' => 'X', 'website_id' => $w->id, 'keywords' => ['a'], 'daily_limit' => 1, 'status' => 'paused', 'mode' => 'autonomous', 'source' => 'plan', 'daily_cost_cap_vnd' => 1000, 'daily_draft_cap' => 1];
+        $form = ['name' => 'X', 'website_id' => $w->id, 'keywords' => ['a'], 'daily_limit' => 1, 'mode' => 'autonomous', 'source' => 'plan', 'daily_cost_cap_vnd' => 1000, 'daily_draft_cap' => 1];
 
         Livewire::test(CampaignResource\Pages\CreateCampaign::class)->fillForm($form + ['policy_ack' => false])
             ->call('create')->assertHasFormErrors(['policy_ack']);

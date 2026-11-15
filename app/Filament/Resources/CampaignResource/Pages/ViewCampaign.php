@@ -67,10 +67,17 @@ class ViewCampaign extends Page
         $c = $this->record;
 
         return [
-            Action::make('tick')->label('Chạy một nhịp')->icon('heroicon-o-play')
+            Action::make('start')->label('Bắt đầu chạy')->icon('heroicon-o-play')
+                ->visible(fn () => $c->status === 'paused' && CampaignResource::canEdit($c))
+                ->requiresConfirmation()->modalHeading('Bắt đầu chạy chiến dịch')->modalDescription(fn () => CampaignResource::startDescription($c->refresh()))
+                ->action(function () use ($c) {
+                    CampaignResource::start($c->refresh());
+                    $this->record = $c->refresh();
+                }),
+            Action::make('tick')->label('Giao 1 bài ngay')->icon('heroicon-o-forward')->color('gray')
                 ->visible(fn () => $c->status === 'active')
-                ->requiresConfirmation()->modalHeading('Chạy một nhịp ngay')
-                ->modalDescription('Chọn bài kế tiếp của chiến dịch và tạo một phiên chạy cho bài đó ngay bây giờ, vẫn trong giới hạn bài/ngày.')
+                ->requiresConfirmation()->modalHeading('Giao 1 bài ngay')
+                ->modalDescription('Giao ngay bài kế tiếp của chiến dịch cho đội AI viết, không chờ lượt tự động. Vẫn trong giới hạn bài/ngày.')
                 ->action(function () use ($c) {
                     CampaignResource::runTick($c->refresh());
                 }),
@@ -82,12 +89,10 @@ class ViewCampaign extends Page
                         ->options(['informational' => 'Thông tin', 'commercial' => 'Thương mại', 'transactional' => 'Giao dịch', 'navigational' => 'Điều hướng']),
                 ])
                 ->action(fn (array $data) => $this->addArticle((string) $data['keyword'], (string) $data['intent'])),
-            Action::make('toggle')->label($c->status === 'active' ? 'Tạm dừng' : 'Bật chạy')->icon($c->status === 'active' ? 'heroicon-o-pause' : 'heroicon-o-play-circle')->color('gray')
-                // Chiến dịch ở vòng đời của lô A (planning/draft/completed/archived) không bật/tắt được bằng nút này, tránh bật lại chiến dịch đã hoàn thành.
-                ->visible(fn () => in_array($c->status, ['active', 'paused'], true))
+            Action::make('pause')->label('Tạm dừng')->icon('heroicon-o-pause')->color('gray')
+                ->visible(fn () => $c->status === 'active' && CampaignResource::canEdit($c))
                 ->action(function () use ($c) {
-                    abort_unless(CampaignResource::canEdit($c) && in_array($c->status, ['active', 'paused'], true), 403);
-                    $c->update(['status' => $c->status === 'active' ? 'paused' : 'active']);
+                    CampaignResource::pause($c->refresh());
                     $this->record = $c->refresh();
                 }),
             Action::make('edit')->label('Cấu hình')->icon('heroicon-o-cog-6-tooth')->color('gray')
@@ -133,6 +138,7 @@ class ViewCampaign extends Page
             'total' => array_sum($counts),
             'today' => CampaignResource::todayCount($c),
             'live' => CampaignResource::liveRunCount($c),
+            'state' => CampaignResource::stateOf($c),
             'left' => CampaignResource::remaining($c),
             'articles' => $articles,
             'planned' => $articles->where('workflow_status', 'planned')->sortByDesc(fn (Article $a) => (int) $a->priority)->values(),

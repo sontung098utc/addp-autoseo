@@ -205,7 +205,7 @@ class BrainUiTest extends TestCase
         $b3 = $this->brain('Ba', 'trong');
         $this->actingAs($this->user('approver'));
         Livewire::test(CampaignResource\Pages\CreateCampaign::class)
-            ->fillForm(['name' => 'CD', 'website_id' => $w->id, 'keywords' => ['kw'], 'daily_limit' => 1, 'status' => 'paused', 'mode' => 'balanced', 'source' => 'keywords', 'daily_cost_cap_vnd' => 1000, 'daily_draft_cap' => 1, 'brain_ids' => [$b3->id, $b1->id]])
+            ->fillForm(['name' => 'CD', 'website_id' => $w->id, 'keywords' => ['kw'], 'daily_limit' => 1, 'mode' => 'balanced', 'source' => 'keywords', 'daily_cost_cap_vnd' => 1000, 'daily_draft_cap' => 1, 'brain_ids' => [$b3->id, $b1->id]])
             ->call('create')->assertHasNoErrors();
         $c = Campaign::firstOrFail();
         $this->assertEquals([$b3->id, $b1->id], $c->brain_ids);

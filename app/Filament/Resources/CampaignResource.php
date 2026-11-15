@@ -10,6 +10,7 @@ use App\Models\AgentRun;
 use App\Models\Article;
 use App\Models\Brain;
 use App\Models\Campaign;
+use Carbon\CarbonImmutable;
 use App\Models\CampaignWait;
 use App\Models\User;
 use App\Services\Agent\Run\CampaignRunner;
@@ -128,8 +129,6 @@ class CampaignResource extends Resource
                     ->columnSpanFull(),
                 Forms\Components\TextInput::make('daily_limit')->label('Tối đa bài mỗi ngày')->numeric()->minValue(1)->maxValue(50)->default(3)->required()
                     ->hintIcon('heroicon-o-information-circle', 'Chống sản xuất hàng loạt: quá giới hạn thì dừng giao bài tới ngày mai (giờ Việt Nam).'),
-                Forms\Components\Select::make('status')->label('Trạng thái')->options(['paused' => 'Tạm dừng', 'active' => 'Đang chạy'])->default('paused')->required()
-                    ->hintIcon('heroicon-o-information-circle', 'Đang chạy: hệ thống tự giao bài theo lịch. Chế độ Duyệt trước: kết quả là bản nháp chờ người duyệt. Chế độ Toàn quyền: bài thường được đội AI tự duyệt. Chưa có gì tự đăng công khai.'),
             ])->columns(2),
             Forms\Components\Section::make('Chế độ')->schema([
                 Forms\Components\Radio::make('mode')->hiddenLabel()->default('balanced')->required()->live()
@@ -180,11 +179,11 @@ class CampaignResource extends Resource
                 Tables\Columns\TextColumn::make('name')->label('Chiến dịch')->searchable()->wrap()->description(fn (Campaign $r) => $r->website?->name.' · Đã giao '.(int) $r->runs_total.' bài · '.(int) $r->runs_review.' chờ duyệt · '.(int) $r->runs_held.' giữ nháp')
                     ->extraHeaderAttributes(['class' => 'ss-col-main'])->extraCellAttributes(['class' => 'ss-col-main']),
                 Tables\Columns\TextColumn::make('status')->label('Trạng thái')->badge()
-                    ->formatStateUsing(fn (string $state) => $state === 'active' ? 'Đang chạy' : 'Tạm dừng')
-                    ->color(fn (string $state) => $state === 'active' ? 'success' : 'gray')
+                    ->formatStateUsing(fn (string $state, Campaign $r) => self::stateOf($r)['label'])
+                    ->color(fn (string $state, Campaign $r) => self::stateOf($r)['tone'])
                     ->icon(fn (Campaign $r) => self::liveRunCount($r) > 0 ? 'heroicon-o-arrow-path' : null)
                     ->extraAttributes(fn (Campaign $r) => self::liveRunCount($r) > 0 ? ['class' => 'ss-badge-live', 'data-running' => '1'] : [])
-                    ->description(fn (Campaign $r) => self::liveRunCount($r) > 0 ? 'Đang viết '.self::liveRunCount($r).' bài' : null)
+                    ->description(fn (Campaign $r) => self::stateOf($r)['hint'])
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
                 Tables\Columns\TextColumn::make('progress')->label('Bài con')->state(fn (Campaign $r) => (int) $r->articles_total.' bài · '.(int) $r->articles_planned.' kế hoạch · '.(int) $r->articles_review.' chờ duyệt')->description(fn (Campaign $r) => self::MODE_LABELS[$r->mode] ?? $r->mode)->visibleFrom('md')
                     ->extraHeaderAttributes(['style' => 'white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
@@ -198,11 +197,69 @@ class CampaignResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make()->label('Cấu hình'),
-                Tables\Actions\Action::make('tick')->label('Chạy một nhịp ngay')->icon('heroicon-o-play')
+                Tables\Actions\Action::make('start')->label('Bắt đầu chạy')->icon('heroicon-o-play')
+                    ->visible(fn (Campaign $r) => $r->status === 'paused' && static::allowed())
+                    ->requiresConfirmation()->modalHeading('Bắt đầu chạy chiến dịch')->modalDescription(fn (Campaign $r) => self::startDescription($r))
+                    ->action(fn (Campaign $r) => static::start($r)),
+                Tables\Actions\Action::make('pause')->label('Tạm dừng')->icon('heroicon-o-pause')->color('gray')
                     ->visible(fn (Campaign $r) => $r->status === 'active' && static::allowed())
-                    ->requiresConfirmation()->modalDescription('Chọn bài kế tiếp và tạo một phiên chạy cho bài đó ngay bây giờ, vẫn trong giới hạn bài/ngày. Bài thường ở chế độ Toàn quyền sẽ được đội AI tự duyệt; còn lại là bản nháp chờ duyệt.')
+                    ->action(fn (Campaign $r) => static::pause($r)),
+                Tables\Actions\Action::make('tick')->label('Giao 1 bài ngay')->icon('heroicon-o-forward')->color('gray')
+                    ->visible(fn (Campaign $r) => $r->status === 'active' && static::allowed())
+                    ->requiresConfirmation()->modalDescription('Giao ngay bài kế tiếp của chiến dịch cho đội AI viết, không chờ lượt tự động. Vẫn trong giới hạn bài/ngày. Bài thường ở chế độ Toàn quyền được đội AI tự duyệt; còn lại là bản nháp chờ duyệt.')
                     ->action(fn (Campaign $r) => static::runTick($r)),
             ]);
+    }
+
+    /** Lời giải thích ở hộp xác nhận "Bắt đầu chạy": nói rõ sẽ viết bài nào, tối đa bao nhiêu bài/ngày, và hệ thống sẽ làm gì tiếp. */
+    public static function startDescription(Campaign $c): string
+    {
+        $next = $c->source === 'plan' ? Article::query()->where('campaign_id', $c->id)->where('workflow_status', 'planned')->orderByDesc('priority')->orderBy('id')->value('primary_keyword') : null;
+
+        return 'Giao ngay '.($next ? 'bài «'.$next.'»' : 'bài kế tiếp').' cho đội AI viết. Sau đó hệ thống tự giao bài kế tiếp mỗi '.self::TICK_MINUTES.' phút, tối đa '.(int) $c->daily_limit.' bài mỗi ngày và trong trần chi phí AI '.number_format((int) $c->daily_cost_cap_vnd, 0, ',', '.').' đ/ngày. Bạn có thể tạm dừng bất cứ lúc nào. Chưa có gì tự đăng công khai.';
+    }
+
+    /** Hệ thống tự giao một bài mỗi chừng này phút (khớp lịch agent:tick trong routes/console.php). */
+    public const TICK_MINUTES = 15;
+
+    /**
+     * Trạng thái THẬT của chiến dịch cho người dùng. "Đang bật" chỉ nghĩa là được phép tự giao bài; chỉ "Đang viết N bài" mới là đội AI đang làm.
+     *
+     * @return array{key:string, label:string, tone:string, hint:?string}
+     */
+    public static function stateOf(Campaign $c): array
+    {
+        if ($c->status !== 'active') {
+            return ['key' => 'paused', 'label' => 'Tạm dừng', 'tone' => 'gray', 'hint' => null];
+        }
+        if (($live = self::liveRunCount($c)) > 0) {
+            return ['key' => 'writing', 'label' => 'Đang viết '.$live.' bài', 'tone' => 'success', 'hint' => null];
+        }
+        if (self::todayCount($c) >= (int) $c->daily_limit) {
+            return ['key' => 'limit', 'label' => 'Đã đủ bài hôm nay', 'tone' => 'warning', 'hint' => 'Tiếp tục vào ngày mai (giờ Việt Nam).'];
+        }
+        $last = $c->last_tick_at ? CarbonImmutable::parse($c->last_tick_at) : null;
+        if ($last === null || $last->lt(CarbonImmutable::now()->subMinutes(self::TICK_MINUTES * 2))) {
+            return ['key' => 'no_tick', 'label' => 'Đã bật, chưa có lượt tự động', 'tone' => 'warning',
+                'hint' => 'Chưa thấy lịch chạy nền hoạt động'.($last ? ' từ '.VnTime::format(VnTime::fromRaw($c, 'last_tick_at')) : '').'. Bấm "Giao 1 bài ngay" để chạy, hoặc bật lịch chạy nền (scheduler).'];
+        }
+
+        return ['key' => 'waiting', 'label' => 'Đã bật, chờ giao bài tiếp', 'tone' => 'info', 'hint' => 'Hệ thống tự giao bài kế tiếp mỗi '.self::TICK_MINUTES.' phút.'];
+    }
+
+    /** Bấm "Bắt đầu chạy": bật chiến dịch VÀ giao ngay bài kế tiếp cho đội AI (không chờ lịch); sau đó hệ thống tiếp tục tự giao. */
+    public static function start(Campaign $c): void
+    {
+        abort_unless(static::canEdit($c) && static::allowed() && in_array($c->status, ['active', 'paused'], true), 403);
+        $c->update(['status' => 'active']);
+        static::runTick($c->refresh());
+    }
+
+    public static function pause(Campaign $c): void
+    {
+        abort_unless(static::canEdit($c) && in_array($c->status, ['active', 'paused'], true), 403);
+        $c->update(['status' => 'paused']);
+        Notification::make()->title('Đã tạm dừng chiến dịch')->body('Không giao thêm bài. Bài đang viết dở vẫn chạy nốt.')->success()->send();
     }
 
     /** Chạy một nhịp ngay (dùng chung cho bảng và trang chiến dịch); kết quả báo qua thông báo. */

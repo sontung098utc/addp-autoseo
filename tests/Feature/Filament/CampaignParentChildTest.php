@@ -171,14 +171,14 @@ class CampaignParentChildTest extends TestCase
         Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'a', 'workflow_status' => 'planned', 'campaign_id' => $this->camp->id]);
         Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'b', 'workflow_status' => 'needs_review', 'campaign_id' => $this->camp->id]);
         Livewire::actingAs($this->user('admin'))->test(ViewCampaign::class, ['record' => $this->camp->id])
-            ->assertSee('Đang chạy')->assertSee('Duyệt trước · cân bằng')->assertSee('Kế hoạch')->assertSee('Chờ duyệt')
-            ->assertSee('Chạy một nhịp')->assertSee('Thêm bài')->assertSee('Bài viết');
+            ->assertSee('Đã bật')->assertSee('Duyệt trước · cân bằng')->assertSee('Kế hoạch')->assertSee('Chờ duyệt')
+            ->assertSee('Giao 1 bài ngay')->assertSee('Thêm bài')->assertSee('Bài viết');
     }
 
     public function test_form_chien_dich_luu_checkpoints(): void
     {
         Livewire::actingAs($this->user('admin'))->test(CreateCampaign::class)
-            ->fillForm(['name' => 'CD mới', 'website_id' => $this->site->id, 'keywords' => ['x'], 'daily_limit' => 3, 'status' => 'paused', 'mode' => 'balanced', 'source' => 'keywords',
+            ->fillForm(['name' => 'CD mới', 'website_id' => $this->site->id, 'keywords' => ['x'], 'daily_limit' => 3, 'mode' => 'balanced', 'source' => 'keywords',
                 'daily_cost_cap_vnd' => 1000, 'daily_draft_cap' => 2, 'checkpoints' => ['plan', 'publish']])
             ->call('create')->assertHasNoFormErrors();
         $this->assertSame(['plan', 'publish'], Campaign::where('name', 'CD mới')->first()->checkpoints);
