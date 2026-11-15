@@ -4,9 +4,6 @@ return [
     // Bấm "Giao đội AI" khởi chạy phiên ở NỀN và chuyển sang trang luồng đang chạy (cần CSDL dùng chung được giữa hai tiến trình). Đặt false để chạy đồng bộ như trước.
     'background_runs' => (bool) env('AGENT_BACKGROUND_RUNS', true),
 
-    /** Điều phối quyết định sau Tổng hợp nguồn báo thiếu căn cứ (bỏ qua / tìm thêm / chuyển người). false = hành vi cũ: tìm thêm đúng một vòng, không quyết định. */
-    'gap_coordination' => (bool) env('AGENT_GAP_COORD', true),
-
     'images' => [
         // Tắt hẳn việc tự tạo ảnh. Mặc định bật; vẫn cần nhà cung cấp ảnh được cấu hình thì mới tạo.
         'enabled' => (bool) env('AGENT_IMAGES_ENABLED', true),
@@ -17,7 +14,7 @@ return [
         'medical' => (bool) env('AGENT_IMAGES_MEDICAL', true),
         // Trần chi phí ảnh = tỉ lệ này của ngân sách phiên.
         'budget_share' => 0.10,
-        'default_budget_vnd' => 50000.0,
+        'default_budget_vnd' => 100000.0,
         // Ước tính giá một ảnh khi provider không khai pricing['image_vnd']. Chưa đo thật.
         'cost_vnd_per_image' => (float) env('AGENT_IMAGES_COST_VND', 1000),
         // Chèn <figure> vào thân bài sau mục H2 tương ứng. Tắt thì chỉ gắn vào phiên bản (ảnh bìa + danh sách ảnh).

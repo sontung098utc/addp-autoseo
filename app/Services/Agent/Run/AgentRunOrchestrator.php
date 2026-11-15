@@ -914,16 +914,15 @@ final class AgentRunOrchestrator
         // ĐIỀU PHỐI SAU TỔNG HỢP: Tổng hợp báo còn thiếu căn cứ → điều phối quyết định BỎ QUA (nêu chung chung), TÌM THÊM NGUỒN (tối đa 2 vòng, dừng khi số khoảng trống không giảm) hay CHUYỂN NGƯỜI CHUYÊN MÔN.
         $round = 0;
         $skipped = false;
-        $coord = (bool) config('agent.gap_coordination', true);
-        if ($coord && $gaps !== []) { // bước báo cáo của Tổng hợp: ghi lại để sơ đồ thấy "Tổng hợp báo thiếu" trước quyết định của điều phối
+        if ($gaps !== []) { // bước báo cáo của Tổng hợp: ghi lại để sơ đồ thấy "Tổng hợp báo thiếu" trước quyết định của điều phối
             $this->step($run, 'synthesize', 'strategist', 'warn', 'Tổng hợp nguồn: còn thiếu căn cứ cho '.count($gaps).' ý',
                 'Còn thiếu: '.implode('; ', array_slice(array_map(fn ($g) => mb_substr((string) $g, 0, 100), $gaps), 0, 3)).'. Báo cho điều phối quyết định.',
                 ['plan' => $plan, 'gaps' => $gaps, 'sources' => $r['sources'], 'interim' => true], $r['model'], $tokens, $cost);
             $cost = 0.0;
             $tokens = 0;
         }
-        while ($gaps !== [] && $round < ($coord ? self::MAX_GAP_ROUNDS : 1)) {
-            [$verdict, $why] = $coord ? $this->judgeGaps($gaps, $risk, $round, $this->spent($run)) : ['search', ''];
+        while ($gaps !== [] && $round < self::MAX_GAP_ROUNDS) {
+            [$verdict, $why] = $this->judgeGaps($gaps, $risk, $round, $this->spent($run));
             if ($verdict === 'skip') {
                 $skipped = true;
                 $this->decision($run, 'gap_skip', 'Điều phối: bỏ qua '.count($gaps).' khoảng trống, viết nêu chung chung', $why, ['gaps' => array_slice($gaps, 0, 4), 'risk' => $risk, 'routes' => []]);
@@ -935,11 +934,11 @@ final class AgentRunOrchestrator
                 break;
             }
             $topics = array_map(fn ($g) => str_word_count(preg_replace('/[^\p{L}\p{N}\s]/u', ' ', (string) $g), 0, 'àáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ') >= 3 ? trim((string) $g) : trim((string) $article->primary_keyword.' '.$g), array_slice($gaps, 0, 3));
-            $coord && $this->decision($run, 'gap_search', 'Điều phối: tìm thêm nguồn cho '.count($topics).' khoảng trống (vòng '.($round + 1).')', $why, ['gaps' => array_slice($gaps, 0, 4), 'risk' => $risk, 'round' => $round + 1, 'routes' => ['sources']]);
+            $this->decision($run, 'gap_search', 'Điều phối: tìm thêm nguồn cho '.count($topics).' khoảng trống (vòng '.($round + 1).')', $why, ['gaps' => array_slice($gaps, 0, 4), 'risk' => $risk, 'round' => $round + 1, 'routes' => ['sources']]);
             $round++;
             $added = $this->topUpEvidence($run, $article, $topics, $risk);
             if ($added <= 0) {
-                $coord && $this->decision($run, 'gap_no_result', 'Điều phối: tìm thêm không có kết quả mới, dừng tìm', 'Không có tài liệu hay mục kho mới cho các khoảng trống nên không tìm tiếp để khỏi tốn chi phí.', ['routes' => []]);
+                $this->decision($run, 'gap_no_result', 'Điều phối: tìm thêm không có kết quả mới, dừng tìm', 'Không có tài liệu hay mục kho mới cho các khoảng trống nên không tìm tiếp để khỏi tốn chi phí.', ['routes' => []]);
                 break;
             }
             $kb = $this->kbForPlanner($article);
@@ -953,12 +952,12 @@ final class AgentRunOrchestrator
             $plan = $r2['plan'];
             $gaps = (array) $plan['gaps'];
             $extra = ' Đã tìm thêm nguồn '.$round.' vòng rồi tổng hợp lại.';
-            if ($coord && $gaps !== [] && count($gaps) >= $before) {
+            if ($gaps !== [] && count($gaps) >= $before) {
                 $this->decision($run, 'gap_no_progress', 'Điều phối: số khoảng trống không giảm sau khi tìm thêm', 'Còn '.count($gaps).' khoảng trống (trước đó '.$before.') nên không tìm tiếp.', ['routes' => []]);
                 break;
             }
         }
-        if ($coord && $gaps !== [] && ! $skipped && $risk === 'high' && ! $this->needsExpert) {
+        if ($gaps !== [] && ! $skipped && $risk === 'high' && ! $this->needsExpert) {
             $this->needsExpert = true;
             $this->decision($run, 'gap_escalate', 'Điều phối: khoảng trống còn lại ở chủ đề rủi ro cao, giữ cho người chuyên môn', 'Còn '.count($gaps).' khoảng trống căn cứ sau khi đã tìm thêm; chủ đề rủi ro cao nên không tự viết cho qua.', ['gaps' => array_slice($gaps, 0, 4), 'routes' => []]);
         }
