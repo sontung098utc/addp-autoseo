@@ -275,5 +275,63 @@ class CampaignProposerTest extends TestCase
         $this->assertSame(2, Article::where('campaign_id', $c->id)->count());
         $this->assertNull($w->get('campaignProposal'));
     }
+
+    public function test_xep_hang_theo_thu_tu_goi_y_va_ghi_ro_khong_phai_luot_tim(): void
+    {
+        $auto = ['đường huyết sau ăn', 'đường huyết cao', 'đường huyết thấp', 'đường huyết buổi sáng'];
+        $p = (new CampaignProposer)->propose($this->site, 'đường huyết', null, $this->serp([], [], [], $auto));
+
+        $this->assertSame(['sau ăn', 'cao', 'thấp', 'buổi sáng'], array_map(fn ($s) => preg_replace('/^đường huyết /u', '', $s['keyword']), $p['satellites']), 'giữ thứ tự Google liệt kê');
+        $scores = array_column($p['satellites'], 'score');
+        $this->assertSame(count($scores), count(array_unique($scores)), 'không còn đồng điểm');
+        $this->assertSame($scores, collect($scores)->sortDesc()->values()->all());
+        $this->assertStringContainsString('#1/4', $p['satellites'][0]['why']);
+        $this->assertStringContainsString('không phải lượt tìm', $p['satellites'][0]['why']);
+        $this->assertSame(0, $p['satellites'][0]['score_parts']['volume'], 'thứ hạng không được tính như lượt tìm');
+    }
+
+    public function test_cung_khia_canh_gop_thanh_mot_ve_tinh_va_tu_khoa_phu(): void
+    {
+        $auto = ['đường huyết thai kỳ có nguy hiểm không', 'đường huyết thai kỳ', 'đường huyết thai kỳ nên ăn gì', 'đường huyết tuýp 1', 'đường huyết ăn gì'];
+        $p = (new CampaignProposer)->propose($this->site, 'đường huyết', null, $this->serp([], [], [], $auto));
+
+        $k = array_column($p['satellites'], 'keyword');
+        $this->assertContains('đường huyết thai kỳ', $k, 'cụm ngắn nhất làm bài');
+        $this->assertNotContains('đường huyết thai kỳ có nguy hiểm không', $k);
+        $this->assertNotContains('đường huyết thai kỳ nên ăn gì', $k);
+        $thai = collect($p['satellites'])->firstWhere('keyword', 'đường huyết thai kỳ');
+        $this->assertEqualsCanonicalizing(['đường huyết thai kỳ có nguy hiểm không', 'đường huyết thai kỳ nên ăn gì'], $thai['secondary']);
+        $this->assertSame('thai kỳ', $thai['facet']);
+        $this->assertStringContainsString('gộp thêm 2 cụm cùng khía cạnh «thai kỳ»', $thai['why']);
+        $this->assertContains('đường huyết tuýp 1', $k, 'khía cạnh khác vẫn đứng riêng');
+        $this->assertCount(3, $p['satellites']);
+    }
+
+    public function test_gop_khia_canh_giai_phong_cho_cho_ung_vien_khac_va_secondary_di_vao_bai_khi_tao(): void
+    {
+        $auto = [];
+        foreach (['thai kỳ', 'thai kỳ có nguy hiểm không', 'thai kỳ nên ăn gì', 'thai kỳ kiêng gì', 'thai kỳ triệu chứng'] as $x) {
+            $auto[] = 'đường huyết '.$x;
+        }
+        foreach (['tuýp 1', 'tuýp 2', 'buổi sáng', 'sau ăn', 'lúc đói', 'khi mang thai ba tháng', 'trẻ em'] as $x) {
+            $auto[] = 'đường huyết '.$x;
+        }
+        $p = (new CampaignProposer)->propose($this->site, 'đường huyết', null, $this->serp([], [], [], $auto));
+        $this->assertCount(CampaignProposer::MAX_SATELLITES, $p['satellites'], 'năm cụm thai kỳ chiếm một chỗ, các chỗ còn lại cho khía cạnh khác');
+
+        $r = (new CampaignProposer)->create($this->user('approver'), $this->site, $p, ['đường huyết thai kỳ']);
+        $a = Article::where('campaign_id', $r['campaign_id'])->where('primary_keyword', 'đường huyết thai kỳ')->first();
+        $this->assertCount(4, $a->secondary_keywords);
+        $this->assertNull(Article::where('primary_keyword', 'đường huyết thai kỳ nên ăn gì')->first(), 'không viết riêng');
+    }
+
+    public function test_chuan_hoa_chu_viet_tat_khong_dung_tu_de_nham(): void
+    {
+        $this->assertSame('tiểu đường thai kỳ có nguy hiểm không', CampaignProposer::normalizeText('tiểu đường thai kỳ có nguy hiểm ko'));
+        $this->assertSame('uống được nước dừa', CampaignProposer::normalizeText('uống đc nước dừa'));
+        $this->assertSame('vitamin K và DC', CampaignProposer::normalizeText('vitamin K và DC'), 'không đổi K hay DC');
+        $p = (new CampaignProposer)->propose($this->site, 'đường huyết', null, $this->serp([], [], [], ['đường huyết thai kỳ có nguy hiểm ko']));
+        $this->assertSame('đường huyết thai kỳ có nguy hiểm không', $p['satellites'][0]['keyword']);
+    }
 }
 
