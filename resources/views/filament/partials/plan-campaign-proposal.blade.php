@@ -97,12 +97,14 @@
                     </div>
                     <div class="cpz-head-line">
                         @if ($tp['views28'] !== null)Wikipedia «{{ $tp['wiki_article'] }}»: {{ number_format($tp['views28'], 0, ',', '.') }} lượt xem/28 ngày
+                        @elseif (in_array('wiki_limited', $tp['flags'], true)) Wikipedia chưa tra được (giới hạn tần suất)
                         @else Chưa có số lượt xem Wikipedia @endif
                         @if ($tp['suggest_count'] !== null) · {{ $tp['suggest_count'] }} gợi ý Google @endif
                     </div>
                     <div class="cpz-chips">
                         @if (($tp['trend']['direction'] ?? 'unknown') === 'up')<x-studio.badge tone="ok">↑ Đang tăng</x-studio.badge>@elseif (($tp['trend']['direction'] ?? 'unknown') === 'down')<x-studio.badge tone="warn">↓ Đang giảm</x-studio.badge>@endif
                         @if (in_array('no_source', $tp['flags'], true))<span title="Kho kiến thức chưa có mục đã duyệt khớp chủ đề này: nên bổ sung nguồn đáng tin trước khi viết."><x-studio.badge tone="warn">Kho chưa có nguồn</x-studio.badge></span>@elseif (($tp['kho_matches'] ?? 0) > 0)<x-studio.badge tone="ok">Kho có nguồn</x-studio.badge>@endif
+                        @if (in_array('wiki_limited', $tp['flags'], true))<span title="Wikimedia giới hạn tần suất gọi nên chưa tra được; chạy lại sau vài phút."><x-studio.badge tone="warn">Wikipedia chưa tra được</x-studio.badge></span>@endif
                         @if (in_array('no_wikipedia', $tp['flags'], true))<x-studio.badge tone="muted">Không có bài Wikipedia</x-studio.badge>@endif
                         @if (in_array('few_suggestions', $tp['flags'], true))<x-studio.badge tone="muted">Ít gợi ý Google</x-studio.badge>@endif
                     </div>

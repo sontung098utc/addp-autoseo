@@ -51,7 +51,9 @@ return [
     'trends' => [
         'enabled' => (bool) env('TRENDS_ENABLED', true),
         // Nghỉ giữa các lượt gọi khi khám phá nhiều chủ đề (mili giây): lịch sự với Google/Wikimedia, tránh bị giới hạn tần suất.
-        'pause_ms' => (int) env('TRENDS_PAUSE_MS', 300),
+        'pause_ms' => (int) env('TRENDS_PAUSE_MS', 900),
+        // Khi Wikipedia trả 429: nghỉ ngần này rồi thử lại đúng một lần.
+        'retry_ms' => (int) env('TRENDS_RETRY_MS', 3000),
         // Wikimedia yêu cầu User-Agent có cách liên hệ: đặt TRENDS_CONTACT (email hoặc URL) trong .env.
         'user_agent' => 'autoseo-research/1.0 (SEO planning tool; contact: '.env('TRENDS_CONTACT', 'chua-dat').')',
         // Từ đồng nghĩa dùng để tìm bài Wikipedia tương ứng (tên thường gọi => tên bài).

@@ -35,6 +35,12 @@ final class WikipediaPageviews
         return $r;
     }
 
+    /** Xóa kết quả đã nhớ của một từ khóa (dùng khi cần gọi lại sau lỗi giới hạn tần suất). */
+    public function forget(string $keyword): void
+    {
+        Cache::forget('trend:wiki:'.md5(Keyword::keyFor($keyword)).':'.now()->toDateString());
+    }
+
     /** @return array<string,mixed> */
     private function compute(string $keyword): array
     {

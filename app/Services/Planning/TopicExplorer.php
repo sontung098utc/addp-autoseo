@@ -124,8 +124,14 @@ final class TopicExplorer
             }
             $t = $trendOn ? $trends->forKeyword($p['topic'], null, true) : ['direction' => 'unknown', 'evidence' => [], 'wiki' => null];
             $w = $t['wiki'] ?? null;
+            if ($trendOn && ($w['rate_limited'] ?? false)) { // bị giới hạn tần suất: nghỉ rồi thử lại đúng một lần, không để ghi nhầm thành "không có bài"
+                usleep(max(0, (int) config('keywords.trends.retry_ms', 3000)) * 1000);
+                (new WikipediaPageviews)->forget($p['topic']);
+                $t = $trends->forKeyword($p['topic'], null, true);
+                $w = $t['wiki'] ?? null;
+            }
             $views = $w !== null && $w['recent'] !== null && $w['previous'] !== null ? (int) $w['recent'] + (int) $w['previous'] : null;
-            $rows[] = $p + ['views28' => $views, 'wiki_article' => $w['article'] ?? null, 'wiki_reason' => $w['reason'] ?? null, 'trend' => $t, 'suggest_count' => $count, 'kho_matches' => $khoOn ? $kho->matches($site, $p['topic'], $theme) : null];
+            $rows[] = $p + ['views28' => $views, 'wiki_article' => $w['article'] ?? null, 'wiki_reason' => $w['reason'] ?? null, 'wiki_limited' => (bool) ($w['rate_limited'] ?? false), 'trend' => $t, 'suggest_count' => $count, 'kho_matches' => $khoOn ? $kho->matches($site, $p['topic'], $theme) : null];
         }
         $max = max(1, ...array_map(fn ($r) => (int) ($r['views28'] ?? 0), $rows ?: [[]]));
         foreach ($rows as &$r) {
@@ -139,7 +145,7 @@ final class TopicExplorer
             $r['score_parts'] = $parts;
             $r['score'] = max(0, min(100, array_sum($parts)));
             $r['flags'] = array_values(array_filter([
-                $r['wiki_article'] === null ? 'no_wikipedia' : null,
+                $r['wiki_limited'] ? 'wiki_limited' : ($r['wiki_article'] === null ? 'no_wikipedia' : null),
                 $r['suggest_count'] !== null && $r['suggest_count'] < 3 ? 'few_suggestions' : null,
                 $r['kho_matches'] === 0 ? 'no_source' : null,
             ]));
@@ -150,6 +156,10 @@ final class TopicExplorer
         $notes[] = 'AI chỉ đề xuất danh sách chủ đề con. Mọi số liệu do hệ thống đo: lượt xem bài Wikipedia là mức quan tâm tương đối, không phải lượt tìm trên Google.';
         if ($autoFail > 0) {
             $notes[] = $autoFail.' chủ đề chưa lấy được gợi ý tự động của Google.';
+        }
+        $limited = count(array_filter($rows, fn ($r) => $r['wiki_limited']));
+        if ($limited > 0) {
+            $notes[] = $limited.' chủ đề chưa tra được Wikipedia vì Wikimedia giới hạn tần suất gọi (không phải "không có bài"). Chạy lại sau vài phút; đặt TRENDS_CONTACT trong .env để được đối xử như ứng dụng có người liên hệ.';
         }
         if (! $khoOn) {
             $notes[] = 'Kho kiến thức của website đang trống nên chưa kiểm được chủ đề nào đã có nguồn đáng tin để viết.';

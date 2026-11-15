@@ -213,4 +213,39 @@ class TopicExplorerTest extends TestCase
         $this->assertNotNull($w->get('campaignProposal'));
         $this->assertSame(0, Campaign::count(), 'chưa tạo chiến dịch');
     }
+
+    public function test_wikipedia_bi_gioi_han_tan_suat_thi_thu_lai_mot_lan_va_khong_ghi_nham_la_khong_co_bai(): void
+    {
+        config(['keywords.trends.retry_ms' => 0]);
+        $calls = 0;
+        $always = false;
+        $end = now()->subDays(2);
+        $items = [];
+        for ($i = 27; $i >= 0; $i--) {
+            $items[] = ['timestamp' => $end->copy()->subDays($i)->format('Ymd').'00', 'views' => 40];
+        }
+        Http::fake([
+            'suggestqueries.google.com/*' => Http::response(json_encode(['x', ['a', 'b', 'c']])),
+            'vi.wikipedia.org/*' => function () use (&$calls, &$always) {
+                $calls++;
+
+                return $always || $calls === 1 ? Http::response('', 429) : Http::response(['x', ['Loãng xương'], [], []]);
+            },
+            'wikimedia.org/*' => Http::response(['items' => $items]),
+            'trends.google.com/*' => Http::response('<rss><channel></channel></rss>'),
+        ]);
+        $r = (new TopicExplorer($this->ai([['topic' => 'loãng xương']])))->explore($this->site, 'sức khỏe người cao tuổi');
+        $t = $r['topics'][0];
+        $this->assertNotContains('wiki_limited', $t['flags'], 'thử lại thành công');
+        $this->assertSame(1120, $t['views28']);
+
+        // Luôn bị giới hạn: gắn cờ riêng, không phải "không có bài"
+        Cache::flush();
+        $always = true;
+        $r = (new TopicExplorer($this->ai([['topic' => 'loãng xương']])))->explore($this->site, 'sức khỏe người cao tuổi');
+        $this->assertContains('wiki_limited', $r['topics'][0]['flags']);
+        $this->assertNotContains('no_wikipedia', $r['topics'][0]['flags']);
+        $this->assertStringContainsString('giới hạn tần suất', implode(' ', $r['notes']));
+    }
 }
+
