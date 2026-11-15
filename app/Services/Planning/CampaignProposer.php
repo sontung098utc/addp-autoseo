@@ -198,7 +198,7 @@ final class CampaignProposer
             }
             $out['satellites'][] = [
                 'keyword' => $c['keyword'], 'role' => 'spoke', 'score' => $c['score'], 'score_parts' => $c['score_parts'], 'volume' => $c['volume'], 'sources' => $sources, 'kho_id' => $c['kho_id'],
-                'secondary' => array_slice($c['also'] ?? [], 0, 4), 'facet' => $c['facet'] ?? null, 'serp_same_cluster' => $in,
+                'secondary' => array_slice($c['also'] ?? [], 0, 4), 'facet' => $c['facet'] ?? null, 'serp_same_cluster' => $in, 'headline' => $this->headline($c),
                 'why' => $this->why($c, $seed, $out['serp_checked'], $in),
                 'if_wrong' => $this->ifWrong($c, $seed, $out['serp_checked'], $in),
             ];
@@ -367,6 +367,26 @@ final class CampaignProposer
         $w = preg_split('/[^\p{L}\p{N}]+/u', Keyword::keyFor($t), -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
         return array_values(array_unique(array_filter($w, fn ($x) => mb_strlen($x) >= 2 && ! in_array($x, self::STOP, true))));
+    }
+
+    /** Một dòng tóm tắt bằng số liệu có thật của ứng viên (cho thẻ gọn); thiếu số liệu thì nói thẳng. */
+    private function headline(array $c): string
+    {
+        $h = [];
+        if ($c['rank_label'] !== null) {
+            $h[] = $c['rank_label'].' của Google';
+        }
+        if ($c['gsc'] !== null) {
+            $h[] = 'GSC vị trí '.number_format($c['gsc']['position'], 1, ',', '.').' · '.number_format($c['gsc']['impressions'], 0, ',', '.').' hiển thị';
+        }
+        if ($c['volume'] !== null) {
+            $h[] = number_format($c['volume'], 0, ',', '.').' lượt tìm/tháng';
+        }
+        if ($h === [] && $c['in_kho']) {
+            $h[] = 'Có trong kho từ khóa';
+        }
+
+        return $h === [] ? 'Chưa có số liệu' : implode(' · ', $h);
     }
 
     private function why(array $c, string $seed, bool $serpChecked, bool $sameCluster): string

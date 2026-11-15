@@ -286,6 +286,7 @@ class CampaignProposerTest extends TestCase
         $this->assertSame(count($scores), count(array_unique($scores)), 'không còn đồng điểm');
         $this->assertSame($scores, collect($scores)->sortDesc()->values()->all());
         $this->assertStringContainsString('#1/4', $p['satellites'][0]['why']);
+        $this->assertSame('Gợi ý tự động #1/4 của Google', $p['satellites'][0]['headline'], 'dòng tóm tắt cho thẻ gọn, chỉ số liệu có thật');
         $this->assertStringContainsString('không phải lượt tìm', $p['satellites'][0]['why']);
         $this->assertSame(0, $p['satellites'][0]['score_parts']['volume'], 'thứ hạng không được tính như lượt tìm');
     }
