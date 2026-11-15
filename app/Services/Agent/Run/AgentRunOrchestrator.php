@@ -139,6 +139,9 @@ final class AgentRunOrchestrator
     /** @var list<mixed>|null dàn ý có sẵn do người gọi truyền vào (G4); null = tự lập dàn ý như cũ */
     private ?array $presetOutline = null;
 
+    /** @var array<string,mixed>|null từ khóa phụ + câu hỏi liên quan của bài (KeywordBrief); null = chưa dựng hoặc không có gì để dùng */
+    private ?array $keywordBrief = null;
+
     /** Lời nhắn làm lại của người duyệt ['message'] và kế hoạch điều phối rút ra từ nó. */
     private ?array $redo = null;
 
@@ -171,6 +174,7 @@ final class AgentRunOrchestrator
         $this->checkpoints = $checkpoints;
         $this->needsExpert = false;
         $this->presetOutline = $presetOutline === [] ? null : $presetOutline;
+        $this->keywordBrief = null;
         $this->redo = $redo !== null && trim((string) ($redo['message'] ?? '')) !== '' ? $redo : null;
         $this->redoPlan = null;
         $this->seq = 0;
@@ -400,6 +404,7 @@ final class AgentRunOrchestrator
         $this->skills['layout'] = $this->usePlaybook('writer', 'article-layout'); // quy tắc chọn khối bố cục, nạp kèm vào prompt viết bài
         // 2c. Thu thập nguồn rồi TỔNG HỢP & ĐỊNH HƯỚNG (trước dàn ý): bài là kết quả của việc đọc, đối chiếu, suy luận từ nhiều nguồn.
         $this->prepareEvidence($run, $article, $assess);
+        $this->prepareKeywordBrief($run, $article);
         if ($this->redo !== null) {
             $this->redoPlan = $this->coordinateRedo($run, $article);
             if ($this->redoPlan['reuse_outline'] && $this->presetOutline === null) {
@@ -419,7 +424,7 @@ final class AgentRunOrchestrator
         } else {
             $this->skills['brief'] = $this->usePlaybook('brief', 'content-brief');
             [$briefPb, $briefNote] = $this->skills['brief'];
-            $briefOptions = ($briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : []) + $this->guidanceOptions($article) + $this->roleOptions('strategist') + $this->brandOptions() + $this->brainCtx->options($article) + ($this->contentPlanText !== null ? ['content_plan' => $this->contentPlanText] : []);
+            $briefOptions = ($briefPb ? ['playbook' => $briefPb->body, 'playbook_ref' => $briefPb->ref()] : []) + $this->guidanceOptions($article) + $this->roleOptions('strategist') + $this->brandOptions() + $this->brainCtx->options($article) + ($this->contentPlanText !== null ? ['content_plan' => $this->contentPlanText] : []) + $this->keywordBriefOptions();
             if ($this->redoPlan !== null && trim($this->redoPlan['outline_note'].$this->redoPlan['image_note']) !== '') {
                 $briefOptions['guidance'] = trim((string) ($briefOptions['guidance'] ?? '')."\nLời nhắn làm lại, điều phối dặn bộ phận dàn ý: ".trim($this->redoPlan['outline_note'].($this->redoPlan['image_note'] !== '' ? ' Về ảnh: '.$this->redoPlan['image_note'] : '')));
             }
@@ -453,6 +458,7 @@ final class AgentRunOrchestrator
         // 5. Viết.
         $attrs = $this->write($run, $article, $outline['outline'] ?? [], [], 'write', 'Viết bản đầu', null);
         $this->bestAttrs = $attrs;
+        $this->noteKeywordCoverage($run, (string) ($attrs['html_content'] ?? ''));
         $report = $this->grade($run, $article, $attrs, 'Chấm bản đầu', 0, $editorPb, $editorNote);
         // Biên tập viên (AI) đọc bài như người thật: bắt chỗ nói vòng, chung chung, thiếu ý mà luật hình thức không thấy; có điểm nghiêm trọng thì sửa trực tiếp bản đang có.
         [$attrs, $report, $editRounds] = $this->editorialPass($run, $article, $outline['outline'] ?? [], $attrs, $report, (string) $assess->level, $editorPb);
@@ -1466,6 +1472,7 @@ final class AgentRunOrchestrator
         if ($this->contentPlanText !== null) {
             $options['content_plan'] = $this->contentPlanText;
         }
+        $options += $this->keywordBriefOptions();
         $options += $this->guidanceOptions($article) + $this->roleOptions('writer') + $this->brandOptions() + $this->brainCtx->options($article);
         $this->kb ??= new KnowledgeContext();
         $this->kb->load($article, $outline); // AG-S20: kiến thức đã duyệt, truy xuất một lần mỗi lượt chạy
@@ -1869,6 +1876,52 @@ final class AgentRunOrchestrator
                 'previous_outline_items' => count($prevOutline), 'source' => $note === '' ? 'ai' : 'fallback'], $meta['model'], $meta['tokens'], $meta['cost']);
 
         return $plan;
+    }
+
+    /**
+     * Từ khóa phụ + câu hỏi liên quan (PAA, tìm kiếm liên quan, gợi ý tự động) đưa vào dàn ý và bản viết. Không AI, chỉ gọi nguồn SERP thật.
+     * Chưa có nguồn SERP: ghi "bỏ qua" nói rõ lý do, bài vẫn dùng từ khóa phụ người đặt. Lỗi bất kỳ không làm hỏng bài.
+     */
+    private function prepareKeywordBrief(AgentRun $run, Article $article): void
+    {
+        try {
+            $b = (new \App\Services\Content\KeywordBrief)->build($article);
+        } catch (Throwable $e) {
+            report($e);
+
+            return;
+        }
+        $this->keywordBrief = \App\Services\Content\KeywordBrief::hasContent($b) ? $b : null;
+        if ($this->keywordBrief === null) {
+            return; // không từ khóa phụ và không có dữ liệu SERP: không có gì để dùng nên không thêm bước
+        }
+        $data = ['purpose' => 'keyword_brief', 'secondary' => $b['secondary'], 'questions' => $b['questions'], 'related' => $b['related'], 'providers' => $b['providers'], 'errors' => $b['errors']];
+        $n = count($b['questions']);
+        if ($b['status'] === 'blocked') {
+            $this->step($run, 'research', 'system', 'skipped', 'Chưa có dữ liệu câu hỏi liên quan', 'Chưa có nguồn SERP nên chưa lấy được câu hỏi người dùng đặt hay cụm liên quan: '.$b['note'].' '.($b['secondary'] !== [] ? 'Bài vẫn dùng '.count($b['secondary']).' từ khóa phụ do người phụ trách đặt.' : 'Bài này chưa đặt từ khóa phụ.'), $data);
+
+            return;
+        }
+        $this->step($run, 'research', 'system', $b['status'] === 'partial' ? 'warn' : 'ok', 'Từ khóa phụ và câu hỏi liên quan: '.count($b['secondary']).' từ khóa phụ, '.$n.' câu hỏi, '.count($b['related']).' cụm liên quan',
+            'Nguồn: '.($b['providers'] !== [] ? implode(', ', $b['providers']) : 'chỉ từ khóa phụ do người đặt').'. Dàn ý và người viết nhận danh sách này để mỗi từ khóa phụ có chỗ và các câu hỏi hợp chủ đề được trả lời; câu lạc đề thì bỏ.'.($b['errors'] !== [] ? ' Một nguồn lỗi: '.implode(' | ', $b['errors']) : ''), $data, null, 0, $b['cost_vnd']);
+    }
+
+    /** @return array{keyword_brief?: array<string,mixed>} */
+    private function keywordBriefOptions(): array
+    {
+        return $this->keywordBrief !== null ? ['keyword_brief' => $this->keywordBrief] : [];
+    }
+
+    /** Đo thật: từ khóa phụ nào đã có trong bản viết đầu, nào chưa (để người đọc đối chiếu; không tự thêm). */
+    private function noteKeywordCoverage(AgentRun $run, string $html): void
+    {
+        $sec = (array) ($this->keywordBrief['secondary'] ?? []);
+        if ($sec === [] || trim($html) === '') {
+            return;
+        }
+        $c = \App\Services\Content\KeywordBrief::coverage($html, $sec);
+        $this->step($run, 'research', 'system', $c['missing'] === [] ? 'ok' : 'warn', 'Từ khóa phụ có trong bài: '.count($c['used']).'/'.count($sec),
+            $c['missing'] === [] ? 'Mọi từ khóa phụ đều xuất hiện trong bản viết đầu.' : 'Chưa thấy trong bản viết đầu: '.implode('; ', $c['missing']).'. Chỉ ghi nhận, không ép chèn nếu không hợp mạch.', ['purpose' => 'keyword_coverage'] + $c);
     }
 
     private function guidanceOptions(Article $article): array

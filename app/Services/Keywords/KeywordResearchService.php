@@ -34,7 +34,7 @@ final class KeywordResearchService
 
     public const KEYWORD_MAX = 120;
 
-    private const INJECTION = '/(b[oỏ]\s*qua\s+(m[oọ]i|t[aấ]t\s*c[aả]|c[aá]c)?\s*(quy\s*t[aắ]c|ch[iỉ]\s*d[aẫ]n|h[uư][oớ]ng\s*d[aẫ]n)|ignore\s+(all\s+|any\s+)?(previous|prior|above|the)\s+(instructions?|rules?)|system\s*prompt|disregard\s+(the\s+)?(rules|instructions)|b[aạ]n\s+l[aà]\s+m[oộ]t\s+tr[oợ]\s*l[yý]|override\s+(the\s+)?(rules|policy))/iu';
+    public const INJECTION = '/(b[oỏ]\s*qua\s+(m[oọ]i|t[aấ]t\s*c[aả]|c[aá]c)?\s*(quy\s*t[aắ]c|ch[iỉ]\s*d[aẫ]n|h[uư][oớ]ng\s*d[aẫ]n)|ignore\s+(all\s+|any\s+)?(previous|prior|above|the)\s+(instructions?|rules?)|system\s*prompt|disregard\s+(the\s+)?(rules|instructions)|b[aạ]n\s+l[aà]\s+m[oộ]t\s+tr[oợ]\s*l[yý]|override\s+(the\s+)?(rules|policy))/iu';
 
     public const DEMO_MESSAGE = 'AI giả lập chưa có kịch bản cho việc này.';
 

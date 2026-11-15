@@ -29,4 +29,17 @@ return [
 
     // Tỷ giá ước tính để đổi CPC (USD) sang VND.
     'usd_vnd_rate' => (float) env('KEYWORDS_USD_VND_RATE', 25000),
+
+    // Dữ liệu SERP thật (câu hỏi liên quan, tìm kiếm liên quan, top 10) cho từ khóa phụ, gom cụm và đề xuất chiến dịch.
+    // Dùng chung DATAFORSEO_LOGIN/PASSWORD. Chưa có khóa thì KHÔNG có dữ liệu SERP (không điền số/câu hỏi giả).
+    'serp' => [
+        'endpoint' => 'https://api.dataforseo.com/v3/serp/google/organic/live/advanced',
+        'depth' => 10,
+        // ƯỚC TÍNH chi phí mỗi lượt tra SERP (VND), chỉnh theo hóa đơn thật.
+        'cost_per_query_vnd' => (float) env('KEYWORDS_SERP_COST_PER_QUERY_VND', 1000),
+        // Gợi ý tự động của Google (không cần khóa). Tắt: SERP_AUTOCOMPLETE=false.
+        'autocomplete' => (bool) env('SERP_AUTOCOMPLETE', true),
+        'autocomplete_endpoint' => 'https://suggestqueries.google.com/complete/search',
+        'cache_days' => 7,
+    ],
 ];
