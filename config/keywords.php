@@ -62,4 +62,10 @@ return [
         'wikipedia_pageviews' => 'https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/vi.wikipedia/all-access/user',
         'rss' => 'https://trends.google.com/trending/rss?geo=VN',
     ],
+
+    // Khai thác ý định theo hành trình người đọc (mẫu câu hỏi + gợi ý Google + AI đề xuất được Google xác nhận).
+    'intent' => ['enabled' => (bool) env('INTENT_ENABLED', true), 'pause_ms' => (int) env('INTENT_PAUSE_MS', 400),
+        // Cụm lệch đối tượng của chiến dịch (hiện hướng tới người cao tuổi): gợi ý chứa các cụm này bị bỏ, trừ khi chính chủ đề chứa chúng. Sửa theo nhóm độc giả của bạn.
+        'exclude_phrases' => ['sau sinh', 'mang thai', 'thai kỳ', 'trẻ em', 'trẻ sơ sinh', 'người trẻ', 'ở trẻ', 'cho bé', 'tuổi dậy thì'],
+    ],
 ];

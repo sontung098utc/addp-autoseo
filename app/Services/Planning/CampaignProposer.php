@@ -9,6 +9,8 @@ use App\Models\Campaign;
 use App\Models\Keyword;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Keywords\IntentMiner;
+use App\Services\Keywords\KeywordAiResolver;
 use App\Services\Keywords\KeywordResearchService;
 use App\Services\Keywords\Serp\SerpClusterer;
 use App\Services\Keywords\Serp\SerpInsights;
@@ -39,7 +41,7 @@ final class CampaignProposer
      * @param  ?array<string,mixed>  $gsc  GscSignals::forWebsite()
      * @return array<string,mixed>
      */
-    public function propose(Website $site, string $seed, ?array $gsc = null, ?SerpInsights $serp = null, ?float $budgetVnd = null): array
+    public function propose(Website $site, string $seed, ?array $gsc = null, ?SerpInsights $serp = null, ?float $budgetVnd = null, ?IntentMiner $intent = null): array
     {
         $seed = trim((string) preg_replace('/[\x00-\x1F\x7F]+|\s+/u', ' ', strip_tags($seed)));
         if ($seed === '' || mb_strlen($seed) > 120 || preg_match(KeywordResearchService::INJECTION, $seed)) {
@@ -57,7 +59,7 @@ final class CampaignProposer
             if ($text === '' || mb_strlen($text) > 190 || $key === $seedKey || preg_match(KeywordResearchService::INJECTION, $text)) {
                 return;
             }
-            $pool[$key] ??= ['keyword' => $text, 'sources' => [], 'volume' => null, 'volume_source' => null, 'gsc' => null, 'in_kho' => false, 'kho_id' => null, 'question' => false, 'rank_ratio' => null, 'rank_label' => null];
+            $pool[$key] ??= ['keyword' => $text, 'sources' => [], 'volume' => null, 'volume_source' => null, 'gsc' => null, 'in_kho' => false, 'kho_id' => null, 'question' => false, 'rank_ratio' => null, 'rank_label' => null, 'stage' => null, 'stage_label' => null, 'angle' => null, 'confirmed' => false, 'tpl' => null];
             $pool[$key]['sources'][$type] = $label;
             if (isset($extra['rank_ratio'])) { // thứ hạng trong danh sách gợi ý: giữ vị trí tốt nhất nếu xuất hiện ở nhiều danh sách
                 if ($pool[$key]['rank_ratio'] === null || $extra['rank_ratio'] > $pool[$key]['rank_ratio']) {
@@ -117,6 +119,34 @@ final class CampaignProposer
             $out['notes'][] = 'Chưa có dữ liệu SERP nên không có câu hỏi và gợi ý tìm kiếm thật: '.$e->getMessage();
         }
 
+        // Ý ĐỊNH theo hành trình người đọc (câu hỏi người thật gõ + góc bài), thay vì chỉ biến thể chữ của chủ đề
+        if (IntentMiner::enabled()) {
+            $miner = $intent ?? new IntentMiner;
+            $ai = $miner->presetAi();
+            if ($ai === null) {
+                try {
+                    $r = KeywordAiResolver::resolve('keyword_suggest');
+                    $ai = $r['demo'] ? null : $r['ai']; // không dùng AI giả lập để bịa câu hỏi
+                } catch (\Throwable) {
+                }
+            }
+            $aiNote = null;
+            $aiCost = 0.0;
+            foreach ($miner->mine($seed, $ai, $aiNote, $aiCost) as $it) {
+                $tpl = $it['source'] === 'template';
+                $label = $tpl ? 'Gợi ý Google theo tình huống' : ($it['confirmed'] ? 'AI đề xuất · Google xác nhận' : 'AI đề xuất · chưa xác nhận');
+                $extra = ['stage' => $it['stage'], 'stage_label' => $it['stage_label'], 'angle' => $it['angle'], 'confirmed' => $it['confirmed'], 'question' => $it['confirmed'], 'tpl' => $it['tpl'] ?? null];
+                if ($tpl && $it['rank_of']) {
+                    $extra += ['rank_ratio' => 1 - ($it['rank'] - 1) / max(1, $it['rank_of']), 'rank_label' => 'Gợi ý theo tình huống #'.$it['rank'].'/'.$it['rank_of']];
+                }
+                $add($it['query'], $tpl ? 'autocomplete' : 'ai', $label, $extra);
+            }
+            $out['cost_vnd'] += $aiCost;
+            if ($aiNote !== null) {
+                $out['notes'][] = $aiNote;
+            }
+        }
+
         // Xu hướng MIỄN PHÍ: ghi lại gợi ý hôm nay để so với lần ghi cũ (tự làm, không cần khóa)
         $trends = new TrendSignals;
         $trendOn = TrendSignals::enabled();
@@ -154,6 +184,7 @@ final class CampaignProposer
             $parts['gsc'] = $c['gsc'] !== null ? (int) min(GscSignals::MAX_POINTS, $c['gsc']['points']) : 0;
             $parts['sources'] = min(20, 8 * max(0, count($c['sources']) - 1) + ($c['question'] ? 12 : 0) + (count($c['sources']) === 1 && ! $c['question'] ? 4 : 0));
             $parts['kho'] = $c['in_kho'] ? 5 : 0;
+            $parts['intent'] = $c['stage'] !== null && $c['confirmed'] ? 10 : 0; // đúng tình huống người đọc VÀ Google xác nhận có người gõ
             $c['kho_n'] = $khoOn ? $this->khoMatches($retriever, $site, $c['keyword'], $seed) : null; // số mục kiến thức đã duyệt khớp chủ đề (chất lượng: có nguồn để viết đúng)
             $parts['kho_nguon'] = $c['kho_n'] === null ? 0 : ($c['kho_n'] >= 2 ? 12 : ($c['kho_n'] === 1 ? 6 : 0));
             $parts['rank'] = $c['rank_ratio'] !== null ? (int) round(10 * $c['rank_ratio']) : 0; // thứ hạng gợi ý, KHÔNG phải lượt tìm
@@ -182,8 +213,7 @@ final class CampaignProposer
         usort($ranked, fn ($a, $b) => [$a['off_topic'], $b['score'], $a['keyword']] <=> [$b['off_topic'], $a['score'], $b['keyword']]);
         $ranked = array_values(array_filter($ranked, fn ($c) => ! $c['off_topic']));
         $ranked = $this->groupFacets($ranked, $seed);
-        $picked = array_slice($ranked, 0, self::MAX_SATELLITES);
-        $rest = array_slice($ranked, self::MAX_SATELLITES);
+        [$picked, $rest] = $this->diversify($ranked, self::MAX_SATELLITES);
 
         // Kiểm tra SERP: vệ tinh nào Google xếp gần như cùng kết quả với trụ (7+ URL chung) thì nên gộp vào bài trụ
         $groupOf = [];
@@ -241,10 +271,36 @@ final class CampaignProposer
             }
             $out['satellites'][] = [
                 'keyword' => $c['keyword'], 'role' => 'spoke', 'score' => $c['score'], 'score_parts' => $c['score_parts'], 'volume' => $c['volume'], 'sources' => $sources, 'kho_id' => $c['kho_id'],
-                'secondary' => array_slice($c['also'] ?? [], 0, 4), 'facet' => $c['facet'] ?? null, 'serp_same_cluster' => $in, 'headline' => $this->headline($c), 'trend' => $c['trend'] ?? null, 'kho_matches' => $c['kho_n'] ?? null,
+                'secondary' => array_slice($c['also'] ?? [], 0, 4), 'facet' => $c['facet'] ?? null, 'serp_same_cluster' => $in, 'headline' => $this->headline($c), 'stage' => $c['stage'], 'stage_label' => $c['stage_label'], 'angle' => $c['angle'], 'confirmed' => $c['confirmed'], 'trend' => $c['trend'] ?? null, 'kho_matches' => $c['kho_n'] ?? null,
                 'why' => $this->why($c, $seed, $out['serp_checked'], $in),
                 'if_wrong' => $this->ifWrong($c, $seed, $out['serp_checked'], $in),
             ];
+        }
+        // Góc bài hấp dẫn cho các vệ tinh chưa có (câu lấy từ gợi ý Google): MỘT lượt gọi AI, chỉ khi có AI thật
+        if (IntentMiner::enabled() && $out['satellites'] !== []) {
+            $aiForAngles = ($intent ?? null)?->presetAi();
+            if ($aiForAngles === null) {
+                try {
+                    $rr = KeywordAiResolver::resolve('keyword_suggest');
+                    $aiForAngles = $rr['demo'] ? null : $rr['ai'];
+                } catch (\Throwable) {
+                }
+            }
+            $need = array_values(array_filter(array_column($out['satellites'], 'keyword'), fn ($k) => empty(collect($out['satellites'])->firstWhere('keyword', $k)['angle'])));
+            if ($aiForAngles !== null && $need !== []) {
+                try {
+                    $angCost = 0.0;
+                    $angles = ($intent ?? new IntentMiner)->angles($need, $aiForAngles, $angCost);
+                    $out['cost_vnd'] += $angCost;
+                    foreach ($out['satellites'] as $i => $sat) {
+                        if (empty($sat['angle']) && isset($angles[$sat['keyword']])) {
+                            $out['satellites'][$i]['angle'] = $angles[$sat['keyword']];
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    $out['notes'][] = 'AI chưa viết được góc bài gợi ý: '.mb_substr(\App\Filament\Support\Schedule\ErrorMasker::mask($e->getMessage()) ?: class_basename($e), 0, 100).'.';
+                }
+            }
         }
         $out['links'] = $this->links($out['pillar']['keyword'], $out['satellites'], $groupOf);
 
@@ -331,6 +387,37 @@ final class CampaignProposer
         });
     }
 
+    /**
+     * Chọn vệ tinh có ĐA DẠNG giai đoạn của người đọc (tối đa 2 mỗi giai đoạn trước, rồi mới lấp đầy theo điểm), để chiến dịch phủ cả hành trình
+     * (nhận biết, cần làm ngay, điều trị, ăn uống, phòng ngừa...) chứ không dồn vào một kiểu câu.
+     *
+     * @param  list<array<string,mixed>>  $ranked  đã xếp theo điểm
+     * @return array{0:list<array<string,mixed>>, 1:list<array<string,mixed>>} [được chọn (theo điểm), còn lại]
+     */
+    private function diversify(array $ranked, int $max, int $perStage = 2): array
+    {
+        $pick = [];
+        $count = [];
+        foreach ($ranked as $i => $c) {
+            $st = $c['stage'] ?? 'khac';
+            if (count($pick) < $max && ($count[$st] ?? 0) < $perStage) {
+                $pick[$i] = true;
+                $count[$st] = ($count[$st] ?? 0) + 1;
+            }
+        }
+        foreach ($ranked as $i => $c) {
+            if (count($pick) >= $max) {
+                break;
+            }
+            $pick[$i] = true;
+        }
+        ksort($pick);
+        $picked = array_map(fn ($i) => $ranked[$i], array_keys($pick));
+        $rest = array_values(array_filter($ranked, fn ($k) => ! isset($pick[$k]), ARRAY_FILTER_USE_KEY));
+
+        return [$picked, $rest];
+    }
+
     /** Chữ viết tắt thường gặp trong gợi ý tìm kiếm, viết đủ để dùng làm từ khóa bài (chỉ thay cả từ). */
     public static function normalizeText(string $t): string
     {
@@ -359,10 +446,32 @@ final class CampaignProposer
      */
     private function groupFacets(array $ranked, string $seed): array
     {
+        // 1) Cùng MẪU CÂU = cùng một ý định ("bị … bao lâu khỏi" với tai biến / đột quỵ / biến thể): một vệ tinh, các câu còn lại thành từ khóa phụ.
+        $byTpl = [];
+        foreach ($ranked as $i => $c) {
+            if (! empty($c['tpl'])) {
+                $byTpl[$c['tpl']][] = $i;
+            }
+        }
+        $dropTpl = [];
+        foreach ($byTpl as $tpl => $idx) {
+            if (count($idx) < 2) {
+                continue;
+            }
+            usort($idx, fn ($a, $b) => [count($this->wordsOf($ranked[$a]['keyword'])), $a] <=> [count($this->wordsOf($ranked[$b]['keyword'])), $b]);
+            $rep = array_shift($idx);
+            $ranked[$rep]['facet'] = trim(str_replace('{t}', '…', $tpl));
+            $ranked[$rep]['also'] = array_map(fn ($j) => $ranked[$j]['keyword'], $idx);
+            foreach ($idx as $j) {
+                $dropTpl[$j] = true;
+            }
+        }
+        $ranked = array_values(array_filter($ranked, fn ($k) => ! isset($dropTpl[$k]), ARRAY_FILTER_USE_KEY));
+
         $seedWords = $this->wordsOf($seed);
         $byFacet = [];
         foreach ($ranked as $i => $c) {
-            if (($f = $this->facet($c['keyword'], $seedWords)) !== null) {
+            if (empty($c['tpl']) && ($f = $this->facet($c['keyword'], $seedWords)) !== null) {
                 $byFacet[$f][] = $i;
             }
         }
@@ -374,7 +483,7 @@ final class CampaignProposer
             usort($idx, fn ($a, $b) => [count($this->wordsOf($ranked[$a]['keyword'])), $ranked[$b]['score'], $a] <=> [count($this->wordsOf($ranked[$b]['keyword'])), $ranked[$a]['score'], $b]);
             $rep = array_shift($idx);
             $ranked[$rep]['facet'] = $f;
-            $ranked[$rep]['also'] = array_map(fn ($j) => $ranked[$j]['keyword'], $idx);
+            $ranked[$rep]['also'] = array_values(array_unique(array_merge($ranked[$rep]['also'] ?? [], array_map(fn ($j) => $ranked[$j]['keyword'], $idx))));
             $ranked[$rep]['score'] = min(100, max($ranked[$rep]['score'], ...array_map(fn ($j) => $ranked[$j]['score'], $idx)));
             foreach ($idx as $j) {
                 $drop[$j] = true;
@@ -435,6 +544,9 @@ final class CampaignProposer
         if ($c['volume'] !== null) {
             $h[] = number_format($c['volume'], 0, ',', '.').' lượt tìm/tháng';
         }
+        if ($c['stage'] !== null && $c['confirmed'] && $c['rank_label'] === null) {
+            $h[] = 'Google xác nhận có người gõ';
+        }
         if (($c['trend']['direction'] ?? 'unknown') === 'up') {
             $h[] = '↑ đang tăng';
         } elseif (($c['trend']['direction'] ?? 'unknown') === 'down') {
@@ -450,7 +562,9 @@ final class CampaignProposer
     private function why(array $c, string $seed, bool $serpChecked, bool $sameCluster): string
     {
         $w = [];
-        if ($c['question']) {
+        if ($c['stage'] !== null) {
+            $w[] = 'câu người đọc hay gõ ở giai đoạn «'.$c['stage_label'].'»'.($c['confirmed'] ? ', Google có gợi ý nên có người thật sự gõ' : ', do AI đề xuất, Google chưa gợi ý nên chưa xác nhận');
+        } elseif ($c['question']) {
             $w[] = 'người dùng hỏi câu này trên Google khi tìm «'.$seed.'» (Mọi người cũng hỏi)';
         }
         if (isset($c['sources']['autocomplete'])) {

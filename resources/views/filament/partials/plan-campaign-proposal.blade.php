@@ -1,7 +1,7 @@
 @php
     $p = $campaignProposal;
     $srcTone = ['keyword' => 'info', 'competitor' => 'accent', 'gsc' => 'ok', 'serp' => 'accent', 'autocomplete' => 'info', 'ai' => 'warn'];
-    $partLabels = ['volume' => 'Lượt tìm', 'gsc' => 'Search Console', 'sources' => 'Độ đa nguồn', 'kho' => 'Có trong kho', 'rank' => 'Thứ hạng gợi ý', 'interest' => 'Mức quan tâm', 'autocomplete' => 'Gợi ý Google', 'ai' => 'AI đề xuất', 'kho_nguon' => 'Kho có nguồn', 'trend' => 'Xu hướng', 'off_topic' => 'Lệch lĩnh vực'];
+    $partLabels = ['volume' => 'Lượt tìm', 'gsc' => 'Search Console', 'sources' => 'Độ đa nguồn', 'kho' => 'Có trong kho', 'rank' => 'Thứ hạng gợi ý', 'intent' => 'Đúng tình huống người đọc', 'interest' => 'Mức quan tâm', 'autocomplete' => 'Gợi ý Google', 'ai' => 'AI đề xuất', 'kho_nguon' => 'Kho có nguồn', 'trend' => 'Xu hướng', 'off_topic' => 'Lệch lĩnh vực'];
     // Trạng thái các nguồn dữ liệu: bật = đã dùng thật trong đề xuất này; tắt = nói rõ cần gì để bật.
     $providers = $p['providers'] ?? [];
     $sources = $p ? [
@@ -60,6 +60,7 @@
     .cpz-bar-act .cpz-in { flex: 1 1 14rem; }
     .cpz-count { font-size: var(--ss-fs-sm); color: var(--ss-text-muted); }
     .cpz-count b { color: var(--ss-text); }
+    .cpz-angle { margin: 0; font-size: var(--ss-fs-sm); color: var(--ss-text); font-style: italic; }
     .cpz-note { font-size: var(--ss-fs-xs); color: var(--ss-text-muted); margin-top: .3rem; }
     @media (prefers-reduced-motion: reduce) { .cpz-card { transition: none; } }
 </style>
@@ -166,7 +167,9 @@
                         <span class="cpz-bar__num">{{ $s['score'] }}/100</span>
                     </div>
                     <div class="cpz-head-line">{{ $s['headline'] ?? '' }}</div>
+                    @if (! empty($s['angle']))<p class="cpz-angle" title="Góc bài do AI gợi ý; bước viết vẫn lập dàn ý riêng">✎ {{ $s['angle'] }}</p>@endif
                     <div class="cpz-chips">
+                        @if (! empty($s['stage_label']))<x-studio.badge tone="accent">{{ $s['stage_label'] }}</x-studio.badge>@endif
                         @foreach ($s['sources'] as $src)<x-studio.badge :tone="$srcTone[$src['type']] ?? 'muted'">{{ $src['label'] }}</x-studio.badge>@endforeach
                         @if ($s['secondary'])<x-studio.badge tone="accent">+{{ count($s['secondary']) }} từ khóa phụ</x-studio.badge>@endif
                         @if (($s['trend']['direction'] ?? 'unknown') === 'up')<span title="{{ implode('; ', array_column($s['trend']['evidence'], 'text')) }}"><x-studio.badge tone="ok">↑ Đang tăng</x-studio.badge></span>@elseif (($s['trend']['direction'] ?? 'unknown') === 'down')<span title="{{ implode('; ', array_column($s['trend']['evidence'], 'text')) }}"><x-studio.badge tone="warn">↓ Đang giảm</x-studio.badge></span>@endif

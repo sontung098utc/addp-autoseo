@@ -23,6 +23,7 @@
         <env name="CACHE_STORE" value="array"/>
         <env name="SERP_AUTOCOMPLETE" value="false"/>
         <env name="TRENDS_ENABLED" value="false"/>
+        <env name="INTENT_ENABLED" value="false"/>
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:" force="true"/>
         <server name="DB_DATABASE" value=":memory:" force="true"/>
