@@ -60,6 +60,9 @@ final class AgentRunOrchestrator
     /** Tư liệu bậc 1 tìm được trên web cho bài đang chạy (rỗng = không có). Chỉ hỗ trợ viết. @var list<array{title:string,domain:string,url:string,excerpt:string}> */
     private array $references = [];
 
+    /** Bản nháp tốt nhất đã có (để lưu lại khi phiên bị cắt giữa chừng vì hết hạn mức hay lỗi nhà cung cấp, không mất công đã làm). */
+    private ?array $bestAttrs = null;
+
     /** Hồ sơ nội dung do bước tổng hợp lập (ContentPlanner) và bản văn bản đưa vào lời nhắn; null = không có (không AI, chưa có nguồn, lỗi). */
     private ?array $contentPlan = null;
 
@@ -173,6 +176,7 @@ final class AgentRunOrchestrator
         $this->seq = 0;
         $this->workingWriter = null;
         $this->references = [];
+        $this->bestAttrs = null;
         $this->contentPlan = null;
         $this->contentPlanText = null;
         $this->kbTitlesVi = [];
@@ -197,7 +201,7 @@ final class AgentRunOrchestrator
             $this->step($run, 'handoff', 'system', 'failed', 'Nhà cung cấp AI vẫn lỗi sau khi thử lại', 'Đã thử lại '.$this->policy->maxRetries.' lần, nhà cung cấp AI vẫn lỗi tạm thời ('.ErrorMasker::short($e->getMessage(), 160).'). Không thay bằng AI giả lập; bài được trả về trạng thái cũ, không có gì được đăng.', ['error' => class_basename($e), 'attempts' => $e->attempts]);
             $article->update(['workflow_status' => $previousStatus]);
 
-            return $this->finish($run, 'failed', 'Nhà cung cấp AI lỗi tạm thời, đã hết '.$this->policy->maxRetries.' lần thử lại. Chưa có bản nháp nào được tạo.');
+            return $this->finishKeepingDraft($run, $article, 'Nhà cung cấp AI lỗi tạm thời, đã hết '.$this->policy->maxRetries.' lần thử lại. Chưa có bản nháp nào được tạo.');
         } catch (AiRouteUnavailable $e) {
             $this->step($run, 'guard', 'system', 'blocked', 'Chưa cấu hình AI cho bước này', $e->getMessage().' Tác vụ không chạy và hệ thống không dùng AI giả lập thay thế. Vào Đội AI → Tích hợp AI để nhập khóa hoặc chọn model.', ['task' => $e->task]);
             $article->update(['workflow_status' => $previousStatus]);
@@ -206,23 +210,23 @@ final class AgentRunOrchestrator
         } catch (CostCapExceeded $e) {
             $article->update(['workflow_status' => $previousStatus]);
 
-            return $this->finish($run, 'failed', $e->getMessage().' Phiên dừng; chưa có bản nháp nào được tạo.');
+            return $this->finishKeepingDraft($run, $article, $e->getMessage().' Phiên dừng; chưa có bản nháp nào được tạo.');
         } catch (\App\Services\Ai\AiQuotaExceeded $e) {
             $this->step($run, 'handoff', 'system', 'failed', 'Hết hạn mức của nhà cung cấp AI', $e->getMessage().' Không thử lại vì chờ vài giây không giúp ích; không thay bằng AI giả lập, bài được trả về trạng thái cũ. Chạy lại sau khi hạn mức đặt lại.', ['error' => 'AiQuotaExceeded']);
             $article->update(['workflow_status' => $previousStatus]);
 
-            return $this->finish($run, 'failed', 'Hết hạn mức theo ngày của nhà cung cấp AI cho model này. Chưa có bản nháp nào được tạo; đổi model, chờ hạn mức đặt lại hoặc bật thanh toán.');
+            return $this->finishKeepingDraft($run, $article, 'Hết hạn mức theo ngày của nhà cung cấp AI cho model này. Chưa có bản nháp nào được tạo; đổi model, chờ hạn mức đặt lại hoặc bật thanh toán.');
         } catch (AiProviderError $e) {
             $this->step($run, 'handoff', 'system', 'failed', 'Nhà cung cấp AI trả lỗi', ErrorMasker::short($e->getMessage(), 200).' Lỗi này thử lại không giúp ích nên phiên dừng; không thay bằng AI giả lập.', ['error' => class_basename($e)]);
             $article->update(['workflow_status' => $previousStatus]);
 
-            return $this->finish($run, 'failed', 'Nhà cung cấp AI từ chối hoặc trả sai định dạng: '.ErrorMasker::short($e->getMessage(), 160));
+            return $this->finishKeepingDraft($run, $article, 'Nhà cung cấp AI từ chối hoặc trả sai định dạng: '.ErrorMasker::short($e->getMessage(), 160));
         } catch (Throwable $e) {
             $this->logUnexpected($e, $run, $article);
             $this->step($run, 'handoff', 'system', 'failed', 'Phiên chạy gặp lỗi', 'Lỗi không lường trước; bài được trả về trạng thái cũ, không có gì được đăng.', ['error' => class_basename($e)]);
             $article->update(['workflow_status' => $previousStatus]);
 
-            return $this->finish($run, 'failed', 'Lỗi hệ thống: '.class_basename($e).'. Chưa có bản nháp nào được tạo.');
+            return $this->finishKeepingDraft($run, $article, 'Lỗi hệ thống: '.class_basename($e).'. Chưa có bản nháp nào được tạo.');
         }
     }
 
@@ -448,10 +452,12 @@ final class AgentRunOrchestrator
 
         // 5. Viết.
         $attrs = $this->write($run, $article, $outline['outline'] ?? [], [], 'write', 'Viết bản đầu', null);
+        $this->bestAttrs = $attrs;
         $report = $this->grade($run, $article, $attrs, 'Chấm bản đầu', 0, $editorPb, $editorNote);
         // Biên tập viên (AI) đọc bài như người thật: bắt chỗ nói vòng, chung chung, thiếu ý mà luật hình thức không thấy; có điểm nghiêm trọng thì sửa trực tiếp bản đang có.
         [$attrs, $report, $editRounds] = $this->editorialPass($run, $article, $outline['outline'] ?? [], $attrs, $report, (string) $assess->level, $editorPb);
         // Mục tiêu là ĐẠT MỌI TIÊU CHÍ (không chỉ lỗi chặn): số vòng không phải mối bận tâm chính, chỉ cần có tiến bộ. Dừng khi đạt, hết ngân sách, hoặc 2 vòng liên tiếp không tốt hơn.
+        $this->bestAttrs = $attrs;
         $maxRounds = max($this->policy->maxRepairRounds, self::QUALITY_ROUNDS) + $editRounds;
         $penalty = $this->penalty($report);
         $score = RunScorer::score($report);
@@ -488,6 +494,7 @@ final class AgentRunOrchestrator
             $better = $new < $penalty || ($new === $penalty && $this->fixableLoad($candidateReport) < $this->fixableLoad($report));
             if ($better) { // tốt hơn: nhận bản mới
                 $attrs = $candidate;
+                $this->bestAttrs = $attrs;
                 $report = $candidateReport;
                 $this->decision($run, 'fix_accepted', "Nhận bản sửa lần {$round}: còn ".count($report->failed()).' mục chưa đạt', "Điểm phạt giảm từ {$penalty} xuống {$new}.", ['penalty_before' => $penalty, 'penalty_after' => $new, 'score_before' => $score, 'score_after' => $newScore]);
                 $penalty = $new;
@@ -2090,6 +2097,42 @@ final class AgentRunOrchestrator
         }
 
         return self::$tokenSplit;
+    }
+
+    /**
+     * Phiên bị cắt giữa chừng (hết hạn mức, nhà cung cấp lỗi, lỗi hệ thống) mà ĐÃ CÓ bản nháp: lưu bản nháp tốt nhất rồi để phiên ở trạng thái "bị giữ" thay vì mất cả công (học claude-seo: ghi kết quả dở dang ngay,
+     * ghi đè khi xong để dừng giữa chừng không mất việc đã làm). Bản lưu chưa được coi là đạt; người xem quyết định. Chưa có bản nháp thì giữ cách cũ: thất bại, trả bài về trạng thái cũ.
+     */
+    private function finishKeepingDraft(AgentRun $run, Article $article, string $reason): AgentRun
+    {
+        $version = $this->savePartialDraft($run, $article, $reason);
+        if ($version === null) {
+            return $this->finish($run, 'failed', $reason);
+        }
+
+        $reason = trim(str_ireplace(['Chưa có bản nháp nào được tạo.', 'chưa có bản nháp nào được tạo.'], '', $reason));
+
+        return $this->finish($run, 'held', $reason.' Đã lưu bản nháp tốt nhất (v'.$version->version.') để không mất công; bản này chưa được coi là đạt, cần người xem rồi chạy lại phần còn lại.');
+    }
+
+    private function savePartialDraft(AgentRun $run, Article $article, string $reason): ?ArticleVersion
+    {
+        try {
+            $attrs = $this->bestAttrs;
+            if (! is_array($attrs) || trim((string) ($attrs['html_content'] ?? '')) === '') {
+                return null;
+            }
+            $attrs['html_content'] = \App\Services\Content\CitationOrder::normalize(ReferenceListRenderer::apply(CitationRenderer::render((string) $attrs['html_content'], $this->kbTitlesVi), $this->references, $this->referencesForList()));
+            $version = $this->persist($article, $attrs, false);
+            $run->update(['final_version_id' => $version->id]);
+            $this->decision($run, 'partial_saved', 'Điều phối: lưu bản nháp tốt nhất vì phiên bị cắt giữa chừng', 'Lý do cắt: '.mb_substr($reason, 0, 200).' Bản nháp tốt nhất đã có được lưu thành v'.$version->version.' để không mất công; chưa qua bước chấm bản giao nên người duyệt cần xem kỹ.', ['version' => $version->version, 'routes' => []]);
+
+            return $version;
+        } catch (Throwable $e) {
+            report($e);
+
+            return null;
+        }
     }
 
     private function finish(AgentRun $run, string $status, ?string $reason): AgentRun
