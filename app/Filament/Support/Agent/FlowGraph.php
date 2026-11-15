@@ -136,6 +136,10 @@ final class FlowGraph
             $ib = $main[$k];
             $a = $hops[$ia];
             $b = $hops[$ib];
+            if ($hasImages && ! $parDone && $a['group'] === 'strategy') { // Tạo ảnh bắt đầu ngay sau «Yêu cầu và thiết kế ảnh», chạy song song với các bước sau
+                $events[] = ['n' => ++$n, 'from' => 'strategy', 'to' => 'images', 'dir' => 'par', 'label' => 'thiết kế ảnh xong → bắt đầu tạo ảnh', 'state' => 'done', 'hop' => $ib];
+                $parDone = true;
+            }
             if ($b['decisions'] !== []) { // có quyết định của điều phối giữa hai lượt: đi qua điều phối
                 $codes = array_column($b['decisions'], 'code');
                 // Báo cáo của bộ phận trước kèm KẾT QUẢ điều phối vừa xử lý (nhận hay bỏ bản sửa)
