@@ -192,6 +192,7 @@ class CampaignProposerTest extends TestCase
 
         $c = Campaign::findOrFail($r['campaign_id']);
         $this->assertSame('paused', $c->status, 'không tự chạy');
+        $this->assertSame([], $c->keywords, 'cột keywords không được null (schema thật bắt buộc NOT NULL)');
         $this->assertSame('CD Đường huyết', $c->name);
         $this->assertSame(3, $r['created']);
         $arts = Article::where('campaign_id', $c->id)->get()->keyBy('primary_keyword');

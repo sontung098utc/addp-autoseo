@@ -375,7 +375,7 @@ final class CampaignProposer
             $labels = array_values(array_unique(array_filter($labels)));
             $c = Campaign::create([
                 'website_id' => $site->id, 'created_by' => $actor->id, 'name' => mb_substr(trim((string) $name) !== '' ? trim((string) $name) : 'Chiến dịch: '.$seed, 0, 120),
-                'status' => Campaign::STATUS_PAUSED, 'source' => 'plan', 'topic_cluster' => mb_substr($seed, 0, 120), 'target_article_count' => count($articles),
+                'status' => Campaign::STATUS_PAUSED, 'source' => 'plan', 'keywords' => [], 'topic_cluster' => mb_substr($seed, 0, 120), 'target_article_count' => count($articles),
                 'description' => 'Tạo từ đề xuất chiến dịch đã duyệt: 1 bài trụ + '.(count($articles) - 1).' bài vệ tinh. Nguồn gợi ý: '.($labels !== [] ? implode(', ', $labels) : 'chủ đề do người duyệt chọn').'.',
                 'settings' => ['proposal' => ['seed' => $seed, 'links' => array_slice((array) ($proposal['links'] ?? []), 0, 60), 'notes' => array_slice((array) ($proposal['notes'] ?? []), 0, 10)]],
             ]);
