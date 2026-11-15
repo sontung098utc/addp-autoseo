@@ -35,8 +35,9 @@ return [
     'serp' => [
         'endpoint' => 'https://api.dataforseo.com/v3/serp/google/organic/live/advanced',
         'depth' => 10,
-        // ƯỚC TÍNH chi phí mỗi lượt tra SERP (VND), chỉnh theo hóa đơn thật.
-        'cost_per_query_vnd' => (float) env('KEYWORDS_SERP_COST_PER_QUERY_VND', 1000),
+        // ƯỚC TÍNH chi phí mỗi lượt tra SERP (VND). DataForSEO Google Organic Live = $0.002/SERP 10 kết quả (trang giá ngày 15/11/2026) ≈ 50 đ ở 25.000 đ/USD;
+        // chế độ Standard queue $0.0006. Chỉnh lại theo hóa đơn thật.
+        'cost_per_query_vnd' => (float) env('KEYWORDS_SERP_COST_PER_QUERY_VND', 50),
         // Gợi ý tự động của Google (không cần khóa). Tắt: SERP_AUTOCOMPLETE=false.
         'autocomplete' => (bool) env('SERP_AUTOCOMPLETE', true),
         'autocomplete_endpoint' => 'https://suggestqueries.google.com/complete/search',
