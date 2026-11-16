@@ -59,4 +59,17 @@ class CitationOrderTest extends TestCase
         $out = CitationOrder::normalize($paras);
         $this->assertSame(6, substr_count($out, 'data-kb='));
     }
+
+    public function test_hai_dong_nguon_cung_duong_dan_gop_thanh_mot_va_khong_lap_chu_thich(): void
+    {
+        $kb = '<sup class="autoseo-cite" data-kb="7" title="Kho"><a href="#nguon-2">[2]</a></sup>';
+        $html = '<p>Một câu.'.$this->sup(1).$kb.'</p><p>Câu khác'.$this->sup(3).'.</p>'
+            .'<div class="autoseo-refs"><ol><li id="nguon-1"><a href="https://cdc.gov/x/">CDC</a></li><li id="nguon-2" data-kb="7"><a href="https://cdc.gov/x">CDC kho</a></li><li id="nguon-3"><a href="https://who.int/y">WHO</a></li><li><a href="https://cdc.gov/x#a">Trùng</a></li></ol></div>';
+        $out = CitationOrder::normalize($html);
+        $this->assertSame(2, substr_count($out, '<li'), 'Dòng trùng đường dẫn và dòng chưa trích trùng bị bỏ.');
+        $this->assertSame(2, substr_count($out, 'autoseo-cite'), 'Hai chú thích liền nhau cùng nguồn chỉ còn một.');
+        $this->assertStringNotContainsString('[2][', strip_tags($out, '<a>'));
+        $this->assertStringContainsString('<li id="nguon-1"', $out);
+        $this->assertStringContainsString('<li id="nguon-2"', $out);
+    }
 }

@@ -558,7 +558,7 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
         $out .= "--- HẾT ---\n";
         $out .= $forOutline
             ? 'Dàn ý: mỗi từ khóa phụ phải có chỗ trong ít nhất một đề mục hoặc ý của mục; câu hỏi nào thật sự quan trọng với người đọc thì thành một mục (hoặc ý trong mục hỏi đáp), câu nào lạc đề so với từ khóa chính thì bỏ. Cụm liên quan chỉ để tham khảo cách người ta diễn đạt, không bắt buộc.'
-            : 'Viết: dùng từ khóa phụ tự nhiên, đúng chỗ (đề mục H2/H3 hoặc thân đoạn), mỗi từ khóa vài lần là đủ, tuyệt đối không nhồi nhét hay làm câu văn gượng; từ nào không hợp mạch thì bỏ. Trả lời trực tiếp các câu hỏi liên quan hợp chủ đề bằng nội dung cụ thể (không chỉ nhắc lại câu hỏi); câu nào lạc đề thì bỏ. Không nhắc tới việc dữ liệu này đến từ công cụ tìm kiếm.';
+            : 'Viết: dùng từ khóa phụ tự nhiên, đúng chỗ (đề mục H2/H3 hoặc thân đoạn), mỗi từ khóa vài lần là đủ, tuyệt đối không nhồi nhét hay làm câu văn gượng; từ nào không hợp mạch thì bỏ. Không viết câu nói về việc người ta gõ/tìm cụm nào (vd. "nhiều người tìm khi gõ..."), không liệt kê biến thể từ khóa trong ngoặc kiểu "X (hay Y)"; mỗi ý chỉ dùng MỘT cách gọi tự nhiên, biến thể nào chỉ nhét vào được bằng cách đó thì bỏ. Trả lời trực tiếp các câu hỏi liên quan hợp chủ đề bằng nội dung cụ thể (không chỉ nhắc lại câu hỏi); câu nào lạc đề thì bỏ. Không nhắc tới việc dữ liệu này đến từ công cụ tìm kiếm.';
 
         return $out;
     }

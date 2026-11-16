@@ -16,6 +16,9 @@ final class CitationOrder
         if ($html === '' || ! preg_match_all(self::SUP, $html)) {
             return $html;
         }
+        // 0. Cùng một đường dẫn mà có hai dòng nguồn (vd. nguồn kho và nguồn web trùng trang): chú thích trỏ hết về dòng đầu, dòng trùng sẽ bị bỏ khỏi danh sách.
+        $html = self::mergeDuplicateSources($html);
+
         // 1. Bớt dày theo từng khối (p, li, td, h2/h3 hay div): lần lặp lại thứ hai của cùng nguồn (chỉ chú thích web) và bản sao liền kề bị bỏ.
         $html = (string) preg_replace_callback('#<(p|li|td|blockquote)\b([^>]*)>(.*?)</\1>#is', function (array $m): string {
             $seen = [];
@@ -33,6 +36,8 @@ final class CitationOrder
 
             return '<'.$m[1].$m[2].'>'.$inner.'</'.$m[1].'>';
         }, $html);
+
+        $html = self::collapseAdjacentSameNumber($html);
 
         // 1b. Kiểu Wikipedia: chú thích web chỉ ở chỗ CẦN. Hạn mức theo độ dài bài (khoảng 1 chú thích mỗi 220 từ, từ 3 đến 12); vượt hạn mức thì giữ những câu có số liệu/mốc trước, rồi theo thứ tự xuất hiện.
         $html = self::capWeb($html);
@@ -65,9 +70,89 @@ final class CitationOrder
                 }
             }
             ksort($cited);
+            $seenUrl = [];
+            foreach ($cited as $li) {
+                if (($u = self::hrefOf($li)) !== '') {
+                    $seenUrl[$u] = true;
+                }
+            }
+            $rest = array_values(array_filter($rest, function (string $li) use (&$seenUrl): bool {
+                $u = self::hrefOf($li);
+                if ($u !== '' && isset($seenUrl[$u])) {
+                    return false; // cùng trang với nguồn đã trích (hoặc đã liệt kê): không liệt kê hai lần
+                }
+                if ($u !== '') {
+                    $seenUrl[$u] = true;
+                }
+
+                return true;
+            }));
 
             return $m[1].implode('', $cited).implode('', $rest).$m[3];
         }, $html, 1);
+    }
+
+    private static function hrefOf(string $li): string
+    {
+        if (! preg_match('#<a\b[^>]*\bhref="([^"]+)"#i', $li, $h)) {
+            return '';
+        }
+
+        return rtrim(strtolower(preg_replace('/#.*$/', '', html_entity_decode($h[1])) ?? ''), '/');
+    }
+
+    private static function mergeDuplicateSources(string $html): string
+    {
+        if (! preg_match('#<div class="autoseo-refs">(.*?)</div>#s', $html, $rm) || ! preg_match_all('#<li\b[^>]*\bid="nguon-(\d+)"[^>]*>.*?</li>#s', $rm[1], $lis, PREG_SET_ORDER)) {
+            return $html;
+        }
+        $first = [];
+        $canon = [];
+        foreach ($lis as $l) {
+            $u = self::hrefOf($l[0]);
+            $n = (int) $l[1];
+            if ($u === '') {
+                continue;
+            }
+            if (isset($first[$u])) {
+                $canon[$n] = $first[$u];
+            } else {
+                $first[$u] = $n;
+            }
+        }
+        if ($canon === []) {
+            return $html;
+        }
+
+        return (string) preg_replace_callback(self::SUP, function (array $s) use ($canon): string {
+            $old = (int) $s[1];
+            if (! isset($canon[$old])) {
+                return $s[0];
+            }
+
+            return (string) preg_replace(['/href="#nguon-\d+"/', '/\[\d+\]/'], ['href="#nguon-'.$canon[$old].'"', '['.$canon[$old].']'], $s[0], 1);
+        }, $html);
+    }
+
+    /** Hai chú thích đứng liền nhau cùng số nhưng khác thuộc tính (vd. một của kho, một của web): chỉ giữ một, ưu tiên bản của kho. */
+    private static function collapseAdjacentSameNumber(string $html): string
+    {
+        $pair = '#('.trim(self::SUP, '#u').')\s*('.trim(self::SUP, '#u').')#u';
+        for ($i = 0; $i < 10; $i++) {
+            $next = (string) preg_replace_callback($pair, function (array $m): string {
+                if ($m[2] !== $m[4]) {
+                    return $m[0];
+                }
+
+                return str_contains($m[3], 'data-kb=') && ! str_contains($m[1], 'data-kb=') ? $m[3] : $m[1];
+            }, $html);
+            if ($next === $html) {
+                break;
+            }
+            $html = $next;
+        }
+
+        return $html;
     }
 
     /** Số chú thích web tối đa cho bài có $words từ. */
