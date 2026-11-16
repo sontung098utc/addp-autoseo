@@ -9,6 +9,7 @@ use App\Models\KnowledgeGap;
 use App\Models\KnowledgeTopic;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\Agent\Readiness\BrainAutoAttach;
 use App\Services\Knowledge\AiJson;
 use App\Services\Knowledge\Build\BrainBuildService;
 use App\Services\Knowledge\Discover\SourceDiscoveryService;
@@ -35,16 +36,28 @@ final class BrainFromSuggestion
         $field = trim(mb_substr(strip_tags($field), 0, 160));
         [$covers, $sensitive] = $article ? $this->suggestionOf($article, $field) : [[], false];
         // Mẫu sức khỏe (YMYL: bắt buộc nguồn, rủi ro cao, chủ đề bệnh/thuốc) CHỈ khi lĩnh vực thật sự nhạy cảm với sức khỏe người đọc; lĩnh vực kỹ thuật/công nghiệp dùng mẫu trống rồi dựng cây chủ đề từ định hướng của bài.
-        $template = $sensitive ? BrainTemplates::suggestFor($field.' '.implode(' ', $covers)) : 'trong';
-        $brain = (new BrainService)->createFromTemplate($field, $template, [$site], $by);
+        // Mẫu chọn theo TÊN lĩnh vực, không theo các mảng bao quát: các mảng có thể nhắc tới bệnh đã có kho riêng ("Nội tiết" bao quát "Đái tháo đường") và kéo nhầm mẫu của bệnh đó.
+        $template = $sensitive ? BrainTemplates::suggestFor($field) : 'trong';
+        if ($template !== 'trong' && $template !== 'y_khoa_tong_quat' && $template !== 'y_khoa_duoc' && Brain::query()->where('status', 'active')->where('domain_key', $template)->exists()) {
+            $template = $sensitive ? 'y_khoa_tong_quat' : 'trong'; // lĩnh vực chuyên biệt đã có Trí tuệ riêng: không nhân bản mẫu của nó thành kho thứ hai
+        }
+        $reused = self::overlapping($field);
+        if ($reused !== null) { // đã có Trí tuệ cùng lĩnh vực (kể cả chưa gắn website): dùng lại, không lập kho trùng
+            if (! $site->brains()->where('brains.id', $reused->id)->exists()) {
+                BrainAutoAttach::attach($site, $reused, 'Dùng lại Trí tuệ có sẵn cùng lĩnh vực «'.$field.'» thay vì lập kho trùng', 100, $article, $by);
+            }
+            $brain = $reused;
+        } else {
+            $brain = (new BrainService)->createFromTemplate($field, $template, [$site], $by);
+        }
 
         $refs = $article ? $this->referencesOf($article) : [];
         $plan = $article ? $this->planOf($article) : [];
-        $topics = $this->direction($brain, $article, $plan, $covers);
+        $topics = $reused !== null ? 0 : $this->direction($brain, $article, $plan, $covers); // kho có sẵn giữ nguyên định hướng và hồ sơ của nó
         // Hồ sơ lĩnh vực (giọng, khung loại bài, thuật ngữ, quy tắc) soạn nháp ĐÚNG lĩnh vực này, không giữ khung của mẫu khác.
-        $profileDraft = (new BrainProfileDrafter(self::lightJson()))->draft($brain, $field, $covers, (string) ($plan['angle'] ?? ''), (string) ($article?->primary_keyword ?? ''), $sensitive);
+        $profileDraft = $reused !== null ? ['status' => 'skipped'] : (new BrainProfileDrafter(self::lightJson()))->draft($brain, $field, $covers, (string) ($plan['angle'] ?? ''), (string) ($article?->primary_keyword ?? ''), $sensitive);
 
-        $res = ['brain' => $brain->fresh(), 'template' => $template, 'topics' => $topics, 'imported' => 0, 'items_auto' => 0, 'items_proposed' => 0, 'sources' => [], 'registered' => 0, 'seed_error' => null, 'profile' => $profileDraft['status']];
+        $res = ['brain' => $brain->fresh(), 'template' => $template, 'topics' => $topics, 'imported' => 0, 'items_auto' => 0, 'items_proposed' => 0, 'sources' => [], 'registered' => 0, 'seed_error' => null, 'reused' => $reused !== null, 'routed' => [], 'profile' => $profileDraft['status']];
         $trusted = [];
         foreach ($refs as $r) {
             $level = SourceTrust::assess($r['url'], $brain, SourceDiscoveryService::fieldFor($field.' '.($article?->primary_keyword ?? '')))['level'];
@@ -65,14 +78,25 @@ final class BrainFromSuggestion
         if ($trusted !== []) {
             try {
                 @set_time_limit(300);
-                $imp = app(SourceDiscoveryService::class)->import($site, array_slice($trusted, 0, self::MAX_SEED), $by, ['brain_id' => $brain->id, 'max_sources' => self::MAX_SEED, 'only_trusted' => true,
-                    'field' => SourceDiscoveryService::fieldFor($field.' '.($article?->primary_keyword ?? '')), 'budget_cap_vnd' => BrainBuildService::totalBudgetVnd() * 0.2, 'purpose' => 'seed']);
-                $res['imported'] = (int) $imp['imported'];
-                $res['items_auto'] = (int) $imp['items_auto'];
-                $res['items_proposed'] = (int) $imp['items_proposed'];
-                foreach ((array) $imp['pages'] as $p) {
-                    if (! empty($p['ok'])) {
-                        $res['sources'][] = ['url' => (string) $p['url'], 'title' => (string) ($p['title'] ?? ''), 'domain' => (string) $p['domain']];
+                // Mỗi nguồn nạp vào ĐÚNG Trí tuệ của lĩnh vực nó (nguồn về bệnh đã có kho riêng thì vào kho bệnh đó), không dồn hết vào kho vừa lập.
+                foreach ($this->routeSources($trusted, $brain, $field) as $g) {
+                    /** @var Brain $b */
+                    $b = $g['brain'];
+                    if ($b->id !== $brain->id && ! $site->brains()->where('brains.id', $b->id)->exists()) {
+                        BrainAutoAttach::attach($site, $b, 'Nguồn tìm được khi viết bài thuộc lĩnh vực của Trí tuệ này', 100, $article, $by);
+                    }
+                    $imp = app(SourceDiscoveryService::class)->import($site, array_slice($g['refs'], 0, self::MAX_SEED), $by, ['brain_id' => $b->id, 'max_sources' => self::MAX_SEED, 'only_trusted' => true,
+                        'field' => SourceDiscoveryService::fieldFor($b->name.' '.($article?->primary_keyword ?? '')), 'budget_cap_vnd' => BrainBuildService::totalBudgetVnd() * 0.2, 'purpose' => 'seed']);
+                    $res['imported'] += (int) $imp['imported'];
+                    $res['items_auto'] += (int) $imp['items_auto'];
+                    $res['items_proposed'] += (int) $imp['items_proposed'];
+                    if ($b->id !== $brain->id) {
+                        $res['routed'][$b->name] = (int) $imp['imported'];
+                    }
+                    foreach ((array) $imp['pages'] as $p) {
+                        if (! empty($p['ok'])) {
+                            $res['sources'][] = ['url' => (string) $p['url'], 'title' => (string) ($p['title'] ?? ''), 'domain' => (string) $p['domain']];
+                        }
                     }
                 }
             } catch (\Throwable $e) {
@@ -82,6 +106,81 @@ final class BrainFromSuggestion
         KnowledgeGap::query()->where('website_id', $site->id)->where('query', mb_substr(KnowledgeSuggestions::BRAIN_PREFIX.$field, 0, 190))->update(['status' => 'filled', 'filled_at' => now()]);
 
         return $res;
+    }
+
+    private const STOP = ['cho', 'cua', 'va', 'benh', 'the', 'tri', 'nguoi', 'khoe', 'suc'];
+
+    /** @return list<string> từ không dấu, chữ thường, bỏ từ chung. */
+    private static function words(string $t, int $min = 3): array
+    {
+        $a = preg_split('/[^a-z0-9]+/', \Illuminate\Support\Str::ascii(mb_strtolower($t))) ?: [];
+
+        return array_values(array_unique(array_filter($a, fn ($w) => strlen($w) >= $min && ! in_array($w, self::STOP, true))));
+    }
+
+    /**
+     * Trí tuệ có sẵn đã bao trọn lĩnh vực được đề xuất (kể cả chưa gắn website): hầu hết từ của tên lĩnh vực (từ 75%, tối thiểu 2 từ) nằm trong tên/lĩnh vực của Trí tuệ đó.
+     * Lĩnh vực HẸP hơn kho có sẵn (vd. "Dinh dưỡng cho người tiểu đường" so với "Dinh dưỡng và chế độ ăn") thì không tính, để vẫn lập được kho chuyên biệt.
+     */
+    public static function overlapping(string $field): ?Brain
+    {
+        $a = self::words($field);
+        if (count($a) < 2) {
+            return null;
+        }
+        foreach (Brain::query()->where('status', 'active')->where('domain_key', '!=', 'thuong_hieu')->orderBy('id')->get() as $b) {
+            $shared = count(array_intersect($a, self::words($b->name.' '.str_replace('_', ' ', (string) $b->domain_key))));
+            if ($shared >= 2 && $shared / count($a) >= 0.75) {
+                return $b;
+            }
+        }
+
+        return null;
+    }
+
+    /** Từ khóa nhận diện lĩnh vực của một Trí tuệ: tên tiếng Việt không dấu và từ tương đương tiếng Anh (nguồn quốc tế thường là tiếng Anh). @return list<string> */
+    private static function terms(string $name): array
+    {
+        $en = array_merge(...array_map(fn ($e) => self::words((string) $e, 4), \App\Services\Knowledge\KnowledgeGlossary::expand($name) ?: ['']));
+
+        return array_values(array_unique(array_merge(self::words($name, 4), $en)));
+    }
+
+    /**
+     * Chia các nguồn về đúng Trí tuệ: nguồn có nhiều dấu hiệu lĩnh vực của MỘT Trí tuệ khác (đang hoạt động, mỗi lĩnh vực một bản gốc) hơn Trí tuệ vừa lập thì vào Trí tuệ đó.
+     *
+     * @param  list<array{url:string,title:string}>  $refs
+     * @return list<array{brain: Brain, refs: list<array{url:string,title:string}>}> nhóm đầu luôn là Trí tuệ đích (có thể rỗng)
+     */
+    public function routeSources(array $refs, Brain $target, string $field): array
+    {
+        $others = [];
+        $domains = [(string) $target->domain_key => true];
+        foreach (Brain::query()->where('status', 'active')->where('domain_key', '!=', 'thuong_hieu')->where('id', '!=', $target->id)->orderBy('id')->limit(60)->get() as $b) {
+            if (! isset($domains[(string) $b->domain_key])) {
+                $domains[(string) $b->domain_key] = true;
+                $others[] = [$b, self::terms($b->name)];
+            }
+        }
+        $targetTerms = self::terms($field.' '.$target->name);
+        $groups = [$target->id => ['brain' => $target, 'refs' => []]];
+        foreach ($refs as $r) {
+            $text = \Illuminate\Support\Str::ascii(mb_strtolower($r['title'].' '.(string) parse_url($r['url'], PHP_URL_HOST).' '.rawurldecode((string) parse_url($r['url'], PHP_URL_PATH))));
+            $score = fn (array $terms) => count(array_filter($terms, fn ($t) => str_contains($text, $t)));
+            $best = null;
+            $bestScore = $score($targetTerms);
+            foreach ($others as [$b, $terms]) {
+                $sc = $score($terms);
+                if ($sc >= 1 && $sc > $bestScore) {
+                    [$best, $bestScore] = [$b, $sc];
+                }
+            }
+            $dest = $best ?? $target;
+            $groups[$dest->id] ??= ['brain' => $dest, 'refs' => []];
+            $groups[$dest->id]['refs'][] = $r;
+        }
+
+        return array_values(array_filter($groups, fn ($g) => $g['refs'] !== []));
     }
 
     /** AI nhẹ cho việc soạn nháp hồ sơ: model của vai trò Điều phối/Biên tập (vd. agy), chưa có thì không dùng AI (hồ sơ trung tính). */
@@ -115,6 +214,12 @@ final class BrainFromSuggestion
         $t .= $r['imported'] > 0
             ? 'Đã nạp '.$r['imported'].' nguồn tin cậy tìm được khi viết bài ('.$r['items_auto'].' mục tự nhận, '.$r['items_proposed'].' mục chờ duyệt): '.implode(', ', array_map(fn ($s) => $s['title'] !== '' ? $s['title'] : $s['domain'], array_slice($r['sources'], 0, 3))).'. '
             : 'Chưa nạp nguồn nào'.($r['seed_error'] ? ' ('.$r['seed_error'].')' : ' (bài chưa có nguồn tin cậy để nạp)').'; bài kế tiếp thuộc lĩnh vực này sẽ tự nạp. ';
+        if (! empty($r['reused'])) {
+            $t = 'Đã dùng lại Trí tuệ có sẵn cùng lĩnh vực thay vì lập kho trùng. '.$t;
+        }
+        if (! empty($r['routed'])) {
+            $t .= ' Nguồn thuộc lĩnh vực khác đã nạp đúng Trí tuệ của nó: '.implode('; ', array_map(fn ($n, $c) => '«'.$n.'»: '.$c.' nguồn', array_keys($r['routed']), $r['routed'])).'. ';
+        }
         if ($r['registered'] > 0) {
             $t .= $r['registered'].' nguồn thường được ghi vào Căn cứ chuẩn mực ở dạng chưa xác nhận để bạn xét.';
         }

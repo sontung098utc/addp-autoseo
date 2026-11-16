@@ -109,6 +109,7 @@ class BrainSuggestionTest extends TestCase
         $top = \App\Models\KnowledgeTopic::where('brain_id', $brain->id)->where('name', 'Từ bài «máy dập viên một chày»')->first();
         $this->assertNotNull($top);
         $this->assertSame(['Cơ chế nén', 'Chọn máy theo quy mô'], \App\Models\KnowledgeTopic::where('parent_id', $top->id)->orderBy('id')->pluck('name')->all(), 'Tiêu đề dàn ý (bỏ phần sau dấu —) thành chủ đề của kho.');
+        $this->assertNull($r['seed_error'], (string) $r['seed_error']);
         $this->assertSame(1, $r['imported']);
         $this->assertSame(1, $r['items_auto'], 'Nguồn tin cậy có đoạn nguyên văn được tự nhận.');
         $this->assertSame('approved', \App\Models\KnowledgeItem::where('title', 'Thẩm định thiết bị')->first()->status);

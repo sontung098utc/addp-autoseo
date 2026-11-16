@@ -1017,7 +1017,8 @@ final class AgentRunOrchestrator
         }
         $kw = (string) $article->primary_keyword;
         $covered = count($this->kbForPlanner($article));
-        $brains = array_map(fn (\App\Models\Brain $b) => ['id' => $b->id, 'name' => $b->name, 'domain' => (string) $b->domain_key, 'description' => (string) $b->description], $this->brainCtx->brains);
+        $attachedIds = $this->brainCtx->ids();
+        $brains = $this->brainCandidates($attachedIds); // MỌI Trí tuệ đang hoạt động (kèm cờ đã gắn website hay chưa): điều phối đánh giá độ rộng của chủ đề và của từng kho
         if ($brains === []) {
             $web = (new \App\Services\Search\WebSearchResolver)->availability();
             if ($covered >= self::KB_ENOUGH || ! $web['ok'] || $web['demo']) {
@@ -1026,40 +1027,40 @@ final class AgentRunOrchestrator
         }
         $existing = $this->suggestedBrainFields($article);
         $r = (new \App\Services\Knowledge\KnowledgeCoordinator(new AiJson($ai, $this->sleep, 0)))->classify($kw, $brains, $existing); // phân loại chỉ là tư vấn: một lần gọi, lỗi thì bỏ qua
-        if ($r['status'] === 'done' && $r['brain_id'] === null && $r['field'] !== '') {
+        if ($r['status'] === 'done' && $r['uncovered'] && $r['field'] !== '') {
             $r['field'] = \App\Services\Knowledge\KnowledgeCoordinator::reuseName($r['field'], $existing); // cùng một lĩnh vực thì dùng đúng tên đã đề xuất, không sinh gợi ý trùng
         }
         if ($r['status'] !== 'done') {
             return;
         }
-        $base = ['purpose' => 'kb_coordination', 'field' => $r['field'], 'brain_id' => $r['brain_id'], 'covered' => $covered, 'recurring' => $r['recurring']];
-        // Chỉ dùng kiến thức của Trí tuệ ĐÃ XÁC ĐỊNH khớp chủ đề (hoặc không dùng kho nếu không có Trí tuệ nào khớp): kho của lĩnh vực khác (vd. Sức khỏe trẻ em trong bài dược công nghiệp) không được lọt vào trích dẫn.
-        $this->narrowBrainScope($r['brain_id'] !== null ? [(int) $r['brain_id']] : []);
-        if ($r['brain_id'] !== null) {
-            // "Đủ kho" phải tính trên CHÍNH Trí tuệ khớp: số đếm trước khi thu hẹp cộng cả mục của Trí tuệ khác (vd. Tim mạch có hàng trăm mục khớp "thực đơn, dinh dưỡng"),
-            // làm Trí tuệ khớp đang TRỐNG vẫn bị coi là "đủ" và không được nạp.
-            $covered = count($this->kbForPlanner($article));
-            $base['covered'] = $covered;
-            $this->matchedBrainId = $r['brain_id'];
-            $name = (string) (collect($brains)->firstWhere('id', $r['brain_id'])['name'] ?? 'Trí tuệ');
-            $empty = $covered >= self::KB_ENOUGH ? $this->emptyTopics($r['brain_id'], $name) : [];
-            if ($empty !== []) { // đủ cho chủ đề này nhưng các mảng định hướng của kho còn trống: nạp dần theo định hướng
-                $this->topUpBrain($run, $article, $r['brain_id'], $name, $covered, $base + ['empty_topics' => $empty], $r, $empty);
-
+        $matchIds = array_column($r['matches'], 'brain_id');
+        $base = ['purpose' => 'kb_coordination', 'field' => $r['field'], 'brain_id' => $r['brain_id'], 'matches' => $r['matches'], 'uncovered' => $r['uncovered'], 'covered' => $covered, 'recurring' => $r['recurring']];
+        // Trí tuệ có sẵn mà bài thuộc về nhưng CHƯA gắn website thì gắn (có nhật ký, hoàn tác được); trần 3 chỉ áp cho việc tự gợi ý theo từ khóa.
+        $attachedNow = [];
+        foreach ($matchIds as $id) {
+            if (! in_array($id, $attachedIds, true) && $article->website && ($b = \App\Models\Brain::query()->where('status', 'active')->find($id))) {
+                \App\Services\Agent\Readiness\BrainAutoAttach::attach($article->website, $b, 'Điều phối kho xác định bài thuộc lĩnh vực của Trí tuệ này', 100, $article);
+                $attachedNow[] = $b->name;
+            }
+        }
+        if ($attachedNow !== []) {
+            $this->brainCtx = \App\Services\Brain\BrainContext::forArticle($article, $this->campaignId);
+            $this->step($run, 'research', 'system', 'ok', 'Gắn Trí tuệ «'.implode('», «', $attachedNow).'» vào website', 'Trí tuệ có sẵn trong hệ thống bao quát chủ đề này nhưng chưa gắn với website nên điều phối đã gắn (ghi nhật ký, gỡ được ở trang Trí tuệ).', $base + ['attached' => $attachedNow], $r['model'], $r['tokens'], $r['cost']);
+        }
+        // Chỉ dùng kiến thức của các Trí tuệ ĐÃ XÁC ĐỊNH khớp chủ đề (hoặc không dùng kho nếu không Trí tuệ nào khớp): kho của lĩnh vực khác không được lọt vào trích dẫn.
+        $this->narrowBrainScope($matchIds);
+        if ($matchIds !== []) {
+            $this->matchedBrainId = (int) $matchIds[0];
+            $base['covered'] = count($this->kbForPlanner($article));
+            foreach ($r['matches'] as $m) { // chủ đề chạm nhiều lĩnh vực thì MỖI Trí tuệ lo phần của nó, không dồn vào một kho
+                $this->coordinateBrain($run, $article, (int) $m['brain_id'], (string) $m['facet'], $base, $r, $brains);
+            }
+            if (! ($r['uncovered'] && $r['recurring'] && $r['field'] !== '')) {
                 return;
             }
-            if ($covered >= self::KB_ENOUGH) {
-                $this->step($run, 'research', 'system', 'ok', 'Kho đã đủ cho chủ đề này', 'Chủ đề thuộc Trí tuệ «'.$name.'» ('.$r['field'].'), kho đã có '.$covered.' mục đã duyệt khớp nên không nạp thêm.', $base + ['brain_name' => $name], $r['model'], $r['tokens'], $r['cost']);
-
-                $this->decision($run, 'kb_coordination', 'Điều phối kho: đủ kiến thức, không nạp thêm', 'Chủ đề thuộc Trí tuệ «'.$name.'» ('.$r['field'].') và kho đã có '.$covered.' mục đã duyệt khớp (đủ từ '.self::KB_ENOUGH.' mục) nên không nạp thêm trước khi viết.', ['covered' => $covered, 'brain' => $name]);
-
-            return;
-            }
-            $this->topUpBrain($run, $article, $r['brain_id'], $name, $covered, $base, $r);
-
-            return;
         }
-        if ($r['recurring']) {
+        if ($r['recurring'] && $r['field'] !== '') {
+            $partial = $matchIds !== [];
             $query = \App\Services\Knowledge\Suggest\KnowledgeSuggestions::BRAIN_PREFIX.$r['field'];
             try {
                 $gap = \App\Models\KnowledgeGap::firstOrCreate(['website_id' => $article->website_id, 'query' => mb_substr($query, 0, 190)], ['article_id' => $article->id, 'count' => 0]);
@@ -1068,15 +1069,82 @@ final class AgentRunOrchestrator
                 report($e);
             }
             $this->step($run, 'research', 'system', 'warn', 'Đề xuất lập Trí tuệ cho lĩnh vực «'.$r['field'].'»',
-                'Chủ đề chưa thuộc Trí tuệ nào đang có và lĩnh vực rộng này («'.$r['field'].'»'.($r['covers'] !== [] ? ', bao quát: '.implode('; ', array_slice($r['covers'], 0, 6)) : '').') sẽ còn lặp lại: nên lập Trí tuệ riêng để các bài sau có nền kiến thức duyệt sẵn. Hệ thống KHÔNG tự lập kho; việc này do người dùng quyết định (đã ghi vào Gợi ý cho kho). Bài này vẫn viết từ các nguồn tìm được. '.$r['reason'],
+                ($partial ? 'Các Trí tuệ có sẵn chỉ bao quát một phần chủ đề; phần còn lại thuộc lĩnh vực' : 'Chủ đề chưa thuộc Trí tuệ nào đang có và lĩnh vực').' («'.$r['field'].'»'.($r['covers'] !== [] ? ', bao quát: '.implode('; ', array_slice($r['covers'], 0, 6)) : '').') sẽ còn lặp lại: nên lập Trí tuệ riêng để các bài sau có nền kiến thức duyệt sẵn. Hệ thống KHÔNG tự lập kho; việc này do người dùng quyết định (đã ghi vào Gợi ý cho kho). Bài này vẫn viết từ các nguồn tìm được. '.$r['reason'],
                 $base + ['suggestion' => ['type' => 'new_brain', 'field' => $r['field'], 'covers' => $r['covers'], 'sensitive' => $r['sensitive']]], $r['model'], $r['tokens'], $r['cost']);
 
-            $this->decision($run, 'kb_coordination', 'Điều phối kho: chưa có Trí tuệ phù hợp, đề xuất lập «'.$r['field'].'»', 'Chủ đề không thuộc Trí tuệ nào đang gắn với website nhưng lĩnh vực rộng «'.$r['field'].'» sẽ còn lặp lại, nên hệ thống KHÔNG tự xây kho mà ghi đề xuất để bạn quyết định lập Trí tuệ; bài vẫn viết từ các nguồn tìm được.', ['field' => $r['field']]);
+            $this->decision($run, 'kb_coordination', 'Điều phối kho: '.($partial ? 'phần chưa ai bao quát' : 'chưa có Trí tuệ phù hợp').', đề xuất lập «'.$r['field'].'»', ($partial ? 'Một phần chủ đề không thuộc Trí tuệ nào đang có; ' : 'Chủ đề không thuộc Trí tuệ nào đang có; ').'lĩnh vực «'.$r['field'].'» sẽ còn lặp lại, nên hệ thống KHÔNG tự xây kho mà ghi đề xuất để bạn quyết định lập Trí tuệ; bài vẫn viết từ các nguồn tìm được.', ['field' => $r['field']]);
 
+            return;
+        }
+        if ($matchIds !== []) {
             return;
         }
         $this->step($run, 'research', 'system', 'ok', 'Chủ đề lẻ: không cần lập kho', 'Chủ đề thuộc «'.($r['field'] !== '' ? $r['field'] : 'lĩnh vực khác').'», không thuộc Trí tuệ nào và không đủ lớn để đáng lập kho. Bài dùng các nguồn tìm được. '.$r['reason'], $base, $r['model'], $r['tokens'], $r['cost']);
         $this->decision($run, 'kb_coordination', 'Điều phối kho: chủ đề lẻ, không lập kho', 'Chủ đề thuộc «'.($r['field'] !== '' ? $r['field'] : 'lĩnh vực khác').'», không thuộc Trí tuệ nào và không đủ lớn để đáng có kho riêng nên không xây kho; bài dùng các nguồn tìm được.', ['field' => $r['field']]);
+    }
+
+    /**
+     * Điều phối MỘT Trí tuệ trong số các Trí tuệ khớp: đếm độ phủ trên CHÍNH Trí tuệ đó (không cộng mục của kho khác), kho trống/thiếu thì nạp theo phần (facet) thuộc nó,
+     * đủ mà còn mảng định hướng trống thì nạp dần theo định hướng.
+     *
+     * @param  array<string,mixed>  $base
+     * @param  array<string,mixed>  $r  kết quả phân loại
+     * @param  list<array<string,mixed>>  $brains
+     */
+    private function coordinateBrain(AgentRun $run, Article $article, int $id, string $facet, array $base, array $r, array $brains): void
+    {
+        $name = (string) (collect($brains)->firstWhere('id', $id)['name'] ?? 'Trí tuệ');
+        $covered = count($this->kbForPlanner($article, [$id]));
+        $base = ['brain_id' => $id, 'covered' => $covered, 'facet' => $facet] + $base;
+        $empty = $covered >= self::KB_ENOUGH ? $this->emptyTopics($id, $name) : [];
+        if ($empty !== []) { // đủ cho chủ đề này nhưng các mảng định hướng của kho còn trống: nạp dần theo định hướng
+            $this->topUpBrain($run, $article, $id, $name, $covered, $base + ['empty_topics' => $empty], $r, $empty);
+
+            return;
+        }
+        if ($covered >= self::KB_ENOUGH) {
+            $this->step($run, 'research', 'system', 'ok', 'Kho «'.$name.'» đã đủ'.($facet !== '' ? ' cho phần «'.$facet.'»' : ' cho chủ đề này'), 'Phần '.($facet !== '' ? '«'.$facet.'» ' : '').'của chủ đề thuộc Trí tuệ «'.$name.'», kho đã có '.$covered.' mục đã duyệt khớp nên không nạp thêm.', $base + ['brain_name' => $name], $r['model'], $r['tokens'], $r['cost']);
+            $this->decision($run, 'kb_coordination', 'Điều phối kho: «'.$name.'» đủ kiến thức, không nạp thêm', 'Phần '.($facet !== '' ? '«'.$facet.'» ' : '').'của chủ đề thuộc Trí tuệ «'.$name.'» và kho đã có '.$covered.' mục đã duyệt khớp (đủ từ '.self::KB_ENOUGH.' mục) nên không nạp thêm trước khi viết.', ['covered' => $covered, 'brain' => $name]);
+
+            return;
+        }
+        $this->topUpBrain($run, $article, $id, $name, $covered, $base, $r, null, $facet);
+    }
+
+    /**
+     * Các Trí tuệ điều phối được xét: những Trí tuệ ĐÃ gắn website (theo thứ tự ưu tiên) cộng các Trí tuệ đang hoạt động khác trong hệ thống (CHƯA gắn), mỗi LĨNH VỰC chỉ một Trí tuệ
+     * (lấy bản gốc, id nhỏ nhất) để không bị nhiễu bởi các bản thử. Trí tuệ thương hiệu của website khác không được xét.
+     *
+     * @param  list<int>  $attachedIds
+     * @return list<array{id:int,name:string,domain:string,description:string,attached:bool,topics:list<string>}>
+     */
+    private function brainCandidates(array $attachedIds): array
+    {
+        $row = function (\App\Models\Brain $b, bool $attached): array {
+            $topics = \App\Models\KnowledgeTopic::query()->where('brain_id', $b->id)->whereNull('parent_id')->orderBy('id')->pluck('name')
+                ->reject(fn ($n) => str_starts_with((string) $n, 'Từ bài'))->take(8)->values()->all();
+
+            return ['id' => $b->id, 'name' => $b->name, 'domain' => (string) $b->domain_key, 'description' => mb_substr((string) $b->description, 0, 160), 'attached' => $attached, 'topics' => array_map('strval', $topics)];
+        };
+        $out = [];
+        $domains = [];
+        foreach ($this->brainCtx->brains as $b) {
+            $out[$b->id] = $row($b, true);
+            $domains[(string) $b->domain_key] = true;
+        }
+        try {
+            foreach (\App\Models\Brain::query()->where('status', 'active')->where('domain_key', '!=', 'thuong_hieu')->whereNotIn('id', $attachedIds)->orderBy('id')->limit(60)->get() as $b) {
+                if (isset($domains[(string) $b->domain_key]) || count($out) >= 24) {
+                    continue;
+                }
+                $domains[(string) $b->domain_key] = true;
+                $out[$b->id] = $row($b, false);
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return array_values($out);
     }
 
     /**
@@ -1140,7 +1208,7 @@ final class AgentRunOrchestrator
     }
 
     /** Luồng nạp cho đúng Trí tuệ đã xác định: nguồn tin cậy từ web, tối đa 3 nguồn, trần 10% ngân sách phiên. */
-    private function topUpBrain(AgentRun $run, Article $article, int $brainId, string $name, int $covered, array $base, array $cl, ?array $topics = null): void
+    private function topUpBrain(AgentRun $run, Article $article, int $brainId, string $name, int $covered, array $base, array $cl, ?array $topics = null, string $facet = ''): void
     {
         $webOk = (new \App\Services\Search\WebSearchResolver)->availability()['ok'];
         if (! $webOk) {
@@ -1151,7 +1219,7 @@ final class AgentRunOrchestrator
         try {
             $svc = app(\App\Services\Knowledge\Discover\SourceDiscoveryService::class);
             // Có danh sách mảng còn trống thì nạp theo TỪNG MẢNG (truy vấn = tên Trí tuệ + tên mảng, 2 nguồn mỗi mảng); không thì nạp theo chủ đề của bài (tối đa 4 nguồn).
-            $queries = $topics !== null ? array_map(fn ($t) => $name.' '.$t, array_slice($topics, 0, 2)) : [(string) $article->primary_keyword];
+            $queries = $topics !== null ? array_map(fn ($t) => $name.' '.$t, array_slice($topics, 0, 2)) : [$facet !== '' ? $name.' '.$facet : (string) $article->primary_keyword]; // chủ đề chạm nhiều lĩnh vực: tìm theo PHẦN thuộc Trí tuệ này
             $imp = ['imported' => 0, 'items_auto' => 0, 'items_proposed' => 0, 'pages' => [], 'auto_item_ids' => [], 'proposed_item_ids' => [], 'cost_vnd' => 0.0, 'run_id' => null];
             foreach ($queries as $q) {
                 $d = $svc->discover($article->website, $q);
@@ -1168,7 +1236,7 @@ final class AgentRunOrchestrator
                 $imp['proposed_item_ids'] = array_merge($imp['proposed_item_ids'], (array) $one['proposed_item_ids']);
             }
             $this->step($run, 'research', 'system', $imp['imported'] > 0 ? 'ok' : 'warn',
-                $topics !== null ? 'Nạp kho «'.$name.'» cho mảng còn trống ('.implode(', ', array_slice($topics, 0, 2)).'): '.$imp['imported'].' nguồn mới' : 'Nạp kho «'.$name.'»: '.$imp['imported'].' nguồn mới',
+                $topics !== null ? 'Nạp kho «'.$name.'» cho mảng còn trống ('.implode(', ', array_slice($topics, 0, 2)).'): '.$imp['imported'].' nguồn mới' : 'Nạp kho «'.$name.'»'.($facet !== '' ? ' cho phần «'.$facet.'»' : '').': '.$imp['imported'].' nguồn mới',
                 $topics !== null
                     ? 'Kho đã đủ cho chủ đề này nhưng các mảng định hướng của kho còn chưa có kiến thức; điều phối nạp dần theo định hướng TRƯỚC khi viết: '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.'
                     : 'Kho mới có '.$covered.' mục khớp chủ đề nên điều phối chạy luồng nạp TRƯỚC khi viết: '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.',
@@ -1211,10 +1279,10 @@ final class AgentRunOrchestrator
     }
 
     /** Mục kiến thức đã duyệt khớp chủ đề để tổng hợp (ngữ cảnh riêng, không chiếm lượt truy xuất theo dàn ý của bước nghiên cứu). @return list<array<string,mixed>> */
-    private function kbForPlanner(Article $article): array
+    private function kbForPlanner(Article $article, ?array $brainIds = null): array
     {
         try {
-            $c = (new KnowledgeContext())->scopeToBrains($this->writerBrainScope($this->brainCtx->ids()));
+            $c = (new KnowledgeContext())->scopeToBrains($this->writerBrainScope($brainIds ?? $this->brainCtx->ids()));
             $c->load($article, []);
 
             return array_values(array_filter((array) ($c->options()['knowledge'] ?? []), fn ($k) => ($k['type'] ?? '') !== 'product'));

@@ -36,18 +36,27 @@ final class BrainAutoAttach
             if (! $brain) {
                 continue;
             }
-            $priority = (int) ($site->brains()->max('brain_website.priority') ?? 0) + 10;
-            $site->brains()->syncWithoutDetaching([$brain->id => ['priority' => $priority]]);
-            $at = now('UTC')->toIso8601String();
-            $log = (array) ($brain->settings['auto_attached'] ?? []);
-            $log[(string) $site->id] = ['at' => $at, 'reason' => $s['reason'], 'by' => $by?->id, 'article_id' => $article->id];
-            $brain->update(['settings' => array_merge((array) $brain->settings, ['auto_attached' => $log])]);
-            (new LogAuditSink)->write(['action' => 'brain_auto_attach', 'actor_id' => $by?->id, 'actor_role' => $by?->role ?? 'system', 'website_id' => $site->id,
-                'brain_id' => $brain->id, 'what' => 'Tự gắn Trí tuệ vào website', 'detail' => ['reason' => $s['reason'], 'score' => $s['score'], 'article_id' => $article->id], 'at_utc' => $at]);
+            self::attach($site, $brain, (string) $s['reason'], (int) $s['score'], $article, $by);
             $done[] = ['id' => $brain->id, 'name' => $brain->name, 'reason' => $s['reason']];
         }
 
         return $done;
+    }
+
+    /**
+     * Gắn MỘT Trí tuệ vào website (ghi dấu tự gắn và nhật ký audit, hoàn tác được bằng detach). Không bị trần MAX_PER_SITE: trần chỉ để việc tự gợi ý theo từ khóa không gắn tràn lan,
+     * còn khi người điều phối kho xác định bài THUỘC lĩnh vực của Trí tuệ đó thì phải gắn được.
+     */
+    public static function attach(Website $site, Brain $brain, string $reason, int $score, ?Article $article = null, ?User $by = null): void
+    {
+        $priority = (int) ($site->brains()->max('brain_website.priority') ?? 0) + 10;
+        $site->brains()->syncWithoutDetaching([$brain->id => ['priority' => $priority]]);
+        $at = now('UTC')->toIso8601String();
+        $log = (array) ($brain->settings['auto_attached'] ?? []);
+        $log[(string) $site->id] = ['at' => $at, 'reason' => $reason, 'by' => $by?->id, 'article_id' => $article?->id];
+        $brain->update(['settings' => array_merge((array) $brain->settings, ['auto_attached' => $log])]);
+        (new LogAuditSink)->write(['action' => 'brain_auto_attach', 'actor_id' => $by?->id, 'actor_role' => $by?->role ?? 'system', 'website_id' => $site->id,
+            'brain_id' => $brain->id, 'what' => 'Tự gắn Trí tuệ vào website', 'detail' => ['reason' => $reason, 'score' => $score, 'article_id' => $article?->id], 'at_utc' => $at]);
     }
 
     /**
