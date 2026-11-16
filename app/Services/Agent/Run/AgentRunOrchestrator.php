@@ -1036,6 +1036,10 @@ final class AgentRunOrchestrator
         // Chỉ dùng kiến thức của Trí tuệ ĐÃ XÁC ĐỊNH khớp chủ đề (hoặc không dùng kho nếu không có Trí tuệ nào khớp): kho của lĩnh vực khác (vd. Sức khỏe trẻ em trong bài dược công nghiệp) không được lọt vào trích dẫn.
         $this->narrowBrainScope($r['brain_id'] !== null ? [(int) $r['brain_id']] : []);
         if ($r['brain_id'] !== null) {
+            // "Đủ kho" phải tính trên CHÍNH Trí tuệ khớp: số đếm trước khi thu hẹp cộng cả mục của Trí tuệ khác (vd. Tim mạch có hàng trăm mục khớp "thực đơn, dinh dưỡng"),
+            // làm Trí tuệ khớp đang TRỐNG vẫn bị coi là "đủ" và không được nạp.
+            $covered = count($this->kbForPlanner($article));
+            $base['covered'] = $covered;
             $this->matchedBrainId = $r['brain_id'];
             $name = (string) (collect($brains)->firstWhere('id', $r['brain_id'])['name'] ?? 'Trí tuệ');
             $empty = $covered >= self::KB_ENOUGH ? $this->emptyTopics($r['brain_id'], $name) : [];
