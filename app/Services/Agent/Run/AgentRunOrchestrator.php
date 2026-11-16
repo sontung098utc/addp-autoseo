@@ -30,6 +30,7 @@ use App\Services\Content\CitationSupportJudge;
 use App\Services\Knowledge\AiJson;
 use App\Services\Content\MedicalDisclaimer;
 use App\Services\Content\NoteRenderer;
+use App\Services\Content\SectionSplice;
 use App\Services\Content\HtmlSanitizer;
 use App\Models\BrandProfile;
 use App\Services\Brand\BrandProfileData;
@@ -166,6 +167,11 @@ final class AgentRunOrchestrator
 
     private int $extraSearches = 0;
 
+    /** Sửa theo đoạn: đã tắt trong phiên này (bản sửa theo đoạn trước không tốt hơn hoặc AI trả sai định dạng) và lượt viết gần nhất có phải sửa theo đoạn không. */
+    private bool $partialDisabled = false;
+
+    private bool $lastRepairPartial = false;
+
     /** kho vẫn chưa có mục đã duyệt khớp sau khi tự chuẩn bị, chủ đề rủi ro cao: bài cần chuyên gia xem lại sau khi viết */
     private bool $needsExpert = false;
 
@@ -186,6 +192,8 @@ final class AgentRunOrchestrator
         $this->kbTitlesVi = [];
         $this->matchedBrainId = null;
         $this->extraSearches = 0;
+        $this->partialDisabled = false;
+        $this->lastRepairPartial = false;
         \App\Services\Search\ClaudeBridgeSearchProvider::forget(); // bộ nhớ kết quả tìm web chỉ sống trong MỘT phiên chạy bài
         $this->markT = microtime(true);
         $this->aiMs = 0.0;
@@ -488,7 +496,8 @@ final class AgentRunOrchestrator
             }
             $feedback = $this->coordinateFix($run, $article, $report, $round);
             try {
-                $candidate = $this->write($run, $article, $outline['outline'] ?? [], $feedback, 'repair', "Sửa lần {$round}", $editorPb, (string) ($attrs['html_content'] ?? ''));
+                $only = $this->partialTargets($report, (string) ($attrs['html_content'] ?? '')); // lỗi chỉ ở vài mục: chỉ viết lại các mục đó (đầu ra ngắn hơn nhiều)
+                $candidate = $this->write($run, $article, $outline['outline'] ?? [], $feedback, 'repair', "Sửa lần {$round}", $editorPb, (string) ($attrs['html_content'] ?? ''), $only, $attrs);
                 $candidateReport = $this->grade($run, $article, $candidate, "Chấm lại sau lần sửa {$round}", $round, $editorPb, '');
             } catch (Throwable $e) { // đã có bản nháp: lỗi AI ở lần sửa không được làm mất nó (trước đây cả phiên bị đánh dấu thất bại)
                 $reason = 'Lần sửa gặp lỗi AI ('.ErrorMasker::short($e->getMessage(), 120).') nên giữ bản nháp hiện tại.';
@@ -508,6 +517,9 @@ final class AgentRunOrchestrator
                 $score = $newScore;
                 $stale = 0;
             } else { // không tốt hơn: GIỮ bản trước (không để bản sửa tệ hơn ghi đè), thử lại với chỉ dẫn mới
+                if ($this->lastRepairPartial) {
+                    $this->partialDisabled = true; // sửa theo đoạn không giúp được: các vòng sau viết lại cả bài như cũ
+                }
                 $stale++;
                 $this->decision($run, 'fix_rejected', "Bỏ bản sửa lần {$round}: không tốt hơn bản đang giữ", "Điểm phạt {$new} không thấp hơn {$penalty} nên giữ bản trước và thử lại ({$stale}/2 lần liên tiếp không tiến bộ).", ['penalty_before' => $penalty, 'penalty_after' => $new, 'score_before' => $score, 'score_after' => $newScore]);
                 if ($stale >= 2) {
@@ -1410,6 +1422,38 @@ final class AgentRunOrchestrator
             ['purpose' => 'references', 'status' => $r['status'], 'query' => $r['query'], 'references' => array_map(fn ($x) => ['domain' => $x['domain'], 'url' => $x['url'], 'title' => $x['title']], $r['references'])], null, 0, $r['cost_vnd']);
     }
 
+    /**
+     * Sửa THEO ĐOẠN được không: chỉ khi mọi mục chưa đạt là loại chỉ ra được đoạn cụ thể (CITE01, CITE02, PROC01), không có lỗi chặn, mỗi chỗ lỗi nằm đúng MỘT mục H2,
+     * không đụng mục cuối (chứa ghi chú và khung lưu ý), và số mục cần sửa không quá nửa bài. Còn lại (tiêu đề, độ dài, từ khóa, bố cục, không chắc mục nào) viết lại cả bài như cũ.
+     *
+     * @return ?list<array{index:int,heading:string}>
+     */
+    private function partialTargets(QualityReport $report, string $html): ?array
+    {
+        if ($this->partialDisabled || ! (bool) config('agent.partial_repair', true) || trim($html) === '' || $report->hasBlocking()) {
+            return null;
+        }
+        $failed = array_filter($report->failed(), fn ($r) => in_array($r->severity, ['P0', 'P1'], true) && ! in_array($r->code, self::NOT_TEXT_FIXABLE, true));
+        $codes = array_values(array_unique(array_map(fn ($r) => $r->code, $failed)));
+        // Phải có ít nhất một lỗi CHỈ RA ĐƯỢC ĐOẠN (CITE01/CITE02/PROC01); các lỗi cấp bài viết cùng nhóm nguồn/trích dẫn (SRC01, EVID01, FACT01) không cản, để vòng sau xử lý.
+        // Mọi mã khác (tiêu đề, độ dài, từ khóa, bố cục...) cần viết lại cả bài.
+        if (array_intersect($codes, ['CITE01', 'CITE02', 'PROC01']) === [] || array_diff($codes, ['CITE01', 'CITE02', 'PROC01', 'SRC01', 'EVID01', 'FACT01']) !== []) {
+            return null;
+        }
+        $cite01 = $this->kbHasItems() ? $report->citationGaps() : [];
+        if ((in_array('CITE01', $codes, true) && $cite01 === []) || (in_array('CITE02', $codes, true) && $report->supportGaps() === []) || (in_array('PROC01', $codes, true) && $report->leakGaps() === [])) {
+            return null; // có mục chưa đạt mà không chỉ ra được đoạn nào
+        }
+        $split = SectionSplice::split($html);
+        $n = count($split['sections']);
+        $idx = $n < 3 ? null : SectionSplice::locate(array_merge($cite01, $report->supportGaps(), $report->leakGaps()), $split['sections']);
+        if ($idx === null || in_array($n - 1, $idx, true) || count($idx) > (int) ceil($n * 0.5)) {
+            return null;
+        }
+
+        return array_map(fn (int $i) => ['index' => $i, 'heading' => preg_match('#<h2[^>]*>(.*?)</h2>#isu', $split['sections'][$i], $m) ? trim(strip_tags($m[1])) : ''], $idx);
+    }
+
     /** Còn việc phải sửa không: lỗi chặn, đoạn thiếu dấu trích (CHỈ khi kho có mục để trích), trích dẫn không hỗ trợ, lỗi bố cục. */
     private function needsRepair(QualityReport $report): bool
     {
@@ -1520,11 +1564,18 @@ final class AgentRunOrchestrator
     }
 
     /** @return array<string, mixed> thuộc tính ArticleVersion (đã làm sạch HTML) */
-    private function write(AgentRun $run, Article $article, array $outline, array $feedback, string $stage, string $title, ?Playbook $editorPb, ?string $previousHtml = null): array
+    /**
+     * @param  ?list<array{index:int,heading:string}>  $only  sửa THEO ĐOẠN: chỉ viết lại các mục H2 này (cần $previousAttrs); null = viết/sửa cả bài
+     * @param  ?array<string,mixed>  $previousAttrs  bản đang giữ (để ghép các mục đã viết lại và giữ nguyên tiêu đề, meta, FAQ, nguồn)
+     */
+    private function write(AgentRun $run, Article $article, array $outline, array $feedback, string $stage, string $title, ?Playbook $editorPb, ?string $previousHtml = null, ?array $only = null, ?array $previousAttrs = null): array
     {
         $options = $feedback === [] ? [] : ['feedback' => $feedback];
         if ($feedback !== [] && $previousHtml !== null && trim($previousHtml) !== '') {
             $options['previous_html'] = $previousHtml; // sửa trực tiếp bản đang có, không viết lại mù từ danh sách lỗi
+            if ($only !== null && $previousAttrs !== null && $only !== []) {
+                $options['only_sections'] = $only;
+            }
         }
         if ($this->redoPlan !== null) { // làm lại theo lời nhắn: người viết thấy lời nhắn, chỉ dẫn của điều phối và bản trước để giữ phần đạt
             $options['redo'] = ['message' => $this->redo['message'], 'note' => $this->redoPlan['writer_note'], 'previous' => $this->redoPlan['previous_text']];
@@ -1563,7 +1614,23 @@ final class AgentRunOrchestrator
         $options += \App\Services\Audit\RefreshOptions::for($article); // AG-S26: bài làm mới từ lỗi Audit
         [$kbData, $kbNote] = $this->kb->stepInfo();
         $r = $this->callAi($run, $stage, $title, fn (AiProviderInterface $ai) => $ai->generateArticle($article, $outline, $options));
-        $html = CitationRenderer::splitMixed(NoteRenderer::apply(HtmlSanitizer::clean($r['html_content'] ?? ''), (array) ($r['notes'] ?? []))); // ghi chú thật (định nghĩa, khái niệm) khác với chú thích nguồn
+        $partialDone = false;
+        if (isset($options['only_sections'])) { // sửa theo đoạn: ghép các mục đã viết lại vào bản đang giữ
+            $prevHtml = (string) ($previousAttrs['html_content'] ?? '');
+            $merged = SectionSplice::merge($prevHtml, array_column($only, 'index'), (string) ($r['html_content'] ?? ''), fn (string $h) => CitationRenderer::splitMixed(HtmlSanitizer::clean($h)));
+            if ($merged !== null) {
+                $partialDone = true;
+                $r = array_merge($r, ['html_content' => $merged, 'notes' => [], 'title' => $previousAttrs['title'] ?? null, 'slug' => $previousAttrs['slug'] ?? null, 'seo_title' => $previousAttrs['seo_title'] ?? null,
+                    'meta_description' => $previousAttrs['meta_description'] ?? null, 'faq_schema' => $previousAttrs['faq_schema'] ?? [], 'sources_cited' => $previousAttrs['sources_cited'] ?? []]);
+            } elseif (count(SectionSplice::split((string) ($r['html_content'] ?? ''))['sections']) < max(3, count(SectionSplice::split($prevHtml)['sections']) - 1)) {
+                // không phải các mục đã yêu cầu cũng không phải bài đầy đủ: bỏ chế độ sửa theo đoạn và viết lại cả bài như cũ
+                $this->partialDisabled = true;
+
+                return $this->write($run, $article, $outline, $feedback, $stage, $title, $editorPb, $previousHtml);
+            }
+        }
+        $this->lastRepairPartial = $partialDone;
+        $html = $partialDone ? (string) $r['html_content'] : CitationRenderer::splitMixed(NoteRenderer::apply(HtmlSanitizer::clean($r['html_content'] ?? ''), (array) ($r['notes'] ?? []))); // ghi chú thật (định nghĩa, khái niệm) khác với chú thích nguồn
         $disclaimerAdded = false;
         if (! empty($options['medical'])) {
             [$html, $disclaimerAdded] = MedicalDisclaimer::ensure($html); // AI quên câu lưu ý y tế thì hệ thống tự thêm (MED01)
@@ -1578,7 +1645,7 @@ final class AgentRunOrchestrator
         $mustCite = $this->brainCtx->reliance() === 'must_cite' && $feedback === [];
         $this->step($run, $stage, 'writer', $silentMock || $mustCite ? 'warn' : 'ok', $title, ($silentMock ? 'Nhà cung cấp AI đã rơi về bản giả lập (thiếu khóa hoặc phản hồi hỏng); nội dung không phải AI thật. ' : '').($feedback === []
             ? 'Viết theo dàn ý'.(($options['guidance'] ?? '') !== '' ? ' và chỉ dẫn thêm của người phụ trách bài' : '').'; HTML được làm sạch trước khi chấm.'.$this->brandNote().$this->brainCtx->note().($mustCite ? ' Lĩnh vực bắt buộc nguồn: cần người có chuyên môn duyệt (luật EVID01 kiểm bằng chứng theo Sổ nguồn ở mức cả bài, chưa nối từng khẳng định với từng nguồn; hiện có '.$citable->count().' nguồn đã xác nhận).' : '').$kbNote.$assetNote.($disclaimerAdded ? ' AI quên câu lưu ý y tế nên hệ thống đã tự thêm khung lưu ý cố định cuối bài.' : '')
-            : 'Gửi lại cho AI '.count($feedback).' lỗi cần sửa (lỗi chặn hoặc đoạn thiếu trích dẫn): '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
+            : ($partialDone ? 'SỬA THEO ĐOẠN: chỉ viết lại '.count((array) $only).' mục ('.implode('; ', array_map(fn ($s) => mb_substr((string) $s['heading'], 0, 40), array_slice((array) $only, 0, 3))).'), giữ nguyên từng ký tự các phần còn lại. ' : '').'Gửi lại cho AI '.count($feedback).' lỗi cần sửa (lỗi chặn hoặc đoạn thiếu trích dẫn): '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
             ['words' => \App\Services\Content\VietnameseText::wordCountHtml($html), 'playbook' => $this->pbData($pb), 'layout_skill' => $this->pbData($this->skills['layout'][0] ?? null)] + $this->brandData() + $this->brainCtx->stepData() + ($mustCite ? ['needs_expert_review' => true] : []) + $kbData + $assetData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
 
         return [
