@@ -10,6 +10,9 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    // Proxy/tunnel được tin tiêu đề X-Forwarded-* (IP/CIDR cách nhau dấu phẩy, hoặc *). Để trống = không tin ai (mặc định). Xem TrustedProxiesServiceProvider.
+    'trusted_proxies' => env('TRUSTED_PROXIES', ''),
+
     'timezone' => env('APP_TIMEZONE', 'Asia/Ho_Chi_Minh'),
 
     'locale' => env('APP_LOCALE', 'vi'),
