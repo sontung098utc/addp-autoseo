@@ -46,6 +46,15 @@ class SectionSpliceTest extends TestCase
         $this->assertNull(SectionSplice::locate(['2 số liệu không có trong mục được trích: 45% 12 mmol. Dùng đúng số của mục kho hoặc bỏ số đó.'], $sections), 'Mô tả không nêu đoạn cụ thể.');
     }
 
+    public function test_doan_mau_ngan_nhu_con_so_van_dinh_vi_duoc_neu_duy_nhat_mot_muc(): void
+    {
+        $sections = ['<h2>A</h2><p>Mức đường huyết bình thường thấp hơn 5,7% theo HbA1c.</p>', '<h2>B</h2><p>Tiền đái tháo đường nằm trong khoảng 5,9% – 6,4% HbA1c.</p>', '<h2>C</h2><p>Kết luận.</p>'];
+        $gap = fn (string $x) => "«{$x}» nêu «{$x}» nhưng mục được trích (KB#1) không có số liệu đó.";
+        $this->assertSame([1], SectionSplice::locate([$gap('5,9% – 6,4%')], $sections), 'Số liệu ngắn nhưng chỉ có ở một mục.');
+        $this->assertNull(SectionSplice::locate([$gap('HbA1c')], $sections), 'Khớp hai mục thì không đoán.');
+        $this->assertNull(SectionSplice::locate(['«5,7%» sai'], $sections), 'Dưới 8 ký tự thì không khẳng định.');
+    }
+
     public function test_ghep_muc_moi_giu_nguyen_phan_con_lai(): void
     {
         $new = '<h2>Mốc xét nghiệm</h2><p>Đường huyết lúc đói từ 7,0 mmol/L trở lên là mốc chẩn đoán theo hướng dẫn.[KB#7]</p>';
@@ -57,6 +66,18 @@ class SectionSpliceTest extends TestCase
         $this->assertStringContainsString('Khát nhiều và tiểu nhiều', $out, 'Mục không sửa giữ nguyên.');
         $this->assertStringContainsString('<aside class="autoseo-notes">', $out, 'Khối ghi chú cuối bài còn nguyên.');
         $this->assertStringNotContainsString('HbA1c từ 6,5%', $out, 'Mục 1 được thay hoàn toàn bằng bản mới.');
+    }
+
+    public function test_lay_dung_muc_yeu_cau_tu_ban_ca_bai_va_bo_phan_con_lai_cua_mo_hinh(): void
+    {
+        $full = '<h2>Dấu hiệu thường gặp</h2><p>MÔ HÌNH ĐỔI MỤC 0</p><h2>Mốc xét nghiệm</h2><p>Mốc mới, đã sửa đúng chỗ lỗi.[KB#7]</p><h2>Khi nào cần gặp bác sĩ</h2><p>MÔ HÌNH ĐỔI MỤC 2</p>';
+        $out = SectionSplice::pick($this->html(), [1], $full, fn (string $h) => $h);
+        $this->assertNotNull($out);
+        $this->assertStringContainsString('Mốc mới, đã sửa đúng chỗ lỗi.', $out);
+        $this->assertStringNotContainsString('MÔ HÌNH ĐỔI', $out, 'Chỉ lấy mục 1; các mục 0 và 2 giữ bản cũ.');
+        $this->assertStringContainsString('Khát nhiều và tiểu nhiều', $out);
+        $this->assertStringContainsString('<aside class="autoseo-notes">', $out);
+        $this->assertNull(SectionSplice::pick($this->html(), [1], '<h2>Tiêu đề khác hẳn</h2><p>x</p>', fn (string $h) => $h), 'Không tìm thấy mục theo tiêu đề thì null.');
     }
 
     public function test_tu_choi_khi_ket_qua_khong_dung_dinh_dang(): void

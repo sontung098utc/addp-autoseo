@@ -44,8 +44,8 @@ final class SectionSplice
         $found = [];
         foreach ($gaps as $gap) {
             $key = mb_substr(self::snippet((string) $gap), 0, 60);
-            if (mb_strlen($key) < 25) {
-                return null; // quá ngắn để khẳng định thuộc mục nào
+            if (mb_strlen($key) < 8) {
+                return null; // quá ngắn để khẳng định thuộc mục nào (đoạn mẫu của CITE02 có thể chỉ là «5,7% – 6,4%»; vẫn phải khớp ĐÚNG MỘT mục)
             }
             $hits = [];
             foreach ($plain as $i => $p) {
@@ -86,6 +86,37 @@ final class SectionSplice
         }
         foreach (array_values($indices) as $k => $i) {
             $sections[$i] = $clean($new['sections'][$k]);
+        }
+
+        return $prev['pre'].implode('', $sections);
+    }
+
+    /**
+     * Mô hình trả lại CẢ BÀI dù chỉ được yêu cầu vài mục: lấy từ bản đó đúng các mục được yêu cầu (khớp theo tiêu đề) và ghép vào bản đang giữ; mọi mục khác giữ nguyên.
+     * Null nếu có mục yêu cầu không tìm thấy theo tiêu đề trong bản mới.
+     *
+     * @param  list<int>  $indices
+     * @param  callable(string): string  $clean
+     */
+    public static function pick(string $previousHtml, array $indices, string $fullNewHtml, callable $clean): ?string
+    {
+        $prev = self::split($previousHtml);
+        $byHeading = [];
+        foreach (self::split($fullNewHtml)['sections'] as $s) {
+            $h = self::heading($s);
+            if ($h !== '' && ! isset($byHeading[$h])) {
+                $byHeading[$h] = $s;
+            }
+        }
+        $sections = $prev['sections'];
+        foreach ($indices as $i) {
+            $h = isset($sections[$i]) ? self::heading($sections[$i]) : '';
+            if ($h === '' || ! isset($byHeading[$h])) {
+                return null;
+            }
+        }
+        foreach ($indices as $i) {
+            $sections[$i] = $clean($byHeading[self::heading($sections[$i])]);
         }
 
         return $prev['pre'].implode('', $sections);

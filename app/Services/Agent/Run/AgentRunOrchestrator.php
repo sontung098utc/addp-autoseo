@@ -172,6 +172,9 @@ final class AgentRunOrchestrator
 
     private bool $lastRepairPartial = false;
 
+    /** Lý do lần xét gần nhất không sửa theo đoạn được (rỗng nếu sửa theo đoạn được); ghi vào dữ liệu bước sửa. */
+    private string $partialSkip = '';
+
     /** kho vẫn chưa có mục đã duyệt khớp sau khi tự chuẩn bị, chủ đề rủi ro cao: bài cần chuyên gia xem lại sau khi viết */
     private bool $needsExpert = false;
 
@@ -1430,7 +1433,10 @@ final class AgentRunOrchestrator
      */
     private function partialTargets(QualityReport $report, string $html): ?array
     {
+        $this->partialSkip = ''; // lý do không sửa theo đoạn được ghi vào dữ liệu bước sửa để chẩn đoán sau này
         if ($this->partialDisabled || ! (bool) config('agent.partial_repair', true) || trim($html) === '' || $report->hasBlocking()) {
+            $this->partialSkip = $this->partialDisabled ? 'đã tắt trong phiên này' : ($report->hasBlocking() ? 'có lỗi chặn' : 'tắt bằng cấu hình');
+
             return null;
         }
         $failed = array_filter($report->failed(), fn ($r) => in_array($r->severity, ['P0', 'P1'], true) && ! in_array($r->code, self::NOT_TEXT_FIXABLE, true));
@@ -1438,16 +1444,22 @@ final class AgentRunOrchestrator
         // Phải có ít nhất một lỗi CHỈ RA ĐƯỢC ĐOẠN (CITE01/CITE02/PROC01); các lỗi cấp bài viết cùng nhóm nguồn/trích dẫn (SRC01, EVID01, FACT01) không cản, để vòng sau xử lý.
         // Mọi mã khác (tiêu đề, độ dài, từ khóa, bố cục...) cần viết lại cả bài.
         if (array_intersect($codes, ['CITE01', 'CITE02', 'PROC01']) === [] || array_diff($codes, ['CITE01', 'CITE02', 'PROC01', 'SRC01', 'EVID01', 'FACT01']) !== []) {
+            $this->partialSkip = 'mã lỗi cần viết lại cả bài: '.implode(',', $codes);
+
             return null;
         }
         $cite01 = $this->kbHasItems() ? $report->citationGaps() : [];
         if ((in_array('CITE01', $codes, true) && $cite01 === []) || (in_array('CITE02', $codes, true) && $report->supportGaps() === []) || (in_array('PROC01', $codes, true) && $report->leakGaps() === [])) {
+            $this->partialSkip = 'lỗi không chỉ ra được đoạn nào';
+
             return null; // có mục chưa đạt mà không chỉ ra được đoạn nào
         }
         $split = SectionSplice::split($html);
         $n = count($split['sections']);
         $idx = $n < 3 ? null : SectionSplice::locate(array_merge($cite01, $report->supportGaps(), $report->leakGaps()), $split['sections']);
         if ($idx === null || in_array($n - 1, $idx, true) || count($idx) > (int) ceil($n * 0.5)) {
+            $this->partialSkip = $n < 3 ? 'bài dưới 3 mục' : ($idx === null ? 'không xác định đúng một mục cho mọi chỗ lỗi' : (in_array($n - 1, $idx, true) ? 'có lỗi ở mục cuối' : 'quá nhiều mục cần sửa ('.count($idx).'/'.$n.')'));
+
             return null;
         }
 
@@ -1613,11 +1625,28 @@ final class AgentRunOrchestrator
         $options += $this->assets->options();
         $options += \App\Services\Audit\RefreshOptions::for($article); // AG-S26: bài làm mới từ lỗi Audit
         [$kbData, $kbNote] = $this->kb->stepInfo();
-        $r = $this->callAi($run, $stage, $title, fn (AiProviderInterface $ai) => $ai->generateArticle($article, $outline, $options));
+        try {
+            $r = $this->callAi($run, $stage, $title, fn (AiProviderInterface $ai) => $ai->generateArticle($article, $outline, $options));
+        } catch (AiSchemaError $e) {
+            if (! isset($options['only_sections'])) {
+                throw $e;
+            }
+            // Sửa theo đoạn mà mô hình trả sai định dạng: không để lỗi này dừng cả vòng sửa; bỏ chế độ theo đoạn và viết lại cả bài như cũ.
+            $this->partialDisabled = true;
+            \Illuminate\Support\Facades\Log::warning('Sửa theo đoạn: AI trả sai định dạng, quay về viết lại cả bài', ['bai' => $article->id, 'loi' => mb_substr($e->getMessage(), 0, 400)]);
+
+            return $this->write($run, $article, $outline, $feedback, $stage, $title, $editorPb, $previousHtml);
+        }
         $partialDone = false;
         if (isset($options['only_sections'])) { // sửa theo đoạn: ghép các mục đã viết lại vào bản đang giữ
             $prevHtml = (string) ($previousAttrs['html_content'] ?? '');
-            $merged = SectionSplice::merge($prevHtml, array_column($only, 'index'), (string) ($r['html_content'] ?? ''), fn (string $h) => CitationRenderer::splitMixed(HtmlSanitizer::clean($h)));
+            $clean = fn (string $h) => CitationRenderer::splitMixed(HtmlSanitizer::clean($h));
+            $merged = SectionSplice::merge($prevHtml, array_column($only, 'index'), (string) ($r['html_content'] ?? ''), $clean);
+            if ($merged === null && count(SectionSplice::split((string) ($r['html_content'] ?? ''))['sections']) >= max(3, count(SectionSplice::split($prevHtml)['sections']) - 1)) {
+                // Mô hình bỏ qua chỉ dẫn và trả lại CẢ BÀI: chỉ lấy các mục được yêu cầu (khớp theo tiêu đề), giữ nguyên phần còn lại để không có thay đổi ngoài ý muốn.
+                $merged = SectionSplice::pick($prevHtml, array_column($only, 'index'), (string) $r['html_content'], $clean);
+                \Illuminate\Support\Facades\Log::warning('Sửa theo đoạn: mô hình trả cả bài thay vì chỉ các mục yêu cầu', ['bai' => $article->id, 'chi_lay_cac_muc' => $merged !== null]);
+            }
             if ($merged !== null) {
                 $partialDone = true;
                 $r = array_merge($r, ['html_content' => $merged, 'notes' => [], 'title' => $previousAttrs['title'] ?? null, 'slug' => $previousAttrs['slug'] ?? null, 'seo_title' => $previousAttrs['seo_title'] ?? null,
@@ -1646,7 +1675,8 @@ final class AgentRunOrchestrator
         $this->step($run, $stage, 'writer', $silentMock || $mustCite ? 'warn' : 'ok', $title, ($silentMock ? 'Nhà cung cấp AI đã rơi về bản giả lập (thiếu khóa hoặc phản hồi hỏng); nội dung không phải AI thật. ' : '').($feedback === []
             ? 'Viết theo dàn ý'.(($options['guidance'] ?? '') !== '' ? ' và chỉ dẫn thêm của người phụ trách bài' : '').'; HTML được làm sạch trước khi chấm.'.$this->brandNote().$this->brainCtx->note().($mustCite ? ' Lĩnh vực bắt buộc nguồn: cần người có chuyên môn duyệt (luật EVID01 kiểm bằng chứng theo Sổ nguồn ở mức cả bài, chưa nối từng khẳng định với từng nguồn; hiện có '.$citable->count().' nguồn đã xác nhận).' : '').$kbNote.$assetNote.($disclaimerAdded ? ' AI quên câu lưu ý y tế nên hệ thống đã tự thêm khung lưu ý cố định cuối bài.' : '')
             : ($partialDone ? 'SỬA THEO ĐOẠN: chỉ viết lại '.count((array) $only).' mục ('.implode('; ', array_map(fn ($s) => mb_substr((string) $s['heading'], 0, 40), array_slice((array) $only, 0, 3))).'), giữ nguyên từng ký tự các phần còn lại. ' : '').'Gửi lại cho AI '.count($feedback).' lỗi cần sửa (lỗi chặn hoặc đoạn thiếu trích dẫn): '.implode(' | ', array_map(fn ($f) => mb_substr($f, 0, 70), array_slice($feedback, 0, 3)))),
-            ['words' => \App\Services\Content\VietnameseText::wordCountHtml($html), 'playbook' => $this->pbData($pb), 'layout_skill' => $this->pbData($this->skills['layout'][0] ?? null)] + $this->brandData() + $this->brainCtx->stepData() + ($mustCite ? ['needs_expert_review' => true] : []) + $kbData + $assetData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
+            ['words' => \App\Services\Content\VietnameseText::wordCountHtml($html), 'playbook' => $this->pbData($pb), 'layout_skill' => $this->pbData($this->skills['layout'][0] ?? null)]
+            + ($feedback !== [] ? ['partial_repair' => $partialDone ? ['sections' => array_column((array) $only, 'index')] : ['skip' => $only === null ? ($this->partialSkip !== '' ? $this->partialSkip : 'không áp dụng') : 'mô hình không tuân thủ, viết lại cả bài']] : []) + $this->brandData() + $this->brainCtx->stepData() + ($mustCite ? ['needs_expert_review' => true] : []) + $kbData + $assetData + $this->providerData($r), $r['model'] ?? null, (int) ($r['tokens_used'] ?? 0), (float) ($r['cost_vnd'] ?? 0));
 
         return [
             'article_id' => $article->id, 'title' => $r['title'] ?? $article->primary_keyword, 'slug' => $r['slug'] ?? 'bai-viet', 'outline' => $outline,

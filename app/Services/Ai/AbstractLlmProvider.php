@@ -116,8 +116,12 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
 
         $r = $this->complete($system, "Hãy viết bài cho từ khóa '{$article->primary_keyword}'. Người tìm từ khóa này cần được trả lời cụ thể và hữu ích ngay từ đầu bài.");
         $data = $this->decode($r['text']);
+        $partial = ! empty($options['only_sections']);
+        if ($partial && (! isset($data['html_content']) || ! is_string($data['html_content']) || trim($data['html_content']) === '') && is_array($data['sections'] ?? null)) {
+            $data['html_content'] = implode('', array_map(fn ($h) => is_string($h) ? $h : '', $data['sections'])); // sửa theo đoạn: chấp nhận khóa "sections" ({chỉ số: html}) mô hình hay trả
+        }
         if (! isset($data['html_content']) || ! is_string($data['html_content']) || trim($data['html_content']) === '') {
-            throw new AiSchemaError('Phản hồi AI thiếu "html_content" đúng định dạng.');
+            throw new AiSchemaError('Phản hồi AI thiếu "html_content" đúng định dạng.'.($partial ? ' (sửa theo đoạn; đầu phản hồi: '.mb_substr(trim(preg_replace('/\s+/u', ' ', (string) $r['text']) ?? ''), 0, 160).')' : ''));
         }
 
         return [
