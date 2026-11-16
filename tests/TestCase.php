@@ -17,5 +17,7 @@ abstract class TestCase extends BaseTestCase
         config(['agent.background_runs' => false]);
         // Dữ liệu minh họa và bản giả (AI/tìm web/ảnh) chỉ bật trong test để test dựng được ngữ cảnh; ngoài test mặc định TẮT (STUDIO_DEMO).
         config(['studio.demo' => true]);
+        // Bộ nhớ kết quả tìm web (biến tĩnh) chỉ sống trong một phiên chạy bài; không để lọt giữa các test.
+        \App\Services\Search\ClaudeBridgeSearchProvider::forget();
     }
 }

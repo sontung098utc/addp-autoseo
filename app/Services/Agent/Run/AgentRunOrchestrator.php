@@ -186,6 +186,7 @@ final class AgentRunOrchestrator
         $this->kbTitlesVi = [];
         $this->matchedBrainId = null;
         $this->extraSearches = 0;
+        \App\Services\Search\ClaudeBridgeSearchProvider::forget(); // bộ nhớ kết quả tìm web chỉ sống trong MỘT phiên chạy bài
         $this->markT = microtime(true);
         $this->aiMs = 0.0;
         $this->trigger = $trigger;
@@ -1453,6 +1454,9 @@ final class AgentRunOrchestrator
             $this->extraSearches++;
             $topics = array_map(fn ($g) => trim(mb_substr((string) $article->primary_keyword, 0, 60).' '.mb_substr(preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', (string) $g) ?? '', 0, 80)), array_slice(array_merge($report->citationGaps(), $report->supportGaps()), 0, 2));
             $added = $topics === [] ? 0 : $this->mergeReferences($topics, $article);
+            if ($added === 0) {
+                $this->extraSearches = self::MAX_EXTRA_SEARCHES; // lượt tìm này không ra gì: tìm lại các vòng sau chỉ tốn vài phút cho cùng kết quả rỗng
+            }
             $searchNote = $added > 0 ? " Đã tìm thêm {$added} tài liệu cho các câu thiếu căn cứ và đưa vào danh sách nguồn của người viết." : ' Đã thử tìm thêm tài liệu cho các câu thiếu căn cứ nhưng chưa có kết quả mới.';
         }
         $this->decision($run, 'fix_plan', 'Điều phối: chấm xong còn '.count($failed)." mục chưa đạt, yêu cầu người viết sửa (lần {$round})",

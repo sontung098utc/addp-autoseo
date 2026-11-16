@@ -40,6 +40,7 @@ final class ReferenceDossier
         $out = ['status' => 'none', 'references' => [], 'reason' => null, 'cost_vnd' => 0.0, 'provider' => null, 'query' => null];
         $seen = [];
         $perDomain = [];
+        ($this->discovery ?? new SourceDiscoveryService)->prefetch($site, array_values($topics), ['max_results' => 8]); // các góc tìm độc lập nhau: tìm CÙNG LÚC (cầu nối Claude), vòng tuần tự dưới đây đọc từ bộ nhớ
         foreach ($topics as $i => $topic) {
             $r = $this->attempt($site, $topic, $allowNeutral);
             $out['cost_vnd'] += $r['cost_vnd'];
@@ -63,7 +64,7 @@ final class ReferenceDossier
                 break;
             }
             if ($i === 0 && $out['references'] === [] && count($topics) === 1) { // kết quả tìm web thay đổi giữa các lần gọi: thử thêm một lần
-                $again = $this->attempt($site, $topic, $allowNeutral);
+                $again = $this->attempt($site, $topic, $allowNeutral, true);
                 $out['cost_vnd'] += $again['cost_vnd'];
                 foreach ($again['references'] as $ref) {
                     $out['references'][] = $ref;
@@ -78,11 +79,11 @@ final class ReferenceDossier
     }
 
     /** @return array{status: string, references: list<array{title: string, domain: string, url: string, excerpt: string, trust?: string}>, reason: ?string, cost_vnd: float, provider: ?string, query: ?string} */
-    private function attempt(Website $site, string $keyword, bool $allowNeutral = false): array
+    private function attempt(Website $site, string $keyword, bool $allowNeutral = false, bool $fresh = false): array
     {
         $out = ['status' => 'none', 'references' => [], 'reason' => null, 'cost_vnd' => 0.0, 'provider' => null, 'query' => null];
         try {
-            $d = ($this->discovery ?? new SourceDiscoveryService)->discover($site, $keyword, ['max_results' => 8]);
+            $d = ($this->discovery ?? new SourceDiscoveryService)->discover($site, $keyword, ['max_results' => 8] + ($fresh ? ['fresh' => true] : []));
         } catch (WebSearchUnavailable $e) {
             return ['status' => $e->getCode() === 429 ? 'quota' : 'unavailable', 'reason' => mb_substr($e->getMessage(), 0, 200)] + $out;
         } catch (\Throwable $e) {
