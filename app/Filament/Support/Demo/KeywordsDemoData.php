@@ -2,28 +2,67 @@
 
 namespace App\Filament\Support\Demo;
 
-/** Dữ liệu MẪU cho màn Từ khóa (chỉ khi DemoMode::enabled() và kho chưa từng được khởi tạo). Không phải số thật. */
+/** Dữ liệu MẪU cho màn Từ khóa (chỉ khi DemoMode::enabled() và kho chưa từng được khởi tạo). Không phải số thật. Chủ đề: website ADDP (thực phẩm chức năng, thiết bị theo dõi sức khỏe). */
 final class KeywordsDemoData
 {
+    public const CLUSTER_SUGAR = 'Đường huyết và tiểu đường';
+
+    public const CLUSTER_METER = 'Máy đo đường huyết';
+
+    public const CLUSTER_BP = 'Huyết áp';
+
+    public const CLUSTER_MEAL = 'Ăn uống cho người tiểu đường';
+
+    /**
+     * @return list<array{0:string,1:?int,2:string,3:?string,4:string,5:?string,6:?string}>
+     *                                                                                      [từ khóa, volume, ý định, nguồn số liệu, nguồn từ khóa, cụm, kế hoạch (planned|article)]
+     */
+    public static function rows(): array
+    {
+        $s = self::CLUSTER_SUGAR;
+        $m = self::CLUSTER_METER;
+        $b = self::CLUSTER_BP;
+        $a = self::CLUSTER_MEAL;
+
+        return [
+            ['chỉ số đường huyết bình thường', 4400, 'informational', 'dataforseo', 'csv', $s, 'article'],
+            ['đường huyết bao nhiêu là tiểu đường', 2900, 'informational', 'dataforseo', 'csv', $s, 'article'],
+            ['triệu chứng tiểu đường type 2', 3600, 'informational', 'dataforseo', 'csv', $s, null],
+            ['cách hạ đường huyết nhanh', 1900, 'informational', 'dataforseo', 'csv', $s, 'planned'],
+            ['đường huyết lúc đói bao nhiêu là cao', 1300, 'informational', 'dataforseo', 'tay', $s, null],
+            ['máy đo đường huyết loại nào tốt', 2400, 'commercial', 'dataforseo', 'csv', $m, 'planned'],
+            ['giá máy đo đường huyết', 1600, 'commercial', 'dataforseo', 'csv', $m, null],
+            ['que thử đường huyết dùng thế nào', 880, 'informational', 'dataforseo', 'ai', $m, null],
+            ['mua máy đo đường huyết Accu-Chek', 720, 'transactional', 'csv', 'competitor', $m, null],
+            ['máy đo đường huyết tại nhà có chính xác không', 590, 'informational', null, 'ai', $m, null],
+            ['máy đo huyết áp bắp tay loại nào tốt', 3200, 'commercial', 'dataforseo', 'csv', $b, 'planned'],
+            ['huyết áp cao nên ăn gì', 2900, 'informational', 'dataforseo', 'csv', $b, null],
+            ['huyết áp thấp là bao nhiêu', 1900, 'informational', 'dataforseo', 'csv', $b, null],
+            ['bữa ăn cho người tiểu đường', 1600, 'informational', 'dataforseo', 'csv', $a, null],
+            ['thực đơn người tiểu đường 7 ngày', 1300, 'informational', 'csv', 'tay', $a, null],
+            ['người tiểu đường ăn trái cây gì', 2400, 'informational', 'dataforseo', 'csv', $a, null],
+            ['sữa dành cho người tiểu đường', 1900, 'commercial', 'dataforseo', 'competitor', $a, null],
+            ['cháo yến mạch cho người tiểu đường', 480, 'informational', null, 'ai', $a, null],
+            // Chưa gom cụm
+            ['thực phẩm chức năng cho người tiểu đường', 2900, 'commercial', 'dataforseo', 'csv', null, null],
+            ['viên uống hỗ trợ đường huyết', 1300, 'commercial', 'dataforseo', 'csv', null, null],
+            ['mỡ máu cao nên ăn gì', 3600, 'informational', 'dataforseo', 'csv', null, null],
+            ['omega 3 loại nào tốt', 2400, 'commercial', 'csv', 'tay', null, null],
+            ['vitamin tổng hợp cho người lớn tuổi', 1000, 'commercial', 'csv', 'tay', null, null],
+            ['kiểm tra đường huyết tại nhà', 880, 'informational', null, 'ai', null, null],
+            ['thực phẩm tốt cho tim mạch', null, 'informational', null, 'ai', null, null],
+            ['người cao tuổi nên bổ sung canxi thế nào', null, 'informational', null, 'ai', null, null],
+            ['nhà thuốc ADDP', 320, 'navigational', 'csv', 'tay', null, null],
+            ['viên uống bổ sung kẽm cho người tiểu đường', null, 'commercial', null, 'competitor', null, null],
+            ['đo huyết áp đúng cách tại nhà', null, 'informational', null, 'tay', null, null],
+            ['chế độ ăn giảm cholesterol', null, 'informational', null, 'tay', null, null],
+        ];
+    }
+
     /** @return list<array{0:string,1:?int,2:string}> [từ khóa, volume, ý định] */
     public static function keywords(): array
     {
-        return [
-            ['học bổng du học Nhật Bản', 1900, 'informational'], ['học bổng du học Hàn Quốc', 1600, 'informational'], ['học bổng du học Úc', 1300, 'informational'],
-            ['học bổng toàn phần là gì', 880, 'informational'], ['điều kiện xin học bổng toàn phần', 720, 'informational'], ['cách săn học bổng toàn phần', 590, 'informational'],
-            ['học bổng chính phủ Hàn Quốc GKS', 480, 'informational'], ['hồ sơ xin học bổng cần những gì', 390, 'informational'], ['học bổng MEXT Nhật Bản', 320, 'informational'],
-            ['tuyển sinh đại học 2026', 5400, 'informational'], ['tuyển sinh đại học 2026 điểm chuẩn', 4400, 'informational'], ['phương thức tuyển sinh đại học 2026', 2900, 'informational'],
-            ['tuyển sinh đại học 2026 khi nào', 1300, 'informational'], ['đăng ký xét tuyển đại học online', 1600, 'transactional'], ['tuyển sinh cao đẳng 2026', 1000, 'informational'],
-            ['lệ phí xét tuyển đại học', 590, 'informational'], ['ngành công nghệ thông tin học gì', 2400, 'informational'], ['ngành công nghệ thông tin ra trường làm gì', 1900, 'informational'],
-            ['ngành công nghệ thông tin lương bao nhiêu', 1600, 'informational'], ['ngành marketing học gì', 1300, 'informational'], ['ngành marketing ra trường làm gì', 1000, 'informational'],
-            ['ngành quản trị kinh doanh học gì', 1300, 'informational'], ['ngành quản trị kinh doanh ra trường làm gì', 880, 'informational'], ['ngành ngôn ngữ Anh học gì', 1100, 'informational'],
-            ['ngành y khoa điểm chuẩn', 2900, 'informational'], ['ngành dược học những trường nào', 720, 'commercial'], ['so sánh ngành kế toán và kiểm toán', 480, 'commercial'],
-            ['trường đại học tốt nhất cho ngành công nghệ thông tin', 590, 'commercial'], ['review trường đại học ngoại thương', 390, 'commercial'], ['học phí đại học 2026', 3600, 'informational'],
-            ['học phí đại học ngoại thương', 1600, 'informational'], ['học phí đại học bách khoa', 1300, 'informational'], ['vay vốn sinh viên học phí', 880, 'transactional'],
-            ['du học Nhật Bản chi phí bao nhiêu', 1900, 'informational'], ['du học Hàn Quốc chi phí bao nhiêu', 1600, 'informational'], ['du học Úc chi phí bao nhiêu', 880, 'informational'],
-            ['chứng chỉ IELTS cần bao nhiêu điểm xin học bổng', 720, 'informational'], ['luyện thi IELTS online', 2400, 'commercial'], ['đăng ký thi IELTS', 1900, 'transactional'],
-            ['cổng thông tin tuyển sinh bộ giáo dục', 320, 'navigational'],
-        ];
+        return array_map(fn ($r) => [$r[0], $r[1], $r[2]], self::rows());
     }
 
     /** Khởi tạo kho lần đầu: chỉ khi bật chế độ minh họa và chưa từng có dữ liệu (null, khác với rỗng do người dùng xóa hết). */
@@ -32,11 +71,27 @@ final class KeywordsDemoData
         if (! DemoMode::enabled() || DemoStore::get('keywords.list') !== null) {
             return;
         }
+        self::reseed();
+    }
+
+    /** Ghi đè kho minh họa bằng bộ mẫu. Chỉ chạm DemoStore (cache), không đụng database. */
+    public static function reseed(): void
+    {
+        if (! DemoMode::enabled()) {
+            return;
+        }
         $list = [];
-        foreach (self::keywords() as $i => [$kw, $vol, $intent]) {
-            $list[] = ['id' => $i + 1, 'keyword' => $kw, 'volume' => $vol, 'difficulty' => null, 'intent' => $intent, 'source' => $i % 7 === 6 ? 'tay' : 'csv', 'cluster' => null];
+        $clusters = [];
+        foreach (self::rows() as $i => [$kw, $vol, $intent, $vsrc, $src, $cluster, $plan]) {
+            $list[] = ['id' => $i + 1, 'keyword' => $kw, 'volume' => $vol, 'volume_source' => $vol !== null ? $vsrc : null, 'difficulty' => null, 'intent' => $intent, 'source' => $src, 'cluster' => $cluster, 'plan' => $plan];
+            if ($cluster !== null) {
+                $clusters[$cluster]['name'] = $cluster;
+                $clusters[$cluster]['intent'] = $clusters[$cluster]['intent'] ?? $intent;
+                $clusters[$cluster]['keywords'][] = $kw;
+            }
         }
         DemoStore::put('keywords.list', $list);
-        DemoStore::put('keywords.clusters', []);
+        DemoStore::put('keywords.clusters', array_values($clusters));
+        DemoStore::put('keywords.proposals', []);
     }
 }

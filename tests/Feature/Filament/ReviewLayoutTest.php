@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\ArticleVersionResource;
 use App\Filament\Resources\ArticleVersionResource\Pages\ViewArticleVersion;
 use App\Models\Article;
@@ -26,7 +27,7 @@ class ReviewLayoutTest extends TestCase
 
     private function user(string $role): User
     {
-        return User::create(['name' => $role, 'email' => uniqid() . '@x.vn', 'password' => 'secret123', 'role' => $role, 'is_active' => true]);
+        return User::create(['name' => $role, 'email' => uniqid().'@x.vn', 'password' => 'secret123', 'role' => $role, 'is_active' => true]);
     }
 
     private function article(string $ws = 'needs_review'): Article
@@ -36,7 +37,7 @@ class ReviewLayoutTest extends TestCase
 
     private function version(Article $a, int $v, string $status, string $html = '<p>x</p>', array $extra = []): ArticleVersion
     {
-        return ArticleVersion::create(array_merge(['article_id' => $a->id, 'version' => $v, 'title' => 't' . $v, 'slug' => 's', 'html_content' => $html, 'review_status' => $status], $extra));
+        return ArticleVersion::create(array_merge(['article_id' => $a->id, 'version' => $v, 'title' => 't'.$v, 'slug' => 's', 'html_content' => $html, 'review_status' => $status], $extra));
     }
 
     public function test_renders_full_data(): void
@@ -61,7 +62,7 @@ class ReviewLayoutTest extends TestCase
         $this->actingAs($this->user('approver'));
         $v = $this->version($this->article(), 1, 'needs_review');
         Livewire::test(ViewArticleVersion::class, ['record' => $v->id])
-            ->assertOk()->assertSee('Chưa có bản đã duyệt để so sánh')->assertSee('META01')->assertSee('Chưa có meta description')
+            ->assertOk()->assertDontSee('Chưa có bản đã duyệt để so sánh')->assertSee('META01')->assertSee('Chưa có meta description')
             ->assertSee('Bài chưa có ảnh nào để kiểm tra alt');
     }
 
@@ -104,7 +105,9 @@ class ReviewLayoutTest extends TestCase
         $this->actingAs($this->user('approver'));
         $v = $this->version($this->article(), 1, 'needs_review', '<p>a</p><script>alert(1)</script>');
         $html = Livewire::test(ViewArticleVersion::class, ['record' => $v->id])->html();
-        $this->assertStringContainsString('sandbox=""', $html);
+        $this->assertStringContainsString('sandbox="allow-popups allow-popups-to-escape-sandbox"', $html);
+        $this->assertStringNotContainsString('allow-scripts', $html);
+        $this->assertStringNotContainsString('allow-same-origin', $html);
         $this->assertStringNotContainsString('<script>alert(1)', $html);
     }
 
@@ -145,13 +148,14 @@ class ReviewLayoutTest extends TestCase
     public function test_navigation_badge_counts_and_hides(): void
     {
         $this->actingAs($this->user('approver'));
-        $this->assertNull(ArticleVersionResource::getNavigationBadge());
+        $this->assertNull(ArticleResource::getNavigationBadge());
         $this->version($this->article(), 1, 'needs_review');
         $this->version($this->article(), 1, 'needs_review');
-        $this->version($this->article(), 1, 'approved');
-        $this->assertSame('2', ArticleVersionResource::getNavigationBadge());
-        $this->assertSame('warning', ArticleVersionResource::getNavigationBadgeColor());
-        $this->assertSame('Chiến dịch', ArticleVersionResource::getNavigationGroup());
-        $this->assertSame('Duyệt bài', ArticleVersionResource::getNavigationLabel());
+        $this->version($this->article('approved'), 1, 'approved');
+        $this->assertSame('2', ArticleResource::getNavigationBadge());
+        $this->assertSame('warning', ArticleResource::getNavigationBadgeColor());
+        $this->assertSame('Chiến dịch', ArticleResource::getNavigationGroup());
+        $this->assertSame('Bài viết', ArticleResource::getNavigationLabel());
+        $this->assertFalse(ArticleVersionResource::shouldRegisterNavigation());
     }
 }

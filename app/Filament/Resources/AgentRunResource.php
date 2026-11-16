@@ -1,0 +1,161 @@
+<?php
+
+namespace App\Filament\Resources;
+
+use App\Filament\Clusters\AgentTeam;
+use App\Filament\Resources\AgentRunResource\Pages;
+use App\Filament\Support\Agent\AgentFlowBlueprint;
+use App\Filament\Support\Agent\RunActivity;
+use App\Filament\Support\Schedule\VnTime;
+use App\Models\AgentRun;
+use App\Models\User;
+use App\Services\Agent\Pipeline\JobTypeRegistry;
+use Filament\Pages\SubNavigationPosition;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
+
+/** AG-S01: nhật ký các phiên chạy của đội AI. Chỉ xem; phiên chỉ do hệ thống tạo. */
+class AgentRunResource extends Resource
+{
+    public const STATUS = [
+        'running' => ['Đang chạy', 'info'],
+        'ready_for_review' => ['Đã có bản nháp chờ duyệt', 'success'],
+        'held' => ['Giữ nháp, cần người xem', 'warning'],
+        'blocked' => ['Bị chặn trước khi chạy', 'gray'],
+        'failed' => ['Lỗi', 'danger'],
+    ];
+
+    protected static ?string $model = AgentRun::class;
+
+    protected static ?string $navigationIcon = 'heroicon-o-cpu-chip';
+
+    protected static ?string $navigationLabel = 'Phiên chạy';
+
+    protected static ?string $cluster = AgentTeam::class;
+
+    protected static ?string $slug = 'phien-chay';
+
+    protected static SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
+
+    protected static ?string $modelLabel = 'Phiên chạy';
+
+    protected static ?string $pluralModelLabel = 'Phiên chạy của đội AI';
+
+    /** Quy ước giao diện: câu thường ("Chiến dịch tự động"), không để Filament tự Viết Hoa Từng Chữ ở tiêu đề và breadcrumb. */
+    protected static bool $hasTitleCaseModelLabel = false;
+
+    protected static ?int $navigationSort = 3;
+
+    /**
+     * Liên kết MỘT nơi tới chi tiết phiên chạy: phiên của một bài mở tab "Phiên chạy" của trang bài (đúng phiên đó); phiên không gắn bài
+     * (xây kho, khảo sát...) mở trang phiên riêng. Mọi nơi tạo liên kết tới phiên đều dùng hàm này để không loạn đường dẫn.
+     */
+    public static function viewUrl(AgentRun|int $run): string
+    {
+        $model = $run instanceof AgentRun ? $run : AgentRun::query()->find($run);
+        if ($model && $model->article_id && \App\Models\Article::query()->whereKey($model->article_id)->exists()) {
+            return ArticleResource::getUrl('view', ['record' => $model->article_id]).'?phien='.$model->id.'#tab-activity';
+        }
+
+        return static::getUrl('view', ['record' => $model ?? $run]);
+    }
+
+    public static function canViewAny(): bool
+    {
+        $u = Auth::user();
+
+        return $u instanceof User && $u->is_active && $u->isApprover();
+    }
+
+    public static function canView(Model $record): bool
+    {
+        return static::canViewAny();
+    }
+
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return false;
+    }
+
+    public static function jobTypeLabel(?string $type): string
+    {
+        $type = $type ?: 'article_write';
+
+        return JobTypeRegistry::find($type)['title'] ?? $type;
+    }
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->modifyQueryUsing(fn ($query) => $query->with(['article', 'website', 'steps']))
+            ->poll(fn () => RunActivity::anyRunning() ? '3s' : '15s')
+            ->defaultSort('id', 'desc')
+            ->recordClasses('ss-sticky-row')
+            ->columns([
+                // Cột nội dung là cột quan trọng nhất: cho rộng; các cột phụ gọn lại, không xuống dòng.
+                Tables\Columns\TextColumn::make('article.primary_keyword')->label('Bài / từ khóa')->searchable()->wrap()
+                    ->state(fn (AgentRun $r) => $r->article?->primary_keyword ?: self::jobTypeLabel($r->job_type))
+                    ->description(fn (AgentRun $r) => $r->website?->name)
+                    ->extraHeaderAttributes(['class' => 'ss-col-main'])->extraCellAttributes(['class' => 'ss-col-main']),
+                Tables\Columns\TextColumn::make('job_type')->label('Loại việc')->badge()->color('gray')->visibleFrom('xl')
+                    ->formatStateUsing(fn (?string $state) => self::jobTypeLabel($state))
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
+                Tables\Columns\TextColumn::make('status')->label('Kết quả')->badge()
+                    ->formatStateUsing(fn (string $state, AgentRun $r) => RunActivity::isStale($r) ? 'Có thể bị treo' : (self::STATUS[$state][0] ?? $state))
+                    ->color(fn (string $state, AgentRun $r) => RunActivity::isStale($r) ? 'warning' : (self::STATUS[$state][1] ?? 'gray'))
+                    ->icon(fn (string $state, AgentRun $r) => RunActivity::isLive($r) ? 'heroicon-o-arrow-path' : null)
+                    ->extraAttributes(fn (AgentRun $r) => RunActivity::isLive($r) ? ['class' => 'ss-badge-live', 'data-running' => '1'] : [])
+                    ->description(fn (AgentRun $r) => RunActivity::isLive($r) ? 'Đang ở: '.(AgentFlowBlueprint::byStage()[$cur = RunActivity::currentStageOf($r, $r->steps)]['title'] ?? JobTypeRegistry::stageLabels((string) $r->job_type, true)[$cur] ?? $cur ?? 'hoàn tất') : null)
+                    ->tooltip(fn (AgentRun $r) => $r->outcome_reason ?: null)
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
+                Tables\Columns\TextColumn::make('score')->label('Điểm')->visibleFrom('xl')->alignCenter()->placeholder('—')
+                    ->state(fn (AgentRun $r) => $r->steps->where('stage', 'grade')->last()?->data['score'] ?? null)
+                    ->tooltip('Điểm 0–100 của lần chấm gần nhất. Quyết định đạt/không do luật, điểm chỉ để theo dõi.')
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%']),
+                // Phiên dùng AI thật là mặc định nên không gắn nhãn; chỉ đánh dấu phiên chạy bằng AI giả lập (dữ liệu cũ hoặc chế độ minh họa).
+                Tables\Columns\TextColumn::make('ai_mode')->label('AI')->visibleFrom('2xl')->badge()
+                    ->formatStateUsing(fn (string $state) => $state === 'real' ? '' : 'AI giả lập')
+                    ->color('gray')
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
+                Tables\Columns\TextColumn::make('repair_rounds')->label('Vòng sửa')->alignCenter()->toggleable(isToggledHiddenByDefault: true)
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'width:1%']),
+                Tables\Columns\TextColumn::make('cost_vnd')->label('Chi phí')->visibleFrom('xl')->toggleable()->alignEnd()
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', '.').' ₫')
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
+                Tables\Columns\TextColumn::make('started_at')->label('Bắt đầu (giờ VN)')->visibleFrom('xl')->sortable()
+                    ->formatStateUsing(fn (AgentRun $r) => VnTime::format(VnTime::fromRaw($r, 'started_at')))
+                    ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
+            ])
+            ->filters([
+                Tables\Filters\SelectFilter::make('job_type')->label('Loại việc')
+                    ->options(fn () => collect(JobTypeRegistry::all())->pluck('title', 'id')->all()),
+            ])
+            ->actions([Tables\Actions\ViewAction::make()->label('Xem diễn biến')]);
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListAgentRuns::route('/'),
+            'view' => Pages\ViewAgentRun::route('/{record}'),
+        ];
+    }
+}

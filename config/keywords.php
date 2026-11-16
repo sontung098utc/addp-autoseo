@@ -1,0 +1,71 @@
+<?php
+
+return [
+    // Nhà cung cấp số liệu lượt tìm. Hiện có: dataforseo. Thêm nhà khác: viết lớp theo App\Contracts\KeywordMetricsProvider và nối trong KeywordMetricsResolver.
+    'provider' => env('KEYWORDS_METRICS_PROVIDER', 'dataforseo'),
+
+    'dataforseo' => [
+        'login' => env('DATAFORSEO_LOGIN'),
+        'password' => env('DATAFORSEO_PASSWORD'),
+        'endpoint' => 'https://api.dataforseo.com/v3/keywords_data/google_ads/search_volume/live',
+    ],
+
+    // Việt Nam, tiếng Việt (mã địa điểm của Google Ads).
+    'location_code' => 2704,
+    'language_code' => 'vi',
+
+    // Số từ khóa mỗi yêu cầu gửi nhà cung cấp (tài liệu của họ cho tối đa 700; dùng lô nhỏ cho dễ kiểm soát chi phí).
+    'batch' => 100,
+
+    // Số từ khóa tối đa tra cho mỗi lần chạy.
+    'max_per_run' => 300,
+
+    // Số liệu cũ hơn số ngày này mới được tra lại.
+    'refresh_days' => 30,
+
+    // ƯỚC TÍNH chi phí cho mỗi 100 từ khóa (VND). Đây là giá trị cấu hình để chặn chi phí, KHÔNG phải bảng giá chính thức:
+    // hãy đối chiếu hóa đơn thật của nhà cung cấp rồi chỉnh lại.
+    'cost_per_100_keywords_vnd' => (float) env('KEYWORDS_COST_PER_100_VND', 2000),
+
+    // Tỷ giá ước tính để đổi CPC (USD) sang VND.
+    'usd_vnd_rate' => (float) env('KEYWORDS_USD_VND_RATE', 25000),
+
+    // Dữ liệu SERP thật (câu hỏi liên quan, tìm kiếm liên quan, top 10) cho từ khóa phụ, gom cụm và đề xuất chiến dịch.
+    // Dùng chung DATAFORSEO_LOGIN/PASSWORD. Chưa có khóa thì KHÔNG có dữ liệu SERP (không điền số/câu hỏi giả).
+    'serp' => [
+        'endpoint' => 'https://api.dataforseo.com/v3/serp/google/organic/live/advanced',
+        'depth' => 10,
+        // ƯỚC TÍNH chi phí mỗi lượt tra SERP (VND). DataForSEO Google Organic Live = $0.002/SERP 10 kết quả (trang giá ngày 15/11/2026) ≈ 50 đ ở 25.000 đ/USD;
+        // chế độ Standard queue $0.0006. Chỉnh lại theo hóa đơn thật.
+        'cost_per_query_vnd' => (float) env('KEYWORDS_SERP_COST_PER_QUERY_VND', 50),
+        // Gợi ý tự động của Google (không cần khóa). Tắt: SERP_AUTOCOMPLETE=false.
+        'autocomplete' => (bool) env('SERP_AUTOCOMPLETE', true),
+        'autocomplete_endpoint' => 'https://suggestqueries.google.com/complete/search',
+        'cache_days' => 7,
+        // Trần chi phí (VND) cho một lần gom cụm theo SERP (mỗi từ khóa một lượt tra).
+        'cluster_budget_vnd' => (float) env('KEYWORDS_SERP_CLUSTER_BUDGET_VND', 40000),
+    ],
+
+    // Xu hướng MIỄN PHÍ, chỉ dùng nguồn chính thức/công khai: lượt xem Wikipedia, nguồn cấp RSS Google Trends VN, lịch sử gợi ý tự ghi.
+    // (Không dùng giao diện Google Trends không chính thức: dễ bị chặn và vi phạm điều khoản.)
+    'trends' => [
+        'enabled' => (bool) env('TRENDS_ENABLED', true),
+        // Nghỉ giữa các lượt gọi khi khám phá nhiều chủ đề (mili giây): lịch sự với Google/Wikimedia, tránh bị giới hạn tần suất.
+        'pause_ms' => (int) env('TRENDS_PAUSE_MS', 900),
+        // Khi Wikipedia trả 429: nghỉ ngần này rồi thử lại đúng một lần.
+        'retry_ms' => (int) env('TRENDS_RETRY_MS', 3000),
+        // Wikimedia yêu cầu User-Agent có cách liên hệ: đặt TRENDS_CONTACT (email hoặc URL) trong .env.
+        'user_agent' => 'autoseo-research/1.0 (SEO planning tool; contact: '.env('TRENDS_CONTACT', 'chua-dat').')',
+        // Từ đồng nghĩa dùng để tìm bài Wikipedia tương ứng (tên thường gọi => tên bài).
+        'synonyms' => ['tiểu đường' => 'đái tháo đường', 'huyết áp cao' => 'tăng huyết áp', 'mỡ máu' => 'rối loạn lipid máu'],
+        'wikipedia_api' => 'https://vi.wikipedia.org/w/api.php',
+        'wikipedia_pageviews' => 'https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/vi.wikipedia/all-access/user',
+        'rss' => 'https://trends.google.com/trending/rss?geo=VN',
+    ],
+
+    // Khai thác ý định theo hành trình người đọc (mẫu câu hỏi + gợi ý Google + AI đề xuất được Google xác nhận).
+    'intent' => ['enabled' => (bool) env('INTENT_ENABLED', true), 'pause_ms' => (int) env('INTENT_PAUSE_MS', 400),
+        // Cụm lệch đối tượng của chiến dịch (hiện hướng tới người cao tuổi): gợi ý chứa các cụm này bị bỏ, trừ khi chính chủ đề chứa chúng. Sửa theo nhóm độc giả của bạn.
+        'exclude_phrases' => ['sau sinh', 'mang thai', 'thai kỳ', 'trẻ em', 'trẻ sơ sinh', 'người trẻ', 'ở trẻ', 'cho bé', 'tuổi dậy thì'],
+    ],
+];

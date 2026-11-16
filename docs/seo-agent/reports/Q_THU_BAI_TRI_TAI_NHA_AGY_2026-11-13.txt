@@ -1,0 +1,120 @@
+RUN 182 status=ready_for_review rounds=1 cost=2353.1 final_version=72
+#1 [guard/ok] Được phép chạy |  tok=0
+    Không có lệnh dừng, website hoạt động, bậc tin cậy T1 (chỉ tạo bản nháp).
+#2 [risk/warn] Hạng rủi ro: cao |  tok=0
+    Chủ đề sức khỏe (có cụm "tiểu đường") Bài cần người có chuyên môn duyệt.
+#3 [research/warn] Tự đọc website để bổ sung kiến thức |  tok=0
+    Chủ đề rủi ro cao, kho chưa có kiến thức khớp nên AI tự đọc 0/1 trang trên website công ty: 0 mục tự nhận (tầng A, hoàn tác được), 0 mục chờ người duyệt.
+#4 [brief/ok] Lập dàn ý (6 mục) | agy-flash-low tok=2494
+    Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. Dùng playbook brief/content-brief@1 (bản nháp, chỉ cho lượt thủ công). Dùng Trí tuệ Đái tháo đường (thử quy trình 2) (hồ sơ 10/11 trường, mức dựa vào AI: Bắt buộc nguồn); Tiêu hóa và gan mật (hồ sơ 6/11 trường, mức dựa vào AI: Bắt buộc nguồn);
+#5 [images/skipped] Không tạo ảnh |  tok=0
+    Tính năng tự tạo ảnh đang tắt.
+#6 [research/warn] Chuẩn bị tài liệu |  tok=0
+    Đã nạp 0 mục kiến thức đã duyệt, 0 ảnh gợi ý, 0 liên kết nội bộ gợi ý, 0 nguồn được phép trích, chưa có hồ sơ doanh nghiệp. Kho kiến thức chưa có mục đã duyệt phù hợp; đã ghi khoảng trống kiến thức.
+#7 [write/warn] Viết bản đầu | agy-flash-medium tok=8201
+    Viết theo dàn ý; HTML được làm sạch trước khi chấm. Dùng Trí tuệ Đái tháo đường (thử quy trình 2) (hồ sơ 10/11 trường, mức dựa vào AI: Bắt buộc nguồn); Tiêu hóa và gan mật (hồ sơ 6/11 trường, mức dựa vào AI: Bắt buộc nguồn); Đái tháo đường (tiểu đường) (hồ sơ 10/11 trường, mức dựa vào AI: Bắt buộc n
+#8 [grade/ok] Chấm bản đầu |  tok=0
+    Điểm 80/100 (tham khảo, mốc 80). Đạt mọi luật bắt buộc (còn 4 mục P1, 0 mục P2 chỉ nên xem). Dùng playbook editor/qa-review@1 (bản nháp, chỉ cho lượt thủ công).
+#9 [edit/warn] Biên tập viên yêu cầu sửa (5 điểm) | agy-flash-medium tok=3799
+    Bài chuẩn y khoa, đập tan ngộ nhận chữa khỏi tại nhà, song cần siết chặt ngưỡng an toàn vận động, cảnh báo cấp cứu hạ đường huyết và bổ sung quy trình tự kiểm tra bàn chân. Người viết sửa trực tiếp bản đang có.
+#10 [failover/warn] Chuyển model dự phòng: Sửa theo biên tập viên | gemini-3.5-flash-lite tok=0
+    Đã chuyển từ OpenAI-tương thích tùy chỉnh · agy-flash-medium sang Gemini – testZunP · gemini-3.5-flash-lite vì lỗi định dạng (Phản hồi AI thiếu "html_content" đúng định dạng.). Dự phòng là model thật, không phải AI giả lập.
+#11 [repair/ok] Sửa theo biên tập viên | gemini-3.5-flash-lite tok=13959
+    Gửi lại cho AI 5 lỗi cần sửa (lỗi chặn hoặc đoạn thiếu trích dẫn): BIÊN TẬP — Kế hoạch vận động thể chất an toàn tại nhà: Chỉ nêu ngưỡng  | BIÊN TẬP — Cảnh báo hạ đường huyết (Dưới 3,9 mmol/L): Thiếu nguyên tắc | BIÊN TẬP — THIẾU: Quy trình kiểm tra bàn chân tại nhà mỗi ngày (quan s
+#12 [grade/ok] Chấm lại sau khi biên tập |  tok=0
+    Điểm 75/100 (tham khảo, mốc 80). Đạt mọi luật bắt buộc (còn 5 mục P1, 0 mục P2 chỉ nên xem).
+#13 [decision/ok] Giữ cho người có chuyên môn duyệt |  tok=0
+    Đạt luật nhưng chủ đề rủi ro cao nên hệ thống không coi là xong; cần người có chuyên môn duyệt trước khi dùng. Kho chưa có kiến thức đã duyệt khớp chủ đề nên cần xem kỹ các khẳng định.
+#14 [handoff/ok] Chuyển người duyệt |  tok=0
+    Đạt mọi luật bắt buộc. Bản nháp v1 đã vào hàng chờ duyệt; chưa xuất bản vì bậc tin cậy T1.
+
+--- BIÊN TẬP VIÊN ---
+verdict=can_sua
+- [major] Kế hoạch vận động thể chất an toàn tại nhà: Chỉ nêu ngưỡng chặn dưới ( => Bổ sung: nếu đường huyết >13,9–16,7 mmol/L, cần hoãn tập luyện, uống nước lọc nghỉ ngơi và kiểm tra ceton vì vận động lúc này khiến gan phóng thích thêm glucose.
+- [major] Cảnh báo hạ đường huyết (Dưới 3,9 mmol/L): Thiếu nguyên tắc cấp cứu sống còn: không được cho ăn/uống nếu bệnh nhân đã mất ý thức, dễ gây sặc vào đường thở dẫn đến ngạt thở tử vong. => Viết rõ: chỉ áp dụng quy tắc 15 khi người bệnh còn tỉnh; nếu lơ mơ hoặc hôn mê, tuyệt đối không đổ nước đường hay nhét kẹo vào miệng mà phải đặt nghiêng và gọi 115 ngay.
+- [minor] Hướng dẫn tự theo dõi đường huyết và ghi chép nhật ký: Bảng mục tiêu bị vỡ định dạng văn bản; thiếu hướng dẫn luân chuyển ngón lấy máu khiến người bệnh dễ bị chai sần đầu ngón tay. => Định dạng lại bảng Markdown chuẩn; bổ sung lưu ý luân phiên đổi ngón giữa các lần thử và sát trùng khô hoàn toàn trước khi bấm kim.
+- [minor] Nguyên tắc xây dựng chế độ ăn cân bằng kiểm soát đường huyết: Chưa hướng dẫn thứ tự nạp thực phẩm trong bữa ăn – kỹ thuật can thiệp tại nhà không tốn tiền giúp ghìm đỉnh đường huyết sau ăn hiệu quả. => Thêm mẹo thứ tự ăn chuẩn y khoa: ăn rau/chất xơ trước, đạm nạc tiếp theo, và ăn tinh bột cuối cùng để làm chậm quá trình rỗng dạ dày và hấp thu glucose.
+- THIẾU: Quy trình kiểm tra bàn chân tại nhà mỗi ngày (quan sát kẽ ngón, vết nứt, mất cảm giác) để phòng loét cắt cụt chi.
+- THIẾU: Ngưỡng an toàn chặn trên trước khi tập thể dục (>13,9 mmol/L phải dừng tập).
+- THIẾU: Xử trí hạ đường huyết khi bệnh nhân hôn mê (tuyệt đối không cho ăn uống qua đường miệng).
+
+=== BÀI ===
+TITLE: Cách trị bệnh tiểu đường tại nhà: Hướng dẫn quản lý chuẩn y khoa
+SEO: Cách trị bệnh tiểu đường tại nhà: Quản lý đường huyết an toàn
+META: Hướng dẫn chi tiết cách trị bệnh tiểu đường tại nhà chuẩn y khoa từ chế độ ăn, vận động, đo đường huyết đến nhận biết dấu hiệu cấp cứu.
+SOURCES: ["B\u1ed9 Y t\u1ebf - H\u01b0\u1edbng d\u1eabn ch\u1ea9n \u0111o\u00e1n v\u00e0 \u0111i\u1ec1u tr\u1ecb \u0111\u00e1i th\u00e1o \u0111\u01b0\u1eddng","Hi\u1ec7p h\u1ed9i \u0110\u00e1i th\u00e1o \u0111\u01b0\u1eddng Hoa K\u1ef3 (ADA) - Khuy\u1ebfn d\u01b0\u1ee1ng dinh d\u01b0\u1ee1ng v\u00e0 v\u1eadn \u0111\u1ed9ng"]
+WORDS: 4112
+
+Tóm tắt nhanh:
+Đái tháo đường là bệnh mạn tính không thể chữa khỏi hoàn toàn; mục tiêu của việc quản lý tại nhà là ổn định đường huyết và ngăn ngừa biến chứng.
+Chế độ dinh dưỡng cần tuân thủ đĩa ăn chuẩn và bổ sung tối thiểu 14g chất xơ/1.000 kcal mỗi ngày theo khuyến cáo.
+Kế hoạch vận động an toàn đòi hỏi tối thiểu 150 phút/tuần cường độ trung bình kết hợp tập sức bền 2–3 buổi/tuần và phải hoãn tập nếu đường huyết trên 13,9 mmol/L kèm nguy cơ ceton.
+Duy trì đường huyết mao mạch lúc đói trong khoảng 4,4–7,2 mmol/L và sau ăn 2 giờ dưới 10,0 mmol/L theo hướng dẫn của Bộ Y tế.
+Cần cảnh giác trước biến chứng hạ đường huyết (dưới 3,9 mmol/L), tuyệt đối không cho ăn uống nếu người bệnh hôn mê và không tự ý ngưng thuốc điều trị.
+Không có bất kỳ phương pháp dân gian hay bài thuốc thảo dược nào có thể chữa khỏi dứt điểm bệnh đái tháo đường (thường gọi là bệnh tiểu đường). Về mặt y khoa, đái tháo đường là tình trạng rối loạn chuyển hóa mạn tính đặc trưng bởi sự thiếu hụt hoặc kháng insulin[a], khiến nồng độ glucose trong máu tăng cao kéo dài. Do đó, bản chất thực sự của cụm từ cách trị bệnh tiểu đường tại nhà chính là thiết lập một quy trình tự quản lý lối sống khoa học nhằm đưa chỉ số đường huyết về ngưỡng an toàn, hỗ trợ phác đồ điều trị của bác sĩ và ngăn chặn các tổn thương lên mạch máu, tim, mắt, thận.
+Hiểu đúng về việc điều trị đái tháo đường tại nhà
+Nguyên tắc xây dựng chế độ ăn cân bằng kiểm soát đường huyết
+Kế hoạch vận động thể chất an toàn tại nhà
+Hướng dẫn tự theo dõi đường huyết và bảng mục tiêu
+Quy trình kiểm tra bàn chân tại nhà mỗi ngày
+Rủi ro từ các bài thuốc truyền miệng và lưu ý dùng thuốc
+Dấu hiệu cấp tính và khi nào nên gặp bác sĩ
+## Hiểu đúng về cách trị bệnh tiểu đường tại nhà: Có thể chữa khỏi hoàn toàn không?
+Nhiều người bệnh mang tâm lý lo âu nên dễ tin vào những lời quảng cáo về các loại nước sắc, thảo dược có khả năng "chữa tận gốc đái tháo đường sau một liệu trình". Đây là quan niệm sai lầm và tiềm ẩn nhiều nguy cơ sức khỏe nghiêm trọng. Hiện nay, các tổ chức y tế quốc tế và Bộ Y tế đều xác nhận đái tháo đường là bệnh lý tiến triển mạn tính, chưa có phương pháp điều trị dứt điểm hoàn toàn để cơ thể tự phục hồi chức năng tiết insulin nguyên vẹn như trước khi mắc bệnh.
+Tuy nhiên, người sống chung với đái tháo đường hoàn toàn có thể kiểm soát bệnh hiệu quả và đạt trạng thái lui bệnh (remission) đối với đái tháo đường tuýp 2 nếu can thiệp tích cực từ giai đoạn sớm. Lui bệnh nghĩa là đường huyết duy trì ở mức bình thường trong nhiều tháng mà không cần dùng thuốc hạ đường huyết, nhờ vào chế độ ăn uống khắt khe và giảm cân bền vững. Dù vậy, tình trạng kháng insulin vẫn có thể tái phát bất cứ lúc nào nếu bạn lơ là thói quen sống. Vì thế, việc chăm sóc tại nhà phải song hành, bổ trợ và tuân thủ phác đồ thuốc do bác sĩ chuyên khoa chỉ định chứ không thể thay thế lẫn nhau.
+## Nguyên tắc xây dựng chế độ ăn cân bằng kiểm soát đường huyết
+Chế độ ăn không phải là kiêng khem tuyệt đối carbohydrate (tinh bột) mà là học cách lựa chọn đúng loại thực phẩm và kiểm soát khẩu phần nạp vào cơ thể. Việc cắt bỏ hoàn toàn tinh bột dễ dẫn đến suy kiệt, hạ đường huyết hoặc toan ceton do chuyển hóa mỡ quá mức.
+Để kiểm soát đường huyết ổn định sau ăn, phương pháp phân bổ đĩa ăn chuẩn (Plate Method) là công cụ đơn giản và hiệu quả nhất tại nhà:
+1/2 đĩa ăn là rau củ không chứa tinh bột: Bao gồm các loại rau lá xanh (cải bó xôi, rau muống, xà lách), dưa leo, cà chua, bông cải xanh. Nhóm này dồi dào vitamin, khoáng chất và cung cấp lượng calo rất thấp.
+1/4 đĩa ăn là nguồn đạm nạc: Ưu tiên ức gà bỏ da, cá tươi, trứng, đậu phụ, các loại hạt họ đậu. Protein giúp làm chậm tốc độ tiêu hóa, tạo cảm giác no lâu và giảm đỉnh đường huyết sau ăn.
+1/4 đĩa ăn là tinh bột phức hợp có chỉ số đường huyết (GI)[b] thấp: Thay thế cơm trắng, bánh mì trắng bằng gạo lứt, yến mạch nguyên cám, khoai lang luộc hoặc ngô luộc. Các loại ngũ cốc nguyên cám giải phóng glucose vào máu từ từ, tránh hiện tượng đường huyết vọt lên cao.
+Về lượng chất xơ, theo khuyến cáo dinh dưỡng của Hiệp hội Đái tháo đường Hoa Kỳ (ADA) và Viện Dinh dưỡng - Bộ Y tế, người trưởng thành nên tiêu thụ tối thiểu 14g chất xơ cho mỗi 1.000 kcal năng lượng nạp vào (tương đương khoảng 20–35g chất xơ mỗi ngày). Chất xơ hòa tan (có nhiều trong yến mạch, đậu, táo, cà rốt) hoạt động như một lớp gel trong ruột non, làm chậm quá trình hấp thu đường vào máu, từ đó cải thiện độ nhạy insulin đáng kể.
+## Kế hoạch vận động thể chất an toàn tại nhà
+Tập luyện thể dục được xem như một "liều thuốc tự nhiên" làm tăng mức độ vận chuyển glucose từ máu vào mô cơ mà không phụ thuộc hoàn toàn vào insulin. Một kế hoạch vận động hợp lý tại nhà cần kết hợp cả bài tập hiếu khí (aerobic) và rèn luyện sức bền.
+Bộ Y tế khuyến nghị người sống chung với đái tháo đường cần duy trì tổng thời gian vận động tối thiểu 150 phút mỗi tuần với cường độ trung bình:
+Bài tập Aerobic (150 phút/tuần): Chia đều 30 phút mỗi ngày, tối thiểu 5 ngày mỗi tuần và không nên ngưng tập quá 2 ngày liên tiếp. Các hình thức phù hợp tại nhà gồm đi bộ nhanh quanh sân, đạp xe tại chỗ, khiêu vũ dưỡng sinh hoặc nhảy dây nhẹ nhàng.
+Rèn luyện sức bền (2–3 buổi/tuần): Thực hiện xen kẽ với các bài tập tăng khối lượng cơ bắp như chống đẩy dựa tường, squat bằng trọng lượng cơ thể, nâng tạ tay nhẹ hoặc dùng dây kháng lực. Tăng khối lượng cơ giúp mở rộng dung tích dự trữ glucose của cơ thể, hỗ trợ hạ đường huyết đường dài.
+Khi tập luyện tại nhà, bạn cần đo đường huyết trước khi bắt đầu. Nếu chỉ số đường huyết dưới 5,6 mmol/L (100 mg/dL), hãy ăn nhẹ một bữa phụ nhỏ chứa khoảng 15g carbohydrate (như 1 lát bánh mì nguyên cám hoặc nửa quả chuối) để phòng ngừa hạ đường huyết trong lúc vận động. Ngược lại, nếu đường huyết vượt quá 13,9 mmol/L, bạn cần hoãn tập luyện, uống nước lọc nghỉ ngơi và kiểm tra ceton vì vận động lúc này có thể khiến gan phóng thích thêm glucose làm tình trạng tăng đường huyết nặng hơn. Luôn chuẩn bị sẵn nước uống và không tập khi cơ thể đang sốt hoặc mệt mỏi bất thường.
+## Hướng dẫn tự theo dõi đường huyết và ghi chép nhật ký
+Theo dõi đường huyết mao mạch bằng máy đo cá nhân tại nhà là kim chỉ nam giúp bạn đánh giá trực tiếp hiệu quả của bữa ăn và bài tập, đồng thời cung cấp dữ liệu chính xác để bác sĩ điều chỉnh phác đồ thuốc khi tái khám.
+Quy trình đo đường huyết mao mạch chuẩn tại nhà bao gồm các bước:
+Rửa tay sạch bằng xà phòng và nước ấm, sau đó lau khô hoàn toàn bằng khăn sạch (nước đọng trên da có thể làm loãng giọt máu, dẫn đến sai lệch kết quả).
+Lắp kim chích và que thử vào máy đo. Chọn mức đâm kim phù hợp với độ dày của da tay.
+Chích máu ở cạnh bên đầu ngón tay (vùng này ít dây thần kinh cảm giác hơn phần chính giữa đầu ngón), nhẹ nhàng vuốt dọc ngón tay để tạo giọt máu tròn trịa.
+Chạm nhẹ đầu que thử vào giọt máu để máy tự hút mẫu, chờ kết quả hiển thị sau vài giây.
+Ghi chép kết quả vào sổ theo dõi kèm thời điểm đo, món ăn gần nhất hoặc cường độ tập luyện.
+Các thời điểm quan trọng cần đo gồm: buổi sáng lúc bụng đói hoàn toàn (sau nhịn ăn ít nhất 8 tiếng), sau khi bắt đầu ăn 2 giờ, và trước khi đi ngủ. Dưới đây là bảng mục tiêu đường huyết dành cho người trưởng thành không mang thai theo hướng dẫn chẩn đoán và điều trị đái tháo đường của Bộ Y tế:
+Chỉ số kiểm soátNgưỡng mục tiêu khuyến nghị (Bộ Y tế)Ý nghĩa lâm sàng
+Đường huyết lúc đói / trước ăn4,4 – 7,2 mmol/L (80 – 130 mg/dL)Đánh giá khả năng điều hòa đường huyết cơ bản của gan và mức insulin nền.
+Đường huyết sau ăn 2 giờDưới 10,0 mmol/L (< 180 mg/dL)Đo lường phản ứng của cơ thể trước lượng carbohydrate vừa tiêu thụ trong bữa ăn.
+HbA1c[c]Dưới 7,0% (< 53 mmol/mol)Phản ánh mức đường huyết trung bình trong 2–3 tháng qua (xét nghiệm tại bệnh viện).
+## Quy trình kiểm tra bàn chân tại nhà mỗi ngày
+Biến chứng thần kinh và mạch máu ngoại biên ở người sống chung với đái tháo đường làm giảm khả năng cảm nhận đau, nhiệt độ, khiến các tổn thương nhỏ dễ bỏ sót và tiến triển thành loét nặng. Do đó, việc tự kiểm tra bàn chân mỗi ngày là thói quen chăm sóc tại nhà cực kỳ quan trọng:
+Thời điểm kiểm tra: Thực hiện vào mỗi buổi tối trước khi đi ngủ, nơi có đầy đủ ánh sáng.
+Quy trình quan sát và sờ nắn: Dùng gương soi để kiểm tra kỹ lòng bàn chân, gót chân và đặc biệt là các kẽ giữa các ngón chân. Quan sát xem có vết nứt da, vết phồng rộp, trầy xước, vết chai sạn bất thường, vết bầm tím hay dấu hiệu sưng đỏ, chảy dịch nào không.
+Kiểm tra nhiệt độ da: Dùng mu bàn tay sờ xem vùng da nào có cảm giác lạnh hơn hoặc nóng ấm hơn các vùng còn lại.
+Hành động cần làm: Nếu phát hiện bất kỳ vết trầy xước hoặc vết loét nào, tuyệt đối không tự ý đắp lá, dán cao hay bôi thuốc không rõ nguồn gốc mà cần rửa sạch nhẹ nhàng bằng nước muối sinh lý, băng bó bằng gạc sạch và đến cơ sở y tế kiểm tra sớm.
+## Rủi ro từ các bài thuốc truyền miệng và lưu ý dùng thuốc đúng chỉ định
+Một trong những sai lầm nguy hiểm nhất của người bệnh là tự ý bỏ thuốc hạ đường huyết hoặc insulin do bác sĩ kê đơn để chuyển sang uống các loại bột thảo mộc, nước lá, cao thực vật được quảng cáo tràn lan trên mạng xã hội.
+Cảnh báo y tế: Việc tự ý ngừng thuốc điều trị để dùng thảo dược không rõ nguồn gốc có thể dẫn tới hôn mê do tăng áp lực thẩm thấu hoặc nhiễm toan ceton đe dọa tính mạng.
+Nhiều sản phẩm gắn mác "gia truyền 100% tự nhiên" thực chất đã bị trộn lén các hoạt chất tân dược hạ đường huyết liều cao, thậm chí chứa phenformin – một loại thuốc đã bị cấm lưu hành trên toàn thế giới từ nhiều thập kỷ trước do gây toan acid lactic tử vong. Việc sử dụng những sản phẩm này không chỉ gây tổn thương gan, suy thận cấp mà còn khiến đường huyết dao động khó lường. Hãy nhớ rằng, thuốc hạ đường huyết được bác sĩ chỉ định dựa trên mức độ suy giảm chức năng tụy và thể trạng riêng của bạn. Mọi ý định bổ sung bất kỳ sản phẩm hỗ trợ nào đều cần được thông qua ý kiến chuyên môn.
+## Nhận biết dấu hiệu cấp tính và khi nào nên gặp bác sĩ
+Trong quá trình tự chăm sóc tại nhà, việc nhận diện sớm các diễn biến cấp tính bất thường là kỹ năng sống còn giúp bạn xử trí kịp thời, tránh biến chứng nguy kịch.
+### 1. Cảnh báo hạ đường huyết (Dưới 3,9 mmol/L)
+Hạ đường huyết xảy ra khi lượng đường trong máu giảm xuống dưới 3,9 mmol/L (70 mg/dL), thường do dùng quá liều thuốc, bỏ bữa hoặc vận động quá sức. Các triệu chứng điển hình bao gồm:
+Cảm giác đói cồn cào, run rẩy tay chân, vã mồ hôi lạnh toàn thân.
+Tim đập nhanh, hồi hộp, bồn chồn, lo lắng vô cớ.
+Chóng mặt, đau đầu, hoa mắt, nhìn mờ hoặc tê bì quanh môi lưỡi.
+Khi xuất hiện các dấu hiệu trên, cần áp dụng ngay quy tắc 15: Chỉ áp dụng quy tắc 15 khi người bệnh còn tỉnh táo: Ăn hoặc uống ngay 15g carbohydrate tác dụng nhanh (ví dụ: uống 1/2 lon nước ngọt thông thường, 3 viên kẹo đường hoặc 1 cốc nước ấm pha 3 thìa cà phê đường). Sau đó nghỉ ngơi và đo lại đường huyết sau 15 phút. Lưu ý sinh tử quan trọng: Nếu người bệnh đã lơ mơ, mất ý thức hoặc hôn mê, tuyệt đối không cố gắng cho ăn, uống nước đường hay nhét bất cứ thứ gì vào miệng vì nguy cơ gây sặc vào đường thở dẫn đến ngạt thở tử vong; thay vào đó cần đặt người bệnh nằm nghiêng an toàn và gọi cấp cứu 115 ngay lập tức.
+### 2. Khi nào nên gặp bác sĩ hoặc đến cơ sở y tế khẩn cấp?
+Bạn cần ngừng tự theo dõi tại nhà và đến cơ sở y tế ngay lập tức nếu gặp phải các dấu hiệu nguy hiểm sau:
+Triệu chứng tăng đường huyết cấp: Khát nước dữ dội, đi tiểu liên tục, hơi thở có mùi hoa quả thối hoặc mùi táo chín (mùi ceton), nôn ói, thở nhanh sâu, lú lẫn, ngủ gà hoặc mất ý thức.
+Đường huyết đo tại nhà liên tục vượt ngưỡng an toàn: Chỉ số đường huyết lúc đói thường xuyên trên 13,9 mmol/L (250 mg/dL) hoặc máy báo chữ "HI" dù đã dùng thuốc đúng giờ.
+Tổn thương bàn chân: Xuất hiện vết trầy xước, phồng rộp, vết loét ở bàn chân có dấu hiệu sưng đỏ, chảy dịch, đổi màu tím đen hoặc mất cảm giác đau.
+Biến chứng thị lực hoặc tiêu hóa kéo dài: Mắt nhìn mờ đột ngột, nôn ói liên tục không giữ được thức ăn hoặc sốt cao kéo dài không rõ nguyên nhân.
+Lưu ý quan trọng: Thông tin trong bài chỉ mang tính tham khảo, không thay thế tư vấn, chẩn đoán hay điều trị của bác sĩ.
+Ghi chú
+Insulin là hormone do tế bào beta tuyến tụy tiết ra, có nhiệm vụ mở khóa giúp glucose từ máu đi vào các tế bào để sản sinh năng lượng.
+Chỉ số đường huyết (Glycemic Index - GI) là thước đo tốc độ làm tăng đường huyết của thực phẩm chứa tinh bột sau khi ăn, xếp loại từ 0 đến 100.
+HbA1c là xét nghiệm máu phản ánh tỷ lệ hemoglobin gắn đường, cho biết mức kiểm soát đường huyết trung bình của cơ thể trong 2-3 tháng gần nhất.
+

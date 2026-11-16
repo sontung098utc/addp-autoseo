@@ -18,8 +18,7 @@
         }
         $tabs[] = ['key' => 'opps', 'label' => 'Cơ hội', 'count' => count($oppRows), 'tone' => $oppRows ? 'warn' : null];
     }
-    $tabs[] = ['key' => 'proposals', 'label' => 'Đề xuất', 'count' => count($proposalRows)];
-    $tabs[] = ['key' => 'rules', 'label' => 'Quy tắc'];
+    if ($hasData || count($proposalRows) > 0) { $tabs[] = ['key' => 'proposals', 'label' => 'Đề xuất', 'count' => count($proposalRows)]; }
     $dimCols = fn () => [
         ['key' => 'key', 'label' => 'Mục', 'type' => 'text', 'sortable' => true],
         ['key' => 'clicks', 'label' => 'Clicks', 'type' => 'number', 'sortable' => true],
@@ -49,10 +48,20 @@
                     <x-filament::button size="sm" :color="$days === $d ? 'info' : 'gray'" :outlined="$days !== $d" wire:click="setDays({{ $d }})" aria-pressed="{{ $days === $d ? 'true' : 'false' }}">{{ $d }} ngày</x-filament::button>
                 @endforeach
             </span>
-            @if (in_array($state, ['ket-noi', 'het-han'], true))
-                <x-studio.badge :tone="$state === 'het-han' ? 'warn' : 'ok'">{{ $state === 'het-han' ? 'Hết hạn' : 'Đã kết nối' }}</x-studio.badge>
-                @if ($report && ! $report['empty'])<span class="ss-text-sm ss-muted">Dữ liệu đến {{ $report['periods']['current']['to']->format('d/m/Y') }}</span>@endif
-            @endif
+            <x-help title="Nguồn dữ liệu và quy tắc" text="Hệ thống chỉ đọc Search Console, không ghi ngược. Chưa kết nối Google thì trang không có số liệu.">
+<ul>
+                        <li>Nguồn: Google Search Console API, OAuth chỉ đọc; hệ thống không ghi ngược vào Search Console.</li>
+                        <li>Xem và tạo đề xuất cập nhật: trưởng nhóm duyệt bài trở lên (kiểm ở server).</li>
+                        <li>Kỳ gần nhất kết thúc ở hôm nay − 3 ngày vì GSC trễ 2–3 ngày. Ngày theo giờ Pacific của Google.</li>
+                        <li>CTR = tổng clicks / tổng impressions; vị trí trung bình có trọng số theo impressions. Vị trí tăng số là xấu đi.</li>
+                        <li>Google lược truy vấn ẩn danh nên tổng truy vấn ≤ tổng trang.</li>
+                        <li>Không có dữ liệu thì ghi "—" hoặc "Mới", không hiển thị số 0 giả.</li>
+                        <li>Cơ hội trang 1: vị trí TB từ {{ OF::PAGE1_MIN_POS }} đến {{ OF::PAGE1_MAX_POS }} và từ {{ OF::MIN_IMPRESSIONS }} impressions.</li>
+                        <li>CTR thấp: dưới {{ OF::LOW_CTR_RATIO * 100 }}% CTR kỳ vọng theo vị trí và từ {{ OF::MIN_IMPRESSIONS }} impressions.</li>
+                        <li>Tụt hạng: vị trí xấu đi từ {{ OF::DROP_POSITION }} bậc hoặc clicks giảm từ {{ OF::DROP_CLICKS_PCT }}% so với kỳ trước, kỳ trước có từ {{ OF::DROP_MIN_PREV_CLICKS }} clicks.</li>
+                        <li>Đề xuất chỉ chờ duyệt; không tự sửa bài, không tự đăng.</li>
+                    </ul>
+            </x-help>
             <span style="flex:1"></span>
             @if ($state === 'ket-noi')
                 <x-filament::button size="sm" color="gray" wire:click="disconnect">Thu hồi kết nối</x-filament::button>
@@ -63,7 +72,7 @@
         </div>
 
         @if ($state === 'chua-ket-noi')
-            <div class="ss-alert ss-alert--warn" role="status" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
+            <div class="ss-alert ss-alert--info" role="status" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
                 <span>Website chưa kết nối Google Search Console.</span>
                 @if (\App\Filament\Support\Demo\DemoMode::enabled())
                     <x-filament::button size="sm" wire:click="connect">Kết nối Google Search Console</x-filament::button>
@@ -76,11 +85,11 @@
         @elseif ($state === 'khong-quyen')
             <div class="ss-alert ss-alert--danger" role="alert">Tài khoản Google đã kết nối không có quyền với property này. Cấp quyền xem hoặc chọn property khác: {{ $websites->pluck('base_url')->implode(', ') }}</div>
         @elseif ($state === 'chua-co-du-lieu' || (in_array($state, ['ket-noi', 'het-han'], true) && $report && $report['empty']))
-            <div class="ss-alert ss-alert--info" role="status">Chưa có dữ liệu cho property này.</div>
+            <div class="ss-text-sm ss-muted" role="status">Chưa có dữ liệu cho property này.</div>
         @endif
         @if ($state === 'het-han')
             <div class="ss-alert ss-alert--warn" role="alert" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
-                <span><x-studio.badge tone="warn">Số liệu có thể đã cũ</x-studio.badge> Kết nối hết hạn.</span>
+                <span>Kết nối hết hạn, số liệu có thể đã cũ.</span>
                 <x-filament::button size="sm" color="gray" wire:click="connect">Kết nối lại</x-filament::button>
             </div>
         @endif
@@ -95,6 +104,7 @@
             </div>
         @endif
 
+        @if (count($tabs) > 0)
         <x-studio.tabs persist="search-console" :tabs="$tabs">
             @if ($hasData)
                 @php
@@ -119,23 +129,23 @@
                                     <polyline points="{{ $pts($report['daily_cur']) }}" fill="none" stroke="var(--ss-accent-fg)" stroke-width="2.5"/>
                                 </svg>
                                 <div class="ss-text-sm" style="display:flex;gap:1rem;flex-wrap:wrap">
-                                    <span><strong style="color:var(--ss-accent-fg)">━</strong> Kỳ này: {{ $n($sumC) }} clicks</span>
-                                    <span><strong style="color:var(--ss-muted-fg)">╌</strong> Kỳ trước: {{ $n($sumP) }} clicks</span>
+                                    <span><strong style="color:var(--ss-accent-fg)">━</strong> Kỳ này</span>
+                                    <span><strong style="color:var(--ss-muted-fg)">╌</strong> Kỳ trước</span>
                                 </div>
                             </div>
                         </div>
+                        @if ($oppRows !== [] && count($oppRows) > 0)
                         <div class="ss-card">
                             <div class="ss-card__h">Top cơ hội</div>
                             <div class="ss-card__b">
                                 <ul class="gs-list">
-                                    @forelse (array_slice($oppRows, 0, 5) as $o)
+                                    @foreach (array_slice($oppRows, 0, 5) as $o)
                                         <li class="ss-text-sm"><x-studio.badge :tone="$o['type']['tone']">{{ $o['type']['text'] }}</x-studio.badge> <strong>{{ $o['key'] }}</strong><div class="ss-text-xs ss-muted">{{ $o['reason'] }}</div></li>
-                                    @empty
-                                        <li class="ss-text-sm ss-muted">Không có cơ hội nào trong kỳ này.</li>
-                                    @endforelse
+                                    @endforeach
                                 </ul>
                             </div>
                         </div>
+                        @endif
                     </div>
                 </x-studio.panel>
 
@@ -171,23 +181,7 @@
                     ['key' => 'period', 'label' => 'Kỳ', 'type' => 'text', 'visible' => false],
                 ]" />
             </x-studio.panel>
-
-            <x-studio.panel key="rules">
-                <div class="ss-card"><div class="ss-card__b">
-                    <ul class="ss-text-sm" style="margin:0;padding-left:1.2rem;display:grid;gap:.35rem">
-                        <li>Nguồn: Google Search Console API, OAuth chỉ đọc; hệ thống không ghi ngược vào Search Console.</li>
-                        <li>Xem và tạo đề xuất cập nhật: trưởng nhóm duyệt bài trở lên (kiểm ở server).</li>
-                        <li>Kỳ gần nhất kết thúc ở hôm nay − 3 ngày vì GSC trễ 2–3 ngày. Ngày theo giờ Pacific của Google.</li>
-                        <li>CTR = tổng clicks / tổng impressions; vị trí trung bình có trọng số theo impressions. Vị trí tăng số là xấu đi.</li>
-                        <li>Google lược truy vấn ẩn danh nên tổng truy vấn ≤ tổng trang.</li>
-                        <li>Không có dữ liệu thì ghi "—" hoặc "Mới", không hiển thị số 0 giả.</li>
-                        <li>Cơ hội trang 1: vị trí TB từ {{ OF::PAGE1_MIN_POS }} đến {{ OF::PAGE1_MAX_POS }} và từ {{ OF::MIN_IMPRESSIONS }} impressions.</li>
-                        <li>CTR thấp: dưới {{ OF::LOW_CTR_RATIO * 100 }}% CTR kỳ vọng theo vị trí và từ {{ OF::MIN_IMPRESSIONS }} impressions.</li>
-                        <li>Tụt hạng: vị trí xấu đi từ {{ OF::DROP_POSITION }} bậc hoặc clicks giảm từ {{ OF::DROP_CLICKS_PCT }}% so với kỳ trước, kỳ trước có từ {{ OF::DROP_MIN_PREV_CLICKS }} clicks.</li>
-                        <li>Đề xuất chỉ chờ duyệt; không tự sửa bài, không tự đăng.</li>
-                    </ul>
-                </div></div>
-            </x-studio.panel>
         </x-studio.tabs>
+        @endif
     </div>
 </x-filament-panels::page>

@@ -2,6 +2,18 @@
 
 namespace App\Filament\Support\Keywords;
 
+use App\Contracts\StructuredAiInterface;
+use App\Filament\Support\Demo\DemoMode;
+use App\Models\Keyword;
+use App\Models\Website;
+use App\Services\Agent\Run\JobRunRecorder;
+use App\Services\Keywords\KeywordAiResolver;
+use App\Services\Keywords\KeywordAiUnavailable;
+use App\Services\Keywords\Serp\SerpClusterer;
+use App\Services\Keywords\Serp\SerpInsights;
+use App\Services\Keywords\Serp\SerpUnavailable;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 
 /**
@@ -12,9 +24,34 @@ final class KeywordService
 {
     public function __construct(private readonly KeywordRepository $repo) {}
 
-    public static function make(): self
+    /**
+     * Bản Eloquent khi chạy production (DemoMode tắt) hoặc bật STUDIO_KEYWORDS_REAL; ngược lại là bản minh họa có nhãn.
+     * Từ khóa thuộc về website đang hoạt động đầu tiên (cùng cách chọn với màn Kế hoạch nội dung).
+     */
+    public static function make(?Website $site = null): self
     {
+        if (self::useReal()) {
+            $site ??= self::defaultSite();
+            if ($site) {
+                return new self(new EloquentKeywordRepository($site->id));
+            }
+        }
+
         return new self(new DemoKeywordRepository);
+    }
+
+    public static function useReal(): bool
+    {
+        return ! DemoMode::enabled() || (bool) config('studio.keywords_real');
+    }
+
+    public static function defaultSite(): ?Website
+    {
+        try {
+            return Website::where('status', 'active')->orderBy('name')->first();
+        } catch (QueryException) {
+            return null; // chưa có bảng (ví dụ test đơn vị không DB) -> dùng bản minh họa
+        }
     }
 
     public function repo(): KeywordRepository
@@ -36,7 +73,7 @@ final class KeywordService
         foreach ($list as $r) {
             $seen[CsvKeywordParser::key($r['keyword'])] = true;
         }
-        $next = (int) max(0, ...array_column($list, 'id')) + 1;
+        $next = (int) max([0, ...array_column($list, 'id')]) + 1;
         $added = 0;
         foreach ($rows as $r) {
             $k = CsvKeywordParser::key($r['keyword']);
@@ -44,7 +81,7 @@ final class KeywordService
                 continue;
             }
             $seen[$k] = true;
-            $list[] = ['id' => $next++, 'keyword' => CsvKeywordParser::normalizeKeyword($r['keyword']), 'volume' => $r['volume'] ?? null, 'difficulty' => null, 'intent' => $r['intent'] ?? KeywordIntent::DEFAULT, 'source' => $source, 'cluster' => null];
+            $list[] = ['id' => $next++, 'keyword' => CsvKeywordParser::normalizeKeyword($r['keyword']), 'volume' => $r['volume'] ?? null, 'volume_source' => ($r['volume'] ?? null) !== null && in_array($source, ['csv', 'tay', 'gsc'], true) ? $source : null, 'difficulty' => null, 'intent' => $r['intent'] ?? KeywordIntent::DEFAULT, 'source' => $source, 'cluster' => null];
             $added++;
         }
         $this->repo->saveList($list);
@@ -111,18 +148,199 @@ final class KeywordService
     public function propose(): int
     {
         $free = array_values(array_map(fn ($r) => $r['keyword'], array_filter($this->repo->all(), fn ($r) => $r['cluster'] === null)));
-        $groups = (new MockClusterer)->cluster($free);
         $byKw = [];
         foreach ($this->repo->all() as $r) {
             $byKw[$r['keyword']] = $r['intent'];
+        }
+        // Tách theo ý định trước khi gom: từ khóa tìm hiểu (thông tin) không chung cụm với từ khóa mua/so sánh dù trùng cụm từ
+        // ("chỉ số đường huyết" ≠ "mua máy đo đường huyết"). Cụm thương mại có hậu tố để không trùng tên (nhận cụm trùng tên sẽ nhập vào nhau).
+        $info = array_values(array_filter($free, fn ($k) => ($byKw[$k] ?? 'informational') === 'informational'));
+        $shop = array_values(array_diff($free, $info));
+        $groups = (new MockClusterer)->cluster($info);
+        foreach ((new MockClusterer)->cluster($shop) as $g) {
+            $groups[] = ['name' => $g['name'].' (mua/so sánh)', 'keywords' => $g['keywords']];
         }
         $props = [];
         foreach ($groups as $i => $g) {
             $props[] = ['id' => $i + 1, 'name' => $g['name'], 'intent' => self::mainIntent($g['keywords'], $byKw), 'keywords' => $g['keywords']];
         }
         $this->repo->saveProposals($props);
+        $this->repo->saveProposalSource('mock');
 
         return count($props);
+    }
+
+    /** Lần đề xuất gần nhất do AI hay do bản minh họa (để giao diện gắn nhãn đúng). @return 'ai'|'serp'|'mock' */
+    public function proposalSource(): string
+    {
+        return $this->repo->proposalSource();
+    }
+
+    /**
+     * Đề xuất gom cụm bằng AI cho các từ khóa CHƯA có cụm và chưa nằm trong đề xuất đang chờ.
+     * Đề xuất mới cùng tên với đề xuất đang chờ thì hợp nhất (không nhân đôi). Không có AI thật: ném KeywordAiUnavailable.
+     *
+     * @return array{proposals:int, label:string, demo:bool, cost_vnd:float, stopped_reason:?string}
+     *
+     * @throws KeywordAiUnavailable
+     */
+    public function proposeWithAi(?StructuredAiInterface $ai = null): array
+    {
+        $siteId = $this->repo instanceof EloquentKeywordRepository ? $this->repo->websiteId() : null;
+        if ($siteId === null) {
+            $o = $this->doProposeWithAi($ai, null);
+            unset($o['before']);
+
+            return $o; // kho minh họa: không có website để ghi phiên
+        }
+        $demo = false;
+        try {
+            if ($ai === null) {
+                try {
+                    $demo = KeywordAiResolver::resolve('keyword_cluster')['demo'];
+                } catch (KeywordAiUnavailable $e) {
+                    $b = JobRunRecorder::start('market_research', $siteId, ['task' => 'keyword_cluster'], Auth::user());
+                    JobRunRecorder::step($b, 'guard', 'Chưa kết nối AI', 'blocked', [], null, 0, 0, 'Chưa gọi AI nên không tốn chi phí.');
+                    JobRunRecorder::finish($b, 'blocked', null, 'Chưa kết nối AI.');
+                    throw $e;
+                }
+            }
+        } catch (KeywordAiUnavailable $e) {
+            throw $e;
+        } catch (\Throwable) {
+            // chỉ để đoán chế độ AI cho nhật ký; lỗi khác sẽ lộ ở doProposeWithAi
+        }
+        $run = JobRunRecorder::start('market_research', $siteId, ['task' => 'keyword_cluster'], Auth::user(), 'manual', $demo ? 'mock' : 'real');
+        try {
+            $out = $this->doProposeWithAi($ai, $run);
+        } catch (\Throwable $e) {
+            JobRunRecorder::finish($run, 'failed', null, 'Lỗi: '.class_basename($e));
+            throw $e;
+        }
+        $failed = $out['stopped_reason'] !== null && $out['cost_vnd'] <= 0.0 && ! ($out['proposals'] > ($out['before'] ?? 0));
+        unset($out['before']);
+        $reason = $out['stopped_reason'];
+        $status = $failed ? 'failed' : ($reason === 'budget' ? 'blocked' : 'ready_for_review');
+        JobRunRecorder::finish($run, $status, ['proposals' => $out['proposals']], $reason);
+
+        return $out;
+    }
+
+    /**
+     * Đề xuất gom cụm theo SERP THẬT (trùng top 10) cho các từ khóa chưa có cụm và chưa nằm trong đề xuất chờ. Không dùng AI, không tốn token;
+     * tốn chi phí tra SERP (ước tính theo config). Chưa có nguồn SERP: ném SerpUnavailable, không gom giả.
+     *
+     * @return array{proposals:int, cost_vnd:float, unprocessed:list<array{keyword:string,reason:string}>, interlinks:list<array{from:string,to:string,shared:int}>, stopped_reason:?string}
+     *
+     * @throws SerpUnavailable
+     */
+    public function proposeWithSerp(?SerpInsights $serp = null, ?float $budgetVnd = null): array
+    {
+        $serp ??= SerpInsights::fromConfig();
+        $props = $this->repo->proposals();
+        $pending = [];
+        foreach ($props as $p) {
+            foreach ($p['keywords'] as $k) {
+                $pending[Keyword::keyFor($k)] = true;
+            }
+        }
+        $all = $this->repo->all();
+        $intents = [];
+        $free = [];
+        foreach ($all as $r) {
+            $intents[$r['keyword']] = $r['intent'];
+            if ($r['cluster'] === null && ! isset($pending[Keyword::keyFor($r['keyword'])])) {
+                $free[] = $r;
+            }
+        }
+        usort($free, fn ($a, $b) => ($b['volume'] ?? -1) <=> ($a['volume'] ?? -1)); // từ khóa nhiều lượt tìm trước (null cuối): được tra SERP trước khi hết trần
+        $siteId = $this->repo instanceof EloquentKeywordRepository ? $this->repo->websiteId() : null;
+        $run = $siteId !== null ? JobRunRecorder::start('market_research', $siteId, ['task' => 'keyword_serp_cluster', 'keywords' => count($free)], Auth::user(), 'manual', 'real') : null;
+        $out = ['proposals' => count($props), 'cost_vnd' => 0.0, 'unprocessed' => [], 'interlinks' => [], 'stopped_reason' => null];
+        try {
+            $res = (new SerpClusterer)->cluster(array_column($free, 'keyword'), $serp, $budgetVnd ?? (float) config('keywords.serp.cluster_budget_vnd', 40000));
+        } catch (SerpUnavailable $e) {
+            if ($run) {
+                JobRunRecorder::step($run, 'guard', 'Chưa có nguồn SERP', 'blocked', [], null, 0, 0, 'Chưa tra SERP nên không tốn chi phí.');
+                JobRunRecorder::finish($run, 'blocked', null, mb_substr($e->getMessage(), 0, 190));
+            }
+            throw $e;
+        }
+        $nextId = (int) max([0, ...array_column($props, 'id')]) + 1;
+        foreach ($res['groups'] as $g) {
+            $props[] = ['id' => $nextId++, 'name' => $g['name'], 'intent' => self::mainIntent($g['keywords'], $intents), 'keywords' => $g['keywords'], 'serp' => ['pillar' => $g['pillar'], 'same_post' => $g['same_post'], 'evidence' => $g['evidence']]];
+        }
+        if ($res['groups'] !== []) {
+            $this->repo->saveProposals($props);
+            $this->repo->saveProposalSource('serp');
+        }
+        $out = ['proposals' => count($props), 'cost_vnd' => $res['cost_vnd'], 'unprocessed' => $res['unprocessed'], 'interlinks' => $res['interlinks'], 'stopped_reason' => $res['stopped']];
+        if ($run) {
+            JobRunRecorder::step($run, 'cluster', 'Gom cụm theo SERP trùng top 10', $res['groups'] !== [] ? 'completed' : 'skipped', ['groups' => count($res['groups']), 'unprocessed' => count($res['unprocessed']), 'providers' => $res['providers'], 'interlinks' => count($res['interlinks'])], null, 0, $res['cost_vnd'], null, 'strategist');
+            JobRunRecorder::finish($run, $res['groups'] !== [] ? 'ready_for_review' : 'blocked', ['proposals' => $out['proposals']], $res['stopped']);
+        }
+
+        return $out;
+    }
+
+    private function doProposeWithAi(?StructuredAiInterface $ai, $run): array
+    {
+        $cap = null;
+        $label = 'AI';
+        $demo = false;
+        if ($ai === null) {
+            ['ai' => $ai, 'cap' => $cap, 'label' => $label, 'demo' => $demo] = KeywordAiResolver::resolve('keyword_cluster');
+        }
+        $all = $this->repo->all();
+        $pending = [];
+        $props = $this->repo->proposals();
+        foreach ($props as $p) {
+            foreach ($p['keywords'] as $k) {
+                $pending[Keyword::keyFor($k)] = true;
+            }
+        }
+        $free = [];
+        $intents = [];
+        foreach ($all as $r) {
+            $intents[$r['keyword']] = $r['intent'];
+            if ($r['cluster'] === null && ! isset($pending[Keyword::keyFor($r['keyword'])])) {
+                $free[] = $r['keyword'];
+            }
+        }
+        $out = ['proposals' => count($props), 'label' => $label, 'demo' => $demo, 'cost_vnd' => 0.0, 'stopped_reason' => null, 'before' => count($props)];
+        JobRunRecorder::step($run, 'guard', 'Chọn từ khóa chưa có cụm', 'completed', ['free_keywords' => count($free), 'pending_proposals' => count($props)]);
+        if ($free === []) {
+            return $out;
+        }
+        $res = (new AiClusterer)->cluster($free, array_column($this->repo->clusters(), 'name'), $ai, $cap);
+        foreach ($res['batches'] as $b) {
+            JobRunRecorder::step($run, 'cluster', 'Gom cụm lô '.$b['n'], $b['status'], ['batch' => $b['n'], 'keywords' => $b['size']], $b['model'], $b['tokens'], $b['cost_vnd'], null, 'strategist');
+        }
+        $nextId = (int) max([0, ...array_column($props, 'id')]) + 1;
+        foreach ($res['groups'] as $g) {
+            $hit = null;
+            foreach ($props as $i => $p) {
+                if (mb_strtolower($p['name']) === mb_strtolower($g['name'])) {
+                    $hit = $i;
+                    break;
+                }
+            }
+            if ($hit !== null) {
+                $props[$hit]['keywords'] = array_values(array_unique(array_merge($props[$hit]['keywords'], $g['keywords'])));
+            } else {
+                $props[] = ['id' => $nextId++, 'name' => $g['name'], 'intent' => $g['name'] === MockClusterer::LEFTOVER ? self::mainIntent($g['keywords'], $intents) : $g['intent'], 'keywords' => $g['keywords']];
+            }
+        }
+        if ($res['groups'] !== []) {
+            $this->repo->saveProposals($props);
+            $this->repo->saveProposalSource('ai');
+        }
+        JobRunRecorder::step($run, 'save', 'Lưu đề xuất cụm chờ nhận', $res['groups'] !== [] ? 'completed' : 'skipped', ['groups' => count($res['groups']), 'unprocessed' => count($res['unprocessed'])]);
+        $out['proposals'] = count($props);
+        $out['cost_vnd'] = $res['cost_vnd'];
+        $out['stopped_reason'] = $res['stopped'] ?? $res['error'];
+
+        return $out;
     }
 
     /** Nhận đề xuất thành cụm thật (trùng tên cụm đã có thì nhập vào cụm đó). */
@@ -179,7 +397,7 @@ final class KeywordService
             throw new InvalidArgumentException('Nhập tên cho cụm mới.');
         }
         $props = $this->repo->proposals();
-        $nextId = (int) max(0, ...array_column($props, 'id')) + 1;
+        $nextId = (int) max([0, ...array_column($props, 'id')]) + 1;
         $new = null;
         foreach ($props as &$p) {
             if ($p['id'] !== $id) {

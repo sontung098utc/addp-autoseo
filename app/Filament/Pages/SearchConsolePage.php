@@ -13,7 +13,11 @@ use App\Models\Website;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Url;
 
 class SearchConsolePage extends Page
@@ -24,9 +28,9 @@ class SearchConsolePage extends Page
 
     protected static ?string $navigationLabel = 'Search Console';
 
-    protected static ?string $navigationGroup = 'Phân tích';
+    protected static ?string $navigationGroup = 'Khám phá';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 5;
 
     protected static ?string $title = 'Search Console';
 
@@ -52,6 +56,14 @@ class SearchConsolePage extends Page
         return $u instanceof User && $u->is_active && $u->isApprover();
     }
 
+    /** Một (i) duy nhất của trang, đặt cạnh tiêu đề (cùng hàng). */
+    public function getHeading(): string|Htmlable
+    {
+        return new HtmlString('Search Console '.Blade::render(<<<'BLADE'
+<x-chain-context step="Khám phá" purpose="Đo hiệu quả bài đã đăng và phát hiện bài tụt hạng để làm mới." :inputs="[['label'=>'Bài đã đăng','url'=>\App\Filament\Resources\PublicationResource::listUrl(),'note'=>'Lịch xuất bản']]" :outputs="[['label'=>'Đề xuất làm mới','url'=>\App\Filament\Pages\AuditPage::getUrl(),'note'=>'bài tụt hạng'],['label'=>'Từ khóa mới','url'=>\App\Filament\Pages\KeywordsPage::getUrl()]]" :compact="true" />
+BLADE));
+    }
+
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
@@ -61,7 +73,7 @@ class SearchConsolePage extends Page
     /** Trạng thái màn: production luôn "chưa kết nối" thật; ngoài production theo ?demo= hoặc cờ gsc.connected. */
     public function state(): string
     {
-        $default = DemoMode::enabled() && DemoStore::get('gsc.connected', true) ? 'ket-noi' : 'chua-ket-noi';
+        $default = (DemoMode::enabled() && DemoStore::get('gsc.connected', true)) || (! DemoMode::enabled() && \App\Filament\Support\Gsc\GoogleSearchConsoleSource::forWebsite($this->websiteId ? Website::find($this->websiteId) : null) !== null) ? 'ket-noi' : 'chua-ket-noi';
 
         return DemoMode::state($this->demo, self::STATES, $default);
     }
@@ -129,7 +141,7 @@ class SearchConsolePage extends Page
 
     public function report(): array
     {
-        return GscService::make()->report($this->days);
+        return GscService::forWebsite($this->websiteId ? Website::find($this->websiteId) : null)->report($this->days);
     }
 
     /** @param array<string, mixed> $d @return float|null chênh lệch để hiển thị (null nếu chưa có / mới) */
@@ -183,7 +195,7 @@ class SearchConsolePage extends Page
             'key' => $p['key'],
             'page' => $p['page'] ?? '—',
             'by' => $p['created_by_name'],
-            'at' => \Illuminate\Support\Carbon::parse($p['created_at'])->setTimezone('Asia/Ho_Chi_Minh')->format('d/m/Y H:i'),
+            'at' => Carbon::parse($p['created_at'])->setTimezone('Asia/Ho_Chi_Minh')->format('d/m/Y H:i'),
             'period' => $p['metrics']['period'],
             'reasons' => implode(' · ', $p['reasons']),
         ], UpdateProposals::all(), array_keys(UpdateProposals::all()));

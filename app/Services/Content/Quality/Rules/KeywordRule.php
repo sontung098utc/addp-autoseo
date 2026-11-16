@@ -25,12 +25,12 @@ class KeywordRule implements QualityRule
         $text = $ctx->text();
         $occ = substr_count($text, $kw);
         $seoTitle = QualityContext::normalize((string) $ctx->version->seo_title);
-        $inTitle = $seoTitle !== '' && str_contains($seoTitle, $kw);
+        $inTitle = $seoTitle !== '' && QualityContext::keywordIn($seoTitle, $kw);
         $titleResult = new RuleResult('KW01', RuleResult::P1, $inTitle, 'Từ khóa trong tiêu đề SEO', $inTitle
             ? "Tiêu đề SEO có chứa «{$kw}»."
             : "Tiêu đề SEO chưa chứa từ khóa «{$kw}». Đưa từ khóa lên gần đầu tiêu đề SEO.", null, 'có trong seo_title', $seoTitle === '' ? 'seo_title trống' : QualityContext::excerpt((string) $ctx->version->seo_title, 80));
 
-        if ($occ === 0) {
+        if ($occ === 0 && ! QualityContext::keywordIn($text, $kw)) {
             return [
                 new RuleResult('KW01', RuleResult::P0, false, 'Từ khóa trong bài',
                     "Từ khóa «{$kw}» hoàn toàn không xuất hiện trong nội dung. Viết lại bài bám sát chủ đề hoặc đổi từ khóa cho đúng.", '0 lần', '≥ 1 lần'),
@@ -39,10 +39,10 @@ class KeywordRule implements QualityRule
         }
 
         $lead = implode(' ', array_slice($ctx->words(), 0, T::KEYWORD_LEAD_WORDS));
-        $inLead = str_contains($lead, $kw);
+        $inLead = QualityContext::keywordIn($lead, $kw);
         $inHeading = false;
         foreach ($ctx->headings() as $h) {
-            if (str_contains($h['text'], $kw)) {
+            if (QualityContext::keywordIn($h['text'], $kw)) {
                 $inHeading = true;
                 break;
             }
@@ -53,7 +53,7 @@ class KeywordRule implements QualityRule
         $dense = $density > T::MAX_KEYWORD_DENSITY_PERCENT;
 
         return [
-            new RuleResult('KW01', RuleResult::P0, true, 'Từ khóa trong bài', "Từ khóa «{$kw}» xuất hiện {$occ} lần.", "{$occ} lần", '≥ 1 lần'),
+            new RuleResult('KW01', RuleResult::P0, true, 'Từ khóa trong bài', $occ > 0 ? "Từ khóa «{$kw}» xuất hiện {$occ} lần." : "Từ khóa «{$kw}» là câu hỏi dài: bài dùng đủ các từ cốt lõi của nó.", "{$occ} lần", '≥ 1 lần'),
             $titleResult,
             new RuleResult('KW01', RuleResult::P1, $inLead, 'Từ khóa trong ' . T::KEYWORD_LEAD_WORDS . ' từ đầu', $inLead
                 ? 'Từ khóa có trong phần mở đầu.'

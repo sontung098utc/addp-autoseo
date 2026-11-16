@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PublicationResource\Pages;
 
 use App\Filament\Resources\PublicationResource;
+use App\Filament\Support\Schedule\HasWeeklyBoard;
 use App\Filament\Support\Schedule\VnTime;
 use App\Models\Publication;
 use App\Services\Publishing\EmergencyStopService;
@@ -15,20 +16,23 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ListPublications extends ListRecords
 {
+    use HasWeeklyBoard;
+
     protected static string $resource = PublicationResource::class;
 
     protected static ?string $title = 'Lịch xuất bản';
 
-    public function getSubheading(): ?string
+    protected static string $view = 'filament.publication.list';
+
+    /** Cảnh báo dừng khẩn cấp: hiện đầu trang chung, trên cả hai tab. @return array{reason: string}|null */
+    public function stopWarning(): ?array
     {
-        $emergencyService = app(EmergencyStopService::class);
-        if ($emergencyService->isStopped()) {
-            $info = $emergencyService->getStopInfo();
-            $reason = $info['reason'] ?? 'Tạm dừng toàn hệ thống';
-            return "⛔ CẢNH BÁO: Lịch xuất bản tự động đang DỪNG KHẨN CẤP ({$reason}). Toàn bộ lượt đăng đang tạm hoãn.";
+        $svc = app(EmergencyStopService::class);
+        if (! $svc->isStopped()) {
+            return null;
         }
 
-        return null;
+        return ['reason' => $svc->getStopInfo()['reason'] ?? 'Tạm dừng toàn hệ thống'];
     }
 
     protected function getHeaderActions(): array
@@ -72,7 +76,7 @@ class ListPublications extends ListRecords
                         ->rows(3),
                 ])
                 ->modalHeading('Kích hoạt Dừng khẩn cấp Lịch xuất bản')
-                ->modalDescription('Toàn bộ lượt xuất bản tự động của hệ thống sẽ lập tức tạm dừng. Các bài đến hạn sẽ không được gửi sang CMS cho đến khi được khôi phục.')
+                ->modalDescription('Toàn bộ lượt xuất bản tự động của hệ thống sẽ lập tức tạm dừng và ĐỘI AI cũng sẽ không viết thêm bài nào (kể cả chiến dịch Toàn quyền và Autopilot) cho đến khi được khôi phục. Các bài đến hạn sẽ không được gửi sang CMS.')
                 ->modalSubmitActionLabel('Kích hoạt dừng khẩn cấp')
                 ->action(function (array $data) use ($emergencyService) {
                     $user = auth()->user();
@@ -99,7 +103,7 @@ class ListPublications extends ListRecords
 
         $today = fn (Builder $query) => $query->where('scheduled_at_utc', '>=', $start)->where('scheduled_at_utc', '<', $end);
         $upcoming = fn (Builder $query) => $query->where('status', 'scheduled')->where('scheduled_at_utc', '>=', $nowUtc);
-        $attention = fn (Builder $query) => $query->whereIn('status', ['failed', 'needs_reconcile']);
+        $attention = fn (Builder $query) => $query->whereIn('status', ['failed', 'needs_reconcile', 'paused', 'awaiting_confirm']);
         $done = fn (Builder $query) => $query->where('status', 'published');
 
         return [

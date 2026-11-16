@@ -4,6 +4,7 @@ namespace Tests\Feature\Filament;
 
 use App\Filament\Pages\AuditPage;
 use App\Filament\Support\Demo\DemoStore;
+use App\Filament\Support\SeoAudit\ScanBlocked;
 use App\Filament\Support\SeoAudit\ScanGuard;
 use App\Filament\Support\SeoAudit\SeoAuditService;
 use App\Models\User;
@@ -11,6 +12,7 @@ use App\Models\Website;
 use App\Services\Security\UrlSafetyService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -26,9 +28,10 @@ class SeoAuditPageTest extends TestCase
         parent::setUp();
         Cache::flush();
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-11-06 03:00:00', 'UTC'));
-        \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::parse('2026-11-06 03:00:00', 'UTC'));
+        Carbon::setTestNow(Carbon::parse('2026-11-06 03:00:00', 'UTC'));
         // DNS giả: domain công khai phân giải ra IP công khai, "noi-bo.test" ra IP nội bộ.
-        app()->instance(UrlSafetyService::class, new class extends UrlSafetyService {
+        app()->instance(UrlSafetyService::class, new class extends UrlSafetyService
+        {
             protected function resolveIps(string $host): array
             {
                 if (filter_var($host, FILTER_VALIDATE_IP)) {
@@ -44,7 +47,7 @@ class SeoAuditPageTest extends TestCase
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();
-        \Illuminate\Support\Carbon::setTestNow();
+        Carbon::setTestNow();
         parent::tearDown();
     }
 
@@ -96,7 +99,7 @@ class SeoAuditPageTest extends TestCase
     public function test_giao_dien_tab_bang_kpi_va_nut_primary_duy_nhat(): void
     {
         $this->as('approver');
-        $c = Livewire::test(AuditPage::class)->assertSee('Nhóm lỗi')->assertSee('Brief đã tạo')->assertSee('Quy tắc')
+        $c = Livewire::test(AuditPage::class)->assertSee('Nhóm lỗi')->assertSee('Brief đã tạo')->assertSee('Cách quét và quy tắc')->assertSee('data-testid="help"', false)
             ->assertSee('Tạo brief từ lỗi')->assertDontSee('Luật nghiệp vụ của màn này');
         $rows = $c->viewData('groupRows');
         $this->assertNotEmpty($rows);
@@ -152,7 +155,7 @@ class SeoAuditPageTest extends TestCase
         $this->assertFalse(ScanGuard::check($lo, null, $u)['ok']);
         $this->assertTrue(ScanGuard::check($this->site, null, $u)['ok']);
         // service chặn dù gọi thẳng
-        $this->expectException(\App\Filament\Support\SeoAudit\ScanBlocked::class);
+        $this->expectException(ScanBlocked::class);
         SeoAuditService::make()->rescan($in, $u);
     }
 
@@ -225,5 +228,26 @@ class SeoAuditPageTest extends TestCase
         $this->as('approver');
         $this->site->update(['status' => 'revoked']);
         Livewire::test(AuditPage::class)->assertSee('Website chưa được kết nối')->assertDontSee('Liên kết gãy (404)');
+    }
+
+    public function test_thanh_cong_cu_gon_mot_nhan_trang_thai_va_nut_phu_trong_menu_them(): void
+    {
+        $this->as('approver');
+        $html = Livewire::test(AuditPage::class)->html();
+        $this->assertSame(1, substr_count($html, 'data-testid="au-run-label"'), 'đúng một nhãn trạng thái');
+        $this->assertStringNotContainsString('không phải kết quả quét website thật</span>', $html, 'câu giải thích dài không nằm sẵn trên thanh công cụ');
+        $this->assertStringContainsString('data-testid="au-more"', $html);
+        $this->assertStringContainsString('Thêm', $html);
+    }
+
+    public function test_dau_i_nam_canh_tieu_de_khong_o_hang_rieng(): void
+    {
+        $this->as('approver');
+        $c = Livewire::test(AuditPage::class);
+        $heading = (string) (new AuditPage)->getHeading();
+        $this->assertStringContainsString('Audit website', $heading);
+        $this->assertStringContainsString('data-testid="chain-context"', $heading);
+        $this->assertSame(1, substr_count($c->html(), 'data-testid="chain-context"'), 'đúng một (i) của trang');
+        $this->assertMatchesRegularExpression('#<h1[^>]*>.*data-testid="chain-context".*</h1>#s', $c->html(), '(i) nằm trong tiêu đề, không ở hàng riêng');
     }
 }

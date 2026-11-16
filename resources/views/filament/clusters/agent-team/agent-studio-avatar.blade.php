@@ -1,0 +1,2 @@
+@php($ic = \App\Services\Agent\Roles\RoleIcons::for((string) ($role ?? '')))
+<span aria-hidden="true" data-role-icon="{{ $role ?? '' }}" style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:{{ $size ?? 2.4 }}rem;height:{{ $size ?? 2.4 }}rem;border-radius:999px;background:{{ $ic['color'] }}1f;color:{{ $ic['color'] }}"><x-filament::icon :icon="$ic['icon']" style="width:{{ ($size ?? 2.4) * .52 }}rem;height:{{ ($size ?? 2.4) * .52 }}rem" /></span>

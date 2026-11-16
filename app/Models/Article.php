@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Observers\ArticleKeywordObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+#[ObservedBy(ArticleKeywordObserver::class)]
 class Article extends Model
 {
     use HasFactory;
@@ -21,6 +24,13 @@ class Article extends Model
         'search_intent',
         'topic_cluster',
         'workflow_status',
+        'kind',
+        'origin',
+        'origin_ref',
+        'keyword_id',
+        'cluster_id',
+        'priority',
+        'guidance',
         'approved_version_id',
     ];
 
@@ -36,9 +46,15 @@ class Article extends Model
         return $this->belongsTo(Website::class);
     }
 
+    /** Chiến dịch chứa bài (cha). Rỗng = bài lẻ. */
     public function campaign(): BelongsTo
     {
         return $this->belongsTo(Campaign::class);
+    }
+
+    public function keyword(): BelongsTo
+    {
+        return $this->belongsTo(Keyword::class);
     }
 
     public function creator(): BelongsTo

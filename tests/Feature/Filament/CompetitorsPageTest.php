@@ -7,7 +7,10 @@ use App\Filament\Support\Competitors\CompetitorService;
 use App\Filament\Support\Competitors\CostPolicy;
 use App\Filament\Support\Competitors\KeywordGapSource;
 use App\Filament\Support\Competitors\SourceUnavailableException;
+use App\Filament\Support\Demo\CompetitorsDemoData;
+use App\Filament\Support\Demo\DemoStore;
 use App\Models\Article;
+use App\Models\Competitor;
 use App\Models\User;
 use App\Models\Website;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -103,7 +106,7 @@ class CompetitorsPageTest extends TestCase
         $this->assertSame(1000, CostPolicy::used());
         $p->assertSee('data-co-section="gaps"', false);
         $this->assertNotNull(CompetitorService::snapshot($this->site));
-        $this->assertCount(1, \App\Filament\Support\Demo\DemoStore::get('competitors.log'));
+        $this->assertCount(1, DemoStore::get('competitors.log'));
     }
 
     public function test_over_quota_blocks_refresh(): void
@@ -125,9 +128,15 @@ class CompetitorsPageTest extends TestCase
 
         app()->instance(KeywordGapSource::class, new class implements KeywordGapSource
         {
-            public function estimateRows(int $n): int { return $n * 1000; }
+            public function estimateRows(int $n): int
+            {
+                return $n * 1000;
+            }
 
-            public function fetch(array $domains): array { throw new SourceUnavailableException('429 hết hạn mức'); }
+            public function fetch(array $domains): array
+            {
+                throw new SourceUnavailableException('429 hết hạn mức');
+            }
         });
         $p->call('doRefresh')->assertSee('Không lấy được dữ liệu')->assertSee('Dữ liệu cũ')->assertDontSee('data-co-section="gaps"', false);
         $this->assertSame($before, CompetitorService::snapshot($this->site));
@@ -165,7 +174,7 @@ class CompetitorsPageTest extends TestCase
         $p = $this->loaded();
         $open = collect($p->instance()->gaps())->filter(fn ($g) => $g['existing'] === null)->values();
         // sau khi hiển thị, có người tạo trùng ở nơi khác (đua)
-        Article::create(['website_id' => $this->site->id, 'created_by' => 1, 'primary_keyword' => strtoupper($open[0]['keyword']), 'workflow_status' => 'planned']);
+        Article::create(['website_id' => $this->site->id, 'created_by' => $this->user('writer')->id, 'primary_keyword' => strtoupper($open[0]['keyword']), 'workflow_status' => 'planned']);
         $before = Article::count();
         $p->set('selected', [$open[1]['norm']])->call('addToPlan');
         $this->assertSame($before + 1, Article::count());
@@ -179,8 +188,8 @@ class CompetitorsPageTest extends TestCase
     public function test_existing_article_marked_not_suggested(): void
     {
         $this->actingAs($this->user('approver'));
-        $kw = \App\Filament\Support\Demo\CompetitorsDemoData::keywordPool()[0]['keyword'];
-        $art = Article::create(['website_id' => $this->site->id, 'created_by' => 1, 'primary_keyword' => '  '.mb_strtoupper($kw).' ', 'workflow_status' => 'published']);
+        $kw = CompetitorsDemoData::keywordPool()[0]['keyword'];
+        $art = Article::create(['website_id' => $this->site->id, 'created_by' => $this->user('writer')->id, 'primary_keyword' => '  '.mb_strtoupper($kw).' ', 'workflow_status' => 'published']);
         $p = $this->loaded();
         $row = collect($p->instance()->gaps())->first(fn ($g) => $g['norm'] === $kw);
         if ($row) { // từ khóa này có thể không được đối thủ giả lập xếp hạng; nếu có thì phải bị đánh dấu
@@ -197,31 +206,81 @@ class CompetitorsPageTest extends TestCase
     {
         $this->page('approver', 'chua-ket-noi')->assertOk();
         $this->page('approver', 'dang-tai')->assertSee('Đang lấy dữ liệu');
-        $this->page('approver', 'khong-doi-thu')->assertSee('Chưa có đối thủ nào');
+        $this->page('approver', 'khong-doi-thu')->assertSee('Chưa theo dõi đối thủ nào');
         $this->page('approver', 'ket-noi')->assertSee('tuyensinhhub.example');
         $e = $this->page('approver', 'loi-api')->set('newDomain', 'a.example')->call('addCompetitor')->call('doRefresh');
         $e->assertSee('Không lấy được dữ liệu')->assertSee('429');
         $this->assertSame(0, CostPolicy::used());
     }
 
-    public function test_production_shows_unconnected_without_sample_data(): void
+    /** AG-S24: production dùng bảng thật, không có số mẫu; không còn trạng thái "chưa kết nối nguồn trả phí". */
+    public function test_production_uses_real_tables_without_sample_data(): void
     {
         $this->app['env'] = 'production';
         $this->assertTrue(app()->isProduction());
         $this->page('approver', 'ket-noi')
-            ->assertSee('Chưa kết nối nguồn từ khóa trả phí')
+            ->assertSee('Chưa theo dõi đối thủ nào')
             ->assertDontSee('tuyensinhhub.example')->assertDontSee('Dữ liệu minh họa —')
             ->set('newDomain', 'a.vn')->call('addCompetitor');
         $this->assertSame([], CompetitorService::domains($this->site));
+        $this->assertSame(['a.vn'], Competitor::pluck('domain')->all());
+    }
+
+    /** Chưa có đối thủ: chỉ một trạng thái trống với MỘT nút hành động (Thêm), không nhãn đỏ, không thẻ KPI rỗng. */
+    public function test_empty_competitors_is_single_neutral_empty_state(): void
+    {
+        $html = $this->page('approver', 'khong-doi-thu')->html();
+        $this->assertStringContainsString('Chưa theo dõi đối thủ nào', $html);
+        $this->assertStringContainsString('data-co-section="empty"', $html);
+        $this->assertSame(1, substr_count($html, 'type="submit"'), 'Đúng một nút hành động chính');
+        $this->assertStringContainsString('Thêm đối thủ', $html);
+        $this->assertStringNotContainsString('data-co-blocked', $html);
+        $this->assertStringNotContainsString('ss-badge--danger', $html);
+        $this->assertStringNotContainsString('Chưa có đối thủ nào để lấy dữ liệu', $html);
+        $this->assertStringNotContainsString('ss-kpi', $html);
+        $this->assertStringNotContainsString('ss-tabs', $html);
+        $this->assertStringNotContainsString('Thêm vào kế hoạch (', $html);
+        $this->assertStringContainsString('data-testid="help"', $html, 'Hướng dẫn nằm trong (i)');
+    }
+
+    public function test_with_data_shows_kpis_and_add_to_plan_only_when_selected(): void
+    {
+        $p = $this->loaded();
+        $html = $p->html();
+        $this->assertStringContainsString('ss-kpi__l">Khoảng trống còn mở', $html);
+        $this->assertStringNotContainsString('ss-kpi__l">Đối thủ theo dõi', $html); // trùng số ở nhãn tab
+        $this->assertStringNotContainsString('Thêm vào kế hoạch (0)', $html);
+        $open = collect($p->instance()->gaps())->first(fn ($g) => $g['existing'] === null);
+        $this->assertStringContainsString('Thêm vào kế hoạch (1)', $p->set('selected', [$open['norm']])->html());
+    }
+
+    public function test_competitors_without_data_hides_kpis_and_empty_tabs_without_red(): void
+    {
+        $html = $this->page()->set('newDomain', 'a.example')->call('addCompetitor')->html();
+        $this->assertStringNotContainsString('ss-kpi', $html);
+        $this->assertStringNotContainsString('Cụm gợi ý', $html);
+        $this->assertStringNotContainsString('ss-badge--danger', $html);
+        $this->assertStringContainsString("studioTabs('competitors'", $html);
+    }
+
+    public function test_default_tab_is_competitors_when_no_gap_data_yet(): void
+    {
+        $this->actingAs($this->user('approver'));
+        $this->app['env'] = 'production';
+        Competitor::create(['website_id' => $this->site->id, 'domain' => 'a.vn']);
+        $html = Livewire::test(CompetitorsPage::class)->html();
+        $this->assertStringContainsString("studioTabs('competitors'", $html);
+        $this->assertStringNotContainsString('data-key="gaps"', $html, 'Tab Khoảng trống ẩn khi chưa có dữ liệu');
     }
 
     public function test_ui_has_tabs_single_primary_and_no_noise(): void
     {
         $html = $this->loaded()->html();
-        foreach (['Khoảng trống', 'Đối thủ', 'Nguồn và chi phí', 'Cụm gợi ý', 'Quy tắc'] as $tab) {
+        foreach (['Khoảng trống', 'Đối thủ', 'Nguồn và chi phí', 'Cụm gợi ý'] as $tab) {
             $this->assertStringContainsString($tab, $html);
         }
-        $this->assertSame(1, substr_count($html, 'data-color="primary"') + substr_count($html, 'fi-color-primary'), 'Chỉ một nút primary');
+        $this->assertLessThanOrEqual(1, substr_count($html, 'data-color="primary"') + substr_count($html, 'fi-color-primary'), 'Không quá một nút primary');
+        $this->assertStringContainsString('data-testid="help"', $html);
         $this->assertStringNotContainsString('minh họa', $html);
         $this->assertStringNotContainsString('Luật nghiệp vụ của màn này', $html);
         $this->assertStringContainsString('ss-page', $html);
@@ -247,8 +306,15 @@ class CompetitorsPageTest extends TestCase
     {
         $p = $this->loaded();
         $g = collect($p->instance()->gaps())->first(fn ($g) => $g['existing'] === null);
-        Article::create(['website_id' => $this->site->id, 'created_by' => 1, 'primary_keyword' => $g['keyword'], 'workflow_status' => 'planned']);
+        Article::create(['website_id' => $this->site->id, 'created_by' => $this->user('writer')->id, 'primary_keyword' => $g['keyword'], 'workflow_status' => 'planned']);
         $p->set('selected', [$g['norm']])->call('addToPlan');
         $this->assertSame(1, Article::count());
+    }
+
+    public function test_dau_i_nam_canh_tieu_de_khong_o_hang_rieng(): void
+    {
+        $heading = (string) (new CompetitorsPage)->getHeading();
+        $this->assertStringContainsString('Đối thủ', $heading);
+        $this->assertStringContainsString('data-testid="chain-context"', $heading);
     }
 }

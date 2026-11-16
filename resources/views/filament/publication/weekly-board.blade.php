@@ -1,11 +1,10 @@
 @php
     use App\Filament\Support\Schedule\VnTime;
     use App\Filament\Support\StatusPresenter;
-    $card = function ($p) use ($viewUrl) {
-        return $viewUrl($p);
+    $card = function ($p) use ($articleUrl) {
+        return $articleUrl($p);
     };
 @endphp
-<x-filament-panels::page>
     <style>
         .ss-sched-bar{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
         .ss-sched-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.5rem}
@@ -13,7 +12,7 @@
         .ss-sched-day{border:1px solid rgba(128,128,128,.25);border-radius:.75rem;padding:.5rem;min-height:8rem}
         .ss-sched-day.is-today{border-color:rgb(var(--primary-600));box-shadow:0 0 0 2px rgba(var(--primary-600),.25)}
         .ss-sched-dayh{font-weight:600;font-size:.8rem;margin-bottom:.4rem}
-        .ss-sched-card{display:block;border-left:4px solid #9ca3af;border-radius:.4rem;padding:.3rem .45rem;margin-bottom:.35rem;font-size:.75rem;background:rgba(128,128,128,.08);text-decoration:none;color:inherit}
+        .ss-sched-card{display:block;border-left:3px solid #9ca3af;border-radius:.4rem;padding:.3rem .45rem;margin-bottom:.35rem;font-size:.75rem;background:rgba(128,128,128,.08);text-decoration:none;color:inherit}
         .ss-sched-card.ss-sched-c-success{border-color:rgb(var(--success-600))}
         .ss-sched-card.ss-sched-c-danger{border-color:rgb(var(--danger-600))}
         .ss-sched-card.ss-sched-c-warning{border-color:rgb(var(--warning-600))}
@@ -36,6 +35,7 @@
         <x-filament::button color="gray" wire:click="currentWeek">Tuần này</x-filament::button>
         <x-filament::button color="gray" wire:click="nextWeek" icon="heroicon-o-chevron-right" icon-position="after">Tuần sau</x-filament::button>
         <strong>{{ $rangeLabel }}</strong>
+        <x-chain-context step="Xuất bản" purpose="Lịch tuần: sắp ngày dự kiến đăng cho bài. Lượt đăng thật theo giờ, trạng thái và đối soát nằm ở tab Danh sách." :inputs="[['label'=>'Bài đã duyệt','url'=>\App\Filament\Resources\ArticleResource::getUrl('index'),'note'=>'Bài viết']]" :outputs="[['label'=>'Lịch xuất bản','url'=>\App\Filament\Resources\PublicationResource::listUrl(),'note'=>'lượt đăng thật'],['label'=>'Search Console','url'=>\App\Filament\Pages\SearchConsolePage::getUrl(),'note'=>'đo sau khi bài lên']]" :compact="true" />
     </div>
 
     <div class="ss-sched-grid" x-data="{ over: null, dragId: null }">
@@ -68,7 +68,7 @@
                             x-on:dragstart="dragId = {{ $p->id }}; $el.classList.add('is-dragging')"
                             x-on:dragend="dragId = null; over = null; $el.classList.remove('is-dragging')"
                         @endif>
-                        <a href="{{ $viewUrl($p) }}" style="text-decoration:none;color:inherit;display:block" draggable="false">
+                        <a href="{{ $articleUrl($p) }}" style="text-decoration:none;color:inherit;display:block" draggable="false">
                             <span class="ss-sched-time">{{ VnTime::format($at, 'H:i') }}</span>
                             {{ $p->articleVersion?->article?->primary_keyword ?? '—' }}
                             <div class="ss-sched-muted">{{ $p->website?->name }} · {{ StatusPresenter::label($p->status, 'publication') }}</div>
@@ -78,31 +78,20 @@
                         @endif
                     </div>
                 @empty
-                    <div class="ss-sched-muted">Không có lượt đăng</div>
+                    <div class="ss-sched-muted" aria-label="Không có lượt đăng">—</div>
                 @endforelse
             </div>
         @endforeach
     </div>
-    <x-filament-actions::modals />
 
-    <div class="ss-sched-box">
-        <div class="ss-sched-h">Hàng đợi hôm nay ({{ $todayQueue->count() }})</div>
-        @forelse ($todayQueue as $p)
-            <div><a href="{{ $viewUrl($p) }}">{{ VnTime::format($p->scheduled_at_utc ? VnTime::fromRaw($p, 'scheduled_at_utc') : null, 'H:i') }} · {{ $p->articleVersion?->article?->primary_keyword ?? '—' }}</a>
-                <span class="ss-sched-muted">{{ $p->website?->name }} · {{ StatusPresenter::label($p->status, 'publication') }}</span></div>
-        @empty
-            <div class="ss-sched-muted">Hôm nay chưa có lượt đăng nào.</div>
-        @endforelse
+    @if ($reconcile->count() > 0)
+    <div class="ss-sched-box" style="border-color:rgb(var(--warning-600))" data-testid="reconcile">
+        <div class="ss-sched-h">Cần đối soát ({{ $reconcile->count() }})
+            <x-help tone="warning" title="Vì sao cần đối soát?" text="CMS không phản hồi sau khi gửi bài. Mở từng lượt để &quot;Đối soát ngay&quot; - hệ thống không tự đăng lại để tránh trùng bài." /></div>
+        @foreach ($reconcile as $p)
+            <div><a href="{{ $articleUrl($p) }}">{{ $p->articleVersion?->article?->primary_keyword ?? '—' }}</a>
+                <span class="ss-sched-muted">{{ $p->website?->name }} · {{ VnTime::format(VnTime::fromRaw($p, 'scheduled_at_utc')) }} · <a href="{{ $viewUrl($p) }}">Đối soát lượt đăng</a></span></div>
+        @endforeach
     </div>
+    @endif
 
-    <div class="ss-sched-box">
-        <div class="ss-sched-h">Cần đối soát ({{ $reconcile->count() }})</div>
-        <p class="ss-sched-muted">CMS không phản hồi sau khi gửi bài. Mở từng lượt để "Đối soát ngay" - hệ thống không tự đăng lại để tránh trùng bài.</p>
-        @forelse ($reconcile as $p)
-            <div><a href="{{ $viewUrl($p) }}">{{ $p->articleVersion?->article?->primary_keyword ?? '—' }}</a>
-                <span class="ss-sched-muted">{{ $p->website?->name }} · {{ VnTime::format(VnTime::fromRaw($p, 'scheduled_at_utc')) }}</span></div>
-        @empty
-            <div class="ss-sched-muted">Không có lượt nào chờ đối soát.</div>
-        @endforelse
-    </div>
-</x-filament-panels::page>

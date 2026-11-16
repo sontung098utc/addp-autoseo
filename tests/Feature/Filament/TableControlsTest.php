@@ -3,7 +3,6 @@
 namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\ArticleResource\Pages\ListArticles;
-use App\Filament\Resources\ArticleVersionResource\Pages\ListArticleVersions;
 use App\Filament\Resources\MediaAssetResource\Pages\ListMediaAssets;
 use App\Filament\Resources\PublicationResource\Pages\ListPublications;
 use App\Filament\Resources\WebsiteResource\Pages\ListWebsites;
@@ -53,7 +52,6 @@ class TableControlsTest extends TestCase
             ListPublications::class => ['website.name', 'last_error', 'published_url', 'publication_key'],
             ListWebsites::class => ['cms_type', 'base_url', 'store_scope', 'last_synced_at'],
             ListArticles::class => ['website.name', 'topic_cluster', 'search_intent', 'created_at'],
-            ListArticleVersions::class => ['title', 'tokens_used', 'cost_vnd', 'created_at'],
             ListMediaAssets::class => ['alt_text', 'website.name', 'mime_type', 'created_at'],
         ];
 
@@ -102,7 +100,7 @@ class TableControlsTest extends TestCase
         $b = Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'beta', 'workflow_status' => 'approved']);
 
         Livewire::test(ListArticles::class)
-            ->filterTable('workflow_status', 'approved')
+            ->set('activeTab', 'approved')
             ->assertCanSeeTableRecords([$b])->assertCanNotSeeTableRecords([$a]);
     }
 

@@ -5,7 +5,6 @@ namespace Tests\Feature\Filament;
 use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\ArticleResource\Pages\ListArticles;
 use App\Filament\Resources\ArticleVersionResource;
-use App\Filament\Resources\ArticleVersionResource\Pages\ListArticleVersions;
 use App\Filament\Resources\MediaAssetResource;
 use App\Filament\Resources\MediaAssetResource\Pages\ListMediaAssets;
 use App\Filament\Resources\PublicationResource;
@@ -40,7 +39,6 @@ class PageTitlesAndWidgetsTest extends TestCase
         $cases = [
             [WebsiteResource::class, ListWebsites::class],
             [ArticleResource::class, ListArticles::class],
-            [ArticleVersionResource::class, ListArticleVersions::class],
             [PublicationResource::class, ListPublications::class],
             [MediaAssetResource::class, ListMediaAssets::class],
         ];

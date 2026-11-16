@@ -36,9 +36,7 @@ class PublishArticleJob implements ShouldQueue
      */
     public int $timeout = 120;
 
-    public function __construct(public Publication $publication)
-    {
-    }
+    public function __construct(public Publication $publication) {}
 
     public function handle(PublisherManager $publisherManager, ?EmergencyStopService $emergencyStop = null): void
     {
@@ -47,6 +45,15 @@ class PublishArticleJob implements ShouldQueue
 
         if (! $publication) {
             Log::warning("[PublishArticleJob] Publication ID {$this->publication->id} không tồn tại.");
+
+            return;
+        }
+
+        // Lượt đang giữ KHÔNG bao giờ được gửi lên CMS (kể cả khi job đã nằm sẵn trong hàng đợi): 'held' (hệ thống), 'paused' (người dừng riêng một bài),
+        // 'awaiting_confirm' (điểm dừng 'trước khi đăng'). Guard này đứng TRƯỚC nhánh dừng khẩn cấp để dừng khẩn cấp không xóa điểm chờ người.
+        if (in_array($publication->status, ['held', 'paused', 'awaiting_confirm'], true)) {
+            Log::info("[PublishArticleJob] Publication #{$publication->id} đang {$publication->status}, bỏ qua không gửi.");
+
             return;
         }
 
@@ -59,12 +66,14 @@ class PublishArticleJob implements ShouldQueue
                 'status' => 'scheduled',
                 'last_error' => "Tạm dừng khẩn cấp: {$reason}",
             ]);
+
             return;
         }
 
         // Chống đăng trùng: Nếu bài đã ở trạng thái xuất bản thành công
         if ($publication->status === 'published') {
             Log::info("[PublishArticleJob] Publication #{$publication->id} (Key: {$publication->publication_key}) đã xuất bản trước đó, bỏ qua.");
+
             return;
         }
 
@@ -72,6 +81,7 @@ class PublishArticleJob implements ShouldQueue
         if ($publication->status === 'needs_reconcile') {
             Log::warning("[PublishArticleJob] Publication #{$publication->id} đang ở trạng thái needs_reconcile. Chuyển sang ReconcilePublicationJob.");
             ReconcilePublicationJob::dispatch($publication);
+
             return;
         }
 
@@ -81,6 +91,7 @@ class PublishArticleJob implements ShouldQueue
                 'status' => 'failed',
                 'last_error' => 'Website liên kết không tồn tại hoặc không ở trạng thái active.',
             ]);
+
             return;
         }
 
@@ -91,6 +102,7 @@ class PublishArticleJob implements ShouldQueue
         if (! $lock->get()) {
             Log::info("[PublishArticleJob] Website #{$website->id} đang bận xuất bản bài khác. Trả job lại hàng đợi sau 15s.");
             $this->release(15);
+
             return;
         }
 
@@ -111,7 +123,16 @@ class PublishArticleJob implements ShouldQueue
                 'last_error' => null,
             ]);
 
-            Log::info("[PublishArticleJob] Xuất bản thành công Publication #{$publication->id} lên {$website->cms_type} (Remote ID: " . ($result['remote_id'] ?? 'N/A') . ").");
+            // AG-S04: bài được đăng bằng cách nâng chính bản nháp => đánh dấu nháp đã đăng (lỗi ghi phụ không làm hỏng lượt đăng).
+            if (! empty($result['promoted_draft_id'])) {
+                try {
+                    $publication->articleVersion?->forceFill(['cms_draft_status' => 'promoted'])->save();
+                } catch (Throwable $e) {
+                    Log::warning("[PublishArticleJob] Không đánh dấu nháp đã đăng cho Publication #{$publication->id}: {$e->getMessage()}");
+                }
+            }
+
+            Log::info("[PublishArticleJob] Xuất bản thành công Publication #{$publication->id} lên {$website->cms_type} (Remote ID: ".($result['remote_id'] ?? 'N/A').').');
         } catch (CmsErrorInterface $e) {
             // Lỗi chuẩn hóa từ CMS connector (WordPress & Magento) theo hợp đồng PR-D / E13
             if ($e->isAmbiguous()) {
@@ -141,7 +162,7 @@ class PublishArticleJob implements ShouldQueue
             Log::error("[PublishArticleJob] Lỗi mạng/timeout khi gửi bài #{$publication->id}: {$e->getMessage()}. Chuyển trạng thái sang needs_reconcile.");
             $publication->update([
                 'status' => 'needs_reconcile',
-                'last_error' => 'Mất kết nối hoặc timeout từ CMS: ' . $e->getMessage(),
+                'last_error' => 'Mất kết nối hoặc timeout từ CMS: '.$e->getMessage(),
             ]);
         } catch (RequestException $e) {
             // Trường hợp response từ server là 504 Gateway Timeout hoặc 502 Bad Gateway

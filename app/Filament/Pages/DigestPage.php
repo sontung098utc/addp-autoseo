@@ -36,7 +36,7 @@ class DigestPage extends Page
 
     public function getSubheading(): ?string
     {
-        return $this->digest()['date_label'].' · '.Auth::user()?->name;
+        return $this->digest()['date_label'];
     }
 
     /** @return array<string, mixed> */

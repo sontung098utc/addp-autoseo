@@ -13,6 +13,8 @@ enum AuditAction: string
     case RevokeWebsite = 'revoke_website';
     case EmergencyStop = 'emergency_stop';
     case Reschedule = 'reschedule';
+    case PausePublication = 'pause_publication';
+    case ResumePublication = 'resume_publication';
 
     /** Hành động bắt buộc có lý do không rỗng. */
     public function requiresReason(): bool

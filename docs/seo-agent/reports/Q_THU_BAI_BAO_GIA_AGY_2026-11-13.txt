@@ -1,0 +1,106 @@
+RUN 180 status=ready_for_review rounds=1 cost=2004.36 final_version=71
+#1 [guard/ok] Được phép chạy |  tok=0
+    Không có lệnh dừng, website hoạt động, bậc tin cậy T1 (chỉ tạo bản nháp).
+#2 [risk/ok] Hạng rủi ro: vừa |  tok=0
+    Chủ đề giá cả (có cụm "báo giá")
+#3 [brief/ok] Lập dàn ý (6 mục) | agy-flash-low tok=1397
+    Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. Dùng playbook brief/content-brief@1 (bản nháp, chỉ cho lượt thủ công).
+#4 [images/skipped] Không tạo ảnh |  tok=0
+    Tính năng tự tạo ảnh đang tắt.
+#5 [research/warn] Chưa có tài liệu bậc 1 từ web |  tok=0
+    Chưa cấu hình tìm kiếm web. Đặt TAVILY_API_KEY trong .env rồi tải lại. Vẫn viết tiếp, dựa trên kiến thức đã duyệt và hiểu biết chuẩn mực của người viết.
+#6 [research/warn] Chuẩn bị tài liệu |  tok=0
+    Đã nạp 0 mục kiến thức đã duyệt, 0 ảnh gợi ý, 0 liên kết nội bộ gợi ý, 0 nguồn được phép trích, chưa có hồ sơ doanh nghiệp. Kho kiến thức chưa có mục đã duyệt phù hợp; đã ghi khoảng trống kiến thức.
+#7 [write/ok] Viết bản đầu | agy-flash-medium tok=6369
+    Viết theo dàn ý; HTML được làm sạch trước khi chấm. Kho kiến thức chưa có mục đã duyệt phù hợp; đã ghi khoảng trống kiến thức để bổ sung. Không có ảnh phù hợp trong thư viện (chỉ nhắc, không chặn).
+#8 [grade/ok] Chấm bản đầu |  tok=0
+    Điểm 90/100 (tham khảo, mốc 80). Đạt mọi luật bắt buộc (còn 2 mục P1, 0 mục P2 chỉ nên xem). Dùng playbook editor/qa-review@1 (bản nháp, chỉ cho lượt thủ công).
+#9 [edit/warn] Biên tập viên yêu cầu sửa (4 điểm) | agy-flash-medium tok=3124
+    Bài viết thực tế, cấu trúc tốt và đi thẳng vào báo giá. Tuy nhiên còn một số khẳng định võ đoán về ROI, thiếu điều kiện báo giá (VAT, bảo hành) và thừa đoạn mục lục thô ở mở bài. Người viết sửa trực tiếp bản đang có.
+#10 [failover/warn] Chuyển model dự phòng: Sửa theo biên tập viên | gemini-3.5-flash-lite tok=0
+    Đã chuyển từ OpenAI-tương thích tùy chỉnh · agy-flash-medium sang Gemini – testZunP · gemini-3.5-flash-lite vì lỗi định dạng (Phản hồi AI thiếu "html_content" đúng định dạng.). Dự phòng là model thật, không phải AI giả lập.
+#11 [retry/warn] Thử lại lần 1/3: Sửa theo biên tập viên (dự phòng) |  tok=0
+    Nhà cung cấp AI lỗi tạm thời (TransientAiError; Nhà cung cấp AI báo lỗi tạm thời (HTTP 503).). Chờ 2 giây rồi thử lại, không đổi sang AI giả lập.
+#12 [repair/ok] Sửa theo biên tập viên | gemini-3.5-flash-lite tok=11207
+    Gửi lại cho AI 4 lỗi cần sửa (lỗi chặn hoặc đoạn thiếu trích dẫn): BIÊN TẬP — So sánh chi phí: Máy nội địa, nhập khẩu Trung Quốc và chuẩn | BIÊN TẬP — THIẾU: Quy trình nghiệm thu kỹ thuật (FAT tại xưởng sản xuấ | BIÊN TẬP — THIẾU: Chính sách bảo hành tiêu chuẩn, thời gian phản ứng k
+#13 [grade/ok] Chấm lại sau khi biên tập |  tok=0
+    Điểm 90/100 (tham khảo, mốc 80). Đạt mọi luật bắt buộc (còn 2 mục P1, 0 mục P2 chỉ nên xem).
+#14 [handoff/ok] Chuyển người duyệt |  tok=0
+    Đạt mọi luật bắt buộc. Bản nháp v2 đã vào hàng chờ duyệt; chưa xuất bản vì bậc tin cậy T1.
+
+--- BIÊN TẬP VIÊN ---
+verdict=can_sua
+- [minor] mở bài: Đoạn mở bài lặp lại gần như nguyên văn nội dung của 'Tóm tắt cốt lõi' và để sót danh sách mục lục dạng thô chưa format. => Xóa danh sách mục lục thô; gộp mở bài súc tích, nêu bật ngay mức giá khởi điểm theo công suất và cảnh báo chi phí phụ trợ chiếm tới 35% tổng mức đầu tư.
+- [major] So sánh chi phí: Máy nội địa, nhập khẩu Trung Quốc và chuẩn châu Âu: Đưa ra mốc thời gian thu hồi vốn (ROI 6-12 tháng, 1-3 năm) như thông số cố định là võ đoán, phụ thuộc vào đơn hàng và biên lợi nhuận của từng xưởng. => Bỏ mốc thời gian ROI cố định; thay bằng phân tích các yếu tố quyết định bài toán hoàn vốn: sản lượng thực tế, tỷ lệ phế phẩm và chi phí downtime khi chờ linh kiện.
+- [minor] Bảng khung báo giá máy dập viên công nghiệp cập nhật 2024: Bảng giá đưa ra các khoảng tiền nhưng chưa nêu rõ phạm vi báo giá: đã bao gồm thuế VAT, phí vận chuyển nâng hạ, lắp đặt hay bảo hành tận nơi chưa. => Bổ sung ghi chú dưới bảng giá: mức giá chỉ mang tính tham khảo cho thân máy tiêu chuẩn, chưa gồm VAT 8-10%, phí vận chuyển siêu trường siêu trọng và bộ khuôn đầu tiên.
+- [minor] Rủi ro vận hành khi mua máy dập viên giá rẻ thanh lý: Nêu con số sửa chữa 'ngốn từ 50 – 80 triệu VNĐ' một cách cụ thể nhưng không có cơ sở phân loại theo dải công suất máy nhỏ hay máy cao tốc. => Sửa lại thành ước tính chi phí phục hồi mâm xoay và con lăn có thể chiếm tới 30-50% giá trị mua máy cũ, cảnh báo nguy cơ không tìm được linh kiện thay thế chuẩn.
+- THIẾU: Quy trình nghiệm thu kỹ thuật (FAT tại xưởng sản xuất và SAT tại xưởng khách hàng) trước khi giải ngân thanh toán đợt cuối.
+- THIẾU: Chính sách bảo hành tiêu chuẩn, thời gian phản ứng kỹ thuật khi sự cố kẹt mâm và điều khoản thanh toán theo tiến độ (đặt cọc, giao hàng, nghiệm thu).
+- THIẾU: Dự toán chi phí vật tư tiêu hao định kỳ: bộ chày cối thay thế theo lô viên, dầu mỡ bôi trơn an toàn thực phẩm/dược phẩm (Food-grade).
+
+=== BÀI ===
+TITLE: Báo Giá Máy Dập Viên Công Nghiệp Mới Nhất & Kinh Nghiệm Mua
+SEO: Báo Giá Máy Dập Viên Công Nghiệp: Phân Khúc & Chi Phí Đầu Tư
+META: Cập nhật báo giá máy dập viên công nghiệp mới nhất. Phân tích chi tiết dòng máy xoay tròn, cao tốc chuẩn GMP, chi phí phát sinh và kinh nghiệm chọn mua.
+SOURCES: ["D\u01b0\u1ee3c \u0111i\u1ec3n Vi\u1ec7t Nam","Ti\u00eau chu\u1ea9n GMP-WHO v\u1ec1 thi\u1ebft b\u1ecb s\u1ea3n xu\u1ea5t d\u01b0\u1ee3c ph\u1ea9m"]
+WORDS: 3156
+
+Tóm tắt cốt lõi:
+Khung giá máy dập viên xoay tròn phổ thông (16–21 chày) dao động từ 150 – 350 triệu VNĐ; dòng cao tốc tự động đạt chuẩn GMP từ 600 triệu đến trên 1,5 tỷ VNĐ.
+Giá thân máy niêm yết chỉ chiếm khoảng 65–70% tổng mức đầu tư; 30–35% còn lại nằm ở chi phí phụ trợ bắt buộc như khuôn dập, máy hút bụi, cấp liệu chân không và hồ sơ thẩm định.
+Bài toán hoàn vốn (ROI) không phụ thuộc vào mốc thời gian cố định mà quyết định bởi sản lượng thực tế, tỷ lệ phế phẩm và thời gian dừng máy (downtime) khi chờ bảo dưỡng.
+Khung báo giá máy dập viên công nghiệp năm 2024 phổ biến dao động từ 150 triệu đến 350 triệu VNĐ cho các dòng máy dập mâm xoay tròn 16–21 trạm chày phổ thông, và từ 600 triệu đến trên 1,5 tỷ VNĐ đối với dòng cao tốc tự động hóa hoàn toàn đạt chuẩn GMP. Mức chênh lệch hàng trăm triệu đến cả tỷ đồng giữa các cấu hình không đơn thuần nằm ở thương hiệu, mà do công suất dập, lực nén tối đa (kN), vật liệu inox tiếp xúc và hệ thống bù trừ trọng lượng tự động quyết định.
+1. Bảng khung báo giá máy dập viên công nghiệp cập nhật 2024
+2. Các yếu tố kỹ thuật trực tiếp định giá máy dập viên
+3. So sánh chi phí: Máy nội địa, nhập khẩu Trung Quốc và chuẩn châu Âu
+4. Hiểu sai phổ biến: "Giá niêm yết là chi phí lăn bánh"
+5. Rủi ro vận hành khi mua máy dập viên giá rẻ thanh lý
+6. Chi phí vật tư tiêu hao, điều khoản thanh toán và quy trình nghiệm thu FAT/SAT
+7. Quy trình khảo sát và nhận báo giá chính xác theo biên độ viên
+## Bảng khung báo giá máy dập viên công nghiệp cập nhật 2024
+Trên thị trường thiết bị dược phẩm và thực phẩm bảo vệ sức khỏe, máy dập viên công nghiệp được chia thành các phân khúc chính dựa trên quy mô sản xuất và mức độ kiểm soát cơ điện:
+Phân loại máySố trạm chàyNăng suất tối đa (viên/giờ)Lực nén chính (kN)Khung giá tham khảo (VNĐ)
+Xoay tròn bán tự động R&D / Tiểu thủ công8 – 12 chày10.000 – 25.00040 – 60 kN90 – 160 triệu
+Xoay tròn công nghiệp phổ thông (ZP series)16 – 21 chày35.000 – 50.00060 – 80 kN150 – 350 triệu
+Xoay tròn trung bình (dược & hóa chất)27 – 33 chày70.000 – 120.00080 – 100 kN380 – 650 triệu
+Cao tốc tự động chuẩn GMP (có nén sơ)37 – 55 chày150.000 – 300.000100 – 120 kN700 triệu – 1,8 tỷ
+Cao tốc tiêu chuẩn châu Âu / G7Phức hợp> 250.000100 – 160 kN3,5 – 7+ tỷ
+## Các yếu tố kỹ thuật trực tiếp định giá máy dập viên
+Sự chênh lệch giữa hai cỗ máy có vẻ ngoài tương đồng thường đến từ bốn thông số cơ khí và điều khiển cốt lõi sau:
+Số trạm chày và kiểu khuôn (B, D, BB): Số trạm quyết định số viên nén ra sau mỗi vòng quay của mâm. Chuẩn khuôn B dùng cho viên nhỏ với tốc độ quay cao; chuẩn khuôn D chịu lực nén lớn hơn dùng cho viên sủi hoặc viên phân bón/hóa chất lớn. Càng nhiều trạm chày, đường kính mâm xoay càng lớn, chi phí phay tiện chính xác cơ khí càng đắt.
+Lực nén sơ (Pre-pressure) và Lực nén chính (Main pressure): Các dòng máy rẻ tiền thường chỉ có một con lăn nén chính. Dòng máy công nghiệp tiêu chuẩn bắt buộc phải có con lăn nén sơ (thường từ 10–20 kN) để ép thoát khí ra khỏi khối bột trước khi con lăn chính (80–100 kN) định hình viên. Thiếu nén sơ, viên chạy tốc độ cao sẽ lập tức bị hiện tượng tách lớp (capping) hoặc vỡ đôi.
+Tiêu chuẩn vật liệu inox (SS304 so với SS316L): Mâm xoay và phễu nạp bột làm từ thép không gỉ SS316L có khả năng kháng axit, chịu mài mòn hóa học cao hơn hẳn SS304, làm giá thành thiết bị tăng thêm 15–25%.
+Hệ số tự động hóa và kiểm soát lực: Máy trang bị cảm biến áp lực piezo điện tử theo thời gian thực (tự động loại bỏ viên lệch tải trọng, tự bù bột qua động cơ servo) thường đắt gấp đôi so với dòng chỉnh tay bằng tay quay cơ học.
+## So sánh chi phí: Máy nội địa, nhập khẩu Trung Quốc và chuẩn châu Âu
+Để tối ưu hóa dòng tiền đầu tư, doanh nghiệp cần cân nhắc kỹ năng lực kỹ thuật và bài toán hoàn vốn thông qua các khía cạnh vận hành thực tế của ba nguồn cung cấp chính:
+Tiêu chí so sánhChế tạo nội địa Việt NamNhập khẩu Trung Quốc (Nhà máy loại 1)Nhập khẩu châu Âu / G7 (Fette, Korsch, Bosch)
+Ưu điểm cốt lõiDễ bảo hành tại xưởng, linh kiện thay thế tức thì, giá cạnh tranh.Mẫu mã đa dạng, công nghệ cập nhật nhanh, dải công suất rộng.Độ bền cơ khí trên 15 năm, sai số cực thấp (<0.5%), phần mềm chuẩn 21 CFR Part 11.
+Nhược điểmChủ yếu dừng ở dòng cơ học, độ hoàn thiện mâm xoay cao tốc chưa mượt.Chất lượng không đồng đều giữa các xưởng, cần đội ngũ nghiệm thu có nghề.Chi phí cực cao, phụ tùng thay thế đặt hàng 8–16 tuần, chi phí bảo dưỡng đắt.
+Bài toán hoàn vốn (ROI)Phụ thuộc vào mức độ ổn định của đơn hàng gia công và tỷ lệ phế phẩm thực tế của xưởng.Tối ưu khi duy trì được sản lượng lớn, kiểm soát tốt thời gian chờ linh kiện thay thế.Yêu cầu dòng tiền lớn, khấu hao dài hạn dựa trên hợp đồng gia công quốc tế biên độ cao.
+Phù hợp nhất vớiCơ sở đông y, phân bón vi sinh, hóa chất gia dụng quy mô vừa.Nhà máy thực phẩm chức năng, dược phẩm tiêu chuẩn GMP-WHO.Tập đoàn đa quốc gia, xưởng dược EU-GMP hoặc PIC/S.
+Mẹo kiểm tra lực nén: Hãy yêu cầu đơn vị bán máy chạy thử mẫu bột thực tế với khuôn chuẩn trước khi chốt hợp đồng để xác định chính xác lực nén cần thiết, tránh mua dư tải gây lãng phí hàng trăm triệu đồng.## Hiểu sai phổ biến: "Giá niêm yết là chi phí lăn bánh"
+Nhiều chủ xưởng khi nhận bảng báo giá 250 triệu VNĐ thường nghĩ chỉ cần chi đúng con số đó là xưởng có thể ra viên thương phẩm. Thực tế, một dây chuyền dập viên vận hành ổn định trong phòng sạch bắt buộc phải bổ sung các hạng mục sau:
+Bộ khuôn dập định hình: Máy thường chỉ đi kèm 01 bộ khuôn cơ bản hình tròn. Nếu sản phẩm là hình oval, có khắc logo, chống dính mạ crôm cứng hoặc phủ TiN, chi phí cho mỗi bộ khuôn dao động từ 15 – 45 triệu VNĐ tùy số trạm.
+Hệ thống hút bụi chuyên dụng: Bột bay lơ lửng trong buồng dập sẽ làm kẹt chày và nhiễm chéo. Một máy hút bụi công nghiệp chống tĩnh điện tiêu chuẩn phòng sạch tốn từ 25 – 50 triệu VNĐ.
+Máy cấp liệu chân không tự động: Thay vì đổ bột thủ công gây bụi và không đều tỷ trọng, hệ thống cấp liệu hút chân không khép kín có giá từ 40 – 80 triệu VNĐ.
+Máy lau bụi viên và khử kim loại: Viên sau khi ra khỏi phễu dập dính bột mịn cần qua máy sàng rung xoắn ốc kết hợp đầu dò kim loại, chi phí khoảng 60 – 120 triệu VNĐ.
+Hồ sơ thẩm định IQ/OQ[a]: Đối với các xưởng làm chuẩn GMP, chi phí kỹ sư đo đạc, lập hồ sơ kiểm định kỹ thuật dao động từ 20 – 50 triệu VNĐ.
+## Rủi ro vận hành khi mua máy dập viên giá rẻ thanh lý
+Mua lại máy dập viên cũ từ các xưởng thanh lý với giá chỉ bằng 30–50% máy mới là lựa chọn hấp dẫn nhưng tiềm ẩn rủi ro phá hủy toàn bộ lô nguyên liệu. Trong cơ cấu dập xoay tròn, độ chính xác cơ khí tính bằng phần trăm milimet.
+Cảnh báo hao mòn mâm xoay: Khi rãnh cam dẫn hướng chày hoặc lỗ cối bị mòn rơ lệch trục, lực dập sẽ không đều khiến độ chênh lệch khối lượng viên vượt ngưỡng ±5% của Dược điển, làm hỏng cả lô dập dù đã bù trừ bột.Ba hư hỏng kinh điển của máy thanh lý gồm: nứt vỡ viên do rơ trục chính khiến lực nén giật cục, mẻ cạnh viên do lỗ cối bị loe miệng dạng chuông (bell-mouthing), và kẹt chày dập gây gãy vấu cam làm dừng toàn bộ máy. Chi phí gia công lại mâm xoay và thay toàn bộ hệ thống con lăn thường ngốn từ 50 – 80 triệu VNĐ, chưa kể thời gian chết máy kéo dài hàng tháng.
+## Chi phí vật tư tiêu hao, điều khoản thanh toán và quy trình nghiệm thu FAT/SAT
+Để bảo vệ dòng vốn và đảm bảo thiết bị vận hành bền bỉ, doanh nghiệp cần làm rõ các điều khoản thương mại và kỹ thuật sau với nhà cung cấp:
+Chi phí vật tư tiêu hao định kỳ: Bộ chày cối là chi phí tiêu hao lớn nhất, cần thay thế định kỳ sau mỗi 30–50 triệu viên tùy độ cứng của bột. Ngoài ra, xưởng phải dự trù chi phí mua dầu mỡ bôi trơn đạt chuẩn an toàn thực phẩm/dược phẩm (Food-grade lubricant H1) để bôi trơn trục chày, tránh nhiễm béo vào dược chất.
+Chính sách bảo hành và thời gian phản ứng kỹ thuật: Tiêu chuẩn bảo hành thường từ 12 tháng. Khi xảy ra sự cố kẹt mâm xoay hoặc hỏng biến tần, nhà cung cấp phải cam kết thời gian kỹ sư có mặt tại xưởng (thường trong vòng 24–48 giờ) để tránh ngưng trệ dây chuyền sản xuất.
+Điều khoản thanh toán theo tiến độ: Thường chia làm 3 đợt: đặt cọc sản xuất (30–40%), thanh toán trước khi giao hàng sau khi nghiệm thu tại xưởng cung cấp (50%), và giữ lại 10% bảo hành sau khi hoàn tất nghiệm thu vận hành tại xưởng khách hàng.
+Quy trình nghiệm thu FAT và SAT: Trước khi xuất xưởng, máy phải qua bước FAT (Factory Acceptance Test) — chạy thử bằng bột thực tế tại nhà xưởng bên bán để kiểm tra năng suất và độ sai số khối lượng. Khi lắp đặt xong tại xưởng người mua, tiến hành bước SAT (Site Acceptance Test) để đối chiếu toàn bộ thông số kỹ thuật trước khi ký biên bản bàn giao và giải ngân đợt cuối.
+## Quy trình khảo sát và nhận báo giá chính xác theo biên độ viên
+Để nhận được báo giá chính xác, không phát sinh chi phí và đúng tải trọng, doanh nghiệp không nên hỏi chung chung "giá máy dập viên bao nhiêu", mà cần chuẩn bị sẵn 5 thông số kỹ thuật then chốt sau cho kỹ sư chế tạo:
+Đặc tính lý tính của bột: Cung cấp độ ẩm (chuẩn thường 1–3%), độ trơn chảy (chỉ số Carr/Hausner) và tính chất dính bết. Bột nhiều đường hoặc cao dược liệu cần khuôn phủ đặc biệt và máy có cơ chế chống dính.
+Kích thước và hình dáng viên: Đường kính viên, độ dày, dạng viên phẳng hay khum, có khắc rãnh chia liều hay khắc chữ nổi logo.
+Lực nén yêu cầu ước tính: Viên sủi hoặc viên muối khử trùng cần lực nén 80–120 kN; viên ngậm hoặc viên nang mềm chỉ cần 20–40 kN.
+Sản lượng mục tiêu trên ca làm việc: Tính bằng số viên/giờ hoặc số kg thành phẩm/ca 8 tiếng để chọn chuẩn mâm 16, 27 hay 33 trạm.
+Yêu cầu phòng sạch: Xưởng đạt chuẩn GMP hay xưởng gia công thực phẩm thông thường, từ đó chốt cấu hình toàn bộ inox 316L hay chỉ inox 304 ở phần tiếp xúc dược chất.
+Ghi chú
+IQ (Installation Qualification) và OQ (Operational Qualification) là quy trình thẩm định lắp đặt và vận hành bắt buộc trong tiêu chuẩn GMP nhằm chứng minh thiết bị hoạt động chính xác theo hồ sơ kỹ thuật của nhà sản xuất.
+

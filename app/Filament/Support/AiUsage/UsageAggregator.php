@@ -30,6 +30,9 @@ final class UsageAggregator
     {
         $this->rows = array_values($rows);
         foreach ($this->rows as $r) {
+            if ($r['article_id'] === 0) {
+                continue; // phiên không gắn bài (G2): cộng vào chi phí, không đếm là bài
+            }
             $this->byArticle[$r['article_id']][] = $r;
         }
     }
@@ -65,7 +68,7 @@ final class UsageAggregator
         if ($in === []) {
             return null;
         }
-        $articleIds = array_values(array_unique(array_column($in, 'article_id')));
+        $articleIds = array_values(array_filter(array_unique(array_column($in, 'article_id'))));
         $totalAll = 0.0;
         $articlesWithCost = 0;
         $regen = 0;
@@ -150,8 +153,8 @@ final class UsageAggregator
         foreach ($groups as $key => $rs) {
             $cost = self::recordedCost($rs);
             $recordedCount = count(array_filter($rs, fn ($r) => ! self::unrecorded($r)));
-            $articles = count(array_unique(array_column($rs, 'article_id')));
-            $articlesCost = count(array_unique(array_column(array_filter($rs, fn ($r) => ! self::unrecorded($r)), 'article_id')));
+            $articles = count(array_filter(array_unique(array_column($rs, 'article_id'))));
+            $articlesCost = count(array_filter(array_unique(array_column(array_filter($rs, fn ($r) => ! self::unrecorded($r)), 'article_id'))));
             $out[] = [
                 'key' => $key,
                 'label' => $by === 'website' ? ($rs[0]['website'] ?? $key) : $key,
@@ -178,7 +181,7 @@ final class UsageAggregator
      */
     public function topArticles(CarbonImmutable $from, CarbonImmutable $to, int $limit = 10): array
     {
-        $ids = array_values(array_unique(array_column($this->inPeriod($from, $to), 'article_id')));
+        $ids = array_values(array_filter(array_unique(array_column($this->inPeriod($from, $to), 'article_id'))));
         $out = [];
         foreach ($ids as $aid) {
             $all = $this->byArticle[$aid];

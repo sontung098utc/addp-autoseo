@@ -2,7 +2,7 @@
 
 namespace App\Filament\Support\Gsc;
 
-use App\Filament\Resources\ArticleVersionResource;
+use App\Filament\Resources\ArticleResource;
 use App\Models\Publication;
 
 /** Nối URL trang trong Search Console với bài đã đăng (publications.published_url). Không khớp -> null. */
@@ -19,7 +19,7 @@ final class PageArticleLinker
             }
             $map[self::normalize((string) $p->published_url)] ??= [
                 'title' => (string) $v->title,
-                'url' => ArticleVersionResource::getUrl('view', ['record' => $v->id]),
+                'url' => ArticleResource::getUrl('view', ['record' => $v->article_id]),
             ];
         }
 

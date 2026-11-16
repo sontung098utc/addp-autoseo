@@ -77,8 +77,13 @@ class FeatureRegistryTest extends TestCase
 
     public function test_tu_dong_hoa_ai_chua_co_thi_khong_duoc_danh_dau_hoat_dong(): void
     {
-        foreach (['ai.router', 'ai.selfrepair', 'pipeline.auto'] as $id) {
+        foreach (['ai.router', 'pipeline.auto'] as $id) {
             $this->assertSame('idea', FeatureRegistry::find($id)['readiness']);
+        }
+        // lát dọc AG-S01 chạy được với AI thật trên dữ liệu thử nhưng chưa có staging/người nghiệm thu: tối đa "Đang phát triển"
+        foreach (['ai.selfrepair', 'run.slice'] as $id) {
+            $this->assertSame('in_development', FeatureRegistry::find($id)['readiness']);
+            $this->assertStringContainsString('chưa có người', FeatureRegistry::find($id)['caveat'].FeatureRegistry::find($id)['what']);
         }
     }
 
@@ -93,5 +98,12 @@ class FeatureRegistryTest extends TestCase
 
         $this->actingAs($this->user('approver', false));
         $this->assertFalse(HowItWorksPage::canAccess());
+    }
+
+    public function test_moi_the_giai_doan_chi_mot_huy_hieu_la_muc_kem_nhat(): void
+    {
+        $this->actingAs($this->user('admin'));
+        $html = Livewire::test(HowItWorksPage::class)->html();
+        $this->assertSame(count(HowItWorksPage::STAGES), substr_count($html, 'data-testid="hw-badge"'));
     }
 }

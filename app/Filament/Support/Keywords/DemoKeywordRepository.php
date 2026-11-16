@@ -41,4 +41,14 @@ final class DemoKeywordRepository implements KeywordRepository
     {
         DemoStore::put('keywords.proposals', array_values($proposals));
     }
+
+    public function proposalSource(): string
+    {
+        return DemoStore::get('keywords.proposal_source', 'mock') === 'ai' ? 'ai' : 'mock';
+    }
+
+    public function saveProposalSource(string $source): void
+    {
+        DemoStore::put('keywords.proposal_source', $source === 'ai' ? 'ai' : 'mock');
+    }
 }

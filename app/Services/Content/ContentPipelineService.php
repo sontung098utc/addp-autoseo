@@ -20,6 +20,9 @@ class ContentPipelineService
             $this->aiProvider = $aiProvider;
         } else {
             $apiKey = env('GOOGLE_AI_API_KEY');
+            if (empty($apiKey) && ! \App\Filament\Support\Demo\DemoMode::enabled()) {
+                throw new \RuntimeException('Chưa kết nối AI (thiếu GOOGLE_AI_API_KEY). AI giả lập chỉ dùng khi bật STUDIO_DEMO ở môi trường phát triển.');
+            }
             $this->aiProvider = !empty($apiKey) ? new GeminiAiProvider($apiKey) : new MockAiProvider();
         }
     }

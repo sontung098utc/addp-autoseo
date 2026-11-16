@@ -4,11 +4,35 @@ namespace App\Filament\Pages;
 
 use App\Filament\Support\Demo\DemoMode;
 use App\Filament\Support\Keywords\CsvKeywordParser;
+use App\Filament\Support\Keywords\EloquentKeywordRepository;
+use App\Filament\Support\Keywords\KeywordArticleLinks;
 use App\Filament\Support\Keywords\KeywordIntent;
 use App\Filament\Support\Keywords\KeywordService;
+use App\Filament\Support\Planning\DuplicateKeywordException;
+use App\Filament\Support\Planning\PlannedArticleCreator;
+use App\Models\Campaign;
+use App\Models\Keyword;
+use App\Models\User;
+use App\Models\Website;
+use App\Services\Keywords\KeywordAiResolver;
+use App\Services\Keywords\KeywordAiUnavailable;
+use App\Services\Keywords\KeywordMetricsEnricher;
+use App\Services\Keywords\KeywordMetricsResolver;
+use App\Services\Keywords\KeywordMetricsUnavailable;
+use App\Services\Keywords\KeywordResearchService;
+use App\Services\Keywords\Serp\SerpUnavailable;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\HtmlString;
 use InvalidArgumentException;
 use Livewire\WithFileUploads;
 
@@ -63,7 +87,7 @@ class KeywordsPage extends Page
     {
         $u = Auth::user();
 
-        return $u instanceof \App\Models\User && $u->is_active && $u->isWriter();
+        return $u instanceof User && $u->is_active && $u->isWriter();
     }
 
     private function guard(): bool
@@ -130,6 +154,133 @@ class KeywordsPage extends Page
         Notification::make()->title('Đã nhập '.$n.' từ khóa')->body(count($r['errors']).' dòng lỗi và '.count($r['duplicates']).' dòng trùng đã được bỏ qua.')->success()->send();
     }
 
+    /** Một (i) duy nhất của trang, đặt cạnh tiêu đề. */
+    public function getHeading(): string|Htmlable
+    {
+        $help = Blade::render('<x-help title="Trang này dùng để làm gì?" text="Kho nguyên liệu để chọn bài nào viết trước. Thêm từ khóa → lấy lượt tìm → gom cụm → đưa vào Kế hoạch. Mọi bước chạy khi bạn bấm." />');
+
+        return new HtmlString('Từ khóa '.$help);
+    }
+
+    /** Hai nút dưới đây nằm trong dải 4 bước (không còn ở đầu trang). */
+    protected function getHeaderActions(): array
+    {
+        return [];
+    }
+
+    /** G3: nút "Khảo sát thị trường (AI)" (bước ① và tab Nhập thêm). Chỉ writer trở lên; tắt kèm lý do khi chưa có AI. */
+    public function marketResearchAction(): Action
+    {
+        $av = KeywordAiResolver::availability('keyword_suggest');
+        $site = KeywordService::defaultSite();
+        $off = ! $av['ok'] ? $av['reason'] : ($site === null || ! KeywordService::useReal() ? 'Cần một website đang hoạt động và dữ liệu thật (không phải bản minh họa).' : null);
+
+        return Action::make('marketResearch')
+            ->label('Khảo sát thị trường (AI)')
+            ->icon('heroicon-o-sparkles')
+            ->color('gray')
+            ->visible(fn () => static::canAccess())
+            ->disabled($off !== null)
+            ->tooltip($off)
+            ->modalHeading('Khảo sát thị trường (AI)')
+            ->modalSubmitActionLabel('Chạy khảo sát')
+            ->form([
+                Placeholder::make('note')->label('')->content('AI không biết lượt tìm kiếm. Từ khóa mới sẽ có nhãn \'AI đề xuất\' và cột lượt tìm để trống; muốn có lượt tìm hãy nhập CSV hoặc nối Search Console.'),
+                Textarea::make('seeds')->label('Hạt giống (tùy chọn, mỗi dòng một từ)')->rows(4)->helperText('Để trống: dùng từ khóa đã có và thông tin thương hiệu của website.'),
+                TextInput::make('limit')->label('Số từ khóa tối đa')->numeric()->default(KeywordResearchService::DEFAULT_LIMIT)->minValue(1)->maxValue(KeywordResearchService::HARD_LIMIT)->required(),
+            ])
+            ->action(function (array $data) use ($site) {
+                $this->guard();
+                $this->runMarketResearch($site, (string) ($data['seeds'] ?? ''), (int) ($data['limit'] ?? 0));
+            });
+    }
+
+    /** Lý do nút "Lấy lượt tìm thật" đang tắt (null = bấm được) và số từ khóa còn chờ tra. @return array{0:?string,1:int} */
+    private function metricsGate(?Website $site): array
+    {
+        $av = KeywordMetricsResolver::availability();
+        $real = $site !== null && KeywordService::useReal();
+        $pending = $real ? (new KeywordMetricsEnricher)->pendingCount($site) : 0;
+        $off = ! $av['ok'] ? $av['reason'] : (! $real ? 'Cần một website đang hoạt động và dữ liệu thật (không phải bản minh họa).' : ($pending === 0 ? 'Mọi từ khóa đã có số liệu hoặc đã được tra gần đây.' : null));
+
+        return [$off, $pending];
+    }
+
+    /** Nút "Lấy lượt tìm thật" (bước ②): hộp xác nhận nói rõ số từ khóa, chi phí ước tính và nguồn. Tắt kèm lý do khi chưa cấu hình. */
+    public function fetchMetricsAction(): Action
+    {
+        $site = KeywordService::defaultSite();
+        $av = KeywordMetricsResolver::availability();
+        [$off, $pending] = $this->metricsGate($site);
+        $est = (int) ceil($pending / 100) * (float) config('keywords.cost_per_100_keywords_vnd', 0);
+
+        return Action::make('fetchMetrics')
+            ->label('Lấy lượt tìm thật')
+            ->icon('heroicon-o-chart-bar')
+            ->visible(fn () => static::canAccess())
+            ->disabled($off !== null)
+            ->tooltip($off)
+            ->modalHeading('Lấy lượt tìm thật')
+            ->modalDescription('Sẽ tra '.$pending.' từ khóa chưa có số liệu (tối đa '.config('keywords.max_per_run').' mỗi lần) từ '.($av['label'] ?? 'nhà cung cấp số liệu').'. Chi phí ước tính khoảng '.number_format($est, 0, ',', '.').' đ — đây là ƯỚC TÍNH theo cấu hình, không phải bảng giá chính thức. Số bạn đã nhập (CSV, nhập tay) không bị ghi đè.')
+            ->modalSubmitActionLabel('Lấy lượt tìm')
+            ->action(function () use ($site) {
+                $this->guard();
+                $this->runFetchMetrics($site);
+            });
+    }
+
+    public function runFetchMetrics(?Website $site): void
+    {
+        $this->guard();
+        if ($site === null || ! KeywordService::useReal()) {
+            $this->fail('Chưa chạy được', 'Chưa có website đang hoạt động hoặc đang dùng dữ liệu minh họa.');
+
+            return;
+        }
+        try {
+            $r = (new KeywordMetricsEnricher)->enrich($site);
+        } catch (KeywordMetricsUnavailable $e) {
+            $this->fail('Chưa có nguồn số liệu', $e->getMessage());
+
+            return;
+        }
+        $body = $r['skipped'].' từ khóa chưa có số liệu ở nguồn (giữ trống). Chi phí ước tính '.number_format($r['cost_vnd'], 0, ',', '.').' đ ('.$r['provider'].').'.($r['provider'] === 'mock' ? ' Đây là số giả lập, không phải lượt tìm thật.' : '').($r['stopped_reason'] ? ' '.$r['stopped_reason'] : '');
+        $n = Notification::make()->title('Đã cập nhật lượt tìm cho '.$r['updated'].' từ khóa')->body($body);
+        $r['stopped_reason'] !== null ? $n->warning()->send() : $n->success()->send();
+    }
+
+    public function runMarketResearch(?Website $site, string $seedText, int $limit): void
+    {
+        $this->guard();
+        if ($site === null) {
+            $this->fail('Chưa chạy được', 'Chưa có website đang hoạt động.');
+
+            return;
+        }
+        $seeds = array_values(array_filter(array_map('trim', preg_split('/\R/u', $seedText) ?: []), fn ($x) => $x !== ''));
+        try {
+            $r = (new KeywordResearchService)->suggest($site, $seeds === [] ? null : $seeds, $limit > 0 ? $limit : null);
+        } catch (KeywordAiUnavailable $e) {
+            $this->fail('Chưa có AI', $e->getMessage());
+
+            return;
+        }
+        if ($r['message'] !== null && $r['added'] === 0) {
+            $this->fail('Khảo sát chưa thêm từ khóa', $r['message']);
+
+            return;
+        }
+        $n = Notification::make()->title('Đã thêm '.$r['added'].' từ khóa (AI đề xuất)')
+            ->body($r['skipped_duplicates'].' từ trùng đã bỏ. Chi phí '.$r['cost_vnd'].' đ ('.$r['label'].'). Lượt tìm chỉ có khi nguồn số liệu thật trả về.'.($r['demo'] ? ' Đây là AI giả lập, không phải kết quả thật.' : ''));
+        $m = $r['metrics'] ?? null;
+        if ($m !== null && $m['updated'] > 0) {
+            $n->body($n->getBody().' Đã lấy lượt tìm thật cho '.$m['updated'].' từ khóa ('.$m['provider'].', chi phí ước tính '.number_format($m['cost_vnd'], 0, ',', '.').' đ).');
+        } elseif ($m !== null && $m['message'] !== null) {
+            $n->body($n->getBody().' '.$m['message']);
+        }
+        $r['message'] !== null ? $n->warning()->send() : $n->success()->send();
+    }
+
     public function addKeyword(): void
     {
         $this->guard();
@@ -145,11 +296,119 @@ class KeywordsPage extends Page
         Notification::make()->title('Đã thêm từ khóa')->success()->send();
     }
 
+    /** Nút "Xóa" ở bảng chỉ mở hộp xác nhận; việc xóa thật nằm ở deleteKeyword, chạy sau khi người dùng xác nhận. */
+    public function confirmDeleteKeyword(int $id): void
+    {
+        $this->guard();
+        $this->mountAction('deleteKeywordConfirm', ['id' => $id]);
+    }
+
+    public function deleteKeywordConfirmAction(): Action
+    {
+        return Action::make('deleteKeywordConfirm')
+            ->requiresConfirmation()
+            ->modalHeading('Xóa từ khóa này?')
+            ->modalDescription('Bài viết đã tạo từ từ khóa này không bị ảnh hưởng. Việc xóa không hoàn tác được.')
+            ->modalSubmitActionLabel('Xóa từ khóa')
+            ->color('danger')
+            ->action(fn (array $arguments) => $this->deleteKeyword((int) ($arguments['id'] ?? 0)));
+    }
+
     public function deleteKeyword(int $id): void
     {
         $this->guard();
         KeywordService::make()->delete($id);
         Notification::make()->title('Đã xóa từ khóa')->body('Bài viết đã tạo từ từ khóa này không bị ảnh hưởng.')->success()->send();
+    }
+
+    /** Nút "Thêm vào kế hoạch" ở bảng chỉ mở hộp chọn chiến dịch; việc tạo bài nằm ở addToPlanNow. */
+    public function addToPlan(int $id): void
+    {
+        $this->guard();
+        $this->mountAction('addToPlanConfirm', ['id' => $id]);
+    }
+
+    /** @return array<string,string> */
+    private function campaignOptions(): array
+    {
+        $opts = ['solo' => 'Bài lẻ — không thuộc chiến dịch'];
+        $repo = KeywordService::make()->repo();
+        if ($repo instanceof EloquentKeywordRepository) {
+            foreach (Campaign::query()->where('website_id', $repo->websiteId())->orderBy('name')->get() as $c) {
+                $opts[(string) $c->id] = $c->name;
+            }
+        }
+
+        return $opts;
+    }
+
+    public function addToPlanConfirmAction(): Action
+    {
+        return Action::make('addToPlanConfirm')
+            ->modalHeading('Thêm vào kế hoạch')
+            ->modalDescription('Tạo một bài ở trạng thái "Đã lên kế hoạch" cho từ khóa này. Chọn chiến dịch, hoặc để Bài lẻ.')
+            ->modalSubmitActionLabel('Thêm vào kế hoạch')
+            ->form([
+                Select::make('campaign')->label('Gán vào')->options(fn () => $this->campaignOptions())->default('solo')->required()->native(false),
+            ])
+            ->action(fn (array $data, array $arguments) => $this->addToPlanNow((int) ($arguments['id'] ?? 0), (string) ($data['campaign'] ?? 'solo')));
+    }
+
+    /** Dùng cùng cơ chế với trang Kế hoạch (PlannedArticleCreator): mỗi từ khóa chính chỉ một bài trên mỗi website. */
+    public function addToPlanNow(int $id, string $campaign = 'solo'): void
+    {
+        $this->guard();
+        $repo = KeywordService::make()->repo();
+        $row = collect($repo->all())->firstWhere('id', $id);
+        if ($row === null) {
+            $this->fail('Không tìm thấy từ khóa', 'Từ khóa có thể đã bị xóa.');
+
+            return;
+        }
+        if (! $repo instanceof EloquentKeywordRepository) {
+            // Kho minh họa: chỉ đánh dấu trong bản xem thử, không tạo bài thật.
+            if (($row['plan'] ?? null) !== null) {
+                Notification::make()->title('Từ khóa đã nằm trong kế hoạch')->warning()->send();
+
+                return;
+            }
+            $repo->saveList(array_map(fn ($r) => $r['id'] === $id ? ['plan' => 'planned'] + $r : $r, $repo->all()));
+            Notification::make()->title('Đã thêm vào kế hoạch (bản xem thử)')->body('Chưa tạo bài thật vì đang dùng dữ liệu mẫu.')->success()->send();
+
+            return;
+        }
+        $site = Website::find($repo->websiteId());
+        $campaignId = null;
+        if ($campaign !== 'solo' && $campaign !== '') {
+            $campaignId = Campaign::query()->where('website_id', $repo->websiteId())->whereKey((int) $campaign)->value('id');
+            if ($campaignId === null) {
+                $this->fail('Không thêm được', 'Chiến dịch không thuộc website này.');
+
+                return;
+            }
+        }
+        $user = Auth::user();
+        if ($site === null || ! $user instanceof User) {
+            $this->fail('Không thêm được', 'Chưa có website đang hoạt động.');
+
+            return;
+        }
+        try {
+            $stored = Keyword::where('website_id', $site->id)->find($id);
+            $a = (new PlannedArticleCreator)->create($user, $site, $row['keyword'], $row['cluster'] ?? null, $row['intent'], [], $stored, 'keyword');
+            if ($campaignId !== null) {
+                $a->update(['campaign_id' => $campaignId]);
+            }
+        } catch (DuplicateKeywordException) {
+            Notification::make()->title('Từ khóa đã có bài')->body('Website đã có bài dùng từ khóa này, không tạo thêm.')->warning()->send();
+
+            return;
+        } catch (InvalidArgumentException $e) {
+            $this->fail('Không thêm được vào kế hoạch', $e->getMessage());
+
+            return;
+        }
+        Notification::make()->title('Đã thêm vào kế hoạch')->body($campaignId !== null ? 'Bài mới thuộc chiến dịch đã chọn.' : 'Bài mới là bài lẻ.')->success()->send();
     }
 
     public function startRename(string $cluster): void
@@ -174,11 +433,53 @@ class KeywordsPage extends Page
     public function propose(): void
     {
         $this->guard();
-        $n = KeywordService::make()->propose();
+        $service = KeywordService::make();
         $this->proposalNames = [];
+        $ai = KeywordAiResolver::availability('keyword_cluster');
+        // AI giả lập (môi trường local) không có kịch bản gom cụm: dùng bản theo luật có nhãn thay vì trả về rỗng.
+        if (KeywordService::useReal() && $ai['ok'] && ! $ai['demo']) {
+            try {
+                $r = $service->proposeWithAi();
+            } catch (KeywordAiUnavailable $e) {
+                $this->fail('Chưa gom cụm được bằng AI', $e->getMessage());
+
+                return;
+            }
+            if ($r['proposals'] === 0) {
+                Notification::make()->title($r['stopped_reason'] ? 'AI chưa gom được cụm nào' : 'Không còn từ khóa chưa gom cụm')
+                    ->body($r['stopped_reason'] ?: null)->warning()->send();
+            } else {
+                Notification::make()->title("AI đề xuất {$r['proposals']} cụm")
+                    ->body('Chi phí '.number_format($r['cost_vnd'], 0, ',', '.').' đ'.($r['demo'] ? ' (AI giả lập)' : '').($r['stopped_reason'] ? '. '.$r['stopped_reason'] : '').' Bạn xem và nhận từng cụm.')->success()->send();
+            }
+
+            return;
+        }
+        // Chưa có AI thật: dùng bản gom cụm minh họa, nói rõ trên màn (nhãn đề xuất đổi thành "minh họa").
+        $n = $service->propose();
         if ($n === 0) {
             Notification::make()->title('Không còn từ khóa chưa gom cụm')->warning()->send();
+        } else {
+            Notification::make()->title("Đề xuất {$n} cụm bằng bản minh họa")->body('Chưa kết nối AI nên dùng gom cụm theo luật, không phải AI.')->warning()->send();
         }
+    }
+
+    /** Gom cụm theo SERP thật (trùng top 10). Chưa có nguồn SERP: báo "bị chặn", không gom giả. */
+    public function proposeBySerp(): void
+    {
+        $this->guard();
+        $this->proposalNames = [];
+        try {
+            $r = KeywordService::make()->proposeWithSerp();
+        } catch (SerpUnavailable $e) {
+            $this->fail('Chưa gom cụm theo SERP được', $e->getMessage());
+
+            return;
+        }
+        $body = 'Chi phí tra SERP ước tính '.number_format($r['cost_vnd'], 0, ',', '.').' đ.'
+            .($r['unprocessed'] !== [] ? ' '.count($r['unprocessed']).' từ khóa chưa tra được SERP nên chưa xếp cụm.' : '')
+            .($r['stopped_reason'] ? ' '.$r['stopped_reason'] : '');
+        Notification::make()->title($r['proposals'] > 0 ? 'Đề xuất '.$r['proposals'].' cụm theo SERP' : 'Chưa gom được cụm nào theo SERP')->body(trim($body))->{$r['proposals'] > 0 ? 'success' : 'warning'}()->send();
     }
 
     private function run(callable $fn): void
@@ -247,35 +548,107 @@ class KeywordsPage extends Page
     {
         $demo = DemoMode::state(request()->query('demo'), ['trong'], '');
         $repo = KeywordService::make()->repo();
+        $site = KeywordService::defaultSite();
         $all = $demo === 'trong' ? [] : $repo->all();
         $clusters = $demo === 'trong' ? [] : $repo->clusters();
+        $rows = $this->keywordRows($all, $site);
+        $proposals = $repo->proposals();
+        [$metricsOff] = $this->metricsGate($site);
 
         return [
             'total' => count($all),
             'clustered' => count(array_filter($all, fn ($r) => $r['cluster'] !== null)),
             'kwColumns' => $this->keywordColumns(),
-            'kwRows' => $this->keywordRows($all),
+            'kwRows' => $rows,
+            'real' => KeywordService::useReal() && $site !== null,
             'clusterColumns' => $this->clusterColumns(),
-            'clusterRows' => $this->clusterRows($clusters),
+            'clusterRows' => $this->clusterRows($clusters, $all),
+            'metricsInfo' => $demo === 'trong' ? null : $this->metricsInfo($site),
+            'steps' => $this->steps($rows, count($proposals), $metricsOff),
+            'planUrl' => ContentPlanPage::getUrl(),
             'clusters' => $clusters,
-            'proposals' => $repo->proposals(),
+            'proposals' => $proposals,
+            'proposalSource' => $repo->proposalSource(),
             'intents' => KeywordIntent::LABELS,
             'demoOn' => DemoMode::enabled(),
         ];
     }
 
-    private const SOURCES = ['csv' => 'CSV', 'tay' => 'Tay', 'ai' => 'AI'];
+    /** Số liệu lượt tìm được coi là THẬT: có số và nguồn là CSV/nhập tay/DataForSEO/Search Console (không phải giả lập, không rõ nguồn). */
+    private const REAL_VOLUME_SOURCES = ['csv', 'tay', 'dataforseo', 'gsc'];
+
+    /**
+     * Dải 4 bước với số thật từ kho. `next` là bước cần làm tiếp: bước đầu tiên còn thiếu mà nút của nó bấm được
+     * (lấy lượt tìm tắt vì chưa cấu hình thì bước đó không được nhấn mạnh, để không chặn người dùng ở một nút chết).
+     *
+     * @param  list<array<string,mixed>>  $rows  kết quả keywordRows()
+     * @return array{items:list<array<string,mixed>>, next:string}
+     */
+    public function steps(array $rows, int $proposalCount = 0, ?string $metricsOff = null): array
+    {
+        $total = count($rows);
+        $volume = count(array_filter($rows, fn ($r) => $r['volumeReal']));
+        $clustered = count(array_filter($rows, fn ($r) => $r['cluster'] !== 'Chưa gom cụm'));
+        $used = count(array_filter($rows, fn ($r) => $r['usage'] !== 'unused'));
+
+        $next = match (true) {
+            $total === 0 => 'add',
+            $volume < $total && $metricsOff === null => 'metrics',
+            $clustered < $total => 'cluster',
+            $used < $total => 'plan',
+            default => 'done',
+        };
+
+        return [
+            'next' => $next,
+            'items' => [
+                ['key' => 'add', 'n' => 1, 'title' => 'Có từ khóa', 'value' => (string) $total, 'done' => $total > 0, 'hint' => $total === 0 ? 'Chưa có từ khóa nào' : 'từ khóa trong kho', 'filter' => null],
+                ['key' => 'metrics', 'n' => 2, 'title' => 'Có lượt tìm thật', 'value' => $volume.'/'.$total, 'done' => $total > 0 && $volume === $total, 'hint' => $total - $volume.' từ chưa có số liệu thật', 'filter' => ['volumeSource', 'Chưa có số liệu'], 'note' => $volume < $total ? $metricsOff : null],
+                ['key' => 'cluster', 'n' => 3, 'title' => 'Đã gom cụm', 'value' => $clustered.'/'.$total, 'done' => $total > 0 && $clustered === $total, 'hint' => $total - $clustered.' từ chưa gom cụm'.($proposalCount > 0 ? ' · '.$proposalCount.' đề xuất chờ nhận' : ''), 'filter' => ['cluster', 'Chưa gom cụm']],
+                ['key' => 'plan', 'n' => 4, 'title' => 'Đã vào kế hoạch / có bài', 'value' => (string) $used, 'done' => $total > 0 && $used === $total, 'hint' => $total - $used.' từ chưa dùng', 'filter' => ['status', 'Chưa dùng']],
+            ],
+        ];
+    }
+
+    /**
+     * Thẻ "Nguồn số liệu lượt tìm": nói thật từng nguồn và số đếm thật từ kho.
+     *
+     * @return array<string,mixed>
+     */
+    public function metricsInfo(?Website $site): array
+    {
+        $av = KeywordMetricsResolver::availability();
+        $info = ['available' => $av['ok'], 'label' => $av['label'], 'reason' => $av['reason'], 'demo' => $av['demo'], 'total' => 0, 'with' => 0, 'dataforseo' => 0, 'latest' => null, 'gsc' => 'Chưa kết nối.'];
+        if ($site !== null && KeywordService::useReal()) {
+            $q = Keyword::query()->where('website_id', $site->id);
+            $info['total'] = (clone $q)->count();
+            $info['with'] = (clone $q)->whereNotNull('volume')->count();
+            $info['dataforseo'] = (clone $q)->where('volume_source', 'dataforseo')->count();
+            $latest = (clone $q)->whereNotNull('volume')->max('metrics_at');
+            $info['latest'] = $latest ? Carbon::parse($latest)->timezone(config('app.timezone'))->format('d/m/Y H:i') : null;
+        }
+
+        return $info;
+    }
+
+    private const VOLUME_SOURCES = ['csv' => 'CSV', 'tay' => 'Nhập tay', 'dataforseo' => 'DataForSEO', 'gsc' => 'Search Console', 'mock' => 'Giả lập'];
+
+    private const SOURCES = ['csv' => 'CSV', 'tay' => 'Nhập tay', 'ai' => 'AI đề xuất', 'gsc' => 'Search Console', 'crawl' => 'Trang đã quét', 'competitor' => 'Đối thủ'];
+
+    private const USAGE_LABELS = ['unused' => 'Chưa dùng', 'planned' => 'Trong kế hoạch', 'article' => 'Đã có bài'];
 
     /** @return list<array<string,mixed>> */
     public function keywordColumns(): array
     {
         return [
-            ['key' => 'keyword', 'label' => 'Từ khóa', 'type' => 'text', 'sortable' => true],
-            ['key' => 'intent', 'label' => 'Ý định', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'tones' => ['Thông tin' => 'info', 'Thương mại' => 'accent', 'Giao dịch' => 'warn', 'Điều hướng' => 'muted']],
+            ['key' => 'label', 'label' => 'Từ khóa', 'type' => 'text', 'sortable' => true],
+            ['key' => 'volume', 'label' => 'Lượt tìm', 'type' => 'number', 'sortable' => true],
             ['key' => 'cluster', 'label' => 'Cụm chủ đề', 'type' => 'text', 'sortable' => true, 'filter' => true],
-            ['key' => 'volume', 'label' => 'Volume CSV', 'type' => 'number', 'sortable' => true],
-            ['key' => 'source', 'label' => 'Nguồn', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'visible' => false, 'tones' => ['CSV' => 'muted', 'Tay' => 'muted', 'AI' => 'accent']],
-            ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Xóa', 'method' => 'deleteKeyword', 'tone' => 'danger']]],
+            ['key' => 'status', 'label' => 'Trạng thái', 'type' => 'link', 'sortable' => true, 'filter' => true],
+            ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Thêm vào kế hoạch', 'method' => 'addToPlan', 'tone' => 'primary'], ['label' => 'Xóa', 'method' => 'confirmDeleteKeyword', 'tone' => 'muted']]],
+            ['key' => 'intent', 'label' => 'Ý định', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'visible' => false, 'tones' => ['Thông tin' => 'info', 'Thương mại' => 'accent', 'Giao dịch' => 'warn', 'Điều hướng' => 'muted']],
+            ['key' => 'volumeSource', 'label' => 'Nguồn số liệu', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'visible' => false, 'tones' => ['CSV' => 'info', 'DataForSEO' => 'ok', 'Nhập tay' => 'muted', 'Search Console' => 'ok', 'Giả lập' => 'warn', 'Chưa có số liệu' => 'muted']],
+            ['key' => 'source', 'label' => 'Nguồn', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'visible' => false, 'tones' => ['CSV' => 'info', 'Nhập tay' => 'muted', 'AI đề xuất' => 'accent', 'Search Console' => 'ok', 'Trang đã quét' => 'muted', 'Đối thủ' => 'warn']],
         ];
     }
 
@@ -283,16 +656,34 @@ class KeywordsPage extends Page
      * @param  list<array<string,mixed>>  $all
      * @return list<array<string,mixed>>
      */
-    public function keywordRows(array $all): array
+    public function keywordRows(array $all, ?Website $site = null): array
     {
-        return array_map(fn ($r) => [
-            'id' => $r['id'],
-            'keyword' => $r['keyword'],
-            'intent' => KeywordIntent::LABELS[$r['intent']] ?? $r['intent'],
-            'cluster' => $r['cluster'] ?? 'Chưa gom cụm',
-            'volume' => $r['volume'],
-            'source' => self::SOURCES[$r['source']] ?? $r['source'],
-        ], $all);
+        $links = KeywordArticleLinks::for($site, array_column($all, 'keyword'));
+        $planUrl = ContentPlanPage::getUrl();
+
+        return array_map(function ($r) use ($links, $planUrl) {
+            $l = $links[Keyword::keyFor($r['keyword'])] ?? KeywordArticleLinks::none();
+            // Trạng thái: có bài thì tính từ bài thật; chưa có bài thì dựa vào cờ kế hoạch (kho minh họa hoặc keywords.status).
+            $usage = $l['article_id'] !== null
+                ? ($l['status'] === 'planned' ? 'planned' : 'article')
+                : (($r['plan'] ?? null) ?: (($r['status'] ?? null) === 'planned' ? 'planned' : 'unused'));
+            $href = $l['article_id'] !== null ? $l['href'] : $planUrl;
+            $source = self::SOURCES[$r['source']] ?? $r['source'];
+
+            return [
+                'id' => $r['id'],
+                'keyword' => $r['keyword'],
+                'label' => $r['keyword'].($r['source'] === 'ai' ? '  ✦ AI đề xuất' : ''),
+                'intent' => KeywordIntent::LABELS[$r['intent']] ?? $r['intent'],
+                'cluster' => $r['cluster'] ?? 'Chưa gom cụm',
+                'volume' => $r['volume'],
+                'volumeSource' => $r['volume'] === null ? 'Chưa có số liệu' : (self::VOLUME_SOURCES[$r['volume_source'] ?? ''] ?? 'Không rõ nguồn'),
+                'volumeReal' => $r['volume'] !== null && in_array($r['volume_source'] ?? null, self::REAL_VOLUME_SOURCES, true),
+                'source' => $source,
+                'usage' => $usage,
+                'status' => ['text' => self::USAGE_LABELS[$usage], 'href' => $href],
+            ];
+        }, $all);
     }
 
     /** @return list<array<string,mixed>> */
@@ -301,21 +692,32 @@ class KeywordsPage extends Page
         return [
             ['key' => 'name', 'label' => 'Cụm', 'type' => 'text', 'sortable' => true],
             ['key' => 'count', 'label' => 'Số từ khóa', 'type' => 'number', 'sortable' => true],
+            ['key' => 'volume', 'label' => 'Tổng lượt tìm', 'type' => 'number', 'sortable' => true],
+            ['key' => 'missing', 'label' => 'Chưa có số liệu', 'type' => 'number', 'sortable' => true],
             ['key' => 'intent', 'label' => 'Ý định', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'tones' => ['Thông tin' => 'info', 'Thương mại' => 'accent', 'Giao dịch' => 'warn', 'Điều hướng' => 'muted']],
             ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Sửa tên', 'method' => 'startRenameById']]],
         ];
     }
 
     /**
+     * Cụm xếp theo tổng lượt tìm giảm dần (cụm nào được tìm nhiều nhất). Tổng chỉ cộng các từ khóa CÓ số; từ khóa chưa có số được đếm riêng.
+     *
      * @param  list<array<string,mixed>>  $clusters
+     * @param  list<array<string,mixed>>  $all  kho từ khóa (để tra volume theo từ khóa)
      * @return list<array<string,mixed>>
      */
-    public function clusterRows(array $clusters): array
+    public function clusterRows(array $clusters, array $all = []): array
     {
+        $vol = [];
+        foreach ($all as $r) {
+            $vol[$r['keyword']] = $r['volume'];
+        }
         $out = [];
         foreach (array_values($clusters) as $i => $c) {
-            $out[] = ['id' => $i, 'name' => $c['name'], 'count' => count($c['keywords']), 'intent' => KeywordIntent::LABELS[$c['intent']] ?? $c['intent']];
+            $with = array_filter(array_map(fn ($k) => $vol[$k] ?? null, $c['keywords']), fn ($v) => $v !== null);
+            $out[] = ['id' => $i, 'name' => $c['name'], 'count' => count($c['keywords']), 'volume' => array_sum($with), 'missing' => count($c['keywords']) - count($with), 'intent' => KeywordIntent::LABELS[$c['intent']] ?? $c['intent']];
         }
+        usort($out, fn ($a, $b) => [$b['volume'], $a['name']] <=> [$a['volume'], $b['name']]);
 
         return $out;
     }

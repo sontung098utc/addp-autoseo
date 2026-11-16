@@ -27,6 +27,8 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('SEO Studio')
+            ->defaultAvatarProvider(\App\Filament\Support\LocalAvatarProvider::class)
+            ->favicon(asset('favicon.svg'))
             ->colors([
                 // Teal #0F6B5C (Editorial Ledger); 600 = màu gốc, nút/chữ sáng dùng 600, tối dùng 400/500.
                 'primary' => [
@@ -67,7 +69,14 @@ class AdminPanelProvider extends PanelProvider
                     ])->render();
                 },
             )
+            ->renderHook(
+                PanelsRenderHook::USER_MENU_BEFORE,
+                fn (): string => \Illuminate\Support\Facades\Auth::user()?->isApprover()
+                    ? \Illuminate\Support\Facades\Blade::render('@livewire(\'agent-running-pill\')')
+                    : '',
+            )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
+            ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
                 \App\Filament\Pages\Dashboard::class,

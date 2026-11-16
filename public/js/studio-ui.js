@@ -8,18 +8,41 @@ document.addEventListener('alpine:init', () => {
   };
 
   Alpine.data('studioTabs', (def, persist) => ({
-    active: def,
+    active: def, canStart: false, canEnd: false,
     init() {
       const keys = this.keys();
       const fromHash = location.hash.startsWith('#tab-') ? location.hash.slice(5) : null;
       const saved = persist ? store('session', 'studio.tab.' + persist, null) : null;
       const pick = [fromHash, saved].find((k) => k && keys.includes(k));
       if (pick) this.active = pick;
+      this.$nextTick(() => { this.measure(); this.reveal(false); });
+      if (window.ResizeObserver) new ResizeObserver(() => this.measure()).observe(this.$refs.strip);
     },
-    keys() { return [...this.$el.querySelectorAll('[role=tab]')].map((e) => e.dataset.key); },
+    // Dấu cuộn: hiện bóng mờ + mũi tên ở mép còn nội dung bị cắt.
+    measure() {
+      const s = this.$refs.strip; if (!s) return;
+      this.canStart = s.scrollLeft > 2;
+      this.canEnd = s.scrollLeft + s.clientWidth < s.scrollWidth - 2;
+    },
+    nudge(dir) {
+      const s = this.$refs.strip; const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      s.scrollBy({ left: dir * Math.max(120, s.clientWidth * 0.6), behavior: reduce ? 'auto' : 'smooth' });
+    },
+    // Đưa tab đang chọn vào khung nhìn (chỉ cuộn ngang thanh tab, không cuộn trang).
+    reveal(smooth = true) {
+      const s = this.$refs.strip; const t = s && s.querySelector('[role=tab][data-key="' + this.active + '"]'); if (!t) return;
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const pad = 36; const l = t.offsetLeft - pad; const r = t.offsetLeft + t.offsetWidth + pad;
+      let x = s.scrollLeft;
+      if (l < s.scrollLeft) x = Math.max(0, l); else if (r > s.scrollLeft + s.clientWidth) x = r - s.clientWidth;
+      if (x !== s.scrollLeft) s.scrollTo({ left: x, behavior: smooth && !reduce ? 'smooth' : 'auto' });
+    },
+    // Chỉ các tab của CHÍNH thanh này (tab lồng bên trong một panel, ví dụ các phần của phiên chạy trong tab Phiên chạy của bài, có thanh riêng).
+    keys() { return [...(this.$refs.strip || this.$el).querySelectorAll('[role=tab]')].map((e) => e.dataset.key); },
     set(k) {
       this.active = k;
       if (persist) save('session', 'studio.tab.' + persist, k);
+      this.$nextTick(() => this.reveal());
     },
     onKey(e) {
       const keys = this.keys(); let i = keys.indexOf(this.active);
@@ -109,3 +132,30 @@ document.addEventListener('alpine:init', () => {
     act(a, row) { if (this.$wire) this.$wire.call(a.method, row.id); },
   }));
 });
+
+/*
+ * Tên truy cập cho nút biểu tượng của Filament không có chữ (nút "Thao tác khác" ba chấm, nút đóng/mở menu ở đầu trang):
+ * trình đọc màn hình chỉ đọc "nút". Lấy tên từ nội dung tooltip có sẵn (x-tooltip), hoặc từ chức năng đóng/mở menu.
+ */
+(function () {
+  const hasName = (b) => (b.getAttribute('aria-label') || b.getAttribute('title') || b.textContent || '').trim() !== '';
+  const fix = (root) => {
+    (root || document).querySelectorAll('button.fi-icon-btn').forEach((b) => {
+      if (hasName(b)) return;
+      let label = '';
+      const tip = b.getAttribute('x-tooltip') || '';
+      const m = tip.match(/content:\s*'((?:[^'\\]|\\.)*)'/);
+      if (m) { try { label = JSON.parse('"' + m[1].replace(/"/g, '\\"') + '"'); } catch (e) { label = m[1]; } }
+      if (!label && b.closest('header') && /sidebar/i.test((b.getAttribute('x-on:click') || '') + (b.getAttribute('x-bind:class') || '') + (b.getAttribute('x-show') || ''))) label = 'Đóng hoặc mở menu';
+      if (!label && b.closest('header')) label = 'Đóng hoặc mở menu';
+      if (label) b.setAttribute('aria-label', label);
+    });
+  };
+  // Tiêu đề khối của Filament là h3 ngay dưới h1 (nhảy cấp): khai báo là cấp 2 cho trình đọc màn hình.
+  const levels = () => document.querySelectorAll('h3.fi-section-header-heading').forEach((h) => h.setAttribute('aria-level', '2'));
+  const start = () => {
+    fix(); levels();
+    new MutationObserver(() => { fix(); levels(); }).observe(document.body, { childList: true, subtree: true });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();

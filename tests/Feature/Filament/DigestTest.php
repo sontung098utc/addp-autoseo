@@ -152,8 +152,50 @@ class DigestTest extends TestCase
         $d = DigestQueries::build($this->user('admin'), $this->now());
         $text = implode(' ', $d['notes']);
 
-        $this->assertStringContainsString('Chưa có nhật ký chạy của AI', $text);
+        $this->assertStringContainsString('Đội AI chưa chạy phiên nào', $text);
+        $this->assertStringNotContainsString('Chưa có nhật ký chạy của AI', $text);
         $this->assertStringContainsString('Chưa đo được hiệu quả SEO', $text);
+    }
+
+    private function agentRun(string $status, string $startedUtc, array $extra = []): \App\Models\AgentRun
+    {
+        $this->n++;
+        $a = Article::create(['website_id' => $this->site->id, 'primary_keyword' => "ag{$this->n}", 'workflow_status' => 'needs_review']);
+
+        return \App\Models\AgentRun::create(array_merge(['website_id' => $this->site->id, 'article_id' => $a->id, 'status' => $status, 'ai_mode' => 'real', 'started_at' => $startedUtc], $extra));
+    }
+
+    public function test_so_lieu_doi_ai_lay_tu_nhat_ky_phien_chay(): void
+    {
+        $in = '2026-11-06 02:00:00'; // trong "hôm qua" theo giờ VN
+        $this->agentRun('ready_for_review', $in, ['repair_rounds' => 1, 'cost_vnd' => 1500]);
+        $r2 = $this->agentRun('held', $in, ['repair_rounds' => 2, 'cost_vnd' => 2500, 'ai_mode' => 'mock']);
+        $this->agentRun('failed', $in, ['cost_vnd' => 0]);
+        $this->agentRun('ready_for_review', '2026-11-01 02:00:00', ['repair_rounds' => 3, 'cost_vnd' => 9999]); // ngoài ngày
+        foreach ([1, 2] as $seq) {
+            \App\Models\AgentRunStep::create(['agent_run_id' => $r2->id, 'seq' => $seq, 'stage' => 'retry', 'role' => 'system', 'status' => 'warn', 'title' => 't']);
+        }
+
+        $d = DigestQueries::build($this->user('approver'), $this->now());
+        $by = collect($d['stats'])->keyBy('label');
+
+        $this->assertSame('3', $by['Phiên chạy của đội AI']['value']);
+        $this->assertStringContainsString('1 phiên lỗi', $by['Phiên chạy của đội AI']['sub']);
+        $this->assertStringContainsString('1 phiên dùng AI giả lập', $by['Phiên chạy của đội AI']['sub']);
+        $this->assertSame('1', $by['Đội AI đưa tới chờ duyệt']['value']);
+        $this->assertSame('1', $by['Đội AI giữ nháp']['value']);
+        $this->assertSame('2 / 3', $by['Tự thử lại / tự sửa']['value'], '2 bước thử lại / 1+2 vòng sửa');
+        $this->assertSame(\App\Filament\Support\AiUsage\Vnd::format(4000), $by['Chi phí đội AI']['value']);
+        $this->assertStringContainsString('lấy từ nhật ký phiên chạy', implode(' ', $d['notes']));
+        $this->assertStringNotContainsString('Đội AI chưa chạy phiên nào', implode(' ', $d['notes']));
+    }
+
+    public function test_bien_tap_vien_khong_thay_so_lieu_chi_phi_doi_ai(): void
+    {
+        $this->agentRun('ready_for_review', '2026-11-06 02:00:00', ['cost_vnd' => 1500]);
+        $d = DigestQueries::build($this->user('writer'), $this->now());
+
+        $this->assertNotContains('Chi phí đội AI', array_column($d['stats'], 'label'));
     }
 
     public function test_hien_dung_khi_dang_dung_xuat_ban(): void
@@ -181,7 +223,7 @@ class DigestTest extends TestCase
             $this->actingAs($this->user($role));
             Livewire::test(DigestPage::class)
                 ->assertOk()
-                ->assertSee('Chưa có nhật ký chạy của AI')
+                ->assertSee('Đội AI chưa chạy phiên nào')
                 ->assertSee('Chưa đo được hiệu quả SEO');
         }
     }

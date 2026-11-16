@@ -22,6 +22,12 @@ class UiKitPage extends Page
 
     protected static string $view = 'filament.pages.ui-kit';
 
+    /** Trang tham chiếu thành phần giao diện dành cho lập trình viên: không hiện trong menu của ai (vẫn vào được bằng đường dẫn /admin/thanh-phan-ui nếu có quyền và chế độ mẫu bật). */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function canAccess(): bool
     {
         return DemoMode::enabled() && (auth()->user()?->is_active ?? false);

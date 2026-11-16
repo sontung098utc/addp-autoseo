@@ -26,6 +26,7 @@ final class WhyAction
             ->modalHeading('Vì sao bài này chưa được đăng?')
             ->modalContent(fn (Model $record) => view('filament.explain.why-not-published', ['result' => self::explain($record)]))
             ->modalSubmitAction(false)
-            ->modalCancelActionLabel('Đóng');
+            ->modalCancelAction(false)
+            ->modalCloseButton();
     }
 }

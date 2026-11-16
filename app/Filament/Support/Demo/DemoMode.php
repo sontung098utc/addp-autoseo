@@ -9,9 +9,13 @@ namespace App\Filament\Support\Demo;
  */
 final class DemoMode
 {
+    /**
+     * Mặc định TẮT: các màn hiện dữ liệu thật hoặc nói rõ "chưa kết nối/chưa có dữ liệu", và AI/tìm web/ảnh/chỉ số từ khóa thiếu cấu hình thì báo rõ,
+     * không rơi về bản giả. Bật (STUDIO_DEMO=true) chỉ để dựng dữ liệu minh họa khi phát triển; không bao giờ bật được ở production.
+     */
     public static function enabled(): bool
     {
-        return ! app()->isProduction();
+        return (bool) config('studio.demo', false) && ! app()->isProduction();
     }
 
     /**

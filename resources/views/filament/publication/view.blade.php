@@ -15,6 +15,9 @@
     $stopInfo = $isStopped ? $emergencyService->getStopInfo($p->website_id) : null;
 @endphp
 <x-filament-panels::page>
+    @if ($p->articleVersion?->article_id)
+        <p class="ss-sched-muted"><a style="text-decoration:underline" href="{{ \App\Filament\Resources\ArticleResource::getUrl('view', ['record' => $p->articleVersion->article_id]) }}#tab-publish"><x-filament::icon icon="heroicon-o-arrow-left" style="width:.95rem;height:.95rem;display:inline;vertical-align:-.15em" /> Xem bài viết «{{ $p->articleVersion->article?->primary_keyword }}»</a></p>
+    @endif
     <style>
         .ss-sched-box{border:1px solid rgba(128,128,128,.25);border-radius:.75rem;padding:1rem;margin-bottom:1rem}
         .ss-sched-h{font-weight:600;margin-bottom:.5rem}
@@ -34,14 +37,12 @@
         <p><strong>Vì sao ở trạng thái này:</strong> {{ $explain['why'] }}</p>
         <p><strong>Bước tiếp theo:</strong> {{ $explain['next'] }}</p>
         @if ($reconcileWhy)
-            <p class="ss-sched-muted">Nút "Đối soát ngay" đang ẩn: {{ $reconcileWhy }}</p>
+            <p class="ss-sched-muted">Không đối soát được lúc này. <x-help title="Nút «Đối soát ngay» đang ẩn" :text="$reconcileWhy" /></p>
         @endif
         @if ($isStopped)
             <div class="ss-sched-emergency">
-                ⛔ Lịch đăng đang TẠM DỪNG KHẨN CẤP: {{ $stopInfo['reason'] ?? 'Toàn hệ thống đang tạm hoãn xuất bản' }}
+                <x-filament::icon icon="heroicon-o-exclamation-triangle" style="width:1.1rem;height:1.1rem;display:inline;vertical-align:-.2em" /> Lịch đăng đang TẠM DỪNG KHẨN CẤP: {{ $stopInfo['reason'] ?? 'Toàn hệ thống đang tạm hoãn xuất bản' }}
             </div>
-        @else
-            <p class="ss-sched-muted">Nút "Tạm dừng lịch đăng": Quản trị viên/Trưởng nhóm có thể kích hoạt tại trang danh sách lịch đăng.</p>
         @endif
     </div>
 

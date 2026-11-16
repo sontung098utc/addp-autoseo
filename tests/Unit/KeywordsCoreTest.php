@@ -2,10 +2,10 @@
 
 namespace Tests\Unit;
 
+use App\Filament\Support\Demo\KeywordsDemoData;
 use App\Filament\Support\Keywords\CsvKeywordParser;
 use App\Filament\Support\Keywords\KeywordService;
 use App\Filament\Support\Keywords\MockClusterer;
-use App\Filament\Support\Demo\KeywordsDemoData;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
@@ -73,13 +73,16 @@ class KeywordsCoreTest extends TestCase
         $n = $s->propose();
         $this->assertGreaterThan(1, $n);
         $props = $s->repo()->proposals();
+        $before = count($s->repo()->clusters()); // bộ mẫu đã có sẵn một số cụm
+        $this->assertGreaterThan(0, $before);
         $s->accept($props[0]['id']);
-        $this->assertCount(1, $s->repo()->clusters());
-        $name = $s->repo()->clusters()[0]['name'];
-        $this->assertSame(count($s->repo()->clusters()[0]['keywords']), count(array_filter($s->repo()->all(), fn ($r) => $r['cluster'] === $name)));
+        $this->assertCount($before + 1, $s->repo()->clusters());
+        $accepted = $s->repo()->clusters()[$before];
+        $name = $accepted['name'];
+        $this->assertSame(count($accepted['keywords']), count(array_filter($s->repo()->all(), fn ($r) => $r['cluster'] === $name)));
 
         $s->renameCluster($name, 'Tên mới');
-        $this->assertSame('Tên mới', $s->repo()->clusters()[0]['name']);
+        $this->assertSame('Tên mới', $s->repo()->clusters()[$before]['name']);
         $this->assertNotEmpty(array_filter($s->repo()->all(), fn ($r) => $r['cluster'] === 'Tên mới'));
 
         $props = $s->repo()->proposals();

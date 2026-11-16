@@ -72,6 +72,7 @@ class ReviewWorkflow
             if ($version->review_status !== 'needs_review' || $article->workflow_status !== 'needs_review') {
                 throw new InvalidArgumentException('Chỉ duyệt được bản đang ở trạng thái Chờ duyệt.');
             }
+            $this->assertNoLiveRun($article);
             $this->assertLatest($article, $version);
 
             $blocking = $this->quality->check($version, $article)->blockingCodes();
@@ -90,7 +91,8 @@ class ReviewWorkflow
                 'reviewed_at' => now(),
                 'review_notes' => $note,
             ]);
-            $article->update(['workflow_status' => 'approved']);
+            // approved_version_id (lô A của Dev1): bản đang được duyệt; ArticleVersion::created xóa giá trị này khi có bản mới.
+            $article->update(['workflow_status' => 'approved', 'approved_version_id' => $version->id]);
             // Nếu tự duyệt mà thiếu ghi chú, AuditRecorder ném lỗi và transaction rollback.
             $this->audit->record(AuditAction::Approve, $actor, $article, $version, $note);
             if ($blocking) {
@@ -108,6 +110,7 @@ class ReviewWorkflow
             if ($version->review_status !== 'needs_review' || $article->workflow_status !== 'needs_review') {
                 throw new InvalidArgumentException('Chỉ từ chối được bản đang ở trạng thái Chờ duyệt.');
             }
+            $this->assertNoLiveRun($article);
             $this->assertLatest($article, $version);
 
             $reason = $this->clean($reason);
@@ -180,6 +183,15 @@ class ReviewWorkflow
         $fresh = ArticleVersion::query()->lockForUpdate()->findOrFail($version->id);
 
         return [$article, $fresh];
+    }
+
+    /** Đội AI đang viết lại bài thì bản trong tay người duyệt sắp bị thay: chờ phiên xong rồi duyệt bản mới. */
+    private function assertNoLiveRun(Article $article): void
+    {
+        $run = \App\Models\AgentRun::query()->where('article_id', $article->id)->where('status', 'running')->latest('id')->first();
+        if ($run && \App\Filament\Support\Agent\RunActivity::isLive($run)) {
+            throw new InvalidArgumentException('Đội AI đang viết lại bài này (phiên #'.$run->id.'). Chờ phiên xong rồi duyệt bản mới.');
+        }
     }
 
     private function assertLatest(Article $article, ArticleVersion $version): void

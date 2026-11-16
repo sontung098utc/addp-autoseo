@@ -27,7 +27,7 @@ class QualityReviewScreenTest extends TestCase
 
     private function user(string $role): User
     {
-        return User::create(['name' => $role, 'email' => uniqid() . '@x.vn', 'password' => 'secret123', 'role' => $role, 'is_active' => true]);
+        return User::create(['name' => $role, 'email' => uniqid().'@x.vn', 'password' => 'secret123', 'role' => $role, 'is_active' => true]);
     }
 
     private function make(bool $bad): ArticleVersion
@@ -52,7 +52,7 @@ class QualityReviewScreenTest extends TestCase
         $this->actingAs($this->user('approver'));
         $v = $this->make(false);
         Livewire::test(ViewArticleVersion::class, ['record' => $v->id])
-            ->assertSee('P0 chưa đạt: 0')->assertSee('P1 chưa đạt: 0')->assertSee('P2 chưa đạt: 0')
+            ->assertDontSee('P0 chưa đạt')->assertDontSee('P1 chưa đạt')->assertDontSee('P2 chưa đạt')
             ->assertSee('Không có mục nào chưa đạt')->assertDontSee('chặn duyệt');
     }
 

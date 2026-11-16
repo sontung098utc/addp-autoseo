@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Website;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -23,7 +24,7 @@ class GscScreenTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        \Illuminate\Support\Facades\Cache::flush();
+        Cache::flush();
         Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
     }
 
@@ -44,7 +45,7 @@ class GscScreenTest extends TestCase
         $this->actingAs($this->user('approver'));
         $c = Livewire::test(SearchConsolePage::class)
             ->assertDontSee('Dữ liệu minh họa')->assertDontSee('(minh họa)')
-            ->assertSee('Tổng quan')->assertSee('Truy vấn')->assertSee('Thiết bị')->assertSee('Quốc gia')->assertSee('Cơ hội')->assertSee('Đề xuất')->assertSee('Quy tắc')
+            ->assertSee('Tổng quan')->assertSee('Truy vấn')->assertSee('Thiết bị')->assertSee('Quốc gia')->assertSee('Cơ hội')->assertSee('Đề xuất')->assertSee('Nguồn dữ liệu và quy tắc')->assertSee('data-testid="help"', false)
             ->assertSee('Clicks theo ngày')
             ->call('setDays', 14)->assertSet('days', 14);
         $dv = $c->viewData('dimRows');
@@ -148,5 +149,12 @@ class GscScreenTest extends TestCase
         // đường người dùng: trang đầu tiên của dữ liệu mẫu dùng URL thật nên chọn nó hiện link bài
         $this->actingAs($this->user('approver'));
         Livewire::test(SearchConsolePage::class)->call('selectItem', 'page', 'https://blog.company.vn/giay-chay-bo-nam/')->assertSee('Bài thật');
+    }
+
+    public function test_dau_i_nam_canh_tieu_de_khong_o_hang_rieng(): void
+    {
+        $heading = (string) (new SearchConsolePage)->getHeading();
+        $this->assertStringContainsString('Search Console', $heading);
+        $this->assertStringContainsString('data-testid="chain-context"', $heading);
     }
 }

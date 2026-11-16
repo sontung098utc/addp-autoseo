@@ -10,6 +10,26 @@ final class PriorityScorer
 {
     public const FORMULA = 'điểm = làm tròn(100 × (0,5 × V + 0,3 × (1 − D ÷ 100) + 0,2 × O))';
 
+    public const FORMULA_REAL = 'điểm = làm tròn(100 × (0,7 × V + 0,3 × O)); không có lượng tìm thì để trống';
+
+    /**
+     * Điểm cho dữ liệu THẬT (CSV/Search Console): không có độ khó nên không dùng D, và không có lượng tìm thì
+     * trả null (để trống), tuyệt đối không điền số giả.
+     *
+     * @return ?array{score:int, reason:string}
+     */
+    public static function scoreReal(?int $volume, int $rankedCompetitors, int $totalCompetitors, int $maxVolume): ?array
+    {
+        if ($volume === null) {
+            return null;
+        }
+        $volNorm = $maxVolume > 0 ? min(1.0, log10(max(0, $volume) + 1) / log10($maxVolume + 1)) : 0.0;
+        $overlap = $totalCompetitors > 0 ? min(1.0, max(0, $rankedCompetitors) / $totalCompetitors) : 0.0;
+        $score = (int) round(100 * (0.7 * $volNorm + 0.3 * $overlap));
+
+        return ['score' => $score, 'reason' => 'Volume '.number_format(max(0, $volume), 0, ',', '.').' · '.$rankedCompetitors.'/'.$totalCompetitors.' đối thủ xếp hạng · điểm '.$score];
+    }
+
     /**
      * @return array{score:int, vol_norm:float, diff_norm:float, overlap_norm:float, pts_volume:float, pts_difficulty:float, pts_overlap:float, total:float, reason:string}
      */

@@ -166,7 +166,7 @@ class PublishExplainerTest extends TestCase
     public function test_hop_thoai_hien_thi_tren_trang_luot_dang(): void
     {
         $this->actingAs($this->user('approver'));
-        $p = $this->pub('scheduled', '2099-01-01 10:00:00');
+        $p = $this->pub('scheduled', '2030-01-01 10:00:00');
 
         Livewire::test(ViewPublication::class, ['record' => $p->id])
             ->mountAction('why')

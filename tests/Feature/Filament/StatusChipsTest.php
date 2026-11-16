@@ -29,7 +29,7 @@ class StatusChipsTest extends TestCase
 
     public function test_nguon_noi_dung_ai_giai_lap_khac_biet_ro_voi_ai_that(): void
     {
-        $this->assertSame('AI thật', StatusPresenter::label('live', 'source'));
+        $this->assertSame('Do AI tạo', StatusPresenter::label('live', 'source'));
         $this->assertSame('AI giả lập', StatusPresenter::label('mock', 'source'));
         $this->assertNotSame(StatusPresenter::color('live', 'source'), StatusPresenter::color('mock', 'source'));
         $this->assertSame('warning', StatusPresenter::color('mock', 'source'));

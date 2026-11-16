@@ -30,7 +30,7 @@ class HowItWorksPage extends Page
 
     protected static ?string $navigationGroup = 'Cài đặt';
 
-    protected static ?int $navigationSort = 8;
+    protected static ?int $navigationSort = 40;
 
     protected static ?string $title = 'Cách hoạt động của SEO Studio';
 
@@ -56,6 +56,7 @@ class HowItWorksPage extends Page
 
         return [
             'stages' => $stages,
+            'flow' => \App\Filament\Support\Agent\AgentFlowBlueprint::stages(),
             'automation' => array_values(array_filter(array_map(fn (string $id) => FeatureRegistry::find($id), ['ai.router', 'ai.selfrepair', 'pipeline.auto']))),
             'counts' => FeatureRegistry::counts(),
         ];

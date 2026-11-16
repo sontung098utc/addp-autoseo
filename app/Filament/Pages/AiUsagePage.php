@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Pages\Concerns\ManagesAiAccounts;
+use App\Filament\Resources\ArticleResource;
 use App\Filament\Support\AiUsage\UsageAggregator;
 use App\Filament\Support\AiUsage\UsageReader;
 use App\Filament\Support\AiUsage\UsageThresholds;
@@ -17,21 +19,30 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
+use Livewire\Attributes\Url;
 use Throwable;
 
+/** Cấu hình AI (trước là Chi phí AI): MỘT hàng tab ngang. Các tab chi phí, ngưỡng, quy tắc, rồi "Tích hợp AI" (tài khoản/khóa/model). URL cũ chuyển về #tab-tich-hop-ai. */
 class AiUsagePage extends Page
 {
+    use ManagesAiAccounts;
+
+    public static function configUrl(): string
+    {
+        return static::getUrl().'#tab-tich-hop-ai';
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static ?string $navigationLabel = 'Chi phí AI';
+    protected static ?string $navigationLabel = 'Cấu hình AI';
 
     protected static ?string $navigationGroup = 'Cài đặt';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 1;
 
-    protected static ?string $title = 'Chi phí AI';
+    protected static ?string $title = 'Cấu hình AI';
 
-    protected static ?string $slug = 'chi-phi-ai';
+    protected static ?string $slug = 'cau-hinh-ai';
 
     protected static string $view = 'filament.pages.ai-usage';
 
@@ -107,8 +118,13 @@ class AiUsagePage extends Page
 
     protected function getHeaderActions(): array
     {
+        // Các action chỉ để Filament nhận diện; nút thật nằm trong từng tab (Ngưỡng, Tích hợp AI).
+        $hide = ['style' => 'display:none', 'aria-hidden' => 'true', 'tabindex' => '-1'];
+
         return [
-            Action::make('setThreshold')
+            $this->editLimitsAction()->extraAttributes($hide),
+            $this->addProviderAction()->extraAttributes($hide),
+            Action::make('setThreshold')->extraAttributes($hide)
                 ->label('Đặt ngưỡng cảnh báo')
                 ->color('primary')
                 ->slideOver()
@@ -170,7 +186,7 @@ class AiUsagePage extends Page
         $now = VnTime::now();
         $pace = $th['month'] !== null ? $th['month'] / $now->daysInMonth : null;
 
-        return [
+        return $this->configViewData() + [
             'websites' => Website::orderBy('name')->get(['id', 'name']),
             'label' => $label,
             'rangeError' => $rangeError,
@@ -253,7 +269,7 @@ class AiUsagePage extends Page
         foreach ($articles as $a) {
             $rows[] = [
                 'id' => $a['article_id'],
-                'title' => ['text' => $a['title'], 'href' => \App\Filament\Resources\ArticleVersionResource::getUrl('view', ['record' => $a['version_id']])],
+                'title' => ['text' => $a['title'], 'href' => ArticleResource::getUrl('view', ['record' => $a['article_id']])],
                 'website' => $a['website'],
                 'models' => implode(', ', $a['models']) ?: 'không rõ model',
                 'cost' => round($a['cost']),

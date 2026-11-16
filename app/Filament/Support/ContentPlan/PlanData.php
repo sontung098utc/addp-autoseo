@@ -29,7 +29,7 @@ final class PlanData
     /**
      * Bài của website kèm ngày (giờ VN) nếu có: bài đã xếp lịch/đã đăng lấy từ publications, bài planned lấy từ DemoStore.
      *
-     * @return list<array{id:int, keyword:string, title:string, status:string, cluster:?string, at:?CarbonImmutable, source:string}>
+     * @return list<array{id:int, keyword:string, title:string, status:string, cluster:?string, campaign_id:?int, at:?CarbonImmutable, source:string}>
      */
     public static function articles(Website $site): array
     {
@@ -50,7 +50,7 @@ final class PlanData
                 $at = CarbonImmutable::parse($planned[$a->id], VnTime::TZ);
                 $source = 'planned';
             }
-            $out[] = ['id' => $a->id, 'keyword' => (string) $a->primary_keyword, 'title' => (string) ($a->latestVersion?->title ?: $a->primary_keyword), 'status' => (string) $a->workflow_status, 'cluster' => $a->topic_cluster, 'at' => $at, 'source' => $source];
+            $out[] = ['id' => $a->id, 'keyword' => (string) $a->primary_keyword, 'title' => (string) ($a->latestVersion?->title ?: $a->primary_keyword), 'status' => (string) $a->workflow_status, 'cluster' => $a->topic_cluster, 'campaign_id' => $a->campaign_id, 'at' => $at, 'source' => $source];
         }
 
         return $out;

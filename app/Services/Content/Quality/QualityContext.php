@@ -15,7 +15,8 @@ class QualityContext
     /** @var list<array{level:int,text:string}>|null */
     private ?array $headings = null;
 
-    public function __construct(public readonly ArticleVersion $version, public readonly ?Article $article)
+    /** @param list<int>|null $brainIds Trí tuệ do ngữ cảnh chạy (chiến dịch) chọn; null = chỉ suy từ website của bài (AG-B3) */
+    public function __construct(public readonly ArticleVersion $version, public readonly ?Article $article, public readonly ?array $brainIds = null)
     {
     }
 
@@ -61,7 +62,7 @@ class QualityContext
     /** @return list<string> */
     public function words(): array
     {
-        return $this->text() === '' ? [] : explode(' ', $this->text());
+        return \App\Services\Content\VietnameseText::words($this->text());
     }
 
     /** @return list<array{level:int,text:string}> theo thứ tự xuất hiện */
@@ -78,6 +79,37 @@ class QualityContext
     }
 
     /** Từ khóa chính: của phiên bản, nếu trống thì của bài. */
+    /** @var list<array{title?: string, url?: string, domain?: string}> nguồn CÓ THẬT mà hệ thống đã tìm thấy khi viết bài này (tài liệu web có địa chỉ), để SRC01 coi là nguồn thật */
+    public array $knownSources = [];
+
+    /** Từ chung chung trong từ khóa dạng câu hỏi dài, không tính khi so khớp theo từ cốt lõi. */
+    private const KW_FILLER = ['the', 'nao', 'la', 'gi', 'va', 'hay', 'cua', 'cho', 'cac', 'nhung', 'mot', 'co', 'khac', 'nhau', 'bao', 'nhieu', 'sao', 'nhu', 'thi', 'de', 'khi', 'nen', 'duoc', 'khong', 'hon', 'so', 'voi'];
+
+    /**
+     * Từ khóa có xuất hiện trong $haystack không: đúng nguyên cụm, hoặc (từ khóa dài từ 5 từ, kiểu câu hỏi tự nhiên) đủ từ CỐT LÕI của nó (bỏ từ chung chung như "thế nào", "là gì",
+     * "khác nhau"): ≥ 80% từ cốt lõi có mặt. Người viết không thể lặp nguyên một câu hỏi dài trong đoạn mở đầu và tiêu đề mà vẫn tự nhiên.
+     */
+    public static function keywordIn(string $haystack, string $kw): bool
+    {
+        if ($kw === '') {
+            return false;
+        }
+        if (str_contains($haystack, $kw)) {
+            return true;
+        }
+        $tok = fn (string $x) => array_values(array_filter(preg_split('/[^\p{L}\p{N}]+/u', \Illuminate\Support\Str::ascii(mb_strtolower($x))) ?: [], fn ($w) => $w !== ''));
+        if (count($tok($kw)) < 5) {
+            return false;
+        }
+        $core = array_values(array_unique(array_filter($tok($kw), fn ($w) => ! in_array($w, self::KW_FILLER, true) && strlen($w) >= 2)));
+        if (count($core) < 3) {
+            return false;
+        }
+        $have = array_flip($tok($haystack));
+
+        return count(array_filter($core, fn ($w) => isset($have[$w]))) / count($core) >= 0.8;
+    }
+
     public function keyword(): string
     {
         return self::normalize((string) ($this->version->focus_keyword ?: $this->article?->primary_keyword ?: ''));

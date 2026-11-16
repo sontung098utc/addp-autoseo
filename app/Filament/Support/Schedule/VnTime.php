@@ -4,6 +4,7 @@ namespace App\Filament\Support\Schedule;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * Quy tắc múi giờ: DB lưu UTC (cột *_utc), giao diện hiển thị Asia/Ho_Chi_Minh.
@@ -33,14 +34,18 @@ final class VnTime
     }
 
     /** Đọc đúng giá trị UTC thô của một cột thời gian trên model. */
-    public static function fromRaw(\Illuminate\Database\Eloquent\Model $model, string $attribute): ?CarbonImmutable
+    public static function fromRaw(Model $model, string $attribute): ?CarbonImmutable
     {
         $raw = $model->getRawOriginal($attribute) ?? $model->getAttributes()[$attribute] ?? null;
         if ($raw instanceof CarbonInterface) {
             return CarbonImmutable::instance($raw)->setTimezone('UTC');
         }
 
-        return $raw ? CarbonImmutable::parse($raw, 'UTC') : null;
+        // Cột *_utc lưu UTC theo tên; cột khác (started_at, created_at...) Eloquent ghi theo app.timezone nên đọc lại đúng múi giờ đó
+        // (trước đây đọc nhầm là UTC: giờ giao diện và thời lượng phiên lệch 7 giờ khi app.timezone = Asia/Ho_Chi_Minh).
+        $tz = str_ends_with($attribute, '_utc') ? 'UTC' : (string) config('app.timezone', 'UTC');
+
+        return $raw ? CarbonImmutable::parse($raw, $tz)->setTimezone('UTC') : null;
     }
 
     public static function format(CarbonInterface|string|null $time, string $format = 'd/m/Y H:i'): string
@@ -70,6 +75,26 @@ final class VnTime
         $start = CarbonImmutable::instance($vnDay)->setTimezone(self::TZ)->startOfDay();
 
         return [$start->utc()->format(self::DB_FORMAT), $start->addDay()->utc()->format(self::DB_FORMAT)];
+    }
+
+    /**
+     * Khoảng một ngày VN theo MÚI GIỜ ỨNG DỤNG, dùng cho cột Eloquent tự ghi bằng now() (agent_runs.started_at, created_at...).
+     * Cột có tên *_utc mới dùng dayRangeUtc. Khi APP_TIMEZONE = UTC hai hàm cho cùng kết quả.
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function dayRangeApp(CarbonInterface $vnDay): array
+    {
+        $start = CarbonImmutable::instance($vnDay)->setTimezone(self::TZ)->startOfDay();
+        $tz = (string) config('app.timezone', 'UTC');
+
+        return [$start->setTimezone($tz)->format(self::DB_FORMAT), $start->addDay()->setTimezone($tz)->format(self::DB_FORMAT)];
+    }
+
+    /** @return array{0: string, 1: string} [bắt đầu, kết thúc) của hôm nay (giờ VN) theo múi giờ ứng dụng. */
+    public static function todayRangeApp(?CarbonInterface $now = null): array
+    {
+        return self::dayRangeApp($now ?? self::now());
     }
 
     /** @return array{0: string, 1: string} */

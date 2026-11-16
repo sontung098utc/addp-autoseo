@@ -1,0 +1,162 @@
+RUN 182 status=ready_for_review rounds=1 cost=12302.56 final_version=72
+#1 [guard/ok] Được phép chạy |  tok=0
+    Không có lệnh dừng, website hoạt động, bậc tin cậy T1 (chỉ tạo bản nháp).
+#2 [risk/ok] Hạng rủi ro: vừa |  tok=0
+    Chủ đề giá cả (có cụm "báo giá")
+#3 [brief/ok] Lập dàn ý (8 mục) | sonnet tok=3732
+    Dàn ý dựa trên từ khóa chính và ý định tìm kiếm của bài. Dùng playbook brief/content-brief@1 (bản nháp, chỉ cho lượt thủ công).
+#4 [images/skipped] Không tạo ảnh |  tok=0
+    Tính năng tự tạo ảnh đang tắt.
+#5 [research/warn] Chưa có tài liệu bậc 1 từ web |  tok=0
+    Chưa cấu hình tìm kiếm web. Đặt TAVILY_API_KEY trong .env rồi tải lại. Vẫn viết tiếp, dựa trên kiến thức đã duyệt và hiểu biết chuẩn mực của người viết.
+#6 [research/warn] Chuẩn bị tài liệu |  tok=0
+    Đã nạp 0 mục kiến thức đã duyệt, 0 ảnh gợi ý, 0 liên kết nội bộ gợi ý, 0 nguồn được phép trích, chưa có hồ sơ doanh nghiệp. Kho kiến thức chưa có mục đã duyệt phù hợp; đã ghi khoảng trống kiến thức.
+#7 [write/ok] Viết bản đầu | sonnet tok=20057
+    Viết theo dàn ý; HTML được làm sạch trước khi chấm. Kho kiến thức chưa có mục đã duyệt phù hợp; đã ghi khoảng trống kiến thức để bổ sung. Không có ảnh phù hợp trong thư viện (chỉ nhắc, không chặn).
+#8 [grade/ok] Chấm bản đầu |  tok=0
+    Điểm 80/100 (tham khảo, mốc 80). Đạt mọi luật bắt buộc (còn 4 mục P1, 0 mục P2 chỉ nên xem). Dùng playbook editor/qa-review@1 (bản nháp, chỉ cho lượt thủ công).
+#9 [edit/warn] Biên tập viên yêu cầu sửa (8 điểm) | sonnet tok=9789
+    Bài trung thực, không bịa giá, có khung chọn máy và checklist báo giá tốt. Nhưng người tìm báo giá không có khoảng ngân sách nào, có đoạn né, FAQ rỗng và bị lẫn tạp (ghi chú, form). Người viết sửa trực tiếp bản đang có.
+#10 [repair/ok] Sửa theo biên tập viên | sonnet tok=35052
+    Gửi lại cho AI 8 lỗi cần sửa (lỗi chặn hoặc đoạn thiếu trích dẫn): BIÊN TẬP — mở bài / Tóm tắt nhanh: Mở bài nói hai lần "chưa có báo giá | BIÊN TẬP — Câu hỏi thường gặp: Các câu hỏi bị mất (chỉ còn phần trả lờ | BIÊN TẬP — Giá máy dập viên theo nhóm máy: Tiêu đề hứa "giá theo nhóm"
+#11 [grade/ok] Chấm lại sau khi biên tập |  tok=0
+    Điểm 80/100 (tham khảo, mốc 80). Đạt mọi luật bắt buộc (còn 4 mục P1, 0 mục P2 chỉ nên xem).
+#12 [handoff/ok] Chuyển người duyệt |  tok=0
+    Đạt mọi luật bắt buộc. Bản nháp v2 đã vào hàng chờ duyệt; chưa xuất bản vì bậc tin cậy T1.
+
+--- BIÊN TẬP VIÊN ---
+verdict=can_sua
+- [major] mở bài / Tóm tắt nhanh: Mở bài nói hai lần "chưa có báo giá xác minh" nhưng không cho người đọc thang tham chiếu nào để ước ngân sách. Người mua transactional vẫn chưa biết nên chuẩn bị cỡ nào. => Đưa cách ước tính cụ thể: ngân sách = giá máy + bộ chày cối + lắp đặt/thẩm định + VAT/vận chuyển. Thêm ví dụ có tên các khoản, không gắn số đồng. Nêu rõ đây là khung, không phải giá.
+- [major] Câu hỏi thường gặp: Các câu hỏi bị mất (chỉ còn phần trả lời). Đáp án như "hãy hỏi trực tiếp", "tôi không có thông tin" là nói vòng, không giải quyết gì. Câu cuối đẩy sang form/hotline như quảng cáo. => Viết lại thành câu hỏi thật (báo giá mất bao lâu, có nên gia công trước, bảo trì thế nào). Mỗi câu trả lời nêu yếu tố quyết định và việc cần làm; bỏ câu kêu gọi gửi form/hotline.
+- [major] Giá máy dập viên theo nhóm máy: Tiêu đề hứa "giá theo nhóm" nhưng bảng chỉ có "thấp/trung bình/cao" và các mức công suất không nguồn. Con số "vài trăm đến vài nghìn viên/giờ" khá lỏng; ví dụ 33 trạm chưa nói chuẩn chày (B/D) ảnh hưởng số trạm. => Đổi tiêu đề cho đúng nội dung. Nêu rằng công suất phụ thuộc chuẩn chày cối (EU/TSM, B, D) và kích thước viên, và công suất phải lấy từ catalogue nhà sản xuất. Nói rõ không có khoảng giá cố định.
+- [minor] Những yếu tố quyết định giá: Câu "xếp theo mức ảnh hưởng" rồi lại nói không có số liệu: thứ tự này là khẳng định không có cơ sở. Chuẩn 316L/304 và "máy châu Âu đắt hơn" cũng chỉ là nhận định chung. => Bỏ cam kết xếp hạng, đổi thành "các yếu tố thường làm giá lệch". Với 316L, giải thích vì sao dùng (chống ăn mòn, yêu cầu vệ sinh) thay vì khẳng định ảnh hưởng giá.
+- [major] Chọn loại máy theo sản phẩm và quy mô sản xuất: Dẫn Thông tư 35/2018/TT-BYT làm quy định GMP hiện hành, dễ sai hoặc đã lỗi thời (ngày hôm nay 2026). Câu "gần như bắt buộc máy quay tròn" cũng quá tuyệt đối. => Chỉ nêu: sản xuất thuốc phải đáp ứng GMP do Bộ Y tế ban hành, hãy kiểm tra văn bản còn hiệu lực trên cổng Cục Quản lý Dược. Đổi "bắt buộc" thành "thường dùng"; thêm ghi chú thực phẩm chức năng theo quy định của Bộ Y tế/Cục ATTP.
+- [minor] Cấu trúc và văn phong: Tóm tắt dùng danh sách mục lục lẫn trong bullet; các hộp "Đừng chốt...", "Mua máy cũ..." lặp ý đã nói; nhiều câu "tôi không có số liệu" lặp, tạo giọng rào đón; đánh dấu [a][b][c] còn sót. => Tách mục lục khỏi tóm tắt, gộp các hộp vào đoạn chính, chỉ giữ một lần lời giải thích về việc không đưa giá. Xóa [a][b][c] hoặc chuyển thành chú thích chuẩn.
+- THIẾU: Ví dụ một bản báo giá mẫu tách hạng mục (không số tiền) để người đọc đối chiếu
+- THIẾU: So sánh dập viên tự đầu tư với gia công: khi nào chuyển đổi, điểm hoà vốn tính thế nào
+- THIẾU: Các lỗi viên thường gặp (bong mặt, dính chày, sai khối lượng) và nguyên nhân do máy hay bột
+- THIẾU: Khi nào cần tư vấn thẩm định/GMP và hồ sơ nào cần cho nhà máy dược
+
+=== BÀI ===
+TITLE: Báo giá máy dập viên công nghiệp: cách ước tính và xin báo giá
+SEO: Báo giá máy dập viên công nghiệp: ước tính & checklist
+META: Cách ước tính ngân sách và đọc báo giá máy dập viên công nghiệp: yếu tố quyết định giá, chi phí ngoài máy, so sánh với gia công và checklist chạy thử.
+SOURCES: ["B\u1ed9 Y t\u1ebf \u2013 C\u1ee5c Qu\u1ea3n l\u00fd D\u01b0\u1ee3c: quy \u0111\u1ecbnh GMP \u0111\u1ed1i v\u1edbi c\u01a1 s\u1edf s\u1ea3n xu\u1ea5t thu\u1ed1c (ng\u01b0\u1eddi \u0111\u1ecdc c\u1ea7n ki\u1ec3m tra v\u0103n b\u1ea3n c\u00f2n hi\u1ec7u l\u1ef1c)","B\u1ed9 Y t\u1ebf \u2013 C\u1ee5c An to\u00e0n th\u1ef1c ph\u1ea9m: quy \u0111\u1ecbnh \u0111\u1ed1i v\u1edbi c\u01a1 s\u1edf s\u1ea3n xu\u1ea5t th\u1ef1c ph\u1ea9m b\u1ea3o v\u1ec7 s\u1ee9c kh\u1ecfe (ng\u01b0\u1eddi \u0111\u1ecdc c\u1ea7n ki\u1ec3m tra v\u0103n b\u1ea3n hi\u1ec7n h\u00e0nh)"]
+WORDS: 5248
+
+Tóm tắt nhanh
+Không có một mức giá chung: giá phụ thuộc loại máy (một chày, quay tròn), số trạm chày cối, vật liệu tiếp xúc, chuẩn GMP và xuất xứ. Giữa máy một chày và máy quay tròn cao tốc đạt GMP, chênh lệch có thể gấp nhiều lần.
+Ngân sách thực = giá máy + bộ chày cối + thiết bị phụ + lắp đặt/thẩm định + vận chuyển/thuế/VAT + phụ tùng dự phòng. Đây là khung để cộng từ các báo giá thật, không phải một mức giá.
+Chọn máy theo đặc tính bột và sản lượng thực, không theo công suất ghi trên catalogue.
+Nếu sản phẩm chưa ổn định hoặc sản lượng nhỏ, gia công dập viên trước thường rẻ hơn mua máy; điểm hòa vốn tính được bằng ba con số.
+Chỉ chốt mua sau khi chạy thử bằng nguyên liệu thật của bạn, và đòi báo giá tách từng hạng mục.
+Các nhóm máy, công suất và vì sao không có khoảng giá cố định
+Những yếu tố quyết định giá
+Chọn máy theo sản phẩm và quy mô
+Chi phí ngoài giá máy
+Máy mới, máy cũ, nhập khẩu và trong nước
+Tự đầu tư hay gia công: điểm hòa vốn
+Lỗi viên thường gặp: do máy hay do bột
+Cách yêu cầu và đọc báo giá
+Kiểm tra trước khi chốt mua
+Câu hỏi thường gặp
+Câu trả lời thẳng cho người đang cần báo giá máy dập viên công nghiệp: giá do cấu hình quyết định, nên một con số chung trên mạng gần như luôn lệch với trường hợp của bạn. Vì chưa có báo giá thực tế được xác minh, bài này không đưa bảng giá bằng đồng. Thứ tự giá tăng dần thì rõ: máy một chày rẻ nhất, máy quay tròn cỡ nhỏ đến vừa đứng giữa, máy quay tròn nhiều trạm tốc độ cao đạt chuẩn GMP đắt nhất.
+Điều bạn làm được ngay hôm nay là dựng khung ngân sách rồi điền số từ báo giá của ít nhất ba nhà cung cấp:
+Ngân sách đầu tư ≈ giá máy + bộ chày cối (kể cả chày cối đặt riêng) + thiết bị phụ + lắp đặt, chạy thử, đào tạo, thẩm định + vận chuyển, thuế, VAT + phụ tùng dự phòng.
+Ví dụ minh họa: một xưởng thực phẩm chức năng định mua máy quay tròn cỡ vừa sẽ lập bảng với các dòng: máy chính; hai bộ chày cối (một bộ viên tròn, một bộ viên oval có khắc logo); máy hút bụi; máy dò kim loại; lắp đặt và đào tạo; vận chuyển; VAT; bộ phụ tùng hao mòn năm đầu. Mỗi dòng ghi một con số lấy từ báo giá, rồi cộng. Dòng nào nhà cung cấp để trống thì hỏi, vì đó thường là khoản bị đẩy sang bạn sau khi ký hợp đồng.
+## Các nhóm máy, công suất và vì sao không có khoảng giá cố định
+Có ba nhóm chính. Bảng dưới sắp theo thứ tự giá tương đối và chỉ ra điều gì quyết định công suất của từng nhóm, vì công suất thật phải lấy từ catalogue hoặc chạy thử của nhà sản xuất, không suy ra từ bài viết.
+Nhóm máyĐiều quyết định công suấtPhù hợpMức giá tương đối
+Một chày (một trạm)Tốc độ dập của một cặp chày cối; công suất thấp nhấtThử nghiệm, R&D, lô nhỏ, viên đặc biệtThấp nhất
+Quay tròn nhiều chày, cỡ nhỏ đến vừaSố trạm, chuẩn chày cối, tốc độ quay, độ chảy của bộtCơ sở thực phẩm chức năng, dược, hóa chất quy mô vừaTrung bình
+Quay tròn tốc độ cao, nhiều trạm, thường hai mặt nénNhư trên, nhân đôi nếu hai mặt nén; thêm hệ cấp liệu cưỡng bứcNhà máy dược sản lượng lớn, yêu cầu GMP chặtCao nhất
+Công suất còn phụ thuộc chuẩn chày cối[a] và kích thước viên: cùng một bàn quay, chuẩn chày cỡ lớn chứa được ít trạm hơn chuẩn cỡ nhỏ, và viên càng lớn thì càng cần nhiều thời gian lấp đầy cối. Công suất lý thuyết tính bằng: số trạm chày cối[b] × số vòng quay mỗi phút × 60, nhân thêm hai nếu là máy hai mặt nén. Ví dụ minh họa: máy 33 trạm chạy 40 vòng/phút cho khoảng 79.200 viên/giờ trên giấy. Thực tế thấp hơn, vì tốc độ bị giới hạn bởi độ chảy của bột và thời gian bột lấp đầy cối.
+Tôi không đưa khoảng giá cố định cho từng nhóm vì cùng một nhóm, giá còn bị kéo bởi vật liệu, chuẩn GMP, xuất xứ và gói dịch vụ (xem phần sau). Con số nào không nêu rõ các yếu tố đó đều không so được với báo giá của bạn.
+Đây cũng là chỗ nhiều người so giá sai. Đừng chia giá máy cho công suất để ra “đồng trên viên/giờ”. Máy rẻ hơn chạy bột chảy kém sẽ phải hạ tốc độ, và công suất thật có thể chỉ bằng một phần con số quảng cáo.
+## Những yếu tố quyết định giá máy dập viên
+Cùng công suất mà hai báo giá lệch nhau đáng kể thường do các yếu tố sau, xếp theo mức ảnh hưởng thường gặp:
+Loại máy và số trạm chày cối: nhiều trạm hơn nghĩa là cụm quay, bàn cối và hệ thống truyền động lớn hơn, giá tăng theo. Đây là yếu tố kéo giá mạnh nhất.
+Chuẩn thiết kế và GMP: máy cho dược cần bề mặt dễ vệ sinh, cách ly vùng nén với khu cơ khí, thường có hệ thống giám sát lực nén. Máy cơ bản cho thực phẩm hoặc hóa chất không cần đầy đủ các tính năng này nên rẻ hơn.
+Vật liệu tiếp xúc sản phẩm: inox 316L chịu ăn mòn tốt hơn 304 và thường dùng cho bột có tính ăn mòn hoặc yêu cầu dược; đổi vật liệu làm đổi giá, nhưng mức chênh cụ thể phải hỏi báo giá.
+Hệ thống hút bụi và kiểm soát lực nén: thường là hạng mục tách riêng; có máy bán kèm, có máy bán rời.
+Xuất xứ và thương hiệu: máy châu Âu thường đắt hơn máy nhập từ châu Á cùng công suất, đổi lại là độ ổn định, hồ sơ kỹ thuật và mạng lưới phụ tùng. Có đáng hay không tùy bạn có bị ràng buộc bởi thanh tra hay khách hàng hay không.
+Bảo hành, đào tạo, hồ sơ kèm máy: gói có hồ sơ thẩm định và đào tạo vận hành đắt hơn gói chỉ giao máy.
+Tôi cố ý không gắn phần trăm chênh lệch cho từng yếu tố, vì chưa có số liệu thị trường được xác minh. Cách làm đúng là yêu cầu nhà cung cấp báo giá tách từng hạng mục, rồi bạn tự thấy mỗi tùy chọn tốn bao nhiêu.
+## Chọn loại máy theo sản phẩm và quy mô sản xuất
+Bắt đầu từ sản phẩm, không bắt đầu từ ngân sách:
+Dược phẩm: thường dùng máy quay tròn có thiết kế phù hợp GMP; máy một chày chủ yếu cho nghiên cứu và lô thử. Sản xuất thuốc phải đáp ứng GMP do Bộ Y tế ban hành. Văn bản này được sửa đổi theo thời gian, nên hãy kiểm tra văn bản còn hiệu lực trên cổng thông tin của Cục Quản lý Dược trước khi đầu tư.
+Thực phẩm chức năng: máy quay tròn cỡ vừa thường hợp lý, vật liệu inox tiếp xúc, dễ vệ sinh để tránh nhiễm chéo giữa các mẻ. Điều kiện cơ sở sản xuất thuộc quản lý của Bộ Y tế (Cục An toàn thực phẩm); hãy đối chiếu quy định hiện hành về thiết bị và nhà xưởng trước khi chọn cấu hình.
+Hóa chất, viên tẩy rửa, viên khử khuẩn: ưu tiên độ bền cụm nén và vật liệu chịu ăn mòn hơn là tính năng GMP.
+Viên sủi: bột rất hút ẩm, cần khu vực độ ẩm thấp và chày cối xử lý bề mặt để chống dính; hỏi nhà cung cấp kinh nghiệm thực tế với bột sủi.
+Thức ăn chăn nuôi dạng viên nén lớn (liếm, khoáng): cần lực nén lớn và viên kích thước lớn, khác hẳn máy dập viên dược.
+Về sản lượng, hãy tính ngược từ nhu cầu: số viên cần mỗi ngày chia cho số giờ chạy thực tế (trừ thời gian vệ sinh, đổi mẻ, kiểm tra), rồi mới so với công suất thực của máy, không phải công suất lý thuyết. Mua dư công suất làm vốn nằm im; mua thiếu thì sau một mùa cao điểm bạn phải mua máy thứ hai.
+## Chi phí ngoài giá máy mà báo giá thường không ghi
+Phần lớn ngân sách bị vượt nằm ở đây. Khi so các báo giá, hãy kiểm tra từng khoản sau có được tính hay chưa:
+Bộ chày cối đi kèm (bao nhiêu bộ, chuẩn nào) và chày cối đặt riêng theo hình dạng, logo, đường kính viên của bạn.
+Lắp đặt, chạy thử, hiệu chuẩn và đào tạo vận hành.
+Vận chuyển, bảo hiểm hàng, thuế nhập khẩu (nếu có) và VAT.
+Phụ tùng hao mòn: chày cối, phớt, vòng bi, con lăn nén.
+Thiết bị đi kèm: hút bụi, máy sàng/dò kim loại, máy làm sạch viên.
+Điện năng, khí nén, điều hòa/hút ẩm cho phòng sản xuất.
+Đừng chốt ngân sách bằng giá máy
+Khi chưa thấy bộ chày cối, lắp đặt và VAT trong báo giá, hãy coi là chưa gồm và yêu cầu nhà cung cấp ghi tổng chi phí giao máy chạy được.
+## Máy mới, máy cũ, nhập khẩu và sản xuất trong nước
+Mỗi lựa chọn đánh đổi giữa giá mua ban đầu và rủi ro vận hành:
+Máy mới nhập khẩu: hồ sơ kỹ thuật đầy đủ, dễ đạt yêu cầu thẩm định; giá cao, thời gian giao và phụ tùng phụ thuộc đại lý.
+Máy sản xuất trong nước hoặc lắp ráp: dễ bảo trì, phản hồi nhanh, phù hợp sản phẩm không yêu cầu GMP dược; cần xem kỹ vật liệu và độ chính xác gia công cụm nén.
+Máy cũ: giá thấp, nhưng độ mòn cụm nén, bàn cối và cam ép khó thấy bằng mắt thường.
+Mua máy cũ phải thấy máy chạy
+Yêu cầu chạy máy bằng nguyên liệu thật, kiểm tra độ đồng đều khối lượng viên và xác nhận còn phụ tùng cho model đó trước khi đặt cọc.
+Thời gian giao hàng và thời hạn bảo hành thay đổi theo từng nhà cung cấp và model, tôi không đưa con số chung. Hãy ghi cả hai vào hợp đồng, kèm điều kiện bảo hành (loại trừ chày cối hao mòn hay không, ai chịu chi phí đi lại kỹ thuật).
+## Tự đầu tư hay gia công dập viên: điểm hòa vốn tính thế nào
+Gia công là phép thử rẻ nhất cho nhu cầu thật. Nó hợp lý khi công thức còn đổi, có nhiều mã sản phẩm lô nhỏ, hoặc bạn chưa chắc đơn hàng kéo dài. Nên chuyển sang tự đầu tư khi sản lượng ổn định nhiều tháng liền, công thức đã chốt, và bạn cần chủ động lịch giao hoặc giữ kín công thức.
+Điểm hòa vốn tính bằng ba con số:
+Vốn đầu tư V: máy, chày cối, thiết bị phụ, lắp đặt, thẩm định, cải tạo khu vực sản xuất.
+Khoản tiết kiệm trên mỗi viên s: phí gia công mỗi viên trừ chi phí tự làm mỗi viên (nhân công, điện, hao hụt bột, bảo trì, khấu hao chày cối). Phần nguyên liệu bỏ ra nếu cả hai phương án đều do bạn cấp.
+Hòa vốn: số viên hòa vốn = V ÷ s; thời gian hoàn vốn = số viên hòa vốn ÷ sản lượng mỗi tháng.
+Nếu thời gian hoàn vốn dài hơn khoảng thời gian bạn chắc chắn bán được sản phẩm đó, chưa nên mua. Hai khoản hay bị quên làm s nhỏ hơn dự tính: nhân công có tay nghề và công vận hành máy lúc nhàn rỗi.
+## Lỗi viên thường gặp: do máy hay do bột
+Biết lỗi đến từ đâu giúp bạn khỏi mua máy lớn hơn để chữa lỗi của công thức. Quy tắc chẩn đoán nhanh: lỗi chỉ xuất hiện ở vài trạm cố định thì nghi chày cối hoặc cụm nén; lỗi xuất hiện đều ở mọi trạm và biến mất khi đổi lô bột thì nghi bột.
+LỗiThường do bộtThường do máy và chày cối
+Bong mặt, tách lớpBột mịn kẹt nhiều khí, quá khô, thiếu chất kết dínhNén quá nhanh, thiếu tiền nén, chày cối mòn hoặc cối bị côn
+Dính chàyBột ẩm, thiếu chất trơnMặt chày xước hoặc chưa đánh bóng, khắc logo quá sâu hay sắc cạnh
+Sai khối lượng viênBột chảy kém, hạt bị phân táchTốc độ quá cao so với thời gian lấp đầy, cấp liệu không đủ, chày mòn không đều
+Viên mềm, dễ vỡBột ít khả năng nén, độ ẩm không phù hợpLực nén thấp, thời gian giữ nén ngắn do chạy quá nhanh
+Vì vậy khi chạy thử, hãy mang đúng lô bột sản xuất chứ không phải bột mẫu đẹp, và ghi lại tốc độ máy mà lỗi bắt đầu xuất hiện.
+## Cách yêu cầu và đọc một bản báo giá đúng chuẩn
+Nhà cung cấp chỉ báo giá chính xác khi bạn đưa đủ thông tin. Hãy chuẩn bị:
+Loại bột: thành phần chính, độ chảy, độ ẩm, có dính chày hay không, có hút ẩm mạnh không.
+Viên: đường kính, độ dày, hình dạng (tròn, oval, có rãnh bẻ), khối lượng viên, có khắc logo không.
+Sản lượng mục tiêu: viên/giờ thực tế và số giờ chạy mỗi ngày.
+Yêu cầu pháp lý: dược/GMP, thực phẩm, hay công nghiệp.
+Điều kiện nhà xưởng: nguồn điện, diện tích, phòng sạch hay không.
+Một bản báo giá đạt chuẩn tách hạng mục như bảng dưới (ví dụ cấu trúc, chưa có số tiền). Dùng nó làm mẫu để đối chiếu từng báo giá bạn nhận.
+Hạng mụcPhải ghi rõHay bị bỏ sót
+Máy chínhModel, số trạm, chuẩn chày cối, lực nén tối đa, đường kính viên tối đa, độ sâu nạp liệu, công suất tối đa, vật liệu từng bộ phận tiếp xúcCông suất tối đa với loại viên nào
+Bộ chày cối kèm máySố bộ, hình dạng, kích thước, chuẩnChày cối đặt riêng theo logo tính ở dòng khác
+Thiết bị phụHút bụi, sàng, dò kim loại: bán kèm hay rờiPhụ kiện kết nối và lắp đặt đi kèm
+Lắp đặt, chạy thử, đào tạoAi làm, số ngày, địa điểmChi phí đi lại, ăn ở của kỹ thuật viên
+Hồ sơ và thẩm địnhCó hỗ trợ IQ/OQ không, bản vẽ, hướng dẫn, danh mục phụ tùngAi chịu chi phí thẩm định
+Vận chuyển, thuếĐiều kiện giao (đến kho bạn hay đến cảng), thuế nhập khẩu, VAT đã gồm hay chưaBảo hiểm hàng, phí thông quan
+Bảo hành và phụ tùngThời hạn, phạm vi, danh mục loại trừ, phụ tùng khuyến nghịChày cối hao mòn có được bảo hành không
+Điều khoảnThanh toán, thời gian giao, hiệu lực báo giáPhạt chậm giao
+Báo giá thiếu mục nào, hỏi mục đó bằng văn bản và lưu lại câu trả lời.
+## Kiểm tra trước khi chốt mua
+Chạy thử bằng nguyên liệu thật: mang mẫu bột của bạn, đo khối lượng viên, độ cứng, độ mài mòn, độ rã. Chạy thử bằng bột mẫu của nhà cung cấp gần như vô nghĩa.
+Xin chứng từ: CO/CQ[c] của máy và vật liệu inox, bản vẽ, hướng dẫn vận hành, danh mục phụ tùng.
+Với sản xuất dược: hỏi hồ sơ thẩm định IQ/OQ[d] mà nhà cung cấp hỗ trợ và ai thực hiện.
+Hỏi dịch vụ sau bán: kỹ thuật viên ở đâu, phụ tùng có sẵn không, thời gian phản hồi khi hỏng.
+Nhờ chuyên gia khi cần: nếu đầu tư lớn hoặc phải xây nhà máy đạt GMP, thuê tư vấn kỹ thuật độc lập rẻ hơn nhiều so với mua sai máy.
+Nên tìm tư vấn thẩm định/GMP trong ba tình huống: lần đầu xây hoặc cải tạo cơ sở sản xuất thuốc, thay máy chính của dây chuyền đang có giấy phép, và chuẩn bị cho đợt đánh giá của cơ quan quản lý. Bộ hồ sơ thiết bị cho nhà máy dược thường gồm: yêu cầu kỹ thuật của người dùng (URS), bản vẽ và chứng nhận vật liệu tiếp xúc, biên bản nghiệm thu tại nhà máy và tại xưởng bạn, hồ sơ IQ/OQ, thẩm định hiệu năng (PQ) với sản phẩm thật do cơ sở thực hiện, chứng nhận hiệu chuẩn thiết bị đo, quy trình vận hành và vệ sinh, và kế hoạch bảo trì. Danh mục bắt buộc chính xác nằm trong văn bản GMP hiện hành của Bộ Y tế, nên hãy đối chiếu trước khi ký hợp đồng.
+## Câu hỏi thường gặp
+Báo giá máy dập viên mất bao lâu mới nhận được?Phụ thuộc vào mức đầy đủ của thông tin và vào việc có chày cối đặt riêng hay không. Báo giá sơ bộ cần loại bột, kích thước viên và sản lượng; báo giá chính thức cần thêm bản vẽ viên đã chốt và, với máy lớn, kết quả chạy thử mẫu. Khi gửi yêu cầu, hãy đề nghị nhà cung cấp cam kết hạn trả lời bằng văn bản để so các bên cùng mốc.
+Có nên gia công dập viên trước khi mua máy không?Nên, nếu công thức chưa chốt, sản lượng chưa ổn định hoặc có nhiều mã nhỏ. Hãy chạy gia công vài lô, ghi lại phí mỗi viên và sản lượng thực, rồi áp công thức hòa vốn ở phần trên. Khi thời gian hoàn vốn ngắn hơn thời gian bạn chắc chắn có đơn hàng thì mới đáng mua máy.
+Có thể thuê hoặc mua trả góp máy dập viên không?Thuê dài hạn thiết bị dập viên công nghiệp không phải hình thức phổ biến; mua trả góp hay thuê tài chính thường đi qua tổ chức tài chính hơn là nhà cung cấp máy. Khi so các phương án, hãy so lãi suất, tiền đặt cọc, quyền sở hữu máy khi kết thúc hợp đồng, và ai chịu bảo hiểm cùng chi phí bảo trì.
+Bao lâu cần bảo trì máy một lần?Chu kỳ chi tiết do nhà sản xuất quy định trong sổ tay. Nguyên tắc chung: vệ sinh sau mỗi mẻ hoặc ca, bôi trơn theo lịch, kiểm tra độ mòn chày cối định kỳ và thay phụ tùng hao mòn ngay khi khối lượng viên bắt đầu lệch. Với sản xuất dược, lịch hiệu chuẩn lực nén và bảo trì phải nằm trong quy trình được phê duyệt.
+
+Ghi chú
+Chuẩn chày cối quy định kích thước thân chày, cối và đầu chày để lắp vừa bàn quay. Các chuẩn hay gặp là B, D (D là cỡ lớn hơn) và EU/TSM; hãy hỏi nhà cung cấp máy tương thích chuẩn nào.
+Trạm chày cối là một cặp chày trên, chày dưới và cối nén viên. Máy có càng nhiều trạm thì mỗi vòng quay tạo ra càng nhiều viên.
+CO là chứng nhận xuất xứ hàng hóa; CQ là chứng nhận chất lượng do nhà sản xuất cấp, thường kèm kết quả kiểm tra vật liệu hoặc xuất xưởng.
+IQ (thẩm định lắp đặt) xác nhận máy được lắp đúng thiết kế; OQ (thẩm định vận hành) xác nhận máy chạy đúng thông số trong dải đã định. Hai bước này thuộc chuỗi thẩm định thiết bị trong GMP dược.
+

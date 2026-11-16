@@ -1,0 +1,93 @@
+<?php
+
+namespace App\Filament\Support\Agent;
+
+/**
+ * AG-S01: "bản thiết kế sống" của luồng đội AI. Mỗi chặng ghi: ai làm, mức sẵn sàng THẬT, điểm nối Dev1 cần xây.
+ * Dùng chung cho trang chi tiết phiên chạy và trang "Cách hoạt động", nên sửa ở đây là cả hai cùng đổi.
+ * readiness dùng cùng từ vựng với FeatureRegistry (active|demo|not_connected|in_development|idea).
+ */
+final class AgentFlowBlueprint
+{
+    /** @return list<array{stage: string, title: string, role: string, readiness: string, what: string, built: string, dev1: string, task: string}> */
+    public static function stages(): array
+    {
+        return [
+            ['stage' => 'guard', 'title' => 'An toàn', 'role' => 'Hệ thống', 'readiness' => 'in_development',
+                'what' => 'Kiểm dừng khẩn cấp và website hoạt động trước khi tốn chi phí.',
+                'built' => 'Đã nối EmergencyStopService và trạng thái website.',
+                'dev1' => 'Dừng khẩn cấp đang lưu trong Cache, mất khi xóa cache: cần bền hóa (AG-B08).', 'task' => 'AG-B08'],
+            ['stage' => 'risk', 'title' => 'Phân hạng rủi ro', 'role' => 'Biên tập', 'readiness' => 'in_development',
+                'what' => 'Chủ đề sức khỏe, tài chính, pháp lý được gắn hạng cao, cần người có chuyên môn.',
+                'built' => 'RiskClassifier bằng luật (AG-K12), có test.',
+                'dev1' => 'Danh sách nguồn được duyệt theo website cần bảng cấu hình (migration).', 'task' => 'AG-K12'],
+            ['stage' => 'sources', 'title' => 'Kho và nguồn', 'role' => 'Hệ thống', 'readiness' => 'in_development',
+                'what' => 'Điều phối xác định Trí tuệ khớp chủ đề, nạp thêm kiến thức tin cậy khi kho thiếu (hoặc đề xuất lập Trí tuệ mới), rồi tìm tài liệu web nhiều góc.',
+                'built' => 'KnowledgeCoordinator + SourceDiscoveryService + ReferenceDossier; mọi quyết định ghi ở Quyết định tự động.',
+                'dev1' => 'Tìm web đang đi qua cầu nối Claude; cần kiểm độ phủ nguồn theo từng lĩnh vực.', 'task' => 'AG-B06'],
+            ['stage' => 'synthesize', 'title' => 'Tổng hợp nguồn', 'role' => 'Trưởng phòng chiến lược', 'readiness' => 'in_development',
+                'what' => 'Biên tập cấp cao đọc tài liệu web và kiến thức trong kho, đối chiếu rồi chốt luận điểm dùng chắc, dùng thận trọng hay bỏ, góc tiếp cận và độ dài mục tiêu.',
+                'built' => 'ContentPlanner (AI trả JSON có cấu trúc); chỉ lập kế hoạch nội dung, không tự thực thi gì.',
+                'dev1' => 'Cần kiểm số liệu trong kế hoạch có khớp đoạn trích nguồn.', 'task' => 'AG-B06'],
+            ['stage' => 'image_design', 'title' => 'Yêu cầu và thiết kế ảnh', 'role' => 'Chiến lược', 'readiness' => 'in_development',
+                'what' => 'Người điều phối nêu mục đích và giá trị từng ảnh, họa viên phân tích rồi thiết kế (ý tưởng, bố cục, mô tả cho model ảnh).',
+                'built' => 'ImageDesigner (AI nhẹ) + kỹ năng designer/image-design; lỗi thì dùng kế hoạch ảnh theo luật.',
+                'dev1' => 'Nhà cung cấp ảnh còn giới hạn hạn ngạch.', 'task' => 'AG-B10'],
+            ['stage' => 'learn', 'title' => 'Học vào kho', 'role' => 'Hệ thống', 'readiness' => 'in_development',
+                'what' => 'Sau khi bài đã lưu, nạp các nguồn tin cậy bài đã dùng vào Trí tuệ để các bài sau có sẵn.',
+                'built' => 'AgentRunOrchestrator::learnFromReferences; lỗi không ảnh hưởng bài.',
+                'dev1' => 'Không cần nối thêm.', 'task' => 'AG-B06'],
+            ['stage' => 'brief', 'title' => 'Dàn ý', 'role' => 'Chiến lược', 'readiness' => 'in_development',
+                'what' => 'Lập dàn ý từ từ khóa và ý định tìm kiếm.',
+                'built' => 'Dùng generateOutline hiện có và nạp playbook brief (AG-K05) cho lượt thủ công; lượt tự động chỉ dùng playbook đã active. Vai trò Chiến lược tắt được ở tab Vai trò (bước này bị bỏ qua, chấm luật vẫn chạy).',
+                'dev1' => 'Playbook còn là bản nháp vì chưa chạy bộ mẫu với model thật; cần AiModelRouter chọn model theo loại việc (AG-B06).', 'task' => 'AG-B06'],
+            ['stage' => 'research', 'title' => 'Chuẩn bị tài liệu', 'role' => 'Hệ thống', 'readiness' => 'in_development',
+                'what' => 'Nạp kiến thức đã duyệt, ảnh, liên kết nội bộ, nguồn được trích và hồ sơ doanh nghiệp trước khi viết.',
+                'built' => 'Bước luật, không gọi AI; ghi số mục đã nạp và khoảng trống kiến thức. Kiểm ngân sách ngay sau bước này, trước bước viết.',
+                'dev1' => 'Chưa kiểm từng khẳng định có nguồn; luật kiểm nguồn nằm ở bước chấm.', 'task' => 'AG-G4'],
+            ['stage' => 'images', 'title' => 'Tạo ảnh', 'role' => 'Họa viên', 'readiness' => 'in_development',
+                'what' => 'Tạo ảnh theo kế hoạch ảnh nằm trong dàn ý (cần ảnh nào, sau mục nào, prompt) bằng model ảnh đã gán cho Họa viên, song song với bước viết; ô lỗi được thử lại một lần.',
+                'built' => 'ArticleImageService::generateSlots; chạy ngay hoặc bằng tiến trình con khi bật AGENT_IMAGES_PARALLEL. Mới thử với ảnh giả lập và cầu nối CLI.',
+                'dev1' => 'Chạy bằng tiến trình con của phiên: về lâu dài chuyển sang hàng đợi (AG-B10).', 'task' => 'AG-B10'],
+            ['stage' => 'write', 'title' => 'Viết', 'role' => 'Người viết', 'readiness' => 'in_development',
+                'what' => 'Viết bài theo dàn ý; HTML luôn qua bộ làm sạch XSS.',
+                'built' => 'Dùng generateArticle hiện có; nạp playbook writer/article-draft (lượt thủ công, bản nháp) kèm dòng "Bạn đang đóng vai"; adapter nhận playbook và danh sách lỗi chặn khi sửa; phát hiện khi nhà cung cấp rơi về giả lập.',
+                'dev1' => 'Nhà cung cấp vẫn chọn cứng trong mã và vẫn tự rơi về Mock khi thiếu khóa (hệ thống chỉ gắn nhãn, chưa chặn): cần bỏ hẳn (AG-B06).', 'task' => 'AG-B06'],
+            ['stage' => 'retry', 'title' => 'Thử lại khi nhà cung cấp lỗi', 'role' => 'Hệ thống', 'readiness' => 'in_development',
+                'what' => 'Lỗi tạm thời (timeout, mất kết nối, 5xx, 429) được thử lại tối đa 3 lần có chờ tăng dần; hết lần thì phiên báo lỗi.',
+                'built' => 'Có trong bộ điều phối, mỗi lần thử ghi một bước; không bao giờ thay bằng AI giả lập. Mới được kiểm bằng test giả lập, chưa gặp lỗi nhà cung cấp thật.',
+                'dev1' => 'Chạy đồng bộ nên đang ngủ trong tiến trình; chuyển sang thử lại của hàng đợi (AG-B10) và model dự phòng thật (AG-B06).', 'task' => 'AG-B10'],
+            ['stage' => 'grade', 'title' => 'Chấm bằng luật', 'role' => 'Biên tập', 'readiness' => 'active',
+                'what' => 'ContentQualityChecker quyết định đạt hay không, AI không được tự chấm.',
+                'built' => '10 luật có sẵn (gồm từ cấm BAN01), đã chạy thật trong hệ thống.',
+                'dev1' => 'Không cần thêm; chỉ nối cài đặt từ cấm theo website sau khi có hồ sơ doanh nghiệp (AG-K11).', 'task' => 'AG-K11'],
+            ['stage' => 'repair', 'title' => 'Tự sửa (đến khi đạt mọi tiêu chí (tối đa 8 vòng))', 'role' => 'Người viết', 'readiness' => 'in_development',
+                'what' => 'Gửi lỗi chặn cho AI sửa; dừng khi hết vòng, hết ngân sách hoặc không cải thiện.',
+                'built' => 'Vòng lặp tất định có giới hạn, có test.',
+                'dev1' => 'Ngân sách và ngắt mạch thật theo ngày/tháng (AG-B09); thử với model thật để đo hội tụ (AG-K09).', 'task' => 'AG-B09'],
+            ['stage' => 'decision', 'title' => 'Quyết định tự động', 'role' => 'Hệ thống', 'readiness' => 'in_development',
+                'what' => 'Ghi lại mỗi lần hệ thống tự quyết (dừng sửa vì không cải thiện, hết ngân sách, hết vòng, giữ cho chuyên gia) kèm dữ kiện trước/sau.',
+                'built' => 'Có trong bộ điều phối; điểm 0-100 chỉ để theo dõi, quyết định đạt hay không vẫn do luật P0.',
+                'dev1' => 'Ngân sách hiện là giá trị mặc định trong RunPolicy, cần nối cài đặt thật theo ngày/tháng (AG-B09).', 'task' => 'AG-B09'],
+            ['stage' => 'assemble', 'title' => 'Lắp ráp', 'role' => 'Hệ thống', 'readiness' => 'in_development',
+                'what' => 'Ghép bài viết với ảnh theo kế hoạch: ảnh bìa gắn làm ảnh đại diện, ảnh trong bài chèn sau đoạn mở đầu của mục tương ứng.',
+                'built' => 'ArticleImageService::assemble; tìm mục theo tên rồi theo thứ tự, ảnh không tìm được mục được báo rõ.',
+                'dev1' => 'Không cần nối thêm.', 'task' => 'AG-S27'],
+            ['stage' => 'handoff', 'title' => 'Bàn giao nháp', 'role' => 'Hệ thống', 'readiness' => 'in_development',
+                'what' => 'Bậc T1: chỉ tạo bản nháp chờ người duyệt, không bao giờ tự xuất bản.',
+                'built' => 'Tạo ArticleVersion và chuyển hàng chờ duyệt; không đụng bảng xuất bản.',
+                'dev1' => 'Nhịp chiến dịch đang chạy bằng lệnh theo lịch, cần thay bằng hàng đợi (AG-B10); chính sách tin cậy T1 → T2 và đẩy nháp lên CMS (AG-A05a).', 'task' => 'AG-B10'],
+        ];
+    }
+
+    /** @return array<string, array<string, mixed>> theo mã chặng */
+    public static function byStage(): array
+    {
+        $out = [];
+        foreach (self::stages() as $s) {
+            $out[$s['stage']] = $s;
+        }
+
+        return $out;
+    }
+}

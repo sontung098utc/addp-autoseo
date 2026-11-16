@@ -15,6 +15,7 @@ class HtmlSanitizer
         'blockquote', 'code', 'pre',
         'table', 'thead', 'tbody', 'tr', 'th', 'td',
         'a', 'img', 'figure', 'figcaption',
+        'div', 'section', 'aside', 'details', 'summary', 'sup', 'sub', 'mark', 'dl', 'dt', 'dd',
     ];
 
     /**

@@ -3,7 +3,7 @@
 namespace Tests\Feature\Filament;
 
 use App\Filament\Pages\AiUsagePage;
-use App\Filament\Resources\ArticleVersionResource;
+use App\Filament\Resources\ArticleResource;
 use App\Filament\Support\AiUsage\UsageThresholds;
 use App\Filament\Support\Demo\AiUsageDemoData;
 use App\Models\Article;
@@ -54,25 +54,25 @@ class AiUsagePageTest extends TestCase
 
     public function test_writer_gets_403_on_route(): void
     {
-        $this->actingAs($this->user('writer'))->get('/admin/chi-phi-ai')->assertForbidden();
+        $this->actingAs($this->user('writer'))->get('/admin/cau-hinh-ai')->assertForbidden();
         $this->assertFalse(AiUsagePage::canAccess());
     }
 
     public function test_inactive_user_blocked(): void
     {
-        $this->actingAs($this->user('approver', false))->get('/admin/chi-phi-ai')->assertStatus(403);
+        $this->actingAs($this->user('approver', false))->get('/admin/cau-hinh-ai')->assertStatus(403);
     }
 
     public function test_approver_route_ok(): void
     {
-        $this->actingAs($this->user('approver'))->get('/admin/chi-phi-ai')->assertOk()->assertSee('Chi phí AI');
+        $this->actingAs($this->user('approver'))->get('/admin/cau-hinh-ai')->assertOk()->assertSee('Cấu hình AI');
     }
 
     public function test_admin_route_ok_and_menu_group(): void
     {
-        $this->actingAs($this->user('admin'))->get('/admin/chi-phi-ai')->assertOk();
+        $this->actingAs($this->user('admin'))->get('/admin/cau-hinh-ai')->assertOk();
         $this->assertSame('Cài đặt', AiUsagePage::getNavigationGroup());
-        $this->assertSame(3, AiUsagePage::getNavigationSort());
+        $this->assertSame(1, AiUsagePage::getNavigationSort());
     }
 
     public function test_writer_livewire_mount_forbidden(): void
@@ -83,7 +83,7 @@ class AiUsagePageTest extends TestCase
 
     public function test_guest_redirected(): void
     {
-        $this->get('/admin/chi-phi-ai')->assertRedirect();
+        $this->get('/admin/cau-hinh-ai')->assertRedirect();
     }
 
     public function test_empty_state_has_no_fake_zero(): void
@@ -104,9 +104,19 @@ class AiUsagePageTest extends TestCase
     public function test_avg_over_threshold_banner_and_boundary(): void
     {
         $this->version('k1', 1, 3412.0);
-        $this->as('approver')->assertSee('Trung bình 3.412 ₫/bài, vượt ngưỡng 3.000 ₫/bài', false)->assertSee('▲ Vượt ngưỡng');
+        $this->as('approver')->assertSee('▲ Vượt ngưỡng 3.000 ₫/bài:', false)->assertSee('trung bình 3.412 ₫/bài', false)->assertSee('▲ Vượt ngưỡng');
         $this->version('k2', 1, 2588.0); // TB = 3000 -> đúng bằng ngưỡng: không vượt
-        $this->as('approver')->assertDontSee('vượt ngưỡng 3.000 ₫/bài', false);
+        $this->as('approver')->assertDontSee('trung bình 3.000 ₫/bài', false); // chỉ còn dải 'bài vượt' vì k1 một mình 3.412 > 3.000
+    }
+
+    /** Gói B #7: trung bình vượt và bài vượt gộp thành MỘT dải cảnh báo, vẫn nêu bài vượt ngưỡng. */
+    public function test_avg_and_article_warnings_are_one_banner(): void
+    {
+        $this->version('k1', 1, 3412.0);
+        $html = $this->as('approver')->html();
+        $this->assertSame(1, substr_count($html, 'data-ai="over-threshold"'));
+        $this->assertStringNotContainsString('data-ai="avg-over"', $html);
+        $this->assertStringContainsString('1 bài vượt', $html);
     }
 
     public function test_month_threshold_banner(): void
@@ -143,7 +153,7 @@ class AiUsagePageTest extends TestCase
         $dear = $this->version('đắt', 1, 5000.0);
         $rows = $this->as('approver')->instance()->getViewData()['topRows'];
         $this->assertSame(['Tiêu đề đắt', 'Tiêu đề rẻ'], array_map(fn ($r) => $r['title']['text'], $rows));
-        $this->assertSame(ArticleVersionResource::getUrl('view', ['record' => $dear->id]), $rows[0]['title']['href']);
+        $this->assertSame(ArticleResource::getUrl('view', ['record' => $dear->article_id]), $rows[0]['title']['href']);
     }
 
     public function test_set_threshold_through_drawer_as_approver_and_admin(): void

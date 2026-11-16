@@ -23,6 +23,8 @@ final class StatusPresenter
         'failed' => ['Lỗi', 'danger', 'heroicon-o-x-circle'],
         'needs_reconcile' => ['Chờ đối soát', 'danger', 'heroicon-o-exclamation-triangle'],
         'held' => ['Tạm giữ', 'gray', 'heroicon-o-pause-circle'],
+        'paused' => ['Tạm dừng', 'gray', 'heroicon-o-pause-circle'],
+        'awaiting_confirm' => ['Chờ bạn xác nhận', 'warning', 'heroicon-o-hand-raised'],
     ];
 
     private const WEBSITE = [
@@ -52,7 +54,7 @@ final class StatusPresenter
      * @var array<string, array{0: string, 1: string, 2: string, 3: string}>
      */
     private const SOURCE = [
-        'live' => ['AI thật', 'success', 'heroicon-o-sparkles', 'Do một model AI thật tạo ra.'],
+        'live' => ['Do AI tạo', 'gray', 'heroicon-o-sparkles', 'Do một model AI tạo ra.'],
         'mock' => ['AI giả lập', 'warning', 'heroicon-o-exclamation-triangle', 'Nội dung mẫu, KHÔNG phải kết quả AI thật.'],
         'imported' => ['Nhập thủ công', 'info', 'heroicon-o-arrow-up-tray', 'Do người dùng tải lên.'],
         'local' => ['Quét cục bộ', 'gray', 'heroicon-o-server', 'Do hệ thống tự tính từ dữ liệu có sẵn, không dùng AI.'],

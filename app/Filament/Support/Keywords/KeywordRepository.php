@@ -28,4 +28,9 @@ interface KeywordRepository
 
     /** @param list<array<string,mixed>> $proposals */
     public function saveProposals(array $proposals): void;
+
+    /** Nguồn của lần đề xuất gần nhất: 'ai' hoặc 'mock' (minh họa). */
+    public function proposalSource(): string;
+
+    public function saveProposalSource(string $source): void;
 }

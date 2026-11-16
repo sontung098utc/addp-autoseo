@@ -57,7 +57,7 @@ class FactRule implements QualityRule
     }
 
     /** @return list<string> */
-    private static function sources(mixed $raw): array
+    public static function sources(mixed $raw): array
     {
         $flat = [];
         $raw = is_array($raw) ? $raw : [$raw];

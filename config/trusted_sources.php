@@ -1,0 +1,48 @@
+<?php
+
+/**
+ * Danh sách tên miền tin cậy và bị loại để hệ thống TỰ phân loại nguồn tìm được trên web (luật cố định, không do AI quyết).
+ * Mục "trusted" được tự nhận vào kho khi có đoạn nguyên văn hợp lệ; "neutral" chỉ được đề xuất; "blocked" bị bỏ.
+ * Mẫu: "who.int" khớp tên miền và mọi tên miền con; "*.gov.vn" khớp mọi tên miền con của gov.vn.
+ * Người dùng bổ sung hoặc chặn thêm qua Sổ nguồn của Trí tuệ (Sổ nguồn thắng danh sách này khi chặn).
+ * Danh sách chỉ là điểm khởi đầu hợp lý, chưa được chuyên gia thẩm định.
+ */
+return [
+    /** Mục rút từ nguồn tin cậy, có đoạn nguyên văn: tự nhận kể cả chủ đề rủi ro cao (y tế...). false = chủ đề tầng C luôn chờ người duyệt như trước. */
+    'auto_approve_any_risk' => (bool) env('KB_AUTO_APPROVE_TRUSTED_ANY_RISK', true),
+
+    'general' => ['*.gov.vn', '*.edu.vn', '*.gov', '*.edu', '*.gov.uk', '*.ac.uk'],
+
+    'fields' => [
+        'health' => [
+            'who.int', 'moh.gov.vn', 'vncdc.gov.vn', 'nih.gov', 'cdc.gov', 'mayoclinic.org', 'nhs.uk', 'diabetes.org', 'idf.org',
+            'pubmed.ncbi.nlm.nih.gov', 'ncbi.nlm.nih.gov', 'cochrane.org', 'medlineplus.gov', 'heart.org', 'cancer.org', 'cancer.gov',
+            'clevelandclinic.org', 'hopkinsmedicine.org', 'health.harvard.edu', 'nice.org.uk', 'ada.org', 'ema.europa.eu', 'fda.gov',
+            'dav.gov.vn', 'vnras.com', 'vien-dinh-duong.org.vn', 'nin.gov.vn', 'bachmai.gov.vn', 'choray.vn',
+            // Bệnh viện và hệ thống y tế trong nước có ban chuyên môn biên soạn nội dung (tìm web thường chỉ trả về nhóm này cho từ khóa tiếng Việt)
+            'vinmec.com', 'tamanhhospital.vn', 'benhvien108.vn', 'nhi.org.vn', 'nhidong.org.vn',
+        ],
+        'pharma' => [
+            'who.int', 'fda.gov', 'ema.europa.eu', 'picscheme.org', 'ispe.org', 'usp.org', 'edqm.eu', 'pda.org', 'ich.org', 'dav.gov.vn', 'cdsco.gov.in', 'tga.gov.au', 'mhra.gov.uk',
+            'pubmed.ncbi.nlm.nih.gov', 'ncbi.nlm.nih.gov', 'sciencedirect.com', 'nature.com', 'springer.com', 'wiley.com', 'tandfonline.com', 'mdpi.com',
+        ],
+        'education' => [
+            'moet.gov.vn', 'unesco.org', 'oecd.org', 'britishcouncil.vn', 'britishcouncil.org', 'studyinaustralia.gov.au', 'educationusa.state.gov',
+            'studyinuk.org', 'campusfrance.org', 'daad.de', 'ielts.org', 'toefl.org',
+        ],
+        'finance' => ['sbv.gov.vn', 'mof.gov.vn', 'ssc.gov.vn', 'imf.org', 'worldbank.org', 'bis.org'],
+        'legal' => ['moj.gov.vn', 'chinhphu.vn', 'thuvienphapluat.vn', 'vbpl.vn', 'quochoi.vn'],
+    ],
+
+    /** Mạng xã hội, diễn đàn, chợ, affiliate, nội dung do người dùng tạo: không dùng làm nguồn. */
+    'blocked' => [
+        'facebook.com', 'fb.com', 'instagram.com', 'tiktok.com', 'youtube.com', 'youtu.be', 'twitter.com', 'x.com', 'threads.net', 'pinterest.com', 'zalo.me',
+        'reddit.com', 'quora.com', 'webtretho.com', 'otofun.net', 'voz.vn', 'tinhte.vn', 'yahoo.com', 'answers.com',
+        'shopee.vn', 'lazada.vn', 'tiki.vn', 'sendo.vn', 'amazon.com', 'ebay.com', 'alibaba.com', 'aliexpress.com',
+        'medium.com', 'blogspot.com', 'wordpress.com', 'wixsite.com', 'tumblr.com', 'linkedin.com',
+        'accesstrade.vn', 'ecomobi.com', 'masoffer.com',
+        // Chuỗi bán lẻ và trang đặt dịch vụ: trang bán hàng/quảng bá, không dùng làm nguồn tham khảo cho bài
+        'dienmayxanh.com', 'bachhoaxanh.com', 'thegioididong.com', 'viettelstore.vn', 'sapo.vn', 'mytour.vn', 'cellphones.com.vn', 'fptshop.com.vn', 'nguyenkim.com', 'hoanghamobile.com', 'mediamart.vn', 'pico.vn',
+        'nhathuoclongchau.com.vn', 'pharmacity.vn', 'nhathuocankhang.com',
+    ],
+];

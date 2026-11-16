@@ -22,9 +22,12 @@ class MediaAssetResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Thư viện ảnh';
 
-    protected static ?string $navigationGroup = 'Cài đặt';
+    /** Quy ước giao diện: câu thường ("Chiến dịch tự động"), không để Filament tự Viết Hoa Từng Chữ ở tiêu đề và breadcrumb. */
+    protected static bool $hasTitleCaseModelLabel = false;
 
-    protected static ?int $navigationSort = 2;
+    protected static ?string $navigationGroup = 'Chiến dịch';
+
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {
@@ -35,10 +38,11 @@ class MediaAssetResource extends Resource
                         Forms\Components\FileUpload::make('file_path')
                             ->label('Tải lên ảnh mới')
                             ->disk('public')
-                            ->directory('media/' . date('Y/m'))
+                            ->directory('media/'.date('Y/m'))
                             ->image()
                             ->imageEditor()
                             ->maxSize(10240)
+                            ->helperText('PNG, JPG hoặc WebP · tối đa 10 MB')
                             ->required(fn (string $context): bool => $context === 'create'),
                         Forms\Components\Select::make('website_id')
                             ->label('Gán cho Website')
@@ -78,11 +82,11 @@ class MediaAssetResource extends Resource
                     ->label('Tiêu đề')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('alt_text')->toggleable()
+                Tables\Columns\TextColumn::make('alt_text')->toggleable()->visibleFrom('xl')
                     ->label('Thẻ Alt SEO')
                     ->limit(35)
                     ->searchable(),
-                Tables\Columns\TextColumn::make('website.name')->toggleable()->sortable()
+                Tables\Columns\TextColumn::make('website.name')->toggleable()->visibleFrom('xl')->sortable()
                     ->label('Website')
                     ->badge()
                     ->default('Dùng chung'),
@@ -92,10 +96,10 @@ class MediaAssetResource extends Resource
                 Tables\Columns\TextColumn::make('file_size')->toggleable(isToggledHiddenByDefault: true)->sortable()
                     ->label('Kích thước')
                     ->formatStateUsing(fn ($record) => $record?->human_file_size ?? ''),
-                Tables\Columns\IconColumn::make('is_featured')
+                Tables\Columns\IconColumn::make('is_featured')->visibleFrom('xl')
                     ->label('Đại diện')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('created_at')->toggleable()
+                Tables\Columns\TextColumn::make('created_at')->toggleable()->visibleFrom('xl')
                     ->label('Ngày tải lên')
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
@@ -108,8 +112,10 @@ class MediaAssetResource extends Resource
                     ->label('Ảnh đại diện'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\DeleteAction::make(),
+                ])->label('Thao tác')->tooltip('Thao tác'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

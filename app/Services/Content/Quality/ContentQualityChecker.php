@@ -4,15 +4,30 @@ namespace App\Services\Content\Quality;
 
 use App\Models\Article;
 use App\Models\ArticleVersion;
+use App\Services\Content\Quality\Rules\BannedTermsRule;
 use App\Services\Content\Quality\Rules\DuplicateRule;
+use App\Services\Content\Quality\Rules\CitationFigureRule;
+use App\Services\Content\Quality\Rules\CitationRule;
+use App\Services\Content\Quality\Rules\EvidenceRule;
+use App\Services\Content\Quality\Rules\MedicalSafetyRule;
+use App\Services\Content\Quality\Rules\SourceRule;
 use App\Services\Content\Quality\Rules\FactRule;
 use App\Services\Content\Quality\Rules\FaqRule;
 use App\Services\Content\Quality\Rules\HeadingRule;
 use App\Services\Content\Quality\Rules\ImageRule;
 use App\Services\Content\Quality\Rules\KeywordRule;
+use App\Services\Content\Quality\Rules\KnowledgeFigureRule;
+use App\Services\Content\Quality\Rules\LayoutRule;
 use App\Services\Content\Quality\Rules\LengthRule;
+use App\Services\Content\Quality\Rules\LinkRule;
 use App\Services\Content\Quality\Rules\MetaRule;
 use App\Services\Content\Quality\Rules\SafetyRule;
+use App\Services\Content\Quality\Rules\HeadingLeakRule;
+use App\Services\Content\Quality\Rules\ImagePlaceholderRule;
+use App\Services\Content\Quality\Rules\ProcessLeakRule;
+use App\Services\Content\Quality\Rules\IntentSpecificityRule;
+use App\Services\Content\Quality\Rules\PaddingRule;
+use App\Services\Content\Quality\Rules\TextGlitchRule;
 
 /**
  * Kiểm tra chất lượng bài tại thời điểm gọi (chưa lưu lịch sử kết quả).
@@ -23,10 +38,28 @@ class ContentQualityChecker
     /** @var list<QualityRule> */
     private array $rules;
 
-    /** @param list<QualityRule>|null $rules */
-    public function __construct(?array $rules = null)
+    /** @var list<string>|null mã luật P0 được chặn; null = mọi luật P0 đều chặn */
+    private ?array $blocking;
+
+    /**
+     * @param  list<QualityRule>|null  $rules  null = bộ luật mặc định và chính sách chặn theo config('quality.blocking_codes')
+     * @param  list<string>|string|null  $blockingCodes  null = theo ngữ cảnh trên; truyền rõ bộ luật thì mặc định chặn mọi P0 (dùng trong test)
+     */
+    public function __construct(?array $rules = null, array|string|null $blockingCodes = null)
     {
+        $this->blocking = $blockingCodes !== null
+            ? self::parseBlocking($blockingCodes)
+            : ($rules === null ? self::parseBlocking((string) config('quality.blocking_codes', 'ALL')) : null);
         $this->rules = $rules ?? self::defaultRules();
+    }
+
+    /** @return list<string>|null */
+    private static function parseBlocking(array|string $v): ?array
+    {
+        $list = is_array($v) ? $v : array_map('trim', explode(',', $v));
+        $list = array_values(array_filter(array_map('strtoupper', $list)));
+
+        return in_array('ALL', $list, true) || $list === [] ? null : $list;
     }
 
     /** @return list<QualityRule> */
@@ -34,16 +67,44 @@ class ContentQualityChecker
     {
         return [
             new LengthRule(), new HeadingRule(), new KeywordRule(), new MetaRule(), new DuplicateRule(),
-            new ImageRule(), new SafetyRule(), new FactRule(), new FaqRule(),
+            new ImageRule(), new SafetyRule(), new FactRule(), new FaqRule(), new BannedTermsRule(), new KnowledgeFigureRule(), new LinkRule(), new EvidenceRule(), new CitationRule(), new CitationFigureRule(), new MedicalSafetyRule(), new SourceRule(),
+            new PaddingRule(), new TextGlitchRule(), new HeadingLeakRule(), new ImagePlaceholderRule(), new IntentSpecificityRule(), new LayoutRule(), new ProcessLeakRule(),
         ];
     }
 
-    public function check(ArticleVersion $version, ?Article $article = null): QualityReport
+    /**
+     * @param  list<int>|null  $brainIds  Trí tuệ do chiến dịch chọn (AG-B3); null = suy từ website của bài
+     * @param  list<array{title?: string, url?: string, domain?: string}>  $knownSources  nguồn có thật hệ thống đã tìm thấy khi viết bài (cho SRC01)
+     */
+    /** @return list<array{title:string,url:string,domain:string}> */
+    private static function refsOf(string $html): array
     {
-        $ctx = new QualityContext($version, $article ?? $version->article);
+        if (! str_contains($html, 'autoseo-refs')) {
+            return [];
+        }
+        $out = [];
+        if (preg_match('#<div class="autoseo-refs">(.*)#s', $html, $m) && preg_match_all('#<a\s[^>]*href="([^"]+)"[^>]*>(.*?)</a>#s', $m[1], $all, PREG_SET_ORDER)) {
+            foreach ($all as $a) {
+                $host = strtolower((string) preg_replace('#^www\.#', '', (string) (parse_url(html_entity_decode($a[1]), PHP_URL_HOST) ?: '')));
+                $out[] = ['title' => trim(strip_tags($a[2])), 'url' => html_entity_decode($a[1]), 'domain' => $host];
+            }
+        }
+
+        return $out;
+    }
+
+    public function check(ArticleVersion $version, ?Article $article = null, ?array $brainIds = null, array $knownSources = []): QualityReport
+    {
+        $ctx = new QualityContext($version, $article ?? $version->article, $brainIds);
+        // Bản đã lắp ráp có khối "Nguồn tham khảo" gồm các tài liệu hệ thống đã tìm thấy thật: dùng làm nguồn đã biết khi người gọi không truyền (chấm lại bản giao, trang duyệt).
+        $ctx->knownSources = $knownSources !== [] ? $knownSources : self::refsOf((string) $version->html_content);
         $results = [];
         foreach ($this->rules as $rule) {
             foreach ($rule->evaluate($ctx) as $r) {
+                // Luật P0 không nằm trong danh sách chặn: hạ xuống cảnh báo (P1), người duyệt vẫn thấy.
+                if ($this->blocking !== null && ! $r->passed && $r->severity === RuleResult::P0 && ! in_array($r->code, $this->blocking, true)) {
+                    $r = new RuleResult($r->code, RuleResult::P1, false, $r->label, rtrim($r->message).' (Chỉ cảnh báo, không chặn.)', $r->measured, $r->threshold, $r->excerpt, $r->details);
+                }
                 $results[] = $r;
             }
         }
