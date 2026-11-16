@@ -80,6 +80,18 @@ class KhoTransferTest extends TestCase
         $this->assertSame('Đã sửa trên server', DB::table('brains')->value('description'), 'Không đè bản có sẵn.');
     }
 
+    public function test_tri_tue_rong_co_san_duoc_dien_vao_thay_vi_bo_qua(): void
+    {
+        [$site] = $this->seedSource();
+        $data = KhoTransfer::export([$site->id]);
+        foreach (['knowledge_items', 'knowledge_item_versions', 'knowledge_sources', 'knowledge_topics', 'brain_sources', 'brain_website'] as $t) {
+            DB::table($t)->delete();
+        }
+        $this->assertSame(1, KhoTransfer::import($data)['brains_added']);
+        $this->assertSame(1, DB::table('brains')->count(), 'Không tạo bản thứ hai.');
+        $this->assertSame(1, DB::table('knowledge_items')->count());
+    }
+
     public function test_website_khong_khop_thi_nhap_nhung_chua_gan(): void
     {
         [$site] = $this->seedSource();

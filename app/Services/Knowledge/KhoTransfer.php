@@ -68,18 +68,19 @@ final class KhoTransfer
         try {
             foreach ($data['brains'] ?? [] as $b) {
                 $row = $b['brain'];
-                if (DB::table('brains')->where('slug', $row['slug'])->exists()) {
+                $existing = DB::table('brains')->where('slug', $row['slug'])->first();
+                if ($existing && DB::table('knowledge_items')->where('brain_id', $existing->id)->exists()) {
                     $sum['brains_skipped'][] = (string) $row['name'];
 
                     continue;
                 }
-                $brainId = DB::table('brains')->insertGetId(self::clean($row, ['id'], ['created_by']));
+                $brainId = $existing ? (int) $existing->id : DB::table('brains')->insertGetId(self::clean($row, ['id'], ['created_by'])); // còn rỗng (vd. vừa cài mẫu): điền vào chính nó
                 $sum['brains_added']++;
                 if (! empty($b['profile'])) {
-                    DB::table('brain_profiles')->insert(array_merge(self::clean($b['profile'], ['id'], ['updated_by']), ['brain_id' => $brainId]));
+                    self::putProfile($brainId, $b['profile']);
                 }
                 foreach ($b['sources'] ?? [] as $s) {
-                    DB::table('brain_sources')->insert(['brain_id' => $brainId] + self::clean($s, ['id'], ['created_by', 'confirmed_by']));
+                    DB::table('brain_sources')->insertOrIgnore(['brain_id' => $brainId] +self::clean($s, ['id'], ['created_by', 'confirmed_by']));
                 }
                 $siteId = null;
                 foreach ($b['websites'] ?? [] as $w) {
@@ -141,6 +142,27 @@ final class KhoTransfer
         $sum['unmatched_sites'] = array_values(array_unique($sum['unmatched_sites']));
 
         return $sum;
+    }
+
+    /** Hồ sơ chưa có thì thêm; đã có thì chỉ điền ô còn trống, không đè. */
+    private static function putProfile(int $brainId, array $profile): void
+    {
+        $cur = DB::table('brain_profiles')->where('brain_id', $brainId)->first();
+        if ($cur === null) {
+            DB::table('brain_profiles')->insert(array_merge(self::clean($profile, ['id'], ['updated_by']), ['brain_id' => $brainId]));
+
+            return;
+        }
+        $fill = [];
+        foreach (self::clean($profile, ['id', 'brain_id', 'created_at', 'updated_at'], ['updated_by']) as $col => $val) {
+            $empty = ($cur->{$col} ?? null) === null || ($cur->{$col} ?? null) === '';
+            if ($val !== null && $val !== '' && $empty) {
+                $fill[$col] = $val;
+            }
+        }
+        if ($fill !== []) {
+            DB::table('brain_profiles')->where('brain_id', $brainId)->update($fill);
+        }
     }
 
     /** Bỏ cột $drop; đặt NULL cho cột $null (id người dùng, khóa ngoại sẽ được gán lại). */
