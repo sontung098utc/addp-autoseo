@@ -60,3 +60,6 @@ sheets_list.txt
 /storage/app/*
 !/storage/app/.gitkeep
 *.zip
+
+# Cache do Laravel tự sinh theo từng máy (liệt kê cả gói dev): không theo dõi, tránh deploy kéo cache của máy khác gây lỗi "Class ... ServiceProvider not found"
+/bootstrap/cache/*.php
