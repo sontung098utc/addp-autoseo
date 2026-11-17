@@ -23,7 +23,19 @@ final class RescheduleAction
                 ->seconds(false)->native(false)
                 ->displayFormat('d/m/Y H:i')->firstDayOfWeek(1)->minutesStep(5)->closeOnDateSelection(false)
                 ->live()->required()
-                ->default(fn (): ?string => ($record ? $record() : null) ? VnTime::format(VnTime::fromRaw($record(), 'scheduled_at_utc'), 'Y-m-d H:i:s') : null)
+                ->default(function () use ($record): ?string {
+                    $p = $record ? $record() : null;
+                    if (! $p) {
+                        return null;
+                    }
+                    $cur = VnTime::fromRaw($p, 'scheduled_at_utc');
+                    // Giờ cũ đã qua (lượt lỗi): gợi ý 9 giờ sáng ngày mai (giờ VN) thay vì một giờ không còn hợp lệ.
+                    if (! $cur || $cur->lt(VnTime::now()->addMinutes(ReschedulePublication::RESCHEDULE_LOCK_MINUTES))) {
+                        return VnTime::now()->addDay()->setTime(9, 0)->format('Y-m-d H:i:s');
+                    }
+
+                    return VnTime::format($cur, 'Y-m-d H:i:s');
+                })
                 ->helperText(function (Forms\Get $get): string {
                     $v = $get('scheduled_at_vn');
                     if (! $v) {

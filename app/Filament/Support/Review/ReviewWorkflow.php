@@ -128,12 +128,27 @@ class ReviewWorkflow
     /** @param CarbonInterface $atVn thời điểm theo giờ Việt Nam (wall-clock) */
     public function schedule(User $actor, ArticleVersion $version, CarbonInterface $atVn, Website $website): Publication
     {
+        return $this->createPublication($actor, $version, $website, $atVn);
+    }
+
+    /**
+     * "Đăng ngay": tạo lượt đăng đến hạn ngay lúc này cho bản đã duyệt (cùng mọi kiểm tra và khóa chống đăng trùng như xếp lịch); người gọi
+     * chạy PublishArticleJob ngay sau đó. Không bỏ qua bước duyệt.
+     */
+    public function publishNow(User $actor, ArticleVersion $version, Website $website): Publication
+    {
+        return $this->createPublication($actor, $version, $website, null);
+    }
+
+    /** @param ?CarbonInterface $atVn giờ VN (wall-clock); null = ngay bây giờ */
+    private function createPublication(User $actor, ArticleVersion $version, Website $website, ?CarbonInterface $atVn): Publication
+    {
         $this->assertApprover($actor);
 
         return DB::transaction(function () use ($actor, $version, $atVn, $website) {
             [$article, $version] = $this->lock($version);
             if ($version->review_status !== 'approved' || $article->workflow_status !== 'approved') {
-                throw new InvalidArgumentException('Chỉ xếp lịch được bản đã duyệt.');
+                throw new InvalidArgumentException($atVn === null ? 'Chỉ đăng được bản đã duyệt.' : 'Chỉ xếp lịch được bản đã duyệt.');
             }
             $this->assertLatest($article, $version);
 
@@ -142,14 +157,18 @@ class ReviewWorkflow
                 throw new InvalidArgumentException('Website đích chưa ở trạng thái Hoạt động.');
             }
 
-            // Lấy đúng ngày giờ người dùng nhập, hiểu là giờ VN (bỏ múi giờ của đối tượng truyền vào), rồi đổi sang UTC.
-            $utc = Carbon::parse($atVn->format('Y-m-d H:i:s'), self::TIMEZONE)->utc();
-            if ($utc->lessThanOrEqualTo(now('UTC'))) {
-                throw new InvalidArgumentException('Thời điểm xuất bản phải ở tương lai.');
+            if ($atVn === null) {
+                $utc = now('UTC')->startOfSecond();
+            } else {
+                // Lấy đúng ngày giờ người dùng nhập, hiểu là giờ VN (bỏ múi giờ của đối tượng truyền vào), rồi đổi sang UTC.
+                $utc = Carbon::parse($atVn->format('Y-m-d H:i:s'), self::TIMEZONE)->utc();
+                if ($utc->lessThanOrEqualTo(now('UTC'))) {
+                    throw new InvalidArgumentException('Thời điểm xuất bản phải ở tương lai.');
+                }
             }
 
             if (Publication::where('article_version_id', $version->id)->exists()) {
-                throw new InvalidArgumentException('Bản này đã được xếp lịch xuất bản, không thể xếp lịch lại.');
+                throw new InvalidArgumentException('Bản này đã có lượt đăng, không tạo thêm. Nếu lượt đó bị lỗi, dùng "Đổi lịch" hoặc "Đăng ngay" ở lượt đăng của bài.');
             }
 
             $key = self::publicationKey($website->id, $article->id, $version->version);
@@ -170,7 +189,7 @@ class ReviewWorkflow
                 'publication_key' => $key,
                 'website_id' => $website->id,
                 'scheduled_at_utc' => $utc->toIso8601String(),
-            ]);
+            ] + ($atVn === null ? ['immediate' => true] : []));
 
             return $publication;
         });
