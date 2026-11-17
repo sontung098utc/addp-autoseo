@@ -15,21 +15,57 @@ use Symfony\Component\Process\Process;
  */
 final class BackgroundRun
 {
+    /** Kết quả lần gọi start() gần nhất trong tiến trình này: started | queued | failed (để giao diện báo đúng thay vì luôn nói "đang khởi động"). */
+    private static string $last = 'none';
+
+    /** Chỉ dùng khi kiểm thử: ép kết quả canSpawn() và/hoặc thay lệnh thật bằng bản giả. */
+    public static ?bool $canSpawnOverride = null;
+
+    public static ?\Closure $runner = null;
+
+    public static function lastOutcome(): string
+    {
+        return self::$last;
+    }
+
+    /** PHP hiện tại có mở được tiến trình con không (nhiều hosting tắt proc_open cho PHP chạy web). */
+    public static function canSpawn(): bool
+    {
+        if (self::$canSpawnOverride !== null) {
+            return self::$canSpawnOverride;
+        }
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+
+        return function_exists('proc_open') && ! in_array('proc_open', $disabled, true);
+    }
+
     public static function available(): bool
     {
         return ImageJob::dbShareable() && (bool) config('agent.background_runs', true);
     }
 
     /** Chờ tối đa $waitSeconds để phiên vừa khởi chạy ghi hàng của nó. @return ?AgentRun null nếu không khởi chạy được hoặc chưa thấy phiên */
-    public static function start(Article $article, ?int $actorId, int $waitSeconds = 10, ?string $redoMessage = null, ?int $campaignId = null): ?AgentRun
+    public static function start(Article $article, ?int $actorId, int $waitSeconds = 10, ?string $redoMessage = null, ?int $campaignId = null, bool $viaQueue = false): ?AgentRun
     {
+        self::$last = 'failed';
+        // Máy chủ web không mở được tiến trình con: chuyển việc khởi chạy cho tiến trình xử lý hàng đợi (php dòng lệnh). Không lặp lại trong chính job đó.
+        if (! $viaQueue && ! self::canSpawn()) {
+            if (config('queue.default') !== 'sync') {
+                \App\Jobs\StartAgentRunJob::dispatch((int) $article->id, $actorId, $redoMessage, $campaignId);
+                self::$last = 'queued';
+            } else {
+                \Illuminate\Support\Facades\Log::error('BackgroundRun: PHP không mở được tiến trình con (proc_open) và hàng đợi là sync nên không thể chạy nền', ['article' => $article->id]);
+            }
+
+            return null;
+        }
         $before = (int) AgentRun::query()->where('article_id', $article->id)->max('id');
         // Máy chủ web (php-fpm/lsphp) và hosting có PHP CLI tên riêng (vd. php82) khiến tự dò chọn nhầm tệp: cho phép chỉ rõ bằng AGENT_PHP_BINARY.
         $php = trim((string) config('agent.php_binary')) ?: ((new PhpExecutableFinder)->find(false) ?: PHP_BINARY);
         $log = storage_path('logs/agent-run-article.log');
         $cmd = 'nohup '.escapeshellarg($php).' artisan agent:run-article '.(int) $article->id.($actorId ? ' --actor='.$actorId : '').($campaignId ? ' --campaign='.$campaignId : '').($redoMessage !== null && trim($redoMessage) !== '' ? ' --redo='.escapeshellarg(mb_substr($redoMessage, 0, 1500)) : '').' >> '.escapeshellarg($log).' 2>&1 &';
         try {
-            (new Process(['sh', '-c', $cmd], base_path(), ImageJob::childEnv()))->run();
+            self::$runner !== null ? (self::$runner)($cmd) : (new Process(['sh', '-c', $cmd], base_path(), ImageJob::childEnv()))->run();
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('BackgroundRun: không chạy được lệnh khởi chạy tiến trình nền', ['article' => $article->id, 'php' => $php, 'loi' => mb_substr($e->getMessage(), 0, 300)]);
 
@@ -38,6 +74,8 @@ final class BackgroundRun
         for ($i = 0; $i < $waitSeconds * 4; $i++) {
             $run = AgentRun::query()->where('article_id', $article->id)->where('id', '>', $before)->latest('id')->first();
             if ($run) {
+                self::$last = 'started';
+
                 return $run;
             }
             usleep(250_000);

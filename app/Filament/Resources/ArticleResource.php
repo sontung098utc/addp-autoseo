@@ -187,7 +187,14 @@ class ArticleResource extends Resource
         // Chạy NỀN rồi chuyển sang trang luồng đang chạy (không treo hộp thoại hàng phút). Giao hàng loạt vẫn tuần tự đồng bộ.
         if ($background && BackgroundRun::available()) {
             $started = BackgroundRun::start($record, Auth::id(), redoMessage: $redoMessage);
-            Notification::make()->title($redoMessage !== null ? 'Đã giao bài #'.$record->id.' làm lại' : 'Đã giao bài #'.$record->id.' cho đội AI')->body($started ? 'Phiên #'.$started->id.' đang chạy, theo dõi diễn biến ngay tại đây.' : 'Phiên đang khởi động, xem tiến trình ở trang bài.')->success()->send();
+            $outcome = BackgroundRun::lastOutcome();
+            if ($outcome === 'failed') { // không khởi chạy được và không xếp hàng được: nói thật, không báo "đã giao"
+                Notification::make()->title('Chưa giao được bài #'.$record->id)->body('Máy chủ không khởi chạy được tiến trình nền. Chưa có phiên nào chạy; xem nhật ký (storage/logs) hoặc báo người quản trị.')->danger()->send();
+
+                return static::getUrl('view', ['record' => $record]);
+            }
+            Notification::make()->title($redoMessage !== null ? 'Đã giao bài #'.$record->id.' làm lại' : 'Đã giao bài #'.$record->id.' cho đội AI')
+                ->body($started ? 'Phiên #'.$started->id.' đang chạy, theo dõi diễn biến ngay tại đây.' : ($outcome === 'queued' ? 'Bài đã xếp hàng, sẽ bắt đầu chạy trong khoảng 1 phút (máy chủ web không tự mở được tiến trình nền nên việc khởi chạy đi qua hàng đợi). Xem tiến trình ở trang bài.' : 'Phiên đang khởi động, xem tiến trình ở trang bài.'))->success()->send();
 
             return $started ? AgentRunResource::viewUrl($started) : static::getUrl('view', ['record' => $record]);
         }
