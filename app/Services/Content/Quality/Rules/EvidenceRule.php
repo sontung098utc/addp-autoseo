@@ -37,7 +37,8 @@ class EvidenceRule implements QualityRule
             return [];
         }
         $ids = array_values(array_unique(array_merge(BrainContext::forArticle($article)->ids(), array_map('intval', $ctx->brainIds ?? []))));
-        if ($ids === [] || ! Brain::query()->whereIn('id', $ids)->where('status', 'active')->get()->contains(fn (Brain $b) => $b->reliance() === 'must_cite')) {
+        $brains = \App\Support\RequestMemo::remember('evidence-brains:'.implode(',', $ids), fn () => $ids === [] ? collect() : Brain::query()->whereIn('id', $ids)->where('status', 'active')->get());
+        if ($ids === [] || ! $brains->contains(fn (Brain $b) => $b->reliance() === 'must_cite')) {
             return [];
         }
         $registry = BrainSourceRegistry::forBrains($ids);
@@ -117,7 +118,7 @@ class EvidenceRule implements QualityRule
     /** Tên miền đã có trong Sổ nguồn của Trí tuệ (kể cả mới là gợi ý chưa xác nhận): chủ Trí tuệ đã xem xét nên KHÔNG tự nâng thành bằng chứng. @param list<int> $brainIds */
     private function inBook(array $brainIds, string $host): bool
     {
-        return \App\Models\BrainSource::query()->whereIn('brain_id', $brainIds)->where(fn ($q) => $q->where('domain', $host)->orWhere('domain', 'like', '%.'.$host))->exists();
+        return \App\Support\RequestMemo::remember('inbook:'.implode(',', $brainIds).':'.$host, fn () => \App\Models\BrainSource::query()->whereIn('brain_id', $brainIds)->where(fn ($q) => $q->where('domain', $host)->orWhere('domain', 'like', '%.'.$host))->exists());
     }
 
     /** Có số liệu kèm đơn vị (liều, ngưỡng, tỷ lệ, mốc thời gian...). */

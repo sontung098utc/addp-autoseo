@@ -29,6 +29,12 @@ final class BrainContext
 
     public static function forArticle(Article $article, ?int $campaignId = null): self
     {
+        // Chỉ phụ thuộc website và chiến dịch; trang liệt kê gọi hàng trăm lần cho các bài cùng website (bộ nhớ chỉ bật trong yêu cầu của trang đó).
+        return \App\Support\RequestMemo::remember('brainctx:'.(int) $article->website_id.':'.(int) $campaignId, fn () => self::buildForArticle($article, $campaignId));
+    }
+
+    private static function buildForArticle(Article $article, ?int $campaignId): self
+    {
         $brains = collect();
         $campaign = $campaignId ? Campaign::query()->find($campaignId) : null;
         $chosen = array_values(array_filter(array_map('intval', (array) ($campaign?->brain_ids ?? []))));

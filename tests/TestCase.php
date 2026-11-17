@@ -21,5 +21,7 @@ abstract class TestCase extends BaseTestCase
         \App\Services\Search\ClaudeBridgeSearchProvider::forget();
         \App\Support\MemoizedSchemaBuilder::flush();
         \App\Services\Agent\Roles\RoleAssignments::flush();
+        \App\Filament\Resources\ArticleResource::forgetRowCaches();
+        \App\Support\RequestMemo::flush();
     }
 }
