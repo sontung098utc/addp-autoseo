@@ -48,4 +48,24 @@ class KnowledgeDedupeSpeedTest extends TestCase
         $selects = collect(\DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'knowledge_items'))->count();
         $this->assertSame(1, $selects, 'Cùng phạm vi chỉ tải mục một lần.');
     }
+
+    public function test_canh_bao_trung_duoc_nho_va_tu_lam_moi_khi_kho_doi(): void
+    {
+        $this->actingAs(\App\Models\User::create(['name' => 'a', 'email' => uniqid().'@x.vn', 'password' => 'secret123', 'role' => 'approver', 'is_active' => true]));
+        $base = 'HbA1c từ 6,5% trở lên ở hai lần xét nghiệm khác nhau cho phép chẩn đoán đái tháo đường theo hướng dẫn hiện hành của nhiều tổ chức y tế.';
+        $a = $this->item($base, 'Mục A');
+        $page = fn () => \Livewire\Livewire::test(\App\Filament\Pages\KnowledgePage::class);
+        $page()->assertOk()->assertDontSee('≈ KB#');
+
+        $b = $this->item($base.' Cần xác nhận lại.', 'Mục B');
+        $page()->assertSee('KB#'.$a->id)->assertSee('≈ KB#'.$b->id, false); // kho đổi: dấu vân tay đổi nên tính lại, hiện cặp mới
+
+        $queries = 0;
+        \DB::listen(function ($q) use (&$queries) { if (str_contains($q->sql, 'content_hash') || str_contains($q->sql, 'from `knowledge_items` where `status` in')) { $queries++; } });
+        $page()->assertSee('≈ KB#'.$b->id, false); // kho không đổi: dùng kết quả đã nhớ
+        $this->assertLessThan(8, $queries, 'Lần hiển thị thứ hai không tính lại toàn bộ cảnh báo.');
+
+        $b->update(['status' => 'rejected']);
+        $page()->assertDontSee('≈ KB#'.$b->id, false); // bị từ chối: tự bỏ cặp cũ
+    }
 }

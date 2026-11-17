@@ -326,14 +326,33 @@ class KnowledgePage extends Page
         if ($manage) {
             $fresh = new KnowledgeFreshness;
             $same = fn ($i) => $b === null || (int) $i->brain_id === $b;
-            $warn = ['pairs' => array_values(array_filter($conflicts->all(), fn ($p) => $same($p['a']))), 'expired' => $fresh->expired()->filter($same)->values(), 'unused' => $fresh->unused()->filter($same)->values(), 'dups' => []];
-            foreach (KnowledgeItem::query()->tap($inScope)->whereIn('status', ['proposed', 'approved'])->limit(300)->get() as $i) {
-                foreach ($dedupe->find($i)['similar'] as $s) {
-                    if ($i->id < $s['item']->id) {
-                        $warn['dups'][] = ['a' => $i, 'b' => $s['item'], 'percent' => $s['percent']];
+            // Cảnh báo mâu thuẫn/trùng tính nặng (so từng cặp) nhưng chỉ đổi khi kho đổi: nhớ kết quả (chỉ mã mục), khóa theo "dấu vân tay" của kho
+            // (số mục, mục sửa gần nhất, mã lớn nhất, số mục từng trạng thái, tổng độ dài nội dung, phạm vi, ngưỡng) nên có thay đổi là tự tính lại, không bao giờ hiện số cũ sai.
+            $stamp = KnowledgeItem::query()->toBase()->selectRaw("count(*) as c, max(updated_at) as m, max(id) as i, sum(case when status = 'proposed' then 1 else 0 end) as p, sum(case when status = 'approved' then 1 else 0 end) as a, sum(length(body)) as l")->first();
+            $key = 'kb:warn:v1:'.md5(json_encode([$stamp, $b, config('knowledge.dup_threshold')]));
+            $ids = \Illuminate\Support\Facades\Cache::remember($key, 1800, function () use ($conflicts, $dedupe, $same, $inScope) {
+                $r = ['pairs' => [], 'dups' => []];
+                foreach ($conflicts->all() as $p) {
+                    if ($same($p['a'])) {
+                        $r['pairs'][] = [$p['a']->id, $p['b']->id];
                     }
                 }
-            }
+                foreach (KnowledgeItem::query()->tap($inScope)->whereIn('status', ['proposed', 'approved'])->limit(300)->get() as $i) {
+                    foreach ($dedupe->find($i)['similar'] as $sim) {
+                        if ($i->id < $sim['item']->id) {
+                            $r['dups'][] = [$i->id, $sim['item']->id, $sim['percent']];
+                        }
+                    }
+                }
+
+                return $r;
+            });
+            $models = KnowledgeItem::query()->whereIn('id', collect($ids['pairs'])->flatten()->merge(collect($ids['dups'])->map(fn ($d) => [$d[0], $d[1]])->flatten())->unique()->all())->get()->keyBy('id');
+            $warn = [
+                'pairs' => array_values(array_filter(array_map(fn ($p) => isset($models[$p[0]], $models[$p[1]]) ? ['a' => $models[$p[0]], 'b' => $models[$p[1]]] : null, $ids['pairs']))),
+                'expired' => $fresh->expired()->filter($same)->values(), 'unused' => $fresh->unused()->filter($same)->values(),
+                'dups' => array_values(array_filter(array_map(fn ($d) => isset($models[$d[0]], $models[$d[1]]) ? ['a' => $models[$d[0]], 'b' => $models[$d[1]], 'percent' => $d[2]] : null, $ids['dups']))),
+            ];
         }
 
         return [
