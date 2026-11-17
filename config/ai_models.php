@@ -56,6 +56,15 @@ return [
      */
     'private_base_url_allowlist' => array_values(array_filter(array_map('trim', explode(',', (string) env('AI_PRIVATE_BASE_URL_ALLOWLIST', ''))))),
 
+    /**
+     * Đồng bộ model thật từ API của hãng (nút "Cập nhật model mới nhất"): bỏ các model không dùng để sinh chữ/ảnh (nhúng, giọng nói, thời gian thực, robot...).
+     * Khớp không phân biệt hoa thường theo tên model. Model mới ra vẫn lọt qua; chỉ loại họ model rõ ràng không phù hợp.
+     */
+    'sync_exclude_pattern' => '/embed|embedding|whisper|tts|transcribe|translate|moderation|realtime|live|audio|robotics|computer-use|davinci|babbage|dall-e|search-preview|omni-moderation/i',
+
+    /** Số ngày hiện dấu "Mới"/"Vừa ngưng" sau khi phát hiện. */
+    'sync_badge_days' => 7,
+
     /** Tên model hợp lệ khi tự thêm (cùng quy tắc RoleAssignments::saveModel). */
     'custom_model_pattern' => '/^[A-Za-z0-9._:\/-]{1,80}$/',
 ];

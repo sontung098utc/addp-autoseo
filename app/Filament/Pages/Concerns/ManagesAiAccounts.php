@@ -8,6 +8,7 @@ use App\Models\AgentSetting;
 use App\Models\AiModelRoute;
 use App\Models\AiProvider;
 use App\Services\Agent\Ai\AiModelCatalog;
+use App\Services\Agent\Ai\AiModelSync;
 use App\Services\Agent\Ai\AiModelRouter;
 use App\Services\Agent\Ai\AiProviderFactory;
 use App\Services\Agent\Roles\RoleAssignments;
@@ -54,11 +55,18 @@ trait ManagesAiAccounts
         return array_values(array_unique(array_filter(array_map(fn ($n) => trim((string) $n), $names), fn ($n) => $n !== '' && AiModelCatalog::validCustomName($n))));
     }
 
-    private function modelFields(string $brandExpr = 'preset'): array
+    private function modelFields(string $brandExpr = 'preset', ?\Closure $providerResolver = null): array
     {
+        // Khi sửa tài khoản có sẵn: gồm cả model thật của hãng (đồng bộ lần gần nhất), không chỉ danh mục cố định.
+        $opts = function (Get $get) use ($brandExpr, $providerResolver) {
+            $p = $providerResolver ? $providerResolver() : null;
+
+            return $p instanceof AiProvider ? AiModelCatalog::optionsFor($p) : AiModelCatalog::options((string) ($get($brandExpr) ?: 'custom'));
+        };
+
         return [
-            CheckboxList::make('models')->label('Model dùng được với tài khoản này')->options(fn (Get $get) => AiModelCatalog::options((string) ($get($brandExpr) ?: 'custom')))
-                ->columns(2)->bulkToggleable()->visible(fn (Get $get) => AiModelCatalog::options((string) ($get($brandExpr) ?: 'custom')) !== [])
+            CheckboxList::make('models')->label('Model dùng được với tài khoản này')->options($opts)
+                ->columns(2)->bulkToggleable()->searchable()->visible(fn (Get $get) => $opts($get) !== [])
                 ->helperText('Chỉ model được bật mới hiện ở danh sách chọn model cho nhân sự.'),
             TagsInput::make('custom_models')->label('Thêm model chữ theo tên')->placeholder('Gõ tên model rồi Enter')
                 ->helperText('Chữ, số và . _ : / - (tối đa 80 ký tự). Dùng khi hãng ra model mới chưa có trong danh sách. Model ở đây luôn được coi là model chữ.')
@@ -150,11 +158,15 @@ trait ManagesAiAccounts
      *
      * @return list<string|array{id: string, kind: string}>
      */
-    private function mergeModels(string $brand, array $picked, array $customText, array $customImage = []): array
+    private function mergeModels(string $brand, array $picked, array $customText, array $customImage = [], ?AiProvider $provider = null): array
     {
+        $synced = $provider ? AiModelSync::activeModels($provider) : [];
         $kinds = [];
         foreach (AiModelCatalog::catalog($brand) as $m) {
             $kinds[$m['id']] = $m['kind'];
+        }
+        foreach ($synced as $id => $m) {
+            $kinds[$id] ??= $m['kind'];
         }
         $out = [];
         foreach (array_map('strval', $picked) as $id) {
@@ -177,7 +189,7 @@ trait ManagesAiAccounts
             ->fillForm(function (array $arguments) {
                 $p = AiProvider::findOrFail($arguments['id']);
                 $brand = AiModelCatalog::brandOf($p);
-                $catalogIds = array_keys(AiModelCatalog::options($brand));
+                $catalogIds = array_keys(AiModelCatalog::optionsFor($p));
                 $enabled = AiModelCatalog::enabledModels($p);
                 $ids = array_column($enabled, 'id');
                 $custom = array_filter($enabled, fn ($m) => ! in_array($m['id'], $catalogIds, true));
@@ -192,7 +204,7 @@ trait ManagesAiAccounts
                 TextInput::make('base_url')->label('Base URL')->url()->maxLength(255)->rules([fn () => $this->baseUrlRule()]),
                 TextInput::make('monthly_budget_vnd')->label('Ngân sách tháng (₫)')->numeric()->minValue(0),
                 Toggle::make('enabled')->label('Đang bật')->helperText('Tắt thì model của tài khoản này không hiện để chọn và các việc dùng nó không chạy.'),
-                ...$this->modelFields(),
+                ...$this->modelFields('preset', fn () => AiProvider::query()->find((int) ($this->mountedActionsArguments[0]['id'] ?? 0))),
             ])
             ->action(function (array $data, array $arguments) {
                 $this->guardAdmin();
@@ -203,7 +215,7 @@ trait ManagesAiAccounts
                     return;
                 }
                 $p->update(['name' => $data['name'], 'base_url' => $data['base_url'] ?: null, 'monthly_budget_vnd' => $data['monthly_budget_vnd'] ?? null, 'enabled' => (bool) $data['enabled'],
-                    'models' => $this->mergeModels(AiModelCatalog::brandOf($p), (array) ($data['models'] ?? []), (array) ($data['custom_models'] ?? []), (array) ($data['custom_image_models'] ?? [])), 'updated_by' => Auth::id()]);
+                    'models' => $this->mergeModels(AiModelCatalog::brandOf($p), (array) ($data['models'] ?? []), (array) ($data['custom_models'] ?? []), (array) ($data['custom_image_models'] ?? []), $p), 'updated_by' => Auth::id()]);
                 Notification::make()->title('Đã lưu tài khoản')->success()->send();
             });
     }
@@ -258,6 +270,78 @@ trait ManagesAiAccounts
                 $r['ok'] ? $n->success() : $n->danger();
                 $n->send();
             });
+    }
+
+    /** Nút "Cập nhật model mới nhất": gọi API danh sách model của mọi tài khoản đang bật; không đổi model đã bật hay bản gán vai trò. */
+    public function syncModelsAction(): Action
+    {
+        return Action::make('syncModels')->label('Cập nhật model mới nhất')->icon('heroicon-o-arrow-path')->color('gray')->hidden(fn () => ! $this->isAdmin())
+            ->action(function () {
+                $this->guardAdmin();
+                $this->runModelSync();
+            });
+    }
+
+    /** Dùng chung cho nút trên trang và lệnh artisan. @return array<string, array<string, mixed>> kết quả theo tên tài khoản */
+    public function runModelSync(?AiProvider $only = null): array
+    {
+        $sync = new AiModelSync;
+        $results = [];
+        $providers = $only ? collect([$only]) : AiProvider::query()->where('enabled', true)->orderBy('id')->get();
+        foreach ($providers as $p) {
+            if (! $p->hasKey()) {
+                continue;
+            }
+            $results[$p->name] = $sync->sync($p);
+        }
+        if ($results === []) {
+            Notification::make()->title('Chưa có tài khoản nào để cập nhật')->body('Cần ít nhất một tài khoản đang bật và đã có khóa API.')->warning()->send();
+
+            return [];
+        }
+        $lines = [];
+        $anyErr = false;
+        foreach ($results as $name => $r) {
+            if (! $r['ok']) {
+                $anyErr = true;
+                $lines[] = "{$name}: không cập nhật được ({$r['error']}). Giữ nguyên danh sách cũ.";
+
+                continue;
+            }
+            $bits = [$r['total'].' model đang hoạt động'];
+            if ($r['added']) {
+                $bits[] = count($r['added']).' mới';
+            }
+            if ($r['back']) {
+                $bits[] = count($r['back']).' quay lại';
+            }
+            if ($r['gone']) {
+                $bits[] = count($r['gone']).' đã ngưng';
+            }
+            $lines[] = "{$name}: ".implode(', ', $bits).'.';
+        }
+        $n = Notification::make()->title($anyErr ? 'Cập nhật model: có tài khoản lỗi' : 'Đã cập nhật danh sách model')->body(implode("\n", $lines));
+        $anyErr ? $n->warning() : $n->success();
+        $n->persistent()->send();
+
+        return $results;
+    }
+
+    /** Bật một model mới phát hiện cho tài khoản (không đụng model đã bật khác). */
+    public function enableDiscoveredModel(int $providerId, string $model): void
+    {
+        $this->guardAdmin();
+        $p = AiProvider::query()->findOrFail($providerId);
+        $found = collect(AiModelSync::discoveredNotEnabled($p))->firstWhere('id', $model);
+        if ($found === null || ! AiModelCatalog::validCustomName($model)) {
+            Notification::make()->title('Không bật được model này')->body('Model không có trong danh sách đã phát hiện hoặc đã được bật.')->warning()->send();
+
+            return;
+        }
+        $entries = is_array($p->models) ? $p->models : AiModelCatalog::defaults(AiModelCatalog::brandOf($p));
+        $entries[] = AiModelCatalog::entryFor($model, $found['kind']);
+        $p->update(['models' => array_values($entries), 'updated_by' => Auth::id()]);
+        Notification::make()->title('Đã bật model')->body($found['name'].' đã hiện ở danh sách chọn model cho nhân sự.')->success()->send();
     }
 
     public function editLimitsAction(): Action
@@ -319,6 +403,7 @@ trait ManagesAiAccounts
             $p->brand = AiModelCatalog::brandOf($p);
             $p->logo = AiModelCatalog::logoOf($p->brand);
             $p->enabled_models = AiModelCatalog::enabledModels($p);
+            $p->discovered = AiModelSync::discoveredNotEnabled($p);
             $roles = RoleAssignments::ROLE_TASKS;
             $p->staff_count = AgentRoleAssignment::query()->where('enabled', true)->where(fn ($q) => $q->where('provider_id', $p->id)->orWhere('fallback_provider_id', $p->id))->whereIn('role_key', array_keys($roles))->count();
 
@@ -332,6 +417,7 @@ trait ManagesAiAccounts
             'imageStatus' => \App\Services\Images\ImageGeneratorResolver::status(),
             'limits' => ['budget' => AgentAi::policy()->budgetVnd, 'rounds' => AgentAi::policy()->maxRepairRounds],
             'tierLabels' => AiProvider::TIER_LABELS,
+            'goneInUse' => AiModelSync::goneInUse(),
         ];
     }
 }
