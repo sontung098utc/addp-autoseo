@@ -19,5 +19,6 @@ abstract class TestCase extends BaseTestCase
         config(['studio.demo' => true]);
         // Bộ nhớ kết quả tìm web (biến tĩnh) chỉ sống trong một phiên chạy bài; không để lọt giữa các test.
         \App\Services\Search\ClaudeBridgeSearchProvider::forget();
+        \App\Support\MemoizedSchemaBuilder::flush();
     }
 }
