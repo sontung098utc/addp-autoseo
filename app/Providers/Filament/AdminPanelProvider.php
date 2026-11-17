@@ -52,10 +52,11 @@ class AdminPanelProvider extends PanelProvider
             ->maxContentWidth(\Filament\Support\Enums\MaxWidth::Full)
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => '<link rel="stylesheet" href="' . e(asset('css/seo-studio.css')) . '">'
-                    . '<script src="' . e(asset('js/studio-ui.js')) . '"></script>'
-                    // Thanh tiến độ ở mép trên khi chuyển trang/chờ máy chủ; ?v= theo ngày sửa file để trình duyệt lấy bản mới sau mỗi lần cập nhật.
-                    . '<script src="' . e(asset('js/studio-progress.js')) . '?v=' . (int) @filemtime(public_path('js/studio-progress.js')) . '"></script>',
+                // ?v= theo ngày sửa file: trình duyệt giữ file tĩnh 7 ngày (cache-control của máy chủ) nên không có số phiên bản thì người dùng thấy bản cũ sau khi cập nhật.
+                fn (): string => '<link rel="stylesheet" href="' . e(static::versionedAsset('css/seo-studio.css')) . '">'
+                    . '<script src="' . e(static::versionedAsset('js/studio-ui.js')) . '"></script>'
+                    // Thanh tiến độ ở mép trên khi chuyển trang/chờ máy chủ.
+                    . '<script src="' . e(static::versionedAsset('js/studio-progress.js')) . '"></script>',
             )
             ->renderHook(
                 PanelsRenderHook::CONTENT_START,
@@ -99,5 +100,10 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ]);
+    }
+    /** Địa chỉ file tĩnh trong public/ kèm ?v=<ngày sửa file> để lấy bản mới sau mỗi lần cập nhật dù trình duyệt đang giữ cache. */
+    public static function versionedAsset(string $path): string
+    {
+        return asset($path) . '?v=' . (int) @filemtime(public_path($path));
     }
 }

@@ -33,4 +33,12 @@ class StudioProgressTest extends TestCase
         $this->assertStringContainsString("addEventListener('DOMContentLoaded', fin", $js, 'Hoàn tất khi nội dung đã sẵn sàng, không chờ sự kiện load (ảnh, phông chữ ngoài).');
         $this->assertStringNotContainsString('innerHTML', $js, 'Không chèn HTML.');
     }
+
+    public function test_moi_file_tinh_cua_giao_dien_co_so_phien_ban_theo_ngay_sua(): void
+    {
+        $html = $this->get('/admin/login')->assertOk()->getContent();
+        foreach (['css/seo-studio.css', 'js/studio-ui.js', 'js/studio-progress.js'] as $f) {
+            $this->assertMatchesRegularExpression('#'.preg_quote($f, '#').'\?v='.(int) filemtime(public_path($f)).'#', $html, "$f phải kèm ?v=<ngày sửa> vì trình duyệt giữ file tĩnh 7 ngày.");
+        }
+    }
 }
