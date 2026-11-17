@@ -85,13 +85,12 @@ class ArticlesListSpeedTest extends TestCase
         $site = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://a.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
         $a = $this->article($site);
         Cache::flush();
-        DB::enableQueryLog();
-        $h1 = $this->hint($a);
-        $first = count(DB::getQueryLog());
-        DB::flushQueryLog();
-        $h2 = $this->hint($a);
-        $this->assertSame($h1, $h2);
-        $this->assertLessThan($first / 2, count(DB::getQueryLog()), 'Lần hai không chạy lại kiểm chất lượng.');
+        $computed = $this->hint($a);
+        $this->assertStringContainsString('Còn lỗi chặn duyệt', (string) $computed);
+
+        // Đặt sẵn một giá trị khác vào đúng khóa: nếu lần gọi sau trả về nó thì đã dùng bộ nhớ, không chạy lại kiểm chất lượng.
+        Cache::put($this->key($a->versions()->first()), 'GIÁ TRỊ TỪ BỘ NHỚ', 60);
+        $this->assertSame('GIÁ TRỊ TỪ BỘ NHỚ', $this->hint($a));
     }
 
     public function test_bang_van_hien_dung_va_khong_loi_khi_bo_nho_dem_hong(): void
