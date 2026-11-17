@@ -120,7 +120,7 @@ class PipelineVisualTest extends TestCase
         $this->assertStringContainsString('data-run="'.$run->id.'"', $html);
         $this->assertStringContainsString('ss-live-pill', $html);
         $this->assertStringContainsString('Xem diễn biến', $html);
-        $this->assertMatchesRegularExpression('/data-testid="pipeline"[^>]*wire:poll\.2s/', $html);
+        $this->assertMatchesRegularExpression('/data-testid="pipeline"[^>]*wire:poll\.'.\App\Filament\Support\Agent\RunActivity::POLL_LIVE.'s/', $html);
     }
 
     public function test_khong_poll_khi_khong_co_phien_running(): void

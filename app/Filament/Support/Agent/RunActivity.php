@@ -18,10 +18,13 @@ final class RunActivity
 {
     public const STALE_MINUTES = 15;
 
-    /** Nhịp poll (giây) khi có / không có phiên đang chạy. */
-    public const POLL_LIVE = 2;
+    /**
+     * Nhịp poll (giây) khi có / không có phiên đang chạy. Đã đo: mỗi lượt làm mới của trang chi tiết bài/Pipeline mất ~0,5 s ở máy dev và 1,4-3 s trên server,
+     * nên 2 s không giữ nổi (các lượt xếp hàng liên tục, mỗi người xem chiếm một tiến trình PHP) → 4 s khi có phiên chạy, 15 s khi rảnh.
+     */
+    public const POLL_LIVE = 4;
 
-    public const POLL_IDLE = 10;
+    public const POLL_IDLE = 15;
 
     /** Phiên running còn "sống" (chưa quá hạn không có bước mới). */
     public static function isLive(AgentRun $run, ?CarbonImmutable $now = null): bool

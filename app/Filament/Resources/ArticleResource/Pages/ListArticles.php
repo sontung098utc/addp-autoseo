@@ -16,6 +16,12 @@ use Illuminate\Support\HtmlString;
 /** AG-S16: một màn Bài viết gộp cả duyệt bài, chia tab ngang theo trạng thái. */
 class ListArticles extends ListRecords
 {
+    /** Mỗi yêu cầu của trang này (kể cả các lượt tự làm mới) bật bộ nhớ trong-yêu-cầu: bảng tính cùng một Trí tuệ/cụm cấm cho hàng chục dòng. */
+    public function boot(): void
+    {
+        \App\Support\RequestMemo::enable();
+    }
+
     protected static ?string $title = 'Bài viết';
 
     protected static string $resource = ArticleResource::class;

@@ -80,13 +80,13 @@ class LiveMotionTest extends TestCase
         $run = $this->makeRun('running', ['guard', 'risk', 'brief']);
 
         $html = $this->get(AgentRunResource::viewUrl($run))->assertOk()->getContent();
-        $this->assertStringContainsString('wire:poll.2s', $html);
+        $this->assertStringContainsString('wire:poll.'.\App\Filament\Support\Agent\RunActivity::POLL_LIVE.'s', $html);
         $this->assertStringContainsString('data-live-stage="write"', $html);
         $this->assertStringContainsString('Đang ở:', $html);
 
         $run->update(['status' => 'ready_for_review']);
         $html = $this->get(AgentRunResource::viewUrl($run))->assertOk()->getContent();
-        $this->assertStringNotContainsString('wire:poll.2s', $html);
+        $this->assertStringNotContainsString('wire:poll.'.\App\Filament\Support\Agent\RunActivity::POLL_LIVE.'s', $html);
         $this->assertStringNotContainsString('data-live-stage', $html);
         $this->assertStringNotContainsString('data-testid="run-live"', $html);
     }
@@ -104,7 +104,7 @@ class LiveMotionTest extends TestCase
 
         $html = $this->get(AgentRunResource::viewUrl($run))->assertOk()->getContent();
         $this->assertStringContainsString('Có thể bị treo', $html);
-        $this->assertStringNotContainsString('wire:poll.2s', $html);
+        $this->assertStringNotContainsString('wire:poll.'.\App\Filament\Support\Agent\RunActivity::POLL_LIVE.'s', $html);
         $this->assertStringNotContainsString('data-live-stage', $html);
         $this->assertStringNotContainsString('data-testid="run-live"', $html);
     }
@@ -131,13 +131,13 @@ class LiveMotionTest extends TestCase
         $url = \App\Filament\Clusters\AgentTeam\Pages\AgentOverview::getUrl();
 
         $html = $this->get($url)->assertOk()->getContent();
-        $this->assertStringContainsString('wire:poll.10s', $html);
+        $this->assertStringContainsString('wire:poll.'.\App\Filament\Support\Agent\RunActivity::POLL_IDLE.'s', $html);
         $this->assertStringNotContainsString('overview-live', $html);
         $this->assertStringNotContainsString('data-live-run', $html);
 
         $run = $this->makeRun('running', ['guard', 'risk', 'brief']);
         $html = $this->get($url)->assertOk()->getContent();
-        $this->assertStringContainsString('wire:poll.2s', $html);
+        $this->assertStringContainsString('wire:poll.'.\App\Filament\Support\Agent\RunActivity::POLL_LIVE.'s', $html);
         $this->assertStringContainsString('Đang chạy 1 phiên', $html);
         // Mỗi phiên đang chạy một dòng, ghi chặng hiện tại (không còn lưới chặng gộp mọi phiên).
         $this->assertStringContainsString('data-live-run="'.$run->id.'"', $html);

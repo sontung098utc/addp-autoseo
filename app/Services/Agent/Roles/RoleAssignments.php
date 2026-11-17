@@ -58,11 +58,13 @@ final class RoleAssignments
 
     public function find(string $role): ?AgentRoleAssignment
     {
-        try {
-            return Schema::hasTable('agent_role_assignments') ? AgentRoleAssignment::query()->with(['provider', 'fallbackProvider', 'updater'])->where('role_key', $role)->first() : null;
-        } catch (Throwable) {
-            return null;
+        foreach ($this->all() as $a) {
+            if ($a->role_key === $role) {
+                return $a;
+            }
         }
+
+        return null;
     }
 
     /** Bản gán MODEL đang có hiệu lực cho một loại việc (bật, đủ provider + model); null nếu không. */
@@ -96,14 +98,44 @@ final class RoleAssignments
         return ['enabled' => true, 'pin' => null];
     }
 
+    /**
+     * Bản gán của mọi vai trò nhớ ít giây: một trang đọc hàng trăm lần mà dữ liệu chỉ đổi khi lưu. Lưu/xóa qua model tự xóa bộ nhớ (sự kiện saved/deleted).
+     * LƯU Ý: cập nhật hàng loạt bằng query builder (->update()/->delete() trên truy vấn) KHÔNG phát sự kiện, nên nơi nào làm vậy phải gọi RoleAssignments::flush().
+     */
+    private const MEMO_TTL = 5;
+
+    /** @var array{at:int, rows:list<AgentRoleAssignment>}|null */
+    private static ?array $memo = null;
+
+    /** Bộ phát sự kiện của model đã được móc để xóa bộ nhớ khi lưu/xóa (mỗi ứng dụng/bài test có bộ phát riêng nên phải móc lại khi nó đổi). */
+    private static ?object $hookedDispatcher = null;
+
+    public static function flush(): void
+    {
+        self::$memo = null;
+    }
+
     /** @return list<AgentRoleAssignment> */
     private function all(): array
     {
+        $d = AgentRoleAssignment::getEventDispatcher();
+        if (self::$hookedDispatcher !== $d) {
+            self::$hookedDispatcher = $d;
+            self::$memo = null;
+            AgentRoleAssignment::saved(fn () => self::flush());
+            AgentRoleAssignment::deleted(fn () => self::flush());
+        }
+        if (self::$memo !== null && time() - self::$memo['at'] < self::MEMO_TTL) {
+            return self::$memo['rows'];
+        }
         try {
-            return Schema::hasTable('agent_role_assignments') ? AgentRoleAssignment::query()->get()->all() : [];
+            $rows = Schema::hasTable('agent_role_assignments') ? AgentRoleAssignment::query()->with(['provider', 'fallbackProvider', 'updater'])->orderBy('id')->get()->all() : [];
         } catch (Throwable) {
             return [];
         }
+        self::$memo = ['at' => time(), 'rows' => $rows];
+
+        return $rows;
     }
 
     public function saveModel(string $role, ?int $providerId, ?string $model, ?int $fallbackProviderId, ?string $fallbackModel, bool $enabled, User $actor): AgentRoleAssignment

@@ -43,9 +43,9 @@ final class AgentRunDispatcher
         // Chưa chỉ định thì lấy điểm dừng của chiến dịch chứa bài (giao tay một bài của chiến dịch cũng dừng đúng chỗ); [] = không dừng.
         $checkpoints ??= $article->campaign_id ? (array) $article->campaign?->checkpoints : null;
         if (self::usesRefresh($article)) {
-            return (new ArticleRefreshRunner($ai, stop: $stop, policy: $policy, handoff: $handoff, router: $router))->run($article, $actor, $trigger, $campaignId);
+            return \App\Services\Agent\Notify\RunFinishedNotifier::afterRun((new ArticleRefreshRunner($ai, stop: $stop, policy: $policy, handoff: $handoff, router: $router))->run($article, $actor, $trigger, $campaignId), $actor, $trigger);
         }
 
-        return (new AgentRunOrchestrator($ai, stop: $stop, policy: $policy, handoff: $handoff, router: $router))->run($article, $actor, $trigger, $campaignId, $presetOutline, $allowWithoutKnowledge, $checkpoints, $redo);
+        return \App\Services\Agent\Notify\RunFinishedNotifier::afterRun((new AgentRunOrchestrator($ai, stop: $stop, policy: $policy, handoff: $handoff, router: $router))->run($article, $actor, $trigger, $campaignId, $presetOutline, $allowWithoutKnowledge, $checkpoints, $redo), $actor, $trigger);
     }
 }

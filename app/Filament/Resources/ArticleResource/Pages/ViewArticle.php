@@ -232,6 +232,25 @@ class ViewArticle extends EditArticle
             });
     }
 
+    /** Đăng ngay một lượt đăng ĐÃ CÓ của bài này (đã xếp lịch hoặc lỗi). Lượt đang đăng/đã đăng/chờ đối soát không đăng lại được. */
+    public function publishNowPublicationAction(): Actions\Action
+    {
+        return Actions\Action::make('publishNowPublication')->label('Đăng ngay')->icon('heroicon-o-paper-airplane')->color('success')
+            ->requiresConfirmation()->modalHeading('Đăng ngay lên website')
+            ->modalDescription('Hệ thống gửi bài này lên website đích ngay bây giờ. Bước đăng tra theo khóa xuất bản trước nên không đăng trùng nếu bài đã có.')
+            ->action(function (array $arguments) {
+                abort_unless(ReviewActions::canApprove(), 403);
+                $p = $this->publicationFor($arguments);
+                if (! in_array($p->status, ['scheduled', 'failed'], true)) {
+                    Notification::make()->title('Không đăng ngay được')->body('Chỉ đăng ngay được lượt đang ở trạng thái "Đã xếp lịch" hoặc "Lỗi".')->danger()->send();
+
+                    return;
+                }
+                \App\Filament\Support\Review\PublishNow::run($p);
+                $this->refreshRecord();
+            });
+    }
+
     /** Giải thích vì sao lượt đăng chưa lên (hoặc trạng thái đăng nếu đã đăng). */
     public function whyPublicationAction(): Actions\Action
     {
@@ -342,6 +361,26 @@ class ViewArticle extends EditArticle
                     }, 'Đã xếp lịch xuất bản');
                     $this->refreshRecord();
                 }),
+            Actions\Action::make('publish_now')->label('Đăng ngay')->icon('heroicon-o-paper-airplane')->color('success')
+                ->visible(fn () => $this->record->workflow_status === 'approved' && $this->latest() !== null)
+                ->authorize(fn () => ReviewActions::canApprove())
+                ->modalHeading('Đăng ngay lên website')
+                ->modalDescription('Đăng bản đã duyệt này lên website ngay bây giờ, không hẹn giờ. Bài lên công khai ngay khi thành công.')
+                ->form([ReviewActions::websiteSelect()])
+                ->fillForm(fn () => ['website_id' => $this->record->website_id])
+                ->modalSubmitActionLabel('Đăng ngay')
+                ->action(function (array $data) {
+                    abort_unless(ReviewActions::canApprove(), 403);
+                    try {
+                        $p = (new ReviewWorkflow)->publishNow(ReviewActions::user(), $this->latest(), Website::findOrFail($data['website_id']));
+                    } catch (\InvalidArgumentException $e) {
+                        Notification::make()->title('Không đăng được')->body($e->getMessage())->danger()->send();
+
+                        return;
+                    }
+                    \App\Filament\Support\Review\PublishNow::run($p);
+                    $this->refreshRecord();
+                }),
             Actions\DeleteAction::make()->visible(fn () => ArticleResource::canDeleteAny()),
         ];
     }
@@ -447,6 +486,24 @@ class ViewArticle extends EditArticle
         Notification::make()->title('Đã tạo Trí tuệ «'.$r['brain']->name.'» và gắn vào '.$article->website->name)->body(\App\Services\Brain\BrainFromSuggestion::summary($r))->success()->persistent()->send();
     }
 
+    /** Các tab của không gian bài; tab chưa nạp chỉ hiện khung "Đang tải…" cho tới khi được nạp (xem loadTabs). */
+    public const TABS = ['overview', 'keyword', 'research', 'content', 'activity', 'publish'];
+
+    /** @var list<string> tab đã được yêu cầu nạp thêm ngoài tab mở đầu (trạng thái của trang, giữ qua các lượt làm mới) */
+    public array $loadedTabs = [];
+
+    /**
+     * Nạp dữ liệu và nội dung cho các tab chưa hiện. Lần dựng đầu CHỈ làm tab mở đầu để trang hiện ra nhanh; trình duyệt gọi hàm này ngay sau đó (không tham số = tất cả)
+     * và ưu tiên tab người dùng vừa bấm.
+     *
+     * @param  list<string>  $keys
+     */
+    public function loadTabs(array $keys = []): void
+    {
+        $keys = $keys === [] ? self::TABS : array_values(array_intersect($keys, self::TABS));
+        $this->loadedTabs = array_values(array_unique(array_merge($this->loadedTabs, $keys)));
+    }
+
     protected function getViewData(): array
     {
         /** @var Article $article */
@@ -455,11 +512,23 @@ class ViewArticle extends EditArticle
         $latest = $versions->first();
         $runs = AgentRun::query()->where('article_id', $article->id)->with('steps')->orderByDesc('id')->get();
         $lastRun = $runs->first();
+        // Tab mở đầu theo trạng thái; bài chưa viết luôn mở Tổng quan và không nhớ tab của bài khác.
+        $tabDefault = match (true) {
+            $latest === null || $article->workflow_status === 'planned' => 'overview',
+            $article->workflow_status === 'needs_review' => 'content',
+            in_array($article->workflow_status, ['approved', 'scheduled'], true) => 'publish',
+            default => 'overview',
+        };
+        // Nạp tab theo nhu cầu: lần đầu chỉ tab mở đầu (+ tab Phiên chạy nếu địa chỉ có ?phien=); các tab khác nạp sau để trang hiện nhanh. Bộ kiểm thử mặc định nạp hết (TestCase đặt ui.lazy_tabs=false); test riêng cho tính năng này bật lại.
+        $lazyTabs = (bool) config('ui.lazy_tabs', true);
+        $tabsLoaded = $lazyTabs ? array_values(array_unique(array_merge([$tabDefault], $this->loadedTabs, $this->phien ? ['activity'] : []))) : self::TABS;
+        $want = fn (string ...$tabs): bool => array_intersect($tabs, $tabsLoaded) !== [];
         // Chi tiết phiên: phiên đang chọn (?phien=, mặc định mới nhất) cho tab Phiên chạy, và phiên mới nhất cho thẻ Luồng chạy ở Tổng quan; dựng một lần nếu là cùng một phiên.
         $selectedRun = ($this->phien ? $runs->firstWhere('id', $this->phien) : null) ?? $lastRun;
         $canRuns = \App\Filament\Resources\AgentRunResource::canViewAny();
-        $runView = $selectedRun && $canRuns ? \App\Filament\Support\Agent\RunViewData::for($selectedRun) : null;
-        $latestRunView = $lastRun && $canRuns ? ($selectedRun && $selectedRun->is($lastRun) ? $runView : \App\Filament\Support\Agent\RunViewData::for($lastRun)) : null;
+        // Chi tiết phiên nặng (~0,5 s): chỉ dựng cho tab cần nó (Phiên chạy dùng runView, Tổng quan dùng latestRunView).
+        $runView = $want('activity') && $selectedRun && $canRuns ? \App\Filament\Support\Agent\RunViewData::for($selectedRun) : null;
+        $latestRunView = $want('overview') && $lastRun && $canRuns ? ($selectedRun && $selectedRun->is($lastRun) && $runView ? $runView : \App\Filament\Support\Agent\RunViewData::for($lastRun)) : null;
         $live = $lastRun && RunActivity::isLive($lastRun) ? $lastRun : null;
         $campaignId = $article->campaign_id ?: $lastRun?->campaign_id;
         $publications = Publication::query()->whereIn('article_version_id', $versions->pluck('id'))->with(['website', 'articleVersion'])->orderByDesc('id')->get();
@@ -473,11 +542,11 @@ class ViewArticle extends EditArticle
         }
         $clusterId = $article->cluster_id ?: $keyword?->cluster_id;
         $cluster = $clusterId ? KeywordCluster::find($clusterId) : null;
-        $clusterKeywords = $cluster
+        $clusterKeywords = $cluster && $want('keyword')
             ? Keyword::query()->where('cluster_id', $cluster->id)->with(['articles' => fn ($q) => $q->select('id', 'keyword_id', 'workflow_status')])
                 ->orderByRaw('volume is null')->orderByDesc('volume')->limit(10)->get()
             : collect();
-        $clusterArticles = $cluster
+        $clusterArticles = $cluster && $want('keyword')
             ? Article::query()->where('cluster_id', $cluster->id)->whereKeyNot($article->id)->orderByDesc('id')->limit(10)->get()
             : collect();
 
@@ -489,18 +558,13 @@ class ViewArticle extends EditArticle
         $unwritten = $latest === null || in_array($article->workflow_status, ['planned', 'drafting', 'rejected'], true);
         // Tính một lần mỗi lượt render; dùng cho khối "Sẵn sàng trước khi giao" và cảnh báo điểm hình thức.
         $readiness = ArticleResource::readiness($article);
-        // Tab mở đầu theo trạng thái; bài chưa viết luôn mở Tổng quan và không nhớ tab của bài khác.
-        $tabDefault = match (true) {
-            $latest === null || $article->workflow_status === 'planned' => 'overview',
-            $article->workflow_status === 'needs_review' => 'content',
-            in_array($article->workflow_status, ['approved', 'scheduled'], true) => 'publish',
-            default => 'overview',
-        };
 
         return [
             'readiness' => $readiness,
             'showPreflight' => $unwritten,
             'tabDefault' => $tabDefault,
+            'tabsLoaded' => $tabsLoaded,
+            'lazyTabs' => $lazyTabs,
             'canUndoAttach' => ReviewActions::user()?->isWriter() ?? false,
             'autoAttached' => $this->recentAutoAttached(),
             'stopInfo' => ($stop = app(EmergencyStopService::class))->isStopped($article->website_id) ? $stop->getStopInfo($article->website_id) : null,
@@ -508,7 +572,7 @@ class ViewArticle extends EditArticle
             'article' => $article,
             'latest' => $latest,
             'versions' => $versions,
-            'versionQuality' => $versions->mapWithKeys(fn (ArticleVersion $v) => [$v->id => ReviewActions::qualityFor($v)->counts()])->all(),
+            'versionQuality' => ! $want('content') ? [] : $versions->mapWithKeys(fn (ArticleVersion $v) => [$v->id => ReviewActions::qualityFor($v)->counts()])->all(),
             'versionRun' => $runs->whereNotNull('final_version_id')->keyBy('final_version_id'),
             'canOpenVersion' => ArticleVersionResource::canViewAny(),
             'runs' => $runs,
@@ -533,9 +597,9 @@ class ViewArticle extends EditArticle
             'outline' => array_values(array_filter((array) ($briefStep?->data['outline'] ?? []), 'is_string')),
             'research' => (array) ($researchStep?->data ?? []) + (array) ($writeStep?->data ?? []),
             'canManageBrains' => \App\Services\Brain\BrainService::canManage(auth()->user()),
-            'kbActivity' => $this->kbActivity($runs),
-            'kbItems' => $this->kbItemsFor($runs),
-            'citedSources' => $this->citedSources($latest, $runs),
+            'kbActivity' => $want('research') ? $this->kbActivity($runs) : ['run_id' => null, 'entries' => []],
+            'kbItems' => $want('research') ? $this->kbItemsFor($runs) : [],
+            'citedSources' => $want('research') ? $this->citedSources($latest, $runs) : [],
             'webSources' => (array) ($runs->flatMap->steps->where('stage', 'research')->filter(fn ($st) => ! empty($st->data['web_sources']))->sortByDesc('id')->first()?->data['web_sources'] ?? []),
             'publications' => $publications,
             'outlineHold' => OutlineHold::forArticle($article),

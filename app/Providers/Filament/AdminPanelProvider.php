@@ -48,12 +48,20 @@ class AdminPanelProvider extends PanelProvider
             ->navigationGroups(['Chiến dịch', 'Lịch đăng', 'Khám phá', 'Phân tích', 'Cài đặt'])
             ->globalSearchKeyBindings(['ctrl+k', 'command+k'])
             ->unsavedChangesAlerts()
+            // Biểu tượng chuông cạnh ảnh đại diện (bảng notifications); thông báo mới còn nổi thành hộp ở góc trên bên phải nhờ NotificationToaster.
+            // Chuông KHÔNG tự hỏi máy chủ riêng (polling null): NotificationToaster đã hỏi theo nhịp và làm mới chuông ngay khi có thông báo mới,
+            // bớt một lượt gọi liên tục ở mọi trang (máy chủ dev chỉ xử lý một yêu cầu một lúc nên các lượt gọi nền xen vào lúc chuyển trang).
+            ->databaseNotifications()
+            ->databaseNotificationsPolling(null)
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth(\Filament\Support\Enums\MaxWidth::Full)
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => '<link rel="stylesheet" href="' . e(asset('css/seo-studio.css')) . '">'
-                    . '<script src="' . e(asset('js/studio-ui.js')) . '"></script>',
+                // ?v= theo ngày sửa file: trình duyệt giữ file tĩnh 7 ngày (cache-control của máy chủ) nên không có số phiên bản thì người dùng thấy bản cũ sau khi cập nhật.
+                fn (): string => '<link rel="stylesheet" href="' . e(static::versionedAsset('css/seo-studio.css')) . '">'
+                    . '<script src="' . e(static::versionedAsset('js/studio-ui.js')) . '"></script>'
+                    // Thanh tiến độ ở mép trên khi chuyển trang/chờ máy chủ.
+                    . '<script src="' . e(static::versionedAsset('js/studio-progress.js')) . '"></script>',
             )
             ->renderHook(
                 PanelsRenderHook::CONTENT_START,
@@ -68,6 +76,12 @@ class AdminPanelProvider extends PanelProvider
                         'canOpenSchedule' => $user->isApprover(),
                     ])->render();
                 },
+            )
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): string => \Illuminate\Support\Facades\Auth::user()?->is_active
+                    ? \Illuminate\Support\Facades\Blade::render('@livewire(\'notification-toaster\')')
+                    : '',
             )
             ->renderHook(
                 PanelsRenderHook::USER_MENU_BEFORE,
@@ -97,5 +111,10 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ]);
+    }
+    /** Địa chỉ file tĩnh trong public/ kèm ?v=<ngày sửa file> để lấy bản mới sau mỗi lần cập nhật dù trình duyệt đang giữ cache. */
+    public static function versionedAsset(string $path): string
+    {
+        return asset($path) . '?v=' . (int) @filemtime(public_path($path));
     }
 }

@@ -23,7 +23,8 @@ final class KnowledgeForbiddenTerms implements BannedTermsProvider
         $ids = array_values(array_unique(array_merge(BrainContext::forArticle($article)->ids(), array_map('intval', $ctx->brainIds ?? []))));
         // Luôn lọc theo danh sách Trí tuệ (kể cả rỗng): null sẽ nạp mục của MỌI Trí tuệ khác.
         $out = [];
-        foreach ((new KnowledgeRetriever())->eligible($site, $ids)->where('type', 'forbidden')->limit(200)->get() as $item) {
+        $items = \App\Support\RequestMemo::remember('forbidden:'.$site->id.':'.implode(',', $ids), fn () => (new KnowledgeRetriever())->eligible($site, $ids)->where('type', 'forbidden')->limit(200)->get());
+        foreach ($items as $item) {
             /** @var KnowledgeItem $item */
             if (($phrases = KnowledgeRetriever::phrases($item)) !== []) {
                 $out['không được nói KB#'.$item->id] = $phrases;

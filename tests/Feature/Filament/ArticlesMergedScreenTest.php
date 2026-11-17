@@ -157,13 +157,13 @@ class ArticlesMergedScreenTest extends TestCase
         $a = $this->article('drafting');
 
         $idle = Livewire::test(ListArticles::class);
-        $this->assertSame('10s', $idle->instance()->getTable()->getPollingInterval());
+        $this->assertSame(\App\Filament\Support\Agent\RunActivity::POLL_IDLE.'s', $idle->instance()->getTable()->getPollingInterval());
         $this->assertStringNotContainsString('ss-badge-live', $idle->html());
 
         $run = $this->mkRun($a, 'running');
         AgentRunStep::create(['agent_run_id' => $run->id, 'seq' => 1, 'role' => 'writer', 'stage' => 'write', 'status' => 'ok', 'title' => 'Viết', 'detail' => 'x']);
         $live = Livewire::test(ListArticles::class);
-        $this->assertSame('2s', $live->instance()->getTable()->getPollingInterval());
+        $this->assertSame(\App\Filament\Support\Agent\RunActivity::POLL_LIVE.'s', $live->instance()->getTable()->getPollingInterval());
         $live->assertSee('ss-badge-live', false)->assertSee('Đang viết · Chấm');
     }
 

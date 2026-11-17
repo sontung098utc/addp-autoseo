@@ -187,7 +187,14 @@ class ArticleResource extends Resource
         // Chạy NỀN rồi chuyển sang trang luồng đang chạy (không treo hộp thoại hàng phút). Giao hàng loạt vẫn tuần tự đồng bộ.
         if ($background && BackgroundRun::available()) {
             $started = BackgroundRun::start($record, Auth::id(), redoMessage: $redoMessage);
-            Notification::make()->title($redoMessage !== null ? 'Đã giao bài #'.$record->id.' làm lại' : 'Đã giao bài #'.$record->id.' cho đội AI')->body($started ? 'Phiên #'.$started->id.' đang chạy, theo dõi diễn biến ngay tại đây.' : 'Phiên đang khởi động, xem tiến trình ở trang bài.')->success()->send();
+            $outcome = BackgroundRun::lastOutcome();
+            if ($outcome === 'failed') { // không khởi chạy được và không xếp hàng được: nói thật, không báo "đã giao"
+                Notification::make()->title('Chưa giao được bài #'.$record->id)->body('Máy chủ không khởi chạy được tiến trình nền. Chưa có phiên nào chạy; xem nhật ký (storage/logs) hoặc báo người quản trị.')->danger()->send();
+
+                return static::getUrl('view', ['record' => $record]);
+            }
+            Notification::make()->title($redoMessage !== null ? 'Đã giao bài #'.$record->id.' làm lại' : 'Đã giao bài #'.$record->id.' cho đội AI')
+                ->body($started ? 'Phiên #'.$started->id.' đang chạy, theo dõi diễn biến ngay tại đây.' : ($outcome === 'queued' ? 'Bài đã xếp hàng, sẽ bắt đầu chạy trong khoảng 1 phút (máy chủ web không tự mở được tiến trình nền nên việc khởi chạy đi qua hàng đợi). Xem tiến trình ở trang bài.' : 'Phiên đang khởi động, xem tiến trình ở trang bài.'))->success()->send();
 
             return $started ? AgentRunResource::viewUrl($started) : static::getUrl('view', ['record' => $record]);
         }
@@ -401,9 +408,9 @@ class ArticleResource extends Resource
                     ->visibleFrom('xl')),
                 static::narrow(Tables\Columns\TextColumn::make('brains')
                     ->label('Trí tuệ')
-                    ->state(fn (Article $r) => ($n = BrainContext::forArticle($r, ArticleRows::lastRun($r)?->campaign_id)->names()) !== '' ? $n : '—')
+                    ->state(fn (Article $r) => ($n = static::brainNamesOf($r)) !== '' ? $n : '—')
                     ->limit(18)
-                    ->tooltip(fn (Article $r) => 'Trí tuệ đang dùng: '.BrainContext::forArticle($r, ArticleRows::lastRun($r)?->campaign_id)->names())
+                    ->tooltip(fn (Article $r) => 'Trí tuệ đang dùng: '.static::brainNamesOf($r))
                     ->visibleFrom('2xl')),
                 static::narrow(Tables\Columns\TextColumn::make('last_run')
                     ->label('Phiên gần nhất')
@@ -453,6 +460,7 @@ class ArticleResource extends Resource
                 static::scheduleAction(),
                 static::viewVersionAction(),
                 Tables\Actions\ActionGroup::make([
+                    static::publishNowAction(),
                     static::rejectAction(),
                     Tables\Actions\Action::make('redo_agent')
                         ->label('Giao làm lại')
@@ -495,6 +503,57 @@ class ArticleResource extends Resource
             ->url(fn (Article $r) => static::getUrl('view', ['record' => $r]));
     }
 
+    /** @var array<string, string> tên Trí tuệ theo (website, chiến dịch) trong một lượt dựng bảng */
+    private static array $brainNames = [];
+
+    /** Xóa bộ nhớ dòng bảng (dùng trong kiểm thử; mỗi yêu cầu web mới tự bắt đầu rỗng). */
+    public static function forgetRowCaches(): void
+    {
+        self::$brainNames = [];
+    }
+
+    /**
+     * Tên các Trí tuệ bài đang dùng. BrainContext::forArticle chỉ phụ thuộc website và chiến dịch của phiên gần nhất, mà cột này gọi hai lần mỗi dòng
+     * (chữ + chú thích) và các bài cùng website/chiến dịch cho cùng kết quả: nhớ theo (website, chiến dịch) thay vì truy vấn lại cho từng dòng.
+     */
+    private static function brainNamesOf(Article $r): string
+    {
+        $campaignId = ArticleRows::lastRun($r)?->campaign_id;
+
+        return self::$brainNames[(int) $r->website_id.'|'.(int) $campaignId] ??= BrainContext::forArticle($r, $campaignId)->names();
+    }
+
+    /**
+     * Chú thích nút Duyệt ("còn lỗi chặn duyệt..."), nhớ theo bản bài. Kiểm chất lượng đầy đủ mất ~110 ms/bản mà bảng gọi cho mọi dòng và tự làm mới
+     * mỗi vài giây, nên nhớ CÂU CẢNH BÁO (không nhớ cả báo cáo). Khóa gồm bản bài (id + ngày sửa) và dấu vân tay của kho tri thức/sổ nguồn, nên sửa bài hay đổi kho
+     * thì tự tính lại; hộp Duyệt vẫn kiểm chất lượng đầy đủ tại thời điểm bấm. Lỗi bộ nhớ đệm (quyền ghi...) thì tính trực tiếp.
+     */
+    private static function blockedHintOf(Article $r): ?string
+    {
+        $v = $r->versions()->orderByDesc('version')->first();
+        if (! $v) {
+            return null;
+        }
+        $compute = fn (): ?string => ReviewActions::blockedHint(ReviewActions::qualityFor($v));
+        try {
+            return \Illuminate\Support\Facades\Cache::remember(self::hintCacheKey($v), 900, fn () => $compute() ?? '') ?: null;
+        } catch (\Throwable) {
+            return $compute();
+        }
+    }
+
+    /** Khóa nhớ chú thích: bản bài (id + ngày sửa) + dấu vân tay kho tri thức/sổ nguồn/Trí tuệ. */
+    private static function hintCacheKey(ArticleVersion $v): string
+    {
+        $kb = \App\Support\RequestMemo::remember('kb-stamp', fn () => md5(json_encode([
+            \App\Models\KnowledgeItem::query()->toBase()->selectRaw('count(*) c, max(updated_at) m')->first(),
+            \App\Models\BrainSource::query()->toBase()->selectRaw('count(*) c, max(updated_at) m')->first(),
+            \App\Models\Brain::query()->toBase()->selectRaw('count(*) c, max(updated_at) m')->first(),
+        ])));
+
+        return 'art-hint:v1:'.$v->id.':'.($v->updated_at?->timestamp ?? 0).':'.$kb;
+    }
+
     /** Kiểm chất lượng bản mới nhất; null nếu bài chưa có bản nào. */
     private static function qualityOf(Article $record): ?QualityReport
     {
@@ -531,7 +590,7 @@ class ArticleResource extends Resource
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'approve')
             ->authorize(fn () => ReviewActions::canApprove())
             ->disabled(fn (Article $r) => ArticleRows::liveRun($r) !== null)
-            ->tooltip(fn (Article $r) => ArticleRows::liveRun($r) ? 'Đội AI đang viết lại bài, chờ xong rồi duyệt bản mới.' : ReviewActions::blockedHint(static::qualityOf($r)))
+            ->tooltip(fn (Article $r) => ArticleRows::liveRun($r) ? 'Đội AI đang viết lại bài, chờ xong rồi duyệt bản mới.' : static::blockedHintOf($r))
             ->modalHeading(fn (Article $r) => static::qualityOf($r)?->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi P0' : 'Duyệt nội dung')
             ->form(fn (Article $r) => ReviewActions::approveForm((int) $r->created_by === (int) ReviewActions::user()?->id, static::qualityOf($r)))
             ->action(function (Article $r, array $data) {
@@ -550,6 +609,30 @@ class ArticleResource extends Resource
             ->action(function (Article $r, array $data) {
                 abort_unless(ReviewActions::canApprove(), 403);
                 ReviewActions::run(fn () => (new ReviewWorkflow)->reject(ReviewActions::user(), static::latest($r), $data['reason'] ?? null), 'Đã từ chối bản thảo');
+            });
+    }
+
+    /** "Đăng ngay" cho bài đã duyệt (cùng điều kiện với Xếp lịch): đăng bản đã duyệt lên website ngay, không hẹn giờ. */
+    private static function publishNowAction(): Tables\Actions\Action
+    {
+        return Tables\Actions\Action::make('publish_now')->label('Đăng ngay')->icon('heroicon-o-paper-airplane')->color('success')
+            ->visible(fn (Article $r) => static::primaryActionFor($r) === 'schedule')
+            ->authorize(fn () => ReviewActions::canApprove())
+            ->modalHeading('Đăng ngay lên website')
+            ->modalDescription('Đăng bản đã duyệt này lên website ngay bây giờ, không hẹn giờ. Bài lên công khai ngay khi thành công.')
+            ->form([ReviewActions::websiteSelect()])
+            ->fillForm(fn (Article $r) => ['website_id' => $r->website_id])
+            ->modalSubmitActionLabel('Đăng ngay')
+            ->action(function (Article $r, array $data) {
+                abort_unless(ReviewActions::canApprove(), 403);
+                try {
+                    $p = (new ReviewWorkflow)->publishNow(ReviewActions::user(), static::latest($r), Website::findOrFail($data['website_id']));
+                } catch (\InvalidArgumentException $e) {
+                    Notification::make()->title('Không đăng được')->body($e->getMessage())->danger()->send();
+
+                    return;
+                }
+                \App\Filament\Support\Review\PublishNow::run($p);
             });
     }
 

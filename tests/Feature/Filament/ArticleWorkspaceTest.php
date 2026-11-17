@@ -86,7 +86,8 @@ class ArticleWorkspaceTest extends TestCase
             ->assertSee('data-testid="aw-runs"', false)
             ->assertSee('data-testid="aw-publications"', false)
             ->assertDontSee('data-testid="aw-live"', false)
-            ->assertDontSee('wire:poll', false);
+            ->assertDontSeeHtml('data-testid="article-workspace" wire:poll') // khung của trang bài không tự làm mới; hộp nổi thông báo và biểu tượng đội AI là thành phần chung có nhịp riêng
+            ->assertDontSee('wire:poll.4s', false);
     }
 
     public function test_bai_chua_co_noi_dung_van_mo_duoc_va_chi_cach_lam_tiep(): void

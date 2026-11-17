@@ -162,6 +162,7 @@ class RoleAssignmentTest extends TestCase
         $this->assertSame('gemini-1.5-flash', $r->target('outline')->model); // vai trò khác không bị ảnh hưởng
 
         AgentRoleAssignment::where('role_key', 'writer')->update(['enabled' => false]);
+        RoleAssignments::flush(); // cập nhật hàng loạt không đi qua sự kiện của model nên không tự xóa bộ nhớ (mã thật chỉ ghi qua model)
         $this->assertSame('gemini-1.5-flash', $r->target('write')->model);
     }
 
