@@ -53,7 +53,9 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): string => '<link rel="stylesheet" href="' . e(asset('css/seo-studio.css')) . '">'
-                    . '<script src="' . e(asset('js/studio-ui.js')) . '"></script>',
+                    . '<script src="' . e(asset('js/studio-ui.js')) . '"></script>'
+                    // Thanh tiến độ ở mép trên khi chuyển trang/chờ máy chủ; ?v= theo ngày sửa file để trình duyệt lấy bản mới sau mỗi lần cập nhật.
+                    . '<script src="' . e(asset('js/studio-progress.js')) . '?v=' . (int) @filemtime(public_path('js/studio-progress.js')) . '"></script>',
             )
             ->renderHook(
                 PanelsRenderHook::CONTENT_START,

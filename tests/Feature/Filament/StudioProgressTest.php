@@ -1,0 +1,30 @@
+<?php
+
+namespace Tests\Feature\Filament;
+
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+/** Thanh tiến độ ở mép trên khi chuyển trang/chờ máy chủ: script phải được nạp ở mọi trang quản trị và giữ các bảo vệ quan trọng. */
+class StudioProgressTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_trang_dang_nhap_nap_script_thanh_tien_do_kem_phien_ban(): void
+    {
+        $html = $this->get('/admin/login')->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('#js/studio-progress\.js\?v=\d+#', $html);
+    }
+
+    public function test_script_ton_tai_va_giu_cac_bao_ve(): void
+    {
+        $js = (string) file_get_contents(public_path('js/studio-progress.js'));
+        $this->assertStringContainsString("id = 'ss-progress'", $js);
+        $this->assertStringContainsString('prefers-reduced-motion', $js, 'Tôn trọng người giảm chuyển động.');
+        $this->assertStringContainsString('defaultPrevented', $js, 'Không chạy khi liên kết đã bị xử lý bằng JavaScript.');
+        $this->assertStringContainsString("wire:navigate", $js, 'Không chồng với thanh của Livewire khi dùng wire:navigate.');
+        $this->assertStringContainsString("'_blank'", (string) preg_replace('/"/', "'", $js).'', 'Không chạy với liên kết mở tab mới.');
+        $this->assertStringContainsString('leaving', $js, 'Xử lý trường hợp người dùng hủy rời trang (hộp thoại chưa lưu).');
+        $this->assertStringNotContainsString('innerHTML', $js, 'Không chèn HTML.');
+    }
+}
