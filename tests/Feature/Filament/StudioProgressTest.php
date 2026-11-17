@@ -25,6 +25,10 @@ class StudioProgressTest extends TestCase
         $this->assertStringContainsString("wire:navigate", $js, 'Không chồng với thanh của Livewire khi dùng wire:navigate.');
         $this->assertStringContainsString("'_blank'", (string) preg_replace('/"/', "'", $js).'', 'Không chạy với liên kết mở tab mới.');
         $this->assertStringContainsString('leaving', $js, 'Xử lý trường hợp người dùng hủy rời trang (hộp thoại chưa lưu).');
+        $this->assertStringContainsString('lastUser', $js, 'Chỉ hiện cho thao tác Livewire do người dùng vừa làm, không cho wire:poll (biểu tượng đội AI tự làm mới 5 giây/lần).');
+        $this->assertStringContainsString('MAX_MS', $js, 'Chốt an toàn: không treo thanh mãi (vd. liên kết tải file).');
+        $this->assertStringContainsString('ss-nav-progress-v', $js, 'Trang mới tiếp tục từ chỗ trang cũ dừng, không nhảy lùi.');
+        $this->assertStringContainsString('function snap', $js, 'Về 0 không trượt ngược.');
         $this->assertStringNotContainsString('innerHTML', $js, 'Không chèn HTML.');
     }
 }
