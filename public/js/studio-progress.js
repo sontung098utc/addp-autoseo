@@ -5,7 +5,7 @@
  * Không phụ thuộc thư viện ngoài, không chèn HTML người dùng (chỉ tạo một phần tử cố định). Tôn trọng prefers-reduced-motion. */
 (function () {
   'use strict';
-  var KEY = 'ss-nav-progress', KEYV = 'ss-nav-progress-v', MAX_MS = 25000, lastUser = 0, startedAt = 0;
+  var BACKGROUND_CALLS = ['loadTabs'], KEY = 'ss-nav-progress', KEYV = 'ss-nav-progress-v', MAX_MS = 25000, lastUser = 0, startedAt = 0;
   var bar = null, value = 0, timer = null, active = 0, leaving = false, lastTick = 0, hideTimer = null;
   var reduced = false;
   try { reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* bỏ qua */ }
@@ -184,7 +184,12 @@
       });
       window.Livewire.hook('commit', function (ctx) {
         var shown = false;
-        var byUser = Date.now() - lastUser < 1500; // wire:poll và cập nhật nền không có thao tác trước đó
+        // Nạp ngầm các tab của trang bài (loadTabs, gọi tự động sau khi trang đã hiện) KHÔNG phải việc người dùng đang chờ: không hiện thanh,
+        // nếu không thanh cứ chạy trong khi nội dung đã hiện. Tab đang chờ có khung "Đang tải…" riêng.
+        var calls = [];
+        try { calls = (ctx.commit && ctx.commit.calls) || []; } catch (e) { /* bỏ qua */ }
+        var background = calls.length > 0 && calls.every(function (c) { return c && BACKGROUND_CALLS.indexOf(c.method) !== -1; });
+        var byUser = !background && Date.now() - lastUser < 1500; // wire:poll và cập nhật nền không có thao tác trước đó
         var t = byUser ? setTimeout(function () { shown = true; start(); }, 350) : 0;
         var end = function () { clearTimeout(t); if (shown) { shown = false; done(); } };
         ctx.respond(end);

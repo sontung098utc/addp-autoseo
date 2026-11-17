@@ -33,6 +33,7 @@ class StudioProgressTest extends TestCase
         $this->assertStringContainsString("addEventListener('DOMContentLoaded', fin", $js, 'Hoàn tất khi nội dung đã sẵn sàng, không chờ sự kiện load (ảnh, phông chữ ngoài).');
         $this->assertStringContainsString('status === 419', $js, 'Phiên hết hạn: thông báo gọn và tự tải lại thay vì hộp thoại + trang lỗi HTML.');
         $this->assertStringContainsString('sessionExpired', $js);
+        $this->assertStringContainsString("BACKGROUND_CALLS = ['loadTabs']", $js, 'Nạp ngầm tab của trang bài không hiện thanh (nội dung đã hiện).');
         $this->assertStringNotContainsString('innerHTML', $js, 'Không chèn HTML.');
     }
 }
