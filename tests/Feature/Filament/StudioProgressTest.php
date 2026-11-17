@@ -29,6 +29,8 @@ class StudioProgressTest extends TestCase
         $this->assertStringContainsString('MAX_MS', $js, 'Chốt an toàn: không treo thanh mãi (vd. liên kết tải file).');
         $this->assertStringContainsString('ss-nav-progress-v', $js, 'Trang mới tiếp tục từ chỗ trang cũ dừng, không nhảy lùi.');
         $this->assertStringContainsString('function snap', $js, 'Về 0 không trượt ngược.');
+        $this->assertStringContainsString("addEventListener('beforeunload'", $js, 'Tải lại trang (F5), gõ địa chỉ, Back/Forward cũng có thanh.');
+        $this->assertStringContainsString("addEventListener('DOMContentLoaded', fin", $js, 'Hoàn tất khi nội dung đã sẵn sàng, không chờ sự kiện load (ảnh, phông chữ ngoài).');
         $this->assertStringNotContainsString('innerHTML', $js, 'Không chèn HTML.');
     }
 }

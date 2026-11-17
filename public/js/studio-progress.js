@@ -66,6 +66,7 @@
 
   function reset() {
     active = 0;
+    leaving = false;
     if (timer) { clearInterval(timer); timer = null; }
     if (bar) { bar.classList.remove('on'); }
     value = 0;
@@ -74,7 +75,8 @@
   }
 
   function done() {
-    if (active > 0) active--;
+    if (active <= 0) return;
+    active--;
     if (active > 0) return;
     if (timer) { clearInterval(timer); timer = null; }
     value = 1;
@@ -120,6 +122,10 @@
     markNavigating(); start();
   }, false);
 
+  // Mọi kiểu rời trang khác (F5, Ctrl+R, nút tải lại, gõ địa chỉ, Back/Forward, chuyển hướng bằng JavaScript sau khi lưu): trang cũ còn hiện trong lúc
+  // chờ máy chủ nên thanh vẫn chạy được. Nếu người dùng hủy hộp thoại "rời trang?" thì bộ phát hiện treo trong start() sẽ tắt thanh.
+  window.addEventListener('beforeunload', function () { if (!leaving) { markNavigating(); start(); } });
+
   // Trang quay lại từ bộ nhớ đệm trình duyệt (nút Back): bỏ thanh đang treo.
   window.addEventListener('pageshow', function (e) { if (e.persisted) reset(); });
 
@@ -130,7 +136,10 @@
     var go = function () {
       start(Math.min(0.85, prev + 0.1)); // tiếp tục từ chỗ trang cũ dừng, không nhảy lùi
       var fin = function () { try { sessionStorage.removeItem(KEY); sessionStorage.removeItem(KEYV); } catch (e) { /* bỏ qua */ } done(); };
-      if (document.readyState === 'complete') fin(); else window.addEventListener('load', fin, { once: true });
+      // Hoàn tất khi DOM đã sẵn sàng (nội dung đã hiện), KHÔNG chờ sự kiện load: load còn chờ ảnh và phông chữ ngoài (fonts.bunny.net) nên có thể đến rất muộn.
+      if (document.readyState !== 'loading') fin();
+      else document.addEventListener('DOMContentLoaded', fin, { once: true });
+      window.addEventListener('load', fin, { once: true }); // dự phòng; done() an toàn khi gọi lại
     };
     if (document.body) go(); else document.addEventListener('DOMContentLoaded', go, { once: true });
   } else {
