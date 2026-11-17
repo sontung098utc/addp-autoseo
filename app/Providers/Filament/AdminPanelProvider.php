@@ -48,6 +48,9 @@ class AdminPanelProvider extends PanelProvider
             ->navigationGroups(['Chiến dịch', 'Lịch đăng', 'Khám phá', 'Phân tích', 'Cài đặt'])
             ->globalSearchKeyBindings(['ctrl+k', 'command+k'])
             ->unsavedChangesAlerts()
+            // Biểu tượng chuông cạnh ảnh đại diện (bảng notifications); thông báo mới còn nổi thành hộp ở góc trên bên phải nhờ NotificationToaster.
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('20s')
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth(\Filament\Support\Enums\MaxWidth::Full)
             ->renderHook(
@@ -68,6 +71,12 @@ class AdminPanelProvider extends PanelProvider
                         'canOpenSchedule' => $user->isApprover(),
                     ])->render();
                 },
+            )
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): string => \Illuminate\Support\Facades\Auth::user()?->is_active
+                    ? \Illuminate\Support\Facades\Blade::render('@livewire(\'notification-toaster\')')
+                    : '',
             )
             ->renderHook(
                 PanelsRenderHook::USER_MENU_BEFORE,
