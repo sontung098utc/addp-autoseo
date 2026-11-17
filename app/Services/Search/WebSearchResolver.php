@@ -24,10 +24,10 @@ final class WebSearchResolver
             throw new WebSearchUnavailable('Nhà cung cấp tìm kiếm "'.$name.'" chưa được cài.');
         }
         if ($name === 'tavily' && trim((string) config('search.tavily.key')) !== '') {
-            // Có khóa Tavily: dùng Tavily VÀ AI tự tìm (cầu nối Claude nếu có, không thì Gemini) cùng lúc, gộp kết quả.
+            // Có khóa Tavily: dùng Tavily trước; khi Tavily lỗi/hết hạn mức mới chuyển sang AI tự tìm (cầu nối Claude nếu có, không thì Gemini).
             $ai = ClaudeBridgeSearchProvider::configured() ? [app(ClaudeBridgeSearchProvider::class), 'Claude'] : (GeminiSearchProvider::configured() ? [app(GeminiSearchProvider::class), 'Gemini'] : null);
             if ($ai !== null) {
-                return ['provider' => new CombinedSearchProvider([app($class), $ai[0]]), 'label' => 'Tavily + AI tự tìm ('.$ai[1].')', 'demo' => false];
+                return ['provider' => new CombinedSearchProvider([app($class), $ai[0]]), 'label' => 'Tavily, dự phòng AI tự tìm ('.$ai[1].')', 'demo' => false];
             }
         }
         if ($name === 'tavily' && trim((string) config('search.tavily.key')) === '' && ClaudeBridgeSearchProvider::configured()) {

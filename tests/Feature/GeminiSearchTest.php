@@ -86,36 +86,38 @@ class GeminiSearchTest extends TestCase
         $this->assertNotInstanceOf(GeminiSearchProvider::class, (new WebSearchResolver)->resolve()['provider'], 'Không còn Gemini bật thì không tự chọn Gemini (môi trường test rơi về bản mô phỏng có nhãn).');
     }
 
-    public function test_co_khoa_tavily_thi_dung_ca_tavily_va_ai_gop_ket_qua_bo_trung_va_chiu_loi_mot_ben(): void
+    public function test_co_khoa_tavily_thi_dung_tavily_truoc_va_khong_goi_ai(): void
     {
         config(['search.tavily.key' => 'tvly-test']);
-        Http::fake([
-            'api.tavily.com/*' => Http::response(['results' => [
-                ['title' => 'WHO', 'url' => 'https://www.who.int/news-room/hba1c/', 'content' => 'a', 'score' => 0.9],
-                ['title' => 'CDC', 'url' => 'https://www.cdc.gov/d?utm_source=x', 'content' => 'b', 'score' => 0.8],
-            ]]),
-            'generativelanguage.googleapis.com/*' => Http::response(['candidates' => [['groundingMetadata' => ['groundingChunks' => [
-                ['web' => ['uri' => 'https://www.who.int/news-room/hba1c', 'title' => 'who.int']],
-                ['web' => ['uri' => 'https://www.nhs.uk/c', 'title' => 'NHS']],
-            ]]]]]),
-        ]);
+        Http::fake(['api.tavily.com/*' => Http::response(['results' => [['title' => 'WHO', 'url' => 'https://www.who.int/x', 'content' => 'a']]])]);
         $res = (new WebSearchResolver)->resolve();
         $this->assertInstanceOf(\App\Services\Search\CombinedSearchProvider::class, $res['provider']);
-        $r = $res['provider']->search('HbA1c', ['max_results' => 8]);
-        $this->assertSame(['https://www.who.int/news-room/hba1c/', 'https://www.cdc.gov/d?utm_source=x', 'https://www.nhs.uk/c'], array_column($r['results'], 'url'), 'Xen kẽ hai bên, WHO trùng chỉ giữ một.');
-        $this->assertSame('tavily+gemini', $r['provider']);
+        $r = $res['provider']->search('HbA1c');
+        $this->assertSame('tavily', $r['provider']);
+        $this->assertArrayNotHasKey('failed', $r);
+        Http::assertNotSent(fn ($req) => str_contains($req->url(), 'generativelanguage'));
     }
 
-    public function test_mot_ben_het_han_muc_van_con_ket_qua_ben_kia(): void
+    public function test_tavily_ket_qua_rong_hop_le_khong_kich_hoat_du_phong(): void
+    {
+        config(['search.tavily.key' => 'tvly-test']);
+        Http::fake(['api.tavily.com/*' => Http::response(['results' => []])]);
+        $r = (new WebSearchResolver)->resolve()['provider']->search('HbA1c', ['include_domains' => ['who.int']]);
+        $this->assertSame([], $r['results']);
+        Http::assertNotSent(fn ($req) => str_contains($req->url(), 'generativelanguage'));
+    }
+
+    public function test_tavily_het_han_muc_thi_chuyen_sang_ai_tu_tim(): void
     {
         config(['search.tavily.key' => 'tvly-test']);
         Http::fake([
-            'api.tavily.com/*' => Http::response(['results' => [['title' => 'WHO', 'url' => 'https://www.who.int/x', 'content' => 'a']]]),
-            'generativelanguage.googleapis.com/*' => Http::response(['error' => ['message' => 'quota']], 429),
+            'api.tavily.com/*' => Http::response(['detail' => 'plan limit'], 432),
+            'generativelanguage.googleapis.com/*' => Http::response(['candidates' => [['groundingMetadata' => ['groundingChunks' => [['web' => ['uri' => 'https://www.nhs.uk/c', 'title' => 'NHS']]]]]]]),
         ]);
         $r = (new WebSearchResolver)->resolve()['provider']->search('HbA1c');
-        $this->assertCount(1, $r['results']);
-        $this->assertNotEmpty($r['failed']);
+        $this->assertSame('gemini', $r['provider']);
+        $this->assertSame(['https://www.nhs.uk/c'], array_column($r['results'], 'url'));
+        $this->assertNotEmpty($r['failed'], 'Ghi lại lý do Tavily không dùng được.');
     }
 
     public function test_ca_hai_ben_loi_thi_bao_loi(): void
