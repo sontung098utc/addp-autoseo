@@ -34,7 +34,7 @@ class ReschedulePublication
 
     public static function lockExplanation(): string
     {
-        return 'Chỉ đổi được lượt "Đã xếp lịch" còn cách giờ đăng trên '.self::RESCHEDULE_LOCK_MINUTES.' phút. Lượt đang đăng/đã đăng/lỗi/chờ đối soát không đổi được vì đã hoặc đang gửi lên CMS, đổi giờ có thể gây đăng trùng.';
+        return 'Đổi được lượt "Đã xếp lịch" còn cách giờ đăng trên '.self::RESCHEDULE_LOCK_MINUTES.' phút, và lượt "Lỗi" (xếp lịch lại, giữ nguyên khóa chống đăng trùng). Lượt đang đăng/đã đăng/chờ đối soát không đổi được vì đã hoặc đang gửi lên CMS, đổi giờ có thể gây đăng trùng.';
     }
 
     /** Lý do tiếng Việt khiến không đổi lịch được (R1-R3), null nếu được. */
@@ -43,8 +43,13 @@ class ReschedulePublication
         if (! $user || ! $user->is_active || ! $user->isApprover()) {
             return 'Chỉ người duyệt trở lên mới được đổi lịch.';
         }
+        if ($p->status === 'failed') {
+            // Lượt LỖI (chắc chắn chưa lên CMS; lỗi mơ hồ đã chuyển sang needs_reconcile) được xếp lịch lại với đúng publication_key cũ: bước đăng luôn tra theo khóa
+            // trước khi tạo bài nên không thể đăng trùng. Không bị chốt theo giờ cũ vì giờ cũ đã qua.
+            return null;
+        }
         if ($p->status !== 'scheduled') {
-            return 'Lượt đăng không ở trạng thái "Đã xếp lịch" nên không đổi giờ được (đã/đang đăng, lỗi hoặc cần đối soát: đổi giờ có thể gây đăng trùng).';
+            return 'Lượt đăng không ở trạng thái "Đã xếp lịch" hoặc "Lỗi" nên không đổi giờ được (đã/đang đăng hoặc cần đối soát: đổi giờ có thể gây đăng trùng).';
         }
         $current = VnTime::fromRaw($p, 'scheduled_at_utc');
         if (! $current || $current->lt(self::earliest())) {
@@ -93,10 +98,12 @@ class ReschedulePublication
                 ($this->beforeUpdate)($fresh);
             }
 
+            $wasFailed = $fresh->status === 'failed';
             $affected = DB::table('publications')
                 ->where('id', $fresh->id)
-                ->where('status', 'scheduled')
-                ->update(['scheduled_at_utc' => VnTime::dbString($newUtc), 'updated_at' => now()]);
+                ->where('status', $wasFailed ? 'failed' : 'scheduled')
+                ->update(['scheduled_at_utc' => VnTime::dbString($newUtc), 'updated_at' => now()]
+                    + ($wasFailed ? ['status' => 'scheduled', 'last_error' => null] : []));
             if ($affected !== 1) {
                 throw new InvalidArgumentException('Lượt đăng vừa thay đổi trạng thái, tải lại trang.');
             }
@@ -107,7 +114,7 @@ class ReschedulePublication
                 'publication_key' => $fresh->publication_key,
                 'from_utc' => $from?->toIso8601String(),
                 'to_utc' => $newUtc->toIso8601String(),
-            ]);
+            ] + ($wasFailed ? ['from_status' => 'failed', 'previous_error' => mb_substr((string) $fresh->last_error, 0, 300)] : []));
 
             return $fresh->refresh();
         });

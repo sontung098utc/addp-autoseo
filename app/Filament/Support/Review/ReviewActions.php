@@ -108,11 +108,10 @@ class ReviewActions
         return [Forms\Components\Textarea::make('reason')->label('Lý do từ chối')->required()];
     }
 
-    /** @return array<int, Forms\Components\Component> */
-    public static function scheduleForm(): array
+    /** Ô chọn website đích dùng chung cho Xếp lịch và Đăng ngay. */
+    public static function websiteSelect(): Forms\Components\Select
     {
-        return [
-            Forms\Components\Select::make('website_id')->label('Website đích')
+        return Forms\Components\Select::make('website_id')->label('Website đích')
                 ->options(fn () => Website::where('status', 'active')->orderBy('name')->pluck('name', 'id'))
                 ->live()
                 ->helperText(function (Forms\Get $get): ?string {
@@ -122,7 +121,14 @@ class ReviewActions
                         ? "Cảnh báo: connector {$site->cms_type} chưa được cài đặt (WordPress: task 1.2). Vẫn xếp lịch được, nhưng đến giờ lượt đăng sẽ báo Lỗi vì chưa có cách gửi bài."
                         : null;
                 })
-                ->required(),
+                ->required();
+    }
+
+    /** @return array<int, Forms\Components\Component> */
+    public static function scheduleForm(): array
+    {
+        return [
+            static::websiteSelect(),
             Forms\Components\DateTimePicker::make('scheduled_at_vn')
                 ->label('Thời điểm xuất bản (giờ Việt Nam)')
                 ->seconds(false)->native(false)

@@ -453,6 +453,7 @@ class ArticleResource extends Resource
                 static::scheduleAction(),
                 static::viewVersionAction(),
                 Tables\Actions\ActionGroup::make([
+                    static::publishNowAction(),
                     static::rejectAction(),
                     Tables\Actions\Action::make('redo_agent')
                         ->label('Giao làm lại')
@@ -550,6 +551,30 @@ class ArticleResource extends Resource
             ->action(function (Article $r, array $data) {
                 abort_unless(ReviewActions::canApprove(), 403);
                 ReviewActions::run(fn () => (new ReviewWorkflow)->reject(ReviewActions::user(), static::latest($r), $data['reason'] ?? null), 'Đã từ chối bản thảo');
+            });
+    }
+
+    /** "Đăng ngay" cho bài đã duyệt (cùng điều kiện với Xếp lịch): đăng bản đã duyệt lên website ngay, không hẹn giờ. */
+    private static function publishNowAction(): Tables\Actions\Action
+    {
+        return Tables\Actions\Action::make('publish_now')->label('Đăng ngay')->icon('heroicon-o-paper-airplane')->color('success')
+            ->visible(fn (Article $r) => static::primaryActionFor($r) === 'schedule')
+            ->authorize(fn () => ReviewActions::canApprove())
+            ->modalHeading('Đăng ngay lên website')
+            ->modalDescription('Đăng bản đã duyệt này lên website ngay bây giờ, không hẹn giờ. Bài lên công khai ngay khi thành công.')
+            ->form([ReviewActions::websiteSelect()])
+            ->fillForm(fn (Article $r) => ['website_id' => $r->website_id])
+            ->modalSubmitActionLabel('Đăng ngay')
+            ->action(function (Article $r, array $data) {
+                abort_unless(ReviewActions::canApprove(), 403);
+                try {
+                    $p = (new ReviewWorkflow)->publishNow(ReviewActions::user(), static::latest($r), Website::findOrFail($data['website_id']));
+                } catch (\InvalidArgumentException $e) {
+                    Notification::make()->title('Không đăng được')->body($e->getMessage())->danger()->send();
+
+                    return;
+                }
+                \App\Filament\Support\Review\PublishNow::run($p);
             });
     }
 

@@ -92,9 +92,41 @@ class ReschedulePublicationTest extends TestCase
         return CarbonImmutable::parse($s, 'Asia/Ho_Chi_Minh');
     }
 
+    public function test_luot_loi_xep_lich_lai_duoc_giu_nguyen_khoa_va_xoa_loi_cu(): void
+    {
+        $p = $this->pub('failed', '2026-11-09 02:00:00'); // giờ cũ đã qua
+        $p->update(['last_error' => '[ERR06] HTTP 400', 'attempt_count' => 1]);
+        $key = $p->publication_key;
+        $this->assertNull(ReschedulePublication::reasonUnavailable($this->admin, $p));
+
+        $r = $this->svc->reschedule($this->admin, $p, $this->vn('2026-11-12 09:00'));
+
+        $this->assertSame('scheduled', $r->status);
+        $this->assertSame($key, $r->publication_key, 'Giữ nguyên khóa chống đăng trùng.');
+        $this->assertNull($r->last_error);
+        $this->assertSame(1, (int) $r->attempt_count, 'Giữ lịch sử số lần thử.');
+        $this->assertSame('2026-11-12 02:00:00', $this->raw($p));
+        $e = end($this->sink->entries);
+        $this->assertSame('failed', $e['extra']['from_status']);
+        $this->assertStringContainsString('ERR06', $e['extra']['previous_error']);
+    }
+
+    public function test_luot_loi_van_phai_chon_gio_tuong_lai(): void
+    {
+        $p = $this->pub('failed', '2026-11-09 02:00:00');
+        $this->expectException(InvalidArgumentException::class);
+        $this->svc->reschedule($this->admin, $p, $this->vn('2026-11-10 10:05')); // 10:00 VN hiện tại + 5 phút < 10 phút chốt
+    }
+
+    public function test_chi_nguoi_duyet_xep_lich_lai_luot_loi(): void
+    {
+        $p = $this->pub('failed', '2026-11-09 02:00:00');
+        $this->assertNotNull(ReschedulePublication::reasonUnavailable($this->user('writer'), $p));
+    }
+
     public function test_r1_chi_scheduled_moi_doi_duoc(): void
     {
-        foreach (['publishing', 'published', 'failed', 'needs_reconcile'] as $st) {
+        foreach (['publishing', 'published', 'needs_reconcile'] as $st) {
             $p = $this->pub($st);
             $this->assertNotNull(ReschedulePublication::reasonUnavailable($this->admin, $p), $st);
             try {

@@ -232,6 +232,25 @@ class ViewArticle extends EditArticle
             });
     }
 
+    /** Đăng ngay một lượt đăng ĐÃ CÓ của bài này (đã xếp lịch hoặc lỗi). Lượt đang đăng/đã đăng/chờ đối soát không đăng lại được. */
+    public function publishNowPublicationAction(): Actions\Action
+    {
+        return Actions\Action::make('publishNowPublication')->label('Đăng ngay')->icon('heroicon-o-paper-airplane')->color('success')
+            ->requiresConfirmation()->modalHeading('Đăng ngay lên website')
+            ->modalDescription('Hệ thống gửi bài này lên website đích ngay bây giờ. Bước đăng tra theo khóa xuất bản trước nên không đăng trùng nếu bài đã có.')
+            ->action(function (array $arguments) {
+                abort_unless(ReviewActions::canApprove(), 403);
+                $p = $this->publicationFor($arguments);
+                if (! in_array($p->status, ['scheduled', 'failed'], true)) {
+                    Notification::make()->title('Không đăng ngay được')->body('Chỉ đăng ngay được lượt đang ở trạng thái "Đã xếp lịch" hoặc "Lỗi".')->danger()->send();
+
+                    return;
+                }
+                \App\Filament\Support\Review\PublishNow::run($p);
+                $this->refreshRecord();
+            });
+    }
+
     /** Giải thích vì sao lượt đăng chưa lên (hoặc trạng thái đăng nếu đã đăng). */
     public function whyPublicationAction(): Actions\Action
     {
@@ -340,6 +359,26 @@ class ViewArticle extends EditArticle
                     ReviewActions::run(function () use ($data) {
                         (new ReviewWorkflow)->schedule(ReviewActions::user(), $this->latest(), ReviewActions::parseVn($data['scheduled_at_vn']), Website::findOrFail($data['website_id']));
                     }, 'Đã xếp lịch xuất bản');
+                    $this->refreshRecord();
+                }),
+            Actions\Action::make('publish_now')->label('Đăng ngay')->icon('heroicon-o-paper-airplane')->color('success')
+                ->visible(fn () => $this->record->workflow_status === 'approved' && $this->latest() !== null)
+                ->authorize(fn () => ReviewActions::canApprove())
+                ->modalHeading('Đăng ngay lên website')
+                ->modalDescription('Đăng bản đã duyệt này lên website ngay bây giờ, không hẹn giờ. Bài lên công khai ngay khi thành công.')
+                ->form([ReviewActions::websiteSelect()])
+                ->fillForm(fn () => ['website_id' => $this->record->website_id])
+                ->modalSubmitActionLabel('Đăng ngay')
+                ->action(function (array $data) {
+                    abort_unless(ReviewActions::canApprove(), 403);
+                    try {
+                        $p = (new ReviewWorkflow)->publishNow(ReviewActions::user(), $this->latest(), Website::findOrFail($data['website_id']));
+                    } catch (\InvalidArgumentException $e) {
+                        Notification::make()->title('Không đăng được')->body($e->getMessage())->danger()->send();
+
+                        return;
+                    }
+                    \App\Filament\Support\Review\PublishNow::run($p);
                     $this->refreshRecord();
                 }),
             Actions\DeleteAction::make()->visible(fn () => ArticleResource::canDeleteAny()),
