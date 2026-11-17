@@ -47,7 +47,7 @@
     active++;
     if (timer) return;
     b.classList.add('on');
-    value = from || 0.08;
+    value = from || 0.12;
     paint();
     lastTick = startedAt = Date.now();
     timer = setInterval(function () {
@@ -58,7 +58,7 @@
       if (leaving && now - lastTick > 1500) { leaving = false; reset(); return; }
       lastTick = now;
       // Tiến chậm dần về ~90%, không bao giờ tự đầy: chỉ done() mới hoàn tất.
-      value += (0.92 - value) * (reduced ? 0.06 : 0.14) * (0.5 + Math.random() * 0.5) + 0.004;
+      value += (0.9 - value) * (reduced ? 0.07 : 0.22) * (0.55 + Math.random() * 0.45) + 0.006; // nhanh ở nửa đầu (≈50% sau 1 s, ≈75% sau 2 s), chậm dần về ~90%
       paint();
       try { sessionStorage.setItem(KEYV, String(value)); } catch (e) { /* bỏ qua */ }
     }, 250);
@@ -146,6 +146,28 @@
     try { sessionStorage.removeItem(KEY); } catch (e) { /* bỏ qua */ }
   }
 
+  /* --- Phiên hết hạn --- */
+  function sessionExpired() {
+    if (document.getElementById('ss-expired')) return;
+    var box = document.createElement('div');
+    box.id = 'ss-expired';
+    box.setAttribute('role', 'alert');
+    box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483001;padding:.7rem 1rem;text-align:center;font-size:.9rem;background:#fff7ed;color:#9a3412;border-bottom:1px solid #fdba74';
+    var msg = document.createElement('span');
+    msg.textContent = 'Phiên đăng nhập đã hết hạn. Đang tải lại trang để đăng nhập lại… ';
+    var link = document.createElement('a');
+    link.href = location.href;
+    link.textContent = 'Tải lại ngay';
+    link.style.textDecoration = 'underline';
+    link.setAttribute('data-no-progress', '');
+    box.appendChild(msg);
+    box.appendChild(link);
+    document.body.appendChild(box);
+    var last = 0;
+    try { last = parseInt(sessionStorage.getItem('ss-419') || '0', 10); sessionStorage.setItem('ss-419', String(Date.now())); } catch (e) { /* bỏ qua */ }
+    if (Date.now() - last > 15000) setTimeout(function () { location.reload(); }, 1500); // vừa tải lại mà vẫn 419: không lặp, để người dùng bấm
+  }
+
   /* --- Ghi nhận thao tác thật của người dùng (để phân biệt với tự làm mới nền) --- */
   ['pointerdown', 'click', 'keydown', 'input', 'change', 'submit'].forEach(function (ev) {
     document.addEventListener(ev, function () { lastUser = Date.now(); }, true);
@@ -154,6 +176,12 @@
   /* --- Thao tác Livewire: hiện thanh nếu chờ quá 350 ms, chỉ khi người dùng vừa thao tác --- */
   document.addEventListener('livewire:init', function () {
     try {
+      // Phiên đăng nhập hết hạn (419): Livewire mặc định hỏi bằng hộp thoại rồi hiện cả trang lỗi HTML. Thay bằng thông báo gọn và tự tải lại (về trang đăng nhập).
+      window.Livewire.hook('request', function (ctx) {
+        ctx.fail(function (r) {
+          if (r && r.status === 419) { r.preventDefault(); sessionExpired(); }
+        });
+      });
       window.Livewire.hook('commit', function (ctx) {
         var shown = false;
         var byUser = Date.now() - lastUser < 1500; // wire:poll và cập nhật nền không có thao tác trước đó

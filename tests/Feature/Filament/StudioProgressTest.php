@@ -31,6 +31,8 @@ class StudioProgressTest extends TestCase
         $this->assertStringContainsString('function snap', $js, 'Về 0 không trượt ngược.');
         $this->assertStringContainsString("addEventListener('beforeunload'", $js, 'Tải lại trang (F5), gõ địa chỉ, Back/Forward cũng có thanh.');
         $this->assertStringContainsString("addEventListener('DOMContentLoaded', fin", $js, 'Hoàn tất khi nội dung đã sẵn sàng, không chờ sự kiện load (ảnh, phông chữ ngoài).');
+        $this->assertStringContainsString('status === 419', $js, 'Phiên hết hạn: thông báo gọn và tự tải lại thay vì hộp thoại + trang lỗi HTML.');
+        $this->assertStringContainsString('sessionExpired', $js);
         $this->assertStringNotContainsString('innerHTML', $js, 'Không chèn HTML.');
     }
 }
