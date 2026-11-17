@@ -16,9 +16,15 @@ use Illuminate\Support\Facades\Http;
  * (1) ghi nhớ kết quả trong phạm vi MỘT phiên chạy bài: cùng truy vấn + cùng bộ lọc tên miền thì không tìm lại (kể cả kết quả rỗng, trừ khi yêu cầu `fresh`);
  * (2) prefetch(): gửi nhiều truy vấn độc lập CÙNG LÚC (Http::pool) rồi để luồng tuần tự cũ đọc từ bộ nhớ. Lỗi ở prefetch bị bỏ qua: lần tìm tuần tự sau đó tự gọi lại và báo lỗi đúng chỗ.
  */
-final class ClaudeBridgeSearchProvider implements WebSearchProvider
+class ClaudeBridgeSearchProvider implements WebSearchProvider
 {
     public const PROVIDER_NAME = 'Claude CLI (cầu nối)';
+
+    /** Tên nhà cung cấp AI chứa địa chỉ và khóa của cầu nối tìm kiếm (lớp con đổi sang cầu nối khác, vd. Codex). */
+    protected function providerName(): string
+    {
+        return self::PROVIDER_NAME;
+    }
 
     /** Kết quả đã nhớ giữ tối đa bao nhiêu giây (phạm vi một phiên chạy bài; quá hạn thì tìm lại). */
     private const MEMO_TTL = 900;
@@ -116,9 +122,9 @@ final class ClaudeBridgeSearchProvider implements WebSearchProvider
     /** @return array{0: string, 1: string} [địa chỉ gốc cầu nối, khóa] @throws WebSearchUnavailable */
     private function endpoint(string $query): array
     {
-        $p = AiProvider::query()->where('name', self::PROVIDER_NAME)->where('enabled', true)->first();
+        $p = AiProvider::query()->where('name', $this->providerName())->where('enabled', true)->first();
         if ($query === '' || $p === null || (string) $p->api_key === '') {
-            throw new WebSearchUnavailable('Chưa cài cầu nối Claude (chạy php artisan agent:claude-setup).');
+            throw new WebSearchUnavailable('Chưa cài cầu nối tìm kiếm "'.$this->providerName().'" (Claude: chạy php artisan agent:claude-setup).');
         }
         $base = preg_replace('#/v1/?$#', '', rtrim((string) $p->base_url, '/'));
         try {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\Search\CodexBridgeSearchProvider;
 use App\Services\Search\TavilySearchProvider;
 
 /**
@@ -12,6 +13,7 @@ return [
 
     'providers' => [
         'tavily' => TavilySearchProvider::class,
+        'codex_bridge' => CodexBridgeSearchProvider::class, // SEARCH_PROVIDER=codex_bridge: ChatGPT tự tìm bằng công cụ web_search (cầu nối scripts/codex_bridge.py)
     ],
 
     'tavily' => [

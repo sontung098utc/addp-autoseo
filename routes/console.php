@@ -50,3 +50,11 @@ Schedule::command('trends:snapshot')
     ->timezone('Asia/Ho_Chi_Minh')
     ->withoutOverlapping()
     ->runInBackground();
+
+// Xử lý hàng đợi (PublishArticleJob, ReconcilePublicationJob...) ngay dưới cron `schedule:run` sẵn có, không cần supervisor: mỗi phút chạy tối đa 50 giây rồi thoát.
+// Chỉ bật khi hàng đợi KHÔNG phải `sync` (sync chạy job ngay trong tiến trình gửi nên không cần tiến trình xử lý).
+Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3 --sleep=1')
+    ->everyMinute()
+    ->when(fn () => config('queue.default') !== 'sync')
+    ->withoutOverlapping(5)
+    ->runInBackground();

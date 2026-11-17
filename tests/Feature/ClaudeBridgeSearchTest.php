@@ -67,6 +67,18 @@ class ClaudeBridgeSearchTest extends TestCase
         Http::assertSentCount(3); // tìm tuần tự sau đó không gọi thêm
     }
 
+    public function test_tim_web_qua_cau_noi_codex_dung_nha_cung_cap_codex_va_chon_duoc_bang_cau_hinh(): void
+    {
+        config(['ai_models.private_base_url_allowlist' => ['172.17.0.1:8772'], 'search.provider' => 'codex_bridge']);
+        AiProvider::create(['name' => \App\Services\Search\CodexBridgeSearchProvider::NAME, 'kind' => 'openai_compat', 'base_url' => 'http://172.17.0.1:8772/v1', 'api_key' => str_repeat('c', 40), 'enabled' => true]);
+        Http::fake(['172.17.0.1:8772/v1/search' => Http::response(['results' => [['title' => 'CDC', 'url' => 'https://www.cdc.gov/a', 'content' => 'x']]])]);
+        $res = (new WebSearchResolver)->resolve();
+        $this->assertInstanceOf(\App\Services\Search\CodexBridgeSearchProvider::class, $res['provider']);
+        $this->assertCount(1, $res['provider']->search('HbA1c')['results']);
+        Http::assertSent(fn ($req) => str_contains($req->url(), ':8772/v1/search') && $req->hasHeader('Authorization', 'Bearer '.str_repeat('c', 40)));
+        $this->assertFalse(ClaudeBridgeSearchProvider::configured(), 'Cầu nối Claude chưa cài nên không bị nhầm với Codex.');
+    }
+
     public function test_prefetch_loi_khong_ne_ngoai_va_lan_tim_tuan_tu_bao_loi_dung_cho(): void
     {
         $this->provider();
