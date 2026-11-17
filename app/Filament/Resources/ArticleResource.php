@@ -401,9 +401,9 @@ class ArticleResource extends Resource
                     ->visibleFrom('xl')),
                 static::narrow(Tables\Columns\TextColumn::make('brains')
                     ->label('Trí tuệ')
-                    ->state(fn (Article $r) => ($n = BrainContext::forArticle($r, ArticleRows::lastRun($r)?->campaign_id)->names()) !== '' ? $n : '—')
+                    ->state(fn (Article $r) => ($n = static::brainNamesOf($r)) !== '' ? $n : '—')
                     ->limit(18)
-                    ->tooltip(fn (Article $r) => 'Trí tuệ đang dùng: '.BrainContext::forArticle($r, ArticleRows::lastRun($r)?->campaign_id)->names())
+                    ->tooltip(fn (Article $r) => 'Trí tuệ đang dùng: '.static::brainNamesOf($r))
                     ->visibleFrom('2xl')),
                 static::narrow(Tables\Columns\TextColumn::make('last_run')
                     ->label('Phiên gần nhất')
@@ -495,6 +495,57 @@ class ArticleResource extends Resource
             ->url(fn (Article $r) => static::getUrl('view', ['record' => $r]));
     }
 
+    /** @var array<string, string> tên Trí tuệ theo (website, chiến dịch) trong một lượt dựng bảng */
+    private static array $brainNames = [];
+
+    /** Xóa bộ nhớ dòng bảng (dùng trong kiểm thử; mỗi yêu cầu web mới tự bắt đầu rỗng). */
+    public static function forgetRowCaches(): void
+    {
+        self::$brainNames = [];
+    }
+
+    /**
+     * Tên các Trí tuệ bài đang dùng. BrainContext::forArticle chỉ phụ thuộc website và chiến dịch của phiên gần nhất, mà cột này gọi hai lần mỗi dòng
+     * (chữ + chú thích) và các bài cùng website/chiến dịch cho cùng kết quả: nhớ theo (website, chiến dịch) thay vì truy vấn lại cho từng dòng.
+     */
+    private static function brainNamesOf(Article $r): string
+    {
+        $campaignId = ArticleRows::lastRun($r)?->campaign_id;
+
+        return self::$brainNames[(int) $r->website_id.'|'.(int) $campaignId] ??= BrainContext::forArticle($r, $campaignId)->names();
+    }
+
+    /**
+     * Chú thích nút Duyệt ("còn lỗi chặn duyệt..."), nhớ theo bản bài. Kiểm chất lượng đầy đủ mất ~110 ms/bản mà bảng gọi cho mọi dòng và tự làm mới
+     * mỗi vài giây, nên nhớ CÂU CẢNH BÁO (không nhớ cả báo cáo). Khóa gồm bản bài (id + ngày sửa) và dấu vân tay của kho tri thức/sổ nguồn, nên sửa bài hay đổi kho
+     * thì tự tính lại; hộp Duyệt vẫn kiểm chất lượng đầy đủ tại thời điểm bấm. Lỗi bộ nhớ đệm (quyền ghi...) thì tính trực tiếp.
+     */
+    private static function blockedHintOf(Article $r): ?string
+    {
+        $v = $r->versions()->orderByDesc('version')->first();
+        if (! $v) {
+            return null;
+        }
+        $compute = fn (): ?string => ReviewActions::blockedHint(ReviewActions::qualityFor($v));
+        try {
+            return \Illuminate\Support\Facades\Cache::remember(self::hintCacheKey($v), 900, fn () => $compute() ?? '') ?: null;
+        } catch (\Throwable) {
+            return $compute();
+        }
+    }
+
+    /** Khóa nhớ chú thích: bản bài (id + ngày sửa) + dấu vân tay kho tri thức/sổ nguồn/Trí tuệ. */
+    private static function hintCacheKey(ArticleVersion $v): string
+    {
+        $kb = \App\Support\RequestMemo::remember('kb-stamp', fn () => md5(json_encode([
+            \App\Models\KnowledgeItem::query()->toBase()->selectRaw('count(*) c, max(updated_at) m')->first(),
+            \App\Models\BrainSource::query()->toBase()->selectRaw('count(*) c, max(updated_at) m')->first(),
+            \App\Models\Brain::query()->toBase()->selectRaw('count(*) c, max(updated_at) m')->first(),
+        ])));
+
+        return 'art-hint:v1:'.$v->id.':'.($v->updated_at?->timestamp ?? 0).':'.$kb;
+    }
+
     /** Kiểm chất lượng bản mới nhất; null nếu bài chưa có bản nào. */
     private static function qualityOf(Article $record): ?QualityReport
     {
@@ -531,7 +582,7 @@ class ArticleResource extends Resource
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'approve')
             ->authorize(fn () => ReviewActions::canApprove())
             ->disabled(fn (Article $r) => ArticleRows::liveRun($r) !== null)
-            ->tooltip(fn (Article $r) => ArticleRows::liveRun($r) ? 'Đội AI đang viết lại bài, chờ xong rồi duyệt bản mới.' : ReviewActions::blockedHint(static::qualityOf($r)))
+            ->tooltip(fn (Article $r) => ArticleRows::liveRun($r) ? 'Đội AI đang viết lại bài, chờ xong rồi duyệt bản mới.' : static::blockedHintOf($r))
             ->modalHeading(fn (Article $r) => static::qualityOf($r)?->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi P0' : 'Duyệt nội dung')
             ->form(fn (Article $r) => ReviewActions::approveForm((int) $r->created_by === (int) ReviewActions::user()?->id, static::qualityOf($r)))
             ->action(function (Article $r, array $data) {

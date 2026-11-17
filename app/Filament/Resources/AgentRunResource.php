@@ -56,7 +56,7 @@ class AgentRunResource extends Resource
     public static function viewUrl(AgentRun|int $run): string
     {
         $model = $run instanceof AgentRun ? $run : AgentRun::query()->find($run);
-        if ($model && $model->article_id && \App\Models\Article::query()->whereKey($model->article_id)->exists()) {
+        if ($model && $model->article_id && \App\Support\RequestMemo::remember('article-exists:'.$model->article_id, fn () => \App\Models\Article::query()->whereKey($model->article_id)->exists())) {
             return ArticleResource::getUrl('view', ['record' => $model->article_id]).'?phien='.$model->id.'#tab-activity';
         }
 
