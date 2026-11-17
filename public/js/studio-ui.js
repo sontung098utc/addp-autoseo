@@ -14,7 +14,7 @@ document.addEventListener('alpine:init', () => {
       const fromHash = location.hash.startsWith('#tab-') ? location.hash.slice(5) : null;
       const saved = persist ? store('session', 'studio.tab.' + persist, null) : null;
       const pick = [fromHash, saved].find((k) => k && keys.includes(k));
-      if (pick) this.active = pick;
+      if (pick) { this.active = pick; if (pick !== def) this.want(pick); }
       this.$nextTick(() => { this.measure(); this.reveal(false); });
       if (window.ResizeObserver) new ResizeObserver(() => this.measure()).observe(this.$refs.strip);
     },
@@ -39,8 +39,13 @@ document.addEventListener('alpine:init', () => {
     },
     // Chỉ các tab của CHÍNH thanh này (tab lồng bên trong một panel, ví dụ các phần của phiên chạy trong tab Phiên chạy của bài, có thanh riêng).
     keys() { return [...(this.$refs.strip || this.$el).querySelectorAll('[role=tab]')].map((e) => e.dataset.key); },
+    // Trang dùng nạp-tab-theo-nhu-cầu (Livewire có loadTabs): xin nạp ngay tab vừa chọn, không chờ lượt nạp nền.
+    want(k) {
+      if (this.$wire && typeof this.$wire.loadTabs === 'function' && !(this._asked ||= {})[k]) { this._asked[k] = true; try { this.$wire.loadTabs([k]); } catch (e) { /* bỏ qua */ } }
+    },
     set(k) {
       this.active = k;
+      this.want(k);
       if (persist) save('session', 'studio.tab.' + persist, k);
       this.$nextTick(() => this.reveal());
     },

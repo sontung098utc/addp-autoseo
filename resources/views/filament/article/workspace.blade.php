@@ -20,6 +20,7 @@
     use App\Models\KnowledgeItem;
     use Illuminate\Support\Str;
 
+    $tabLoaded = fn (string $k): bool => in_array($k, $tabsLoaded, true); // tab chưa nạp chỉ hiện khung chờ (nạp ngay sau lần dựng đầu)
     $dash = fn ($v) => filled($v) ? $v : '—';
     $num = fn ($v) => $v === null ? '—' : number_format((int) $v, 0, ',', '.');
     [$statusLabel, $statusColor] = \App\Filament\Support\Review\ArticleRows::statusBadge($article, false);
@@ -88,6 +89,7 @@
 @endphp
 <x-filament-panels::page>
     <style>
+        .aw-skel{display:flex;align-items:center;gap:.6rem;padding:1.2rem .6rem;opacity:.7;font-size:.9rem}
         .aw-meta{display:flex;flex-wrap:wrap;gap:.4rem .5rem;align-items:center;margin-top:-.4rem}
         .aw-chip{font-size:.75rem;padding:.1rem .55rem;border-radius:999px;border:1px solid var(--ss-border,rgba(128,128,128,.35))}
         a.aw-chip{text-decoration:underline}
@@ -154,7 +156,7 @@
         .aw-thumbs img{width:120px;height:80px;object-fit:cover;border-radius:.4rem}
         .aw-thumbs figcaption{font-size:.72rem;max-width:120px;opacity:.8}
     </style>
-    <div class="aw-stack" data-testid="article-workspace" @if ($live) wire:poll.{{ $pollSeconds }}s @endif>
+    <div class="aw-stack" data-testid="article-workspace" @if ($live) wire:poll.{{ $pollSeconds }}s @endif @if ($lazyTabs && count($tabsLoaded) < count(W::TABS)) wire:init="loadTabs" @endif>
         <div class="aw-meta" data-testid="aw-meta">
             <x-filament::badge :color="$statusColor">{{ $statusLabel }}</x-filament::badge>
             @if ($needsExpert)
@@ -177,6 +179,7 @@
         <x-studio.tabs :persist="$showPreflight ? null : 'bai-viet-v4-'.$article->id" :default="$tabDefault" :tabs="$tabs">
             {{-- Tổng quan: việc tiếp theo + một nút chính, tiến trình, thông tin bài. Giải thích cất vào (i). --}}
             <x-studio.panel key="overview">
+                @if ($tabLoaded('overview'))
                 <div class="aw-stack">
                     @if (! empty($stopInfo))
                         <p class="aw-note" data-testid="aw-stopped" style="color:#b91c1c;border:1px solid #b91c1c;border-radius:.5rem;padding:.5rem .75rem"><x-filament::icon icon="heroicon-o-exclamation-triangle" style="width:1.1rem;height:1.1rem;display:inline;vertical-align:-.2em" /> Hệ thống đang DỪNG KHẨN CẤP ({{ $stopInfo['reason'] ?? 'không ghi lý do' }}): đội AI sẽ không chạy cho đến khi được khôi phục ở Lịch xuất bản.</p>
@@ -368,10 +371,14 @@
                         </x-filament-panels::form>
                     </div>
                 </div>
+                            @else
+                    <div class="aw-skel" role="status" aria-busy="true" data-testid="aw-skel-overview"><span class="ss-spin" aria-hidden="true"></span> Đang tải…</div>
+                @endif
             </x-studio.panel>
 
             {{-- Từ khóa và kế hoạch: bài sinh ra từ đâu, vì sao đáng viết, nằm cạnh những bài nào. --}}
             <x-studio.panel key="keyword">
+                @if ($tabLoaded('keyword'))
                 <div class="aw-stack">
                     <div class="aw-grid">
                         <section class="ss-review-card" data-testid="aw-keyword">
@@ -454,10 +461,14 @@
                         </section>
                     @endif
                 </div>
+                            @else
+                    <div class="aw-skel" role="status" aria-busy="true" data-testid="aw-skel-keyword"><span class="ss-spin" aria-hidden="true"></span> Đang tải…</div>
+                @endif
             </x-studio.panel>
 
             {{-- Nghiên cứu và nguồn: AI đã dựa vào những gì để viết bản mới nhất. --}}
             <x-studio.panel key="research">
+                @if ($tabLoaded('research'))
                 <div class="aw-stack">
                     @if ($knowledgeGap)
                         <div class="aw-note" data-testid="aw-gap" style="color:#b45309;margin:0">Bài này chưa có căn cứ từ kho kiến thức. <x-help tone="warning" title="Vì sao cần xem lại"><p>{{ ArticleResource::GAP_NOTE }}</p></x-help></div>
@@ -636,10 +647,14 @@
                         @endif
                     </div>
                 </div>
+                            @else
+                    <div class="aw-skel" role="status" aria-busy="true" data-testid="aw-skel-research"><span class="ss-spin" aria-hidden="true"></span> Đang tải…</div>
+                @endif
             </x-studio.panel>
 
             {{-- Nội dung: danh sách phiên bản; bấm Xem để sang trang chi tiết phiên bản (đọc, so sánh, kiểm chất lượng, duyệt). --}}
             <x-studio.panel key="content">
+                @if ($tabLoaded('content'))
                 <div class="aw-stack">
                     <section class="ss-review-card">
                         <div class="aw-head" style="justify-content:flex-start;gap:.4rem">
@@ -697,10 +712,14 @@
                         </section>
                     @endif
                 </div>
+                            @else
+                    <div class="aw-skel" role="status" aria-busy="true" data-testid="aw-skel-content"><span class="ss-spin" aria-hidden="true"></span> Đang tải…</div>
+                @endif
             </x-studio.panel>
 
             {{-- Hoạt động: các phiên chạy của đội AI; phiên đang chạy hiện từng chặng theo thời gian thực. --}}
             <x-studio.panel key="activity">
+                @if ($tabLoaded('activity'))
                 <div class="aw-stack">
                     @if ($live)
                         @php $stageKeys = array_keys(W::runStages()); $at = array_search($liveStage, $stageKeys, true); @endphp
@@ -774,10 +793,14 @@
                         </section>
                     @endif
                 </div>
+                            @else
+                    <div class="aw-skel" role="status" aria-busy="true" data-testid="aw-skel-activity"><span class="ss-spin" aria-hidden="true"></span> Đang tải…</div>
+                @endif
             </x-studio.panel>
 
             {{-- Xuất bản: bản nào lên website nào, lúc nào, kết quả ra sao. --}}
             <x-studio.panel key="publish">
+                @if ($tabLoaded('publish'))
                 <section class="ss-review-card">
                     <div class="aw-head">
                         <h2 class="ss-review-card__title">Lịch xuất bản của bài <x-help title="Dừng riêng bài này"><p>"Tạm dừng bài này" chỉ giữ lượt đăng của bài này, các bài khác vẫn đăng. Dừng khẩn cấp cho cả hệ thống ở trang Lịch xuất bản.</p></x-help></h2>
@@ -814,6 +837,9 @@
                         </div>
                     @endif
                 </section>
+                            @else
+                    <div class="aw-skel" role="status" aria-busy="true" data-testid="aw-skel-publish"><span class="ss-spin" aria-hidden="true"></span> Đang tải…</div>
+                @endif
             </x-studio.panel>
         </x-studio.tabs>
     </div>
