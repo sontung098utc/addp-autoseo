@@ -85,4 +85,44 @@ class GeminiSearchTest extends TestCase
         $this->assertFalse(GeminiSearchProvider::configured());
         $this->assertNotInstanceOf(GeminiSearchProvider::class, (new WebSearchResolver)->resolve()['provider'], 'Không còn Gemini bật thì không tự chọn Gemini (môi trường test rơi về bản mô phỏng có nhãn).');
     }
+
+    public function test_co_khoa_tavily_thi_dung_ca_tavily_va_ai_gop_ket_qua_bo_trung_va_chiu_loi_mot_ben(): void
+    {
+        config(['search.tavily.key' => 'tvly-test']);
+        Http::fake([
+            'api.tavily.com/*' => Http::response(['results' => [
+                ['title' => 'WHO', 'url' => 'https://www.who.int/news-room/hba1c/', 'content' => 'a', 'score' => 0.9],
+                ['title' => 'CDC', 'url' => 'https://www.cdc.gov/d?utm_source=x', 'content' => 'b', 'score' => 0.8],
+            ]]),
+            'generativelanguage.googleapis.com/*' => Http::response(['candidates' => [['groundingMetadata' => ['groundingChunks' => [
+                ['web' => ['uri' => 'https://www.who.int/news-room/hba1c', 'title' => 'who.int']],
+                ['web' => ['uri' => 'https://www.nhs.uk/c', 'title' => 'NHS']],
+            ]]]]]),
+        ]);
+        $res = (new WebSearchResolver)->resolve();
+        $this->assertInstanceOf(\App\Services\Search\CombinedSearchProvider::class, $res['provider']);
+        $r = $res['provider']->search('HbA1c', ['max_results' => 8]);
+        $this->assertSame(['https://www.who.int/news-room/hba1c/', 'https://www.cdc.gov/d?utm_source=x', 'https://www.nhs.uk/c'], array_column($r['results'], 'url'), 'Xen kẽ hai bên, WHO trùng chỉ giữ một.');
+        $this->assertSame('tavily+gemini', $r['provider']);
+    }
+
+    public function test_mot_ben_het_han_muc_van_con_ket_qua_ben_kia(): void
+    {
+        config(['search.tavily.key' => 'tvly-test']);
+        Http::fake([
+            'api.tavily.com/*' => Http::response(['results' => [['title' => 'WHO', 'url' => 'https://www.who.int/x', 'content' => 'a']]]),
+            'generativelanguage.googleapis.com/*' => Http::response(['error' => ['message' => 'quota']], 429),
+        ]);
+        $r = (new WebSearchResolver)->resolve()['provider']->search('HbA1c');
+        $this->assertCount(1, $r['results']);
+        $this->assertNotEmpty($r['failed']);
+    }
+
+    public function test_ca_hai_ben_loi_thi_bao_loi(): void
+    {
+        config(['search.tavily.key' => 'tvly-test']);
+        Http::fake(['*' => Http::response(['error' => ['message' => 'x']], 500)]);
+        $this->expectException(WebSearchUnavailable::class);
+        (new WebSearchResolver)->resolve()['provider']->search('HbA1c');
+    }
 }

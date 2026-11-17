@@ -82,6 +82,9 @@ final class SourceDiscoveryService
     {
         try {
             $provider = $this->resolver->resolve()['provider'];
+            if ($provider instanceof \App\Services\Search\CombinedSearchProvider) {
+                $provider = $provider->bridge() ?? $provider; // chỉ cầu nối Claude mới tìm trước song song được
+            }
             if (! $provider instanceof \App\Services\Search\ClaudeBridgeSearchProvider || count($topics) < 2) {
                 return;
             }
