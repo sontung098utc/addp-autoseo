@@ -21,13 +21,13 @@ class AiProvider extends Model
 
     public const TIER_LABELS = ['cheap' => 'Rẻ', 'standard' => 'Chuẩn', 'reasoning' => 'Suy luận'];
 
-    protected $fillable = ['name', 'kind', 'base_url', 'api_key', 'monthly_budget_vnd', 'enabled', 'pricing', 'models', 'last_test_at', 'last_test_ok', 'last_test_message', 'updated_by'];
+    protected $fillable = ['name', 'kind', 'base_url', 'api_key', 'monthly_budget_vnd', 'enabled', 'pricing', 'models', 'last_test_at', 'last_test_ok', 'last_test_message', 'updated_by', 'models_synced_at'];
 
     protected $hidden = ['api_key'];
 
     protected function casts(): array
     {
-        return ['api_key' => 'encrypted', 'monthly_budget_vnd' => 'float', 'enabled' => 'boolean', 'pricing' => 'array', 'models' => 'array', 'last_test_at' => 'datetime', 'last_test_ok' => 'boolean'];
+        return ['api_key' => 'encrypted', 'monthly_budget_vnd' => 'float', 'enabled' => 'boolean', 'pricing' => 'array', 'models' => 'array', 'last_test_at' => 'datetime', 'last_test_ok' => 'boolean', 'models_synced_at' => 'datetime'];
     }
 
     public function hasKey(): bool

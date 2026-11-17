@@ -107,6 +107,21 @@ final class AiModelCatalog
         return $o;
     }
 
+    /**
+     * Lựa chọn model cho form sửa một tài khoản: danh mục tạo sẵn + model thật hãng đang trả về (lần đồng bộ gần nhất), để không bị giới hạn ở danh sách cố định.
+     *
+     * @return array<string, string> id => nhãn
+     */
+    public static function optionsFor(AiProvider $p): array
+    {
+        $o = self::options(self::brandOf($p));
+        foreach (AiModelSync::activeModels($p) as $id => $m) {
+            $o[$id] ??= $m['name'].' · '.($m['kind'] === self::KIND_IMAGE ? 'Ảnh' : 'Chữ');
+        }
+
+        return $o;
+    }
+
     /** @return list<string> id model bật sẵn khi thêm tài khoản */
     public static function defaults(string $brand): array
     {
@@ -131,6 +146,7 @@ final class AiModelCatalog
             $cat[$m['id']] = $m;
         }
         $entries = is_array($p->models) ? $p->models : self::defaults($brand);
+        $flags = AiModelSync::flags($p); // dấu "Mới"/"Đã ngưng" theo lần đồng bộ model gần nhất (rỗng nếu chưa đồng bộ)
         $out = [];
         $seen = [];
         foreach ($entries as $e) {
@@ -141,7 +157,7 @@ final class AiModelCatalog
             $seen[$id] = true;
             $m = $cat[$id] ?? null;
             $out[] = ['id' => $id, 'name' => $m['name'] ?? $id, 'tier' => $m['tier'] ?? null, 'context' => $m['context'] ?? null, 'price' => $m['price'] ?? null, 'custom' => $m === null,
-                'kind' => $declared ?? ($m['kind'] ?? self::inferKind($id))];
+                'kind' => $declared ?? ($m['kind'] ?? self::inferKind($id)), 'flag' => $flags[$id] ?? null];
         }
 
         return $out;

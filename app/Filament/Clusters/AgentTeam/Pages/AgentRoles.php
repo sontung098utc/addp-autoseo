@@ -419,6 +419,10 @@ class AgentRoles extends Page
             if (! $ok || ! in_array($model, array_column($ok['models'], 'id'), true)) {
                 throw new \InvalidArgumentException('Model này chưa được bật ở Cấu hình AI.');
             }
+            // Chỉ chặn CHỌN MỚI model đã ngưng; bản gán sẵn có không bị đụng tới (chỉ hiện cảnh báo).
+            if ((collect($ok['models'])->firstWhere('id', $model)['flag'] ?? null) === 'gone') {
+                throw new \InvalidArgumentException('Hãng không còn liệt kê model này (đã ngưng). Chọn model khác.');
+            }
             $assign = new RoleAssignments;
             $a = $assign->find((string) $this->studioRole);
             $p = [$a?->provider_id, $a?->model, $a?->fallback_provider_id, $a?->fallback_model];

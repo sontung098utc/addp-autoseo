@@ -298,7 +298,8 @@
                         $labelOf = function ($slot) use ($s) {
                             $x = $s[$slot] ?? null; if (! $x) return null;
                             $g = collect($s['groups'])->firstWhere('id', $x['provider']);
-                            return ['name' => $g['name'] ?? 'Tài khoản đã xóa', 'logo' => $g['logo'] ?? 'custom', 'model' => $x['model'], 'ok' => (bool) $g];
+                            $mm = collect($g['models'] ?? [])->firstWhere('id', $x['model']);
+                            return ['name' => $g['name'] ?? 'Tài khoản đã xóa', 'logo' => $g['logo'] ?? 'custom', 'model' => $x['model'], 'ok' => (bool) $g, 'flag' => $mm['flag'] ?? null];
                         };
                     @endphp
                     <div class="ags-ph">
@@ -315,7 +316,7 @@
                             <div class="ags-card" data-slot="{{ $slot }}">
                                 <div class="text-xs" style="opacity:.65">{{ $slotLabel }}</div>
                                 @if ($cur)
-                                    <div style="display:flex;align-items:center;gap:.5rem;margin-top:.25rem"><x-ai.logo :brand="$cur['logo']" :size="1.7" /><span style="min-width:0"><strong class="text-sm">{{ $cur['model'] }}</strong><span class="text-xs" style="display:block;opacity:.7">{{ $cur['name'] }}{{ $cur['ok'] ? '' : ' · không dùng được' }}</span></span>
+                                    <div style="display:flex;align-items:center;gap:.5rem;margin-top:.25rem"><x-ai.logo :brand="$cur['logo']" :size="1.7" /><span style="min-width:0"><strong class="text-sm">{{ $cur['model'] }}</strong>@if (($cur['flag'] ?? null) === 'gone')<x-studio.badge tone="danger" title="Hãng không còn liệt kê model này. Chọn model khác trước khi nó ngừng hẳn.">Đã ngưng</x-studio.badge>@elseif (($cur['flag'] ?? null) === 'new')<x-studio.badge tone="ok">Mới</x-studio.badge>@endif<span class="text-xs" style="display:block;opacity:.7">{{ $cur['name'] }}{{ $cur['ok'] ? '' : ' · không dùng được' }}</span></span>
                                         @if ($edit)<button type="button" style="{{ $btn }};margin-left:auto" wire:click="clearModel('{{ $slot }}')">Bỏ</button>@endif</div>
                                 @else
                                     <div class="text-sm" style="opacity:.6;margin-top:.25rem">{{ $slot === 'primary' ? 'Chưa chọn, dùng định tuyến theo loại việc' : 'Không có dự phòng' }}</div>
@@ -330,6 +331,7 @@
                             @forelse ($g['models'] as $m)
                                 <div class="ags-mrow" data-model="{{ $m['id'] }}">
                                     <span style="min-width:0;flex:1"><span class="text-sm">{{ $m['name'] }}</span>
+                                        @if (($m['flag'] ?? null) === 'new')<x-studio.badge tone="ok">Mới</x-studio.badge>@elseif (($m['flag'] ?? null) === 'gone')<x-studio.badge tone="danger" title="Hãng không còn liệt kê model này">Đã ngưng</x-studio.badge>@endif
                                         @if ($m['tier'])<span class="ags-tier {{ $mTier[$m['tier']] ?? '' }}">{{ $s['tierLabels'][$m['tier']] ?? $m['tier'] }}</span>@else<span class="ags-tier">tùy chỉnh</span>@endif
                                         @if ($m['context'])<span class="text-xs" style="opacity:.55"> · {{ \App\Services\Agent\Ai\AiModelCatalog::contextLabel($m['context']) }} ngữ cảnh</span>@endif
                                         <code class="text-xs" style="opacity:.5;display:block">{{ $m['id'] }}</code></span>
