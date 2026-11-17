@@ -24,12 +24,15 @@ final class BackgroundRun
     public static function start(Article $article, ?int $actorId, int $waitSeconds = 10, ?string $redoMessage = null, ?int $campaignId = null): ?AgentRun
     {
         $before = (int) AgentRun::query()->where('article_id', $article->id)->max('id');
-        $php = (new PhpExecutableFinder)->find(false) ?: PHP_BINARY;
+        // Máy chủ web (php-fpm/lsphp) và hosting có PHP CLI tên riêng (vd. php82) khiến tự dò chọn nhầm tệp: cho phép chỉ rõ bằng AGENT_PHP_BINARY.
+        $php = trim((string) config('agent.php_binary')) ?: ((new PhpExecutableFinder)->find(false) ?: PHP_BINARY);
         $log = storage_path('logs/agent-run-article.log');
         $cmd = 'nohup '.escapeshellarg($php).' artisan agent:run-article '.(int) $article->id.($actorId ? ' --actor='.$actorId : '').($campaignId ? ' --campaign='.$campaignId : '').($redoMessage !== null && trim($redoMessage) !== '' ? ' --redo='.escapeshellarg(mb_substr($redoMessage, 0, 1500)) : '').' >> '.escapeshellarg($log).' 2>&1 &';
         try {
             (new Process(['sh', '-c', $cmd], base_path(), ImageJob::childEnv()))->run();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('BackgroundRun: không chạy được lệnh khởi chạy tiến trình nền', ['article' => $article->id, 'php' => $php, 'loi' => mb_substr($e->getMessage(), 0, 300)]);
+
             return null;
         }
         for ($i = 0; $i < $waitSeconds * 4; $i++) {
@@ -39,6 +42,8 @@ final class BackgroundRun
             }
             usleep(250_000);
         }
+        $tail = is_file($log) ? mb_substr((string) @file_get_contents($log, false, null, max(0, (int) filesize($log) - 600)), -600) : null;
+        \Illuminate\Support\Facades\Log::warning('BackgroundRun: đã gọi lệnh nhưng chưa thấy phiên sau '.$waitSeconds.' giây', ['article' => $article->id, 'php' => $php, 'co_tep_log' => $tail !== null, 'cuoi_log' => $tail]);
 
         return null;
     }

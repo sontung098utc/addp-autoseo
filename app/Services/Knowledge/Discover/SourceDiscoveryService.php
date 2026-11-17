@@ -72,6 +72,38 @@ final class SourceDiscoveryService
         $this->resolver ??= new WebSearchResolver;
     }
 
+    /**
+     * Tìm trước, CÙNG LÚC, lượt tìm đầu tiên của nhiều chủ đề (chỉ khi nhà cung cấp là cầu nối Claude, mỗi lượt mất vài phút). Truy vấn và bộ lọc tên miền
+     * được dựng giống hệt discover() nên khi discover() chạy tuần tự sau đó sẽ đọc từ bộ nhớ, không tìm lại. Không ném lỗi.
+     *
+     * @param  list<string>  $topics
+     */
+    public function prefetch(Website $site, array $topics, array $options = []): void
+    {
+        try {
+            $provider = $this->resolver->resolve()['provider'];
+            if (! $provider instanceof \App\Services\Search\ClaudeBridgeSearchProvider || count($topics) < 2) {
+                return;
+            }
+            $brain = $site->brains()->first();
+            $calls = [];
+            foreach ($topics as $topic) {
+                $topic = trim(preg_replace('/\s+/u', ' ', (string) $topic) ?? '');
+                if ($topic === '') {
+                    continue;
+                }
+                $field = $options['field'] ?? self::fieldFor($topic, $brain);
+                $query = mb_substr($topic.(isset(self::HINTS[$field ?? '']) ? ' '.self::HINTS[$field] : ''), 0, 300);
+                $opts = ['max_results' => min(10, (int) ($options['max_results'] ?? 10))];
+                $domains = $field !== null ? SourceTrust::domainsFor($field) : [];
+                $calls[] = [$query, $domains !== [] ? $opts + ['include_domains' => array_slice($domains, 0, 20)] : $opts + ['exclude_domains' => array_slice((array) config('trusted_sources.blocked', []), 0, 20)]];
+            }
+            $provider->prefetch($calls);
+        } catch (\Throwable) {
+            // bỏ qua: discover() tuần tự vẫn chạy bình thường
+        }
+    }
+
     /** Lĩnh vực rủi ro của chủ đề theo luật (không AI): sức khỏe nếu có cụm sức khỏe hoặc Trí tuệ rủi ro cao và chủ đề xếp hạng cao. */
     public static function fieldFor(string $topic, ?Brain $brain = null): ?string
     {
@@ -116,7 +148,7 @@ final class SourceDiscoveryService
         $rows = [];
         $total = 0;
         $providerName = '';
-        $searchOpts = ['max_results' => min(10, (int) ($options['max_results'] ?? 10))];
+        $searchOpts = ['max_results' => min(10, (int) ($options['max_results'] ?? 10))] + (! empty($options['fresh']) ? ['fresh' => true] : []);
         if ($field !== null && ($domains = SourceTrust::domainsFor($field)) !== []) {
             $res = $provider->search($query, $searchOpts + ['include_domains' => array_slice($domains, 0, 20)]);
             $cost += (float) $res['cost_vnd'];

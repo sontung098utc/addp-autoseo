@@ -46,15 +46,29 @@ final class KnowledgeConflicts
     public function all(): array
     {
         $items = KnowledgeItem::query()->whereIn('status', ['proposed', 'approved'])
-            ->whereNotNull('entity')->whereNotNull('field')->whereNotNull('value')->get();
+            ->whereNotNull('entity')->whereNotNull('field')->whereNotNull('value')->orderBy('id')->get();
+        // Gom theo (thực thể, trường) trong bộ nhớ thay vì truy vấn lại cho từng mục (hàng trăm truy vấn/trang). Cùng luật với for():
+        // hai mục mâu thuẫn khi cùng thực thể + trường, khác giá trị (kèm đơn vị), và cùng phạm vi (cùng website hoặc có một bên là "chung").
+        $groups = [];
+        foreach ($items as $it) {
+            if (self::key($it->entity) === '' || self::key($it->field) === '' || self::key($it->value) === '') {
+                continue;
+            }
+            $groups[self::key($it->entity)."\x1f".self::key($it->field)][] = $it;
+        }
         $pairs = [];
-        foreach ($items as $a) {
-            foreach ($this->for($a) as $b) {
-                if ($a->id < $b->id) {
-                    $pairs[] = ['a' => $a, 'b' => $b];
+        foreach ($groups as $g) {
+            for ($x = 0, $n = count($g); $x < $n; $x++) {
+                for ($y = $x + 1; $y < $n; $y++) {
+                    [$a, $b] = [$g[$x], $g[$y]]; // đã sắp theo id nên a->id < b->id
+                    $sameScope = $a->website_id === null || $b->website_id === null || (int) $a->website_id === (int) $b->website_id;
+                    if ($sameScope && self::key($a->value.' '.$a->value_unit) !== self::key($b->value.' '.$b->value_unit)) {
+                        $pairs[] = ['a' => $a, 'b' => $b];
+                    }
                 }
             }
         }
+        usort($pairs, fn ($p, $q) => [$p['a']->id, $p['b']->id] <=> [$q['a']->id, $q['b']->id]);
 
         return $pairs;
     }

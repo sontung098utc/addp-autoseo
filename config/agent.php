@@ -4,6 +4,14 @@ return [
     // Bấm "Giao đội AI" khởi chạy phiên ở NỀN và chuyển sang trang luồng đang chạy (cần CSDL dùng chung được giữa hai tiến trình). Đặt false để chạy đồng bộ như trước.
     'background_runs' => (bool) env('AGENT_BACKGROUND_RUNS', true),
 
+    // Đường dẫn PHP CLI dùng để khởi chạy tiến trình nền (agent:run-article). Để trống = tự dò. Hosting có PHP CLI tên riêng (vd. /usr/local/php82/bin/php82)
+    // hoặc máy chủ web là php-fpm/lsphp thì tự dò có thể chọn nhầm tệp và tiến trình nền không chạy; đặt rõ ở đây.
+    'php_binary' => env('AGENT_PHP_BINARY'),
+
+    // Vòng sửa: khi mọi lỗi chỉ nằm ở vài mục H2 (trích dẫn, lộ quá trình nguồn) thì chỉ viết lại các mục đó thay vì cả bài (đầu ra và thời gian giảm nhiều, giữ nguyên phần đã tốt).
+    // Tự quay về viết lại cả bài khi không chắc hoặc bản sửa không tốt hơn. Đặt false để luôn viết lại cả bài như trước.
+    'partial_repair' => (bool) env('AGENT_PARTIAL_REPAIR', true),
+
     // Chiến dịch chạy SONG SONG: số bài một chiến dịch được viết cùng lúc (1–5; chiến dịch có thể đặt riêng ở Cấu hình) và trần số phiên đang chạy của cả hệ thống
     // (bảo vệ hạn mức AI: mỗi bài chạy song song là thêm các lượt gọi AI cùng lúc, dễ gặp giới hạn tần suất).
     'campaign_concurrency' => (int) env('AGENT_CAMPAIGN_CONCURRENCY', 3),

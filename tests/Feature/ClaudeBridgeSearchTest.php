@@ -39,6 +39,56 @@ class ClaudeBridgeSearchTest extends TestCase
         Http::assertSent(fn ($req) => $req->hasHeader('Authorization', 'Bearer '.str_repeat('k', 40)) && $req['include_domains'] === ['nhs.uk']);
     }
 
+    public function test_cung_truy_van_trong_mot_phien_chi_tim_mot_lan_tru_khi_yeu_cau_tim_lai(): void
+    {
+        $this->provider();
+        Http::fake(['172.17.0.1:8771/v1/search' => Http::response(['results' => [['title' => 'A', 'url' => 'https://www.nhs.uk/a', 'content' => 'x']]])]);
+        $p = new ClaudeBridgeSearchProvider;
+        $a = $p->search('đái tháo đường', ['max_results' => 8, 'include_domains' => ['nhs.uk']]);
+        $b = $p->search('đái tháo đường', ['max_results' => 10, 'include_domains' => ['nhs.uk']]);
+        $this->assertSame($a['results'], $b['results']);
+        Http::assertSentCount(1);
+        $p->search('đái tháo đường', ['include_domains' => ['nhs.uk'], 'fresh' => true]);
+        Http::assertSentCount(2);
+        $p->search('đái tháo đường', ['include_domains' => ['who.int']]);
+        Http::assertSentCount(3); // bộ lọc tên miền khác = truy vấn khác
+    }
+
+    public function test_prefetch_gui_cac_truy_van_doc_lap_mot_luot_roi_search_doc_tu_bo_nho(): void
+    {
+        $this->provider();
+        Http::fake(['172.17.0.1:8771/v1/search' => Http::response(['results' => [['title' => 'A', 'url' => 'https://www.nhs.uk/a', 'content' => 'x']]])]);
+        $p = new ClaudeBridgeSearchProvider;
+        $p->prefetch([['góc 1', []], ['góc 2', []], ['góc 3', []], ['góc 1', []]]);
+        Http::assertSentCount(3); // góc trùng chỉ gửi một lần
+        foreach (['góc 1', 'góc 2', 'góc 3'] as $q) {
+            $this->assertCount(1, $p->search($q)['results']);
+        }
+        Http::assertSentCount(3); // tìm tuần tự sau đó không gọi thêm
+    }
+
+    public function test_tim_web_qua_cau_noi_codex_dung_nha_cung_cap_codex_va_chon_duoc_bang_cau_hinh(): void
+    {
+        config(['ai_models.private_base_url_allowlist' => ['172.17.0.1:8772'], 'search.provider' => 'codex_bridge']);
+        AiProvider::create(['name' => \App\Services\Search\CodexBridgeSearchProvider::NAME, 'kind' => 'openai_compat', 'base_url' => 'http://172.17.0.1:8772/v1', 'api_key' => str_repeat('c', 40), 'enabled' => true]);
+        Http::fake(['172.17.0.1:8772/v1/search' => Http::response(['results' => [['title' => 'CDC', 'url' => 'https://www.cdc.gov/a', 'content' => 'x']]])]);
+        $res = (new WebSearchResolver)->resolve();
+        $this->assertInstanceOf(\App\Services\Search\CodexBridgeSearchProvider::class, $res['provider']);
+        $this->assertCount(1, $res['provider']->search('HbA1c')['results']);
+        Http::assertSent(fn ($req) => str_contains($req->url(), ':8772/v1/search') && $req->hasHeader('Authorization', 'Bearer '.str_repeat('c', 40)));
+        $this->assertFalse(ClaudeBridgeSearchProvider::configured(), 'Cầu nối Claude chưa cài nên không bị nhầm với Codex.');
+    }
+
+    public function test_prefetch_loi_khong_ne_ngoai_va_lan_tim_tuan_tu_bao_loi_dung_cho(): void
+    {
+        $this->provider();
+        Http::fake(['*' => Http::response(['error' => ['message' => 'quá tải']], 500)]);
+        $p = new ClaudeBridgeSearchProvider;
+        $p->prefetch([['a', []], ['b', []]]); // không ném lỗi
+        $this->expectException(WebSearchUnavailable::class);
+        $p->search('a');
+    }
+
     public function test_khong_co_khoa_tavily_thi_resolver_dung_cau_noi_neu_da_cai(): void
     {
         $this->assertFalse(ClaudeBridgeSearchProvider::configured());

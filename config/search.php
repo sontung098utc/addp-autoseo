@@ -1,5 +1,7 @@
 <?php
 
+use App\Services\Search\CodexBridgeSearchProvider;
+use App\Services\Search\GeminiSearchProvider;
 use App\Services\Search\TavilySearchProvider;
 
 /**
@@ -12,11 +14,18 @@ return [
 
     'providers' => [
         'tavily' => TavilySearchProvider::class,
+        'gemini' => GeminiSearchProvider::class, // SEARCH_PROVIDER=gemini, hoặc tự dùng khi không có khóa Tavily/cầu nối: Gemini tự tìm bằng Google Search (dùng khóa Gemini đã lưu)
+        'codex_bridge' => CodexBridgeSearchProvider::class, // SEARCH_PROVIDER=codex_bridge: ChatGPT tự tìm bằng công cụ web_search (cầu nối scripts/codex_bridge.py)
     ],
 
     'tavily' => [
         'key' => env('TAVILY_API_KEY'),
         'url' => env('TAVILY_URL', 'https://api.tavily.com/search'),
+    ],
+
+    'gemini' => [
+        'model' => env('SEARCH_GEMINI_MODEL', 'gemini-3.6-flash'),
+        'timeout' => (int) env('SEARCH_GEMINI_TIMEOUT', 60),
     ],
 
     /** Thời gian chờ tối đa (giây) cho tìm web qua cầu nối Claude (tìm + mở trang chậm hơn API tìm kiếm thường). */
