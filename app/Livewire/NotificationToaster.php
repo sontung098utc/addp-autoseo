@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
 
 /**
- * Hộp nổi góc trên bên phải cho thông báo MỚI (cùng kiểu thông báo hiện có của Filament). Đọc bảng `notifications` của người dùng theo nhịp 10 giây
+ * Hộp nổi góc trên bên phải cho thông báo MỚI (cùng kiểu thông báo hiện có của Filament). Đọc bảng `notifications` của người dùng theo nhịp 15 giây
  * và hiện những thông báo chưa đọc phát sinh SAU khi trang mở (thông báo cũ chỉ nằm ở biểu tượng chuông, không bật lại mỗi lần chuyển trang).
  * Không tự đánh dấu đã đọc và không xóa: thông báo vẫn nằm ở chuông sau khi hộp nổi đóng; người dùng đọc/xóa ở chuông. Một thông báo chỉ nổi một lần trong mỗi trang (nhớ id).
  */

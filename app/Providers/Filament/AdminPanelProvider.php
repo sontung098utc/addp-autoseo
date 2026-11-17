@@ -49,8 +49,10 @@ class AdminPanelProvider extends PanelProvider
             ->globalSearchKeyBindings(['ctrl+k', 'command+k'])
             ->unsavedChangesAlerts()
             // Biểu tượng chuông cạnh ảnh đại diện (bảng notifications); thông báo mới còn nổi thành hộp ở góc trên bên phải nhờ NotificationToaster.
+            // Chuông KHÔNG tự hỏi máy chủ riêng (polling null): NotificationToaster đã hỏi theo nhịp và làm mới chuông ngay khi có thông báo mới,
+            // bớt một lượt gọi liên tục ở mọi trang (máy chủ dev chỉ xử lý một yêu cầu một lúc nên các lượt gọi nền xen vào lúc chuyển trang).
             ->databaseNotifications()
-            ->databaseNotificationsPolling('20s')
+            ->databaseNotificationsPolling(null)
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth(\Filament\Support\Enums\MaxWidth::Full)
             ->renderHook(
