@@ -290,7 +290,7 @@ class KnowledgePage extends Page
     {
         $manage = static::canManage();
         $conflicts = new KnowledgeConflicts;
-        $dedupe = new KnowledgeDedupe;
+        $dedupe = (new KnowledgeDedupe)->withScopeCache(); // trang chỉ đọc: tải mục cùng phạm vi một lần, không tải lại cho từng mục
 
         $flags = function (KnowledgeItem $i) use ($conflicts, $dedupe): array {
             $f = $dedupe->find($i);
