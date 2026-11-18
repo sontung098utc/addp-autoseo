@@ -21,11 +21,19 @@
         .hp-pop p{margin:.25rem 0}.hp-pop ul{margin:.25rem 0 .25rem 1.1rem;list-style:disc}
     </style>
 @endonce
-<span class="hp" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false" data-testid="help">
-    <button type="button" class="hp-btn @if ($tone === 'warning') hp-btn--warning @endif" :aria-expanded="open" aria-haspopup="dialog" aria-label="{{ $label }}" @click.stop="open = ! open">
+{{-- Khung giải thích dùng vị trí CỐ ĐỊNH theo màn hình (tính khi mở) để không bị cắt bởi vùng cuộn/hộp nổi chứa nó; thiếu chỗ phía dưới thì lật lên trên. --}}
+<span class="hp" x-data="{ open: false, place() {
+        const b = $refs.btn.getBoundingClientRect(), p = $refs.pop, w = Math.min(352, window.innerWidth * 0.8), m = 8;
+        p.style.position = 'fixed'; p.style.right = 'auto'; p.style.width = w + 'px';
+        const left = {{ $align === 'right' ? 'true' : 'false' }} ? b.right - w : b.left;
+        p.style.left = Math.max(m, Math.min(left, window.innerWidth - w - m)) + 'px';
+        p.style.top = (b.bottom + 6) + 'px';
+        requestAnimationFrame(() => { const h = p.offsetHeight; if (b.bottom + 6 + h > window.innerHeight - m) { p.style.top = Math.max(m, b.top - h - 6) + 'px'; } });
+    } }" x-init="$watch('open', v => v && $nextTick(() => place()))" @keydown.escape.window="open = false" @click.outside="open = false" @scroll.window.capture="open = false" @resize.window="open = false" data-testid="help">
+    <button type="button" x-ref="btn" class="hp-btn @if ($tone === 'warning') hp-btn--warning @endif" :aria-expanded="open" aria-haspopup="dialog" aria-label="{{ $label }}" @click.stop="open = ! open">
         <x-filament::icon :icon="$tone === 'warning' ? 'heroicon-o-exclamation-circle' : 'heroicon-o-information-circle'" style="width:1.05rem;height:1.05rem" />
     </button>
-    <span class="hp-pop hp-pop--{{ $align === 'right' ? 'right' : 'left' }}" x-show="open" x-cloak x-transition.opacity.duration.120ms role="dialog" @if ($title) aria-label="{{ $title }}" @endif>
+    <span x-ref="pop" class="hp-pop hp-pop--{{ $align === 'right' ? 'right' : 'left' }}" x-show="open" x-cloak x-transition.opacity.duration.120ms role="dialog" @if ($title) aria-label="{{ $title }}" @endif>
         @if ($title)<b class="hp-t">{{ $title }}</b>@endif
         @if ($text !== null)<span style="display:block;margin:.25rem 0">{{ $text }}</span>@endif
         {{ $slot }}

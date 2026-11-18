@@ -64,10 +64,10 @@ class ContentPlanPageTest extends TestCase
         $this->assertTrue(ContentPlanPage::canAccess());
         $this->actingAs($this->user('writer', false));
         $this->assertFalse(ContentPlanPage::canAccess());
-        $this->get('/admin/doi-ai/ke-hoach')->assertForbidden();
+        $this->get('/admin/ke-hoach')->assertForbidden();
         auth()->logout();
         $this->assertFalse(ContentPlanPage::canAccess());
-        $r = $this->actingAs($this->writer)->get('/admin/doi-ai/ke-hoach')->assertOk()->assertDontSee('Dữ liệu minh họa');
+        $r = $this->actingAs($this->writer)->get('/admin/ke-hoach')->assertOk()->assertDontSee('Dữ liệu minh họa');
         foreach (['Lịch tuần', 'Cụm chủ đề', 'Quy tắc của kế hoạch'] as $tab) {
             $r->assertSee($tab);
         }

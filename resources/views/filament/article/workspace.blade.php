@@ -176,7 +176,7 @@
             @if ($article->website)<span class="aw-chip">{{ $article->website->name }}</span>@endif
         </div>
 
-        <x-studio.tabs :persist="$showPreflight ? null : 'bai-viet-v4-'.$article->id" :default="$tabDefault" :tabs="$tabs">
+        <x-studio.tabs :persist="$showPreflight ? null : 'bai-viet-v4-'.$article->id" :default="$tabDefault" :tabs="$tabs" :lazy="$lazyTabs">
             {{-- Tổng quan: việc tiếp theo + một nút chính, tiến trình, thông tin bài. Giải thích cất vào (i). --}}
             <x-studio.panel key="overview">
                 @if ($tabLoaded('overview'))

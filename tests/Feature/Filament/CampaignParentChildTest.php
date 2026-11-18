@@ -114,24 +114,23 @@ class CampaignParentChildTest extends TestCase
             ->assertDontSee('Xếp theo luật, không dùng AI', escape: false)->assertSeeHtml('data-source="keyword"');
     }
 
-    public function test_menu_khong_con_muc_ke_hoach_rieng_va_tab_nam_trong_cum(): void
+    public function test_ke_hoach_la_muc_menu_lon_ngay_duoi_doi_ai(): void
     {
-        $this->assertSame(AgentTeam::class, ContentPlanPage::getCluster());
+        $this->assertNull(ContentPlanPage::getCluster(), 'Kế hoạch không còn là tab con của cụm Đội AI');
         $this->actingAs($this->user('admin'));
         Filament::setCurrentPanel(Filament::getDefaultPanel());
-        $topLabels = collect(Filament::getNavigation())->flatMap(fn ($g) => $g->getItems())->map(fn ($i) => $i->getLabel())->all();
-        $this->assertNotContains('Kế hoạch nội dung', $topLabels);
-        $this->assertNotContains('Kế hoạch', $topLabels);
-        $tabs = collect(Filament::getPages()) // trang trong cụm
-            ->filter(fn ($p) => $p === ContentPlanPage::class);
-        $this->assertCount(1, $tabs);
-        $this->get('/admin/doi-ai/ke-hoach')->assertOk()->assertSee('Chiến dịch')->assertSee('Kế hoạch');
+        $group = collect(Filament::getNavigation())->first(fn ($g) => $g->getLabel() === 'Chiến dịch');
+        $labels = $group->getItems()->map(fn ($i) => $i->getLabel())->values()->all();
+        $this->assertSame(['Đội AI', 'Kế hoạch'], array_slice($labels, 0, 2), 'Kế hoạch nằm ngay dưới Đội AI');
+        $this->assertContains('Bài viết', $labels);
+        $this->get('/admin/ke-hoach')->assertOk()->assertSee('Các kế hoạch')->assertSee('Lập kế hoạch');
     }
 
     public function test_url_cu_chuyen_huong_va_bien_tap_vien_van_vao_tab_ke_hoach(): void
     {
-        $this->get('/admin/ke-hoach-noi-dung')->assertRedirect('/admin/doi-ai/ke-hoach');
-        $this->actingAs($this->user('writer'))->get('/admin/doi-ai/ke-hoach')->assertOk();
+        $this->get('/admin/ke-hoach-noi-dung')->assertRedirect('/admin/ke-hoach');
+        $this->get('/admin/doi-ai/ke-hoach')->assertRedirect('/admin/ke-hoach');
+        $this->actingAs($this->user('writer'))->get('/admin/ke-hoach')->assertOk();
         $this->assertNotSame(200, $this->actingAs($this->user('writer'))->get('/admin/doi-ai/chien-dich')->status());
     }
 

@@ -8,19 +8,52 @@ use App\Filament\Support\Schedule\VnTime;
 use App\Models\Article;
 use App\Models\Publication;
 use App\Models\Website;
+use App\Filament\Support\Demo\DemoMode;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Schema;
 
-/** Đọc dữ liệu THẬT cho màn Kế hoạch nội dung. Ngày dự kiến của bài "Đã lên kế hoạch" lưu tạm ở DemoStore. */
+/**
+ * Đọc dữ liệu THẬT cho màn Kế hoạch nội dung. Ngày dự kiến của bài "Đã lên kế hoạch" lưu ở cột articles.planned_at (UTC).
+ * Nếu cột chưa có (chưa chạy migration) thì quay về DemoStore như trước: kho tạm đó chỉ hoạt động ở chế độ minh họa,
+ * còn ngoài chế độ này thì KHÔNG lưu được: dùng canPersistDates() để nói thật với người dùng thay vì báo "đã xếp ngày".
+ */
 final class PlanData
 {
+    private static bool $hasColumn = false;
+
+    public static function hasColumn(): bool
+    {
+        return self::$hasColumn = self::$hasColumn || Schema::hasColumn('articles', 'planned_at');
+    }
+
+    /** Ngày dự kiến có thực sự lưu được không (cột đã có, hoặc đang ở chế độ minh họa). */
+    public static function canPersistDates(): bool
+    {
+        return self::hasColumn() || DemoMode::enabled();
+    }
+
     /** @return array<int, string> id => "Y-m-d H:i" giờ VN */
     public static function plannedDates(): array
     {
+        if (self::hasColumn()) {
+            $out = [];
+            foreach (Article::query()->whereNotNull('planned_at')->get(['id', 'planned_at']) as $a) {
+                $out[$a->id] = CarbonImmutable::parse((string) $a->getRawOriginal('planned_at'), 'UTC')->setTimezone(VnTime::TZ)->format('Y-m-d H:i');
+            }
+
+            return $out;
+        }
+
         return (array) DemoStore::get('contentplan.dates', []);
     }
 
     public static function setPlannedDate(int $articleId, string $vnDateTime): void
     {
+        if (self::hasColumn()) {
+            Article::query()->whereKey($articleId)->update(['planned_at' => CarbonImmutable::parse($vnDateTime, VnTime::TZ)->utc()->format('Y-m-d H:i:s')]);
+
+            return;
+        }
         $d = self::plannedDates();
         $d[$articleId] = $vnDateTime;
         DemoStore::put('contentplan.dates', $d);

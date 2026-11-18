@@ -48,7 +48,7 @@
                     </ul>
                 </x-help>
                 <span style="flex:1"></span>
-                <span @if (! $canCreate) title="Cụm đã có bài cho mọi từ khóa hoặc chưa chọn cụm." @endif>{{ $this->createFromClusterAction }}</span>
+                <x-filament::button icon="heroicon-o-plus" x-on:click="document.querySelector('.ss-tab[data-key=lap-ke-hoach]')?.click()" data-plan-new>Lập kế hoạch</x-filament::button>
             @else
                 <div class="ss-alert ss-alert--warn">Chưa có website đang hoạt động. Kết nối website ở màn Website trước.</div>
             @endif
@@ -66,14 +66,19 @@
 
         @php
             $tabs = [
+                ['key' => 'cac-ke-hoach', 'label' => 'Các kế hoạch', 'count' => count(array_filter($planGroups, fn ($g) => $g['campaign'])) ?: null],
+                ['key' => 'lap-ke-hoach', 'label' => 'Lập kế hoạch'],
                 ['key' => 'lich-tuan', 'label' => 'Lịch tuần', 'count' => $weekCount],
-                ['key' => 'de-xuat', 'label' => 'Đề xuất kế hoạch', 'count' => count($proposals) > 0 ? count($proposals) : null],
                 ['key' => 'cum', 'label' => 'Cụm chủ đề', 'count' => count($rows)],
             ];
             if (count($undated) > 0) { $tabs[] = ['key' => 'chua-cum', 'label' => 'Chưa có ngày', 'count' => count($undated)]; }
             if (count($allConflicts) > 0) { $tabs[] = ['key' => 'canh-bao', 'label' => 'Cảnh báo', 'count' => count($allConflicts), 'tone' => 'danger']; }
         @endphp
         <x-studio.tabs persist="ke-hoach-noi-dung" :tabs="$tabs">
+            <x-studio.panel key="cac-ke-hoach">
+                @include('filament.partials.plan-overview')
+            </x-studio.panel>
+
             <x-studio.panel key="lich-tuan">
                 <div class="cp-bar">
                     <x-filament::button color="gray" size="sm" wire:click="previousWeek">Tuần trước</x-filament::button>
@@ -102,12 +107,8 @@
                 </div>
             </x-studio.panel>
 
-            <x-studio.panel key="de-xuat">
-                <x-chain-context step="Kế hoạch của chiến dịch" purpose="Quyết định viết gì, theo thứ tự ưu tiên. Mỗi bài thuộc một chiến dịch hoặc là bài lẻ." :inputs="[['label'=>'Từ khóa và cụm chủ đề','url'=>\App\Filament\Pages\KeywordsPage::getUrl()],['label'=>'Đề xuất làm mới từ Audit','url'=>\App\Filament\Pages\AuditPage::getUrl()]]" :outputs="[['label'=>'Bài «Đã lên kế hoạch» để đội AI viết','url'=>\App\Filament\Resources\ArticleResource::getUrl('index'),'note'=>'Bài viết']]" />
-                @if (auth()->user()?->isApprover())
-                    @include('filament.partials.plan-campaign-proposal')
-                @endif
-                @include('filament.partials.plan-proposals', ['proposals' => $proposals, 'pendingAudit' => $pendingAudit, 'showTarget' => $showTarget, 'targetCampaigns' => $campaigns])
+            <x-studio.panel key="lap-ke-hoach">
+                @include('filament.partials.plan-compose')
             </x-studio.panel>
 
             <x-studio.panel key="cum">
@@ -144,23 +145,11 @@
                                         <li><span class="ss-muted">Mọi từ khóa đã có bài.</span></li>@endforelse
                                 </ul>
                                 @if (count($detail['cov']['free']) > 12)<p class="ss-muted ss-text-xs">Còn {{ count($detail['cov']['free']) - 12 }} từ khóa nữa.</p>@endif
-                                <div style="margin-top:.75rem">
-                                    <x-studio.badge tone="accent">AI đề xuất</x-studio.badge>
-                                    <x-filament::button color="gray" size="sm" wire:click="suggest" :disabled="! $canCreate">Gợi ý bài cho cụm</x-filament::button>
-                                    @if ($suggestions)<div class="ss-muted ss-text-xs" style="margin-top:.3rem">Nguồn: {{ count($detail['cov']['free']) }} từ khóa chưa có bài</div>@endif
-                                    @foreach ($suggestions as $s)
-                                        <label class="ss-text-sm" style="display:block;margin-top:.4rem"><input type="checkbox" wire:model="suggestPick" value="{{ $s['keyword'] }}"> {{ $s['title'] }} <span class="ss-muted">— {{ $s['keyword'] }}</span></label>
-                                    @endforeach
-                                    @if ($suggestions && $showTarget)
-                                        <select class="cp-in" wire:model="planTarget" aria-label="Gán vào chiến dịch" style="margin-top:.4rem">
-                                            <option value="">Gán vào…</option><option value="solo">Bài lẻ — không thuộc chiến dịch</option>
-                                            @foreach ($campaigns as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach
-                                        </select>
-                                    @endif
-                                    @if ($suggestions)
-                                        <x-filament::button color="gray" size="sm" wire:click="createSuggested" style="margin-top:.4rem">Tạo các bài đã chọn</x-filament::button>
-                                    @endif
-                                </div>
+                                @if ($canCreate)
+                                    <div style="margin-top:.75rem">
+                                        <x-filament::button color="gray" size="sm" x-on:click="$dispatch('plan-method', 'cum'); document.querySelector('.ss-tab[data-key=lap-ke-hoach]')?.click()">Lập kế hoạch cho cụm này</x-filament::button>
+                                    </div>
+                                @endif
                             @else
                                 <p class="ss-muted ss-text-sm">Chọn một cụm trong bảng.</p>
                             @endif
@@ -195,5 +184,8 @@
         </x-studio.tabs>
     </div>
 
+    @if (auth()->user()?->isApprover() && $importOpen)
+        @include('filament.partials.plan-file-import')
+    @endif
     <x-filament-actions::modals />
 </x-filament-panels::page>

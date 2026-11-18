@@ -52,7 +52,7 @@ class ArticleResource extends Resource
 
     protected static ?string $navigationGroup = 'Chiến dịch';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 3; // sau Đội AI (1) và Kế hoạch (2)
 
     protected static function user(): ?User
     {
