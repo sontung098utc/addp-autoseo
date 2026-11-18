@@ -154,7 +154,7 @@ class GscSignalsTest extends TestCase
         $bad = GoogleSearchConsoleSource::forWebsite($this->site);
         $this->assertSame([], $bad->rows('query', $p['from'], $p['to']));
         $this->assertTrue($bad->isEmpty());
-        $this->assertStringContainsString('chưa được thêm vào thuộc tính sc-domain:a.vn', $bad->error());
+        $this->assertStringContainsString('chưa có quyền với thuộc tính sc-domain:a.vn', $bad->error());
 
         $why = null;
         $this->assertNull(GscSignals::forWebsite($this->site, 28, $why));

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Http;
  * Token truy cập Google cho service account (JWT bearer, RS256). Đọc file khóa do người dùng cấp qua config('gsc.service_account_json');
  * khóa riêng không được ghi log, không đưa vào thông báo lỗi. Token cache tới lúc hết hạn.
  */
-final class GscAccessToken
+final class GscAccessToken implements GscTokenProvider
 {
     public function __construct(private readonly string $keyFile) {}
 
@@ -18,6 +18,16 @@ final class GscAccessToken
         $path = (string) config('gsc.service_account_json');
 
         return $path !== '' && is_file($path) && is_readable($path) ? new self($path) : null;
+    }
+
+    public function kind(): string
+    {
+        return 'service_account';
+    }
+
+    public function label(): string
+    {
+        return 'service account';
     }
 
     /** @throws GscFailed */

@@ -19,15 +19,38 @@ final class GoogleSearchConsoleSource implements GscSource
 
     private ?string $error = null;
 
-    public function __construct(private readonly string $property, private readonly GscAccessToken $auth) {}
+    public function __construct(private readonly string $property, private readonly GscTokenProvider $auth) {}
 
     /** Thuộc tính Search Console cho website, hoặc null nếu chưa cấu hình khóa / website không có địa chỉ. */
     public static function forWebsite(?Website $site): ?self
     {
-        $auth = GscAccessToken::fromConfig();
+        $auth = self::provider();
         $prop = $site ? self::propertyFor($site) : null;
 
         return $auth && $prop ? new self($prop, $auth) : null;
+    }
+
+    /**
+     * Cách đăng nhập theo GSC_AUTH: 'service_account' | 'oauth' | 'auto' (mặc định: service account nếu có khóa, nếu không thì tài khoản Google đã kết nối).
+     * Cố tình không tự đổi sang cách còn lại khi một cách bị lỗi, để lỗi quyền không bị che bởi một nguồn khác.
+     */
+    public static function provider(): ?GscTokenProvider
+    {
+        return match ((string) config('gsc.auth', 'auto')) {
+            'service_account' => GscAccessToken::fromConfig(),
+            'oauth' => GscOAuthToken::fromConfig(),
+            default => GscAccessToken::fromConfig() ?? GscOAuthToken::fromConfig(),
+        };
+    }
+
+    public function authLabel(): string
+    {
+        return $this->auth->label();
+    }
+
+    public function authKind(): string
+    {
+        return $this->auth->kind();
     }
 
     public static function propertyFor(Website $site): ?string
@@ -103,7 +126,7 @@ final class GoogleSearchConsoleSource implements GscSource
                 throw new GscFailed('Không kết nối được Search Console: '.mb_substr($e->getMessage(), 0, 120));
             }
             if (! $res->successful()) {
-                throw new GscFailed('Search Console trả lỗi HTTP '.$res->status().($res->status() === 403 ? ' (service account chưa được thêm vào thuộc tính '.$this->property.').' : '.'));
+                throw new GscFailed('Search Console trả lỗi HTTP '.$res->status().($res->status() === 403 ? ' ('.$this->auth->label().' chưa có quyền với thuộc tính '.$this->property.'; hãy thêm vào Search Console hoặc kiểm tra loại thuộc tính domain/url).' : '.'));
             }
             $batch = (array) ($res->json('rows') ?? []);
             foreach ($batch as $r) {

@@ -77,7 +77,11 @@
                 @if (\App\Filament\Support\Demo\DemoMode::enabled())
                     <x-filament::button size="sm" wire:click="connect">Kết nối Google Search Console</x-filament::button>
                 @else
-                    <span class="ss-muted">Quản trị sẽ kết nối khi hệ thống có kết nối Google.</span>
+                    @if ($oauthReady)
+                        <x-filament::button size="sm" wire:click="connect">Kết nối Google Search Console</x-filament::button>
+                    @else
+                        <span class="ss-muted">Chưa có cách kết nối: cấu hình file service account (GSC_SERVICE_ACCOUNT_JSON) hoặc OAuth (GSC_OAUTH_CLIENT_ID/SECRET).</span>
+                    @endif
                 @endif
             </div>
         @elseif ($state === 'dang-dong-bo')
@@ -86,6 +90,12 @@
             <div class="ss-alert ss-alert--danger" role="alert">Tài khoản Google đã kết nối không có quyền với property này. Cấp quyền xem hoặc chọn property khác: {{ $websites->pluck('base_url')->implode(', ') }}</div>
         @elseif ($state === 'chua-co-du-lieu' || (in_array($state, ['ket-noi', 'het-han'], true) && $report && $report['empty']))
             <div class="ss-text-sm ss-muted" role="status">Chưa có dữ liệu cho property này.</div>
+        @endif
+        @if ($authLabel && $state === 'ket-noi')
+            <div class="ss-text-sm ss-muted" role="status">Đang đọc số liệu bằng {{ $authLabel }}.</div>
+        @endif
+        @if ($report && $report['error'])
+            <div class="ss-alert ss-alert--danger" role="alert">{{ $report['error'] }}</div>
         @endif
         @if ($state === 'het-han')
             <div class="ss-alert ss-alert--warn" role="alert" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
