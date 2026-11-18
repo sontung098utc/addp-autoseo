@@ -8,7 +8,9 @@ use App\Filament\Pages\BrainBuildPage;
 use App\Filament\Resources\AgentRunResource;
 use App\Filament\Resources\ArticleResource;
 use App\Filament\Support\Agent\RunActivity;
+use App\Filament\Support\AiUsage\RunCost;
 use App\Filament\Support\Review\ReviewQueue;
+use App\Filament\Support\Schedule\VnTime;
 use App\Models\AgentRun;
 use App\Models\Website;
 use App\Services\Knowledge\Suggest\KnowledgeSuggestions;
@@ -53,7 +55,7 @@ class AgentTodayWidget extends Widget
             'expert' => $expert,
             'blocked' => ReviewQueue::problemRunCount($since),
             'runs' => (clone $today)->count(),
-            'cost' => (float) (clone $today)->sum('cost_vnd'),
+            'cost' => RunCost::between(VnTime::todayRangeApp()[0], VnTime::todayRangeApp()[1], 'created_at'),
             'suggestions' => $suggestions,
             'urls' => [
                 'pipeline' => class_exists(PipelineMap::class) ? PipelineMap::getUrl() : null,
