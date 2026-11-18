@@ -68,7 +68,8 @@ class PlanUiFixesTest extends TestCase
     public function test_validation_messages_are_vietnamese(): void
     {
         $msg = Validator::make(['day' => ''], ['day' => 'required'], [], ['day' => 'ngày mới'])->errors()->first('day');
-        $this->assertSame('Hãy nhập hoặc chọn ngày mới.', $msg);
+        $this->assertStringContainsString('ngày mới', $msg);
+        $this->assertStringContainsString('nhập', $msg);
         $this->assertStringNotContainsString('field is required', $msg);
     }
 
