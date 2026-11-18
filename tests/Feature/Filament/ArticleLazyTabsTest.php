@@ -93,4 +93,23 @@ class ArticleLazyTabsTest extends TestCase
 
         $this->assertLessThan($eager, $lazy, "Lần đầu chỉ tab mở đầu phải ít truy vấn hơn dựng đủ ($lazy so với $eager).");
     }
+
+    public function test_chi_trang_bai_bat_nap_theo_tab_con_cac_trang_tab_khac_khong_goi_loadtabs(): void
+    {
+        $html = Livewire::test(ViewArticle::class, ['record' => $this->article->id])->html();
+        $this->assertStringContainsString('data-lazy-tabs="1"', $html, 'Trang bài bật nạp theo tab.');
+
+        // Trang có thanh tab nhưng KHÔNG có hàm loadTabs: nếu mã trình duyệt gọi nó thì máy chủ trả lỗi 500 (đã xảy ra trên server, trang Lịch xuất bản).
+        $other = Livewire::test(\App\Filament\Resources\PublicationResource\Pages\ListPublications::class)->html();
+        $this->assertStringContainsString('data-tabs="tabs-lich-xuat-ban"', $other);
+        $this->assertStringNotContainsString('data-lazy-tabs', $other, 'Trang khác không được tự xưng nạp theo tab.');
+        $this->assertFalse(method_exists(\App\Filament\Resources\PublicationResource\Pages\ListPublications::class, 'loadTabs'));
+    }
+
+    public function test_ma_trinh_duyet_khong_do_loadtabs_bang_typeof_vi_wire_tra_ham_cho_moi_ten(): void
+    {
+        $js = (string) file_get_contents(public_path('js/studio-ui.js'));
+        $this->assertStringContainsString("dataset.lazyTabs === '1'", $js);
+        $this->assertStringNotContainsString("typeof this.\$wire.loadTabs", $js);
+    }
 }

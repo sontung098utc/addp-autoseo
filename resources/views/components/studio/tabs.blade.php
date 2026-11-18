@@ -1,4 +1,4 @@
-@props(['tabs' => [], 'default' => null, 'persist' => null, 'label' => 'Các phần của trang'])
+@props(['tabs' => [], 'default' => null, 'persist' => null, 'label' => 'Các phần của trang', 'lazy' => false])
 @php
     $tabs = array_values($tabs);
     $default ??= $tabs[0]['key'] ?? '';
@@ -23,7 +23,7 @@
 @endonce
 {{-- wire:key theo (tab mặc định, khóa nhớ tab): khi trạng thái bài đổi (vd. phiên chạy xong, tab mặc định và khóa nhớ đổi) thì Livewire DỰNG LẠI khối này thay vì chỉ sửa thuộc tính x-data.
      Trước đây x-data bị đánh giá lại trên cùng phần tử: nút tab theo phạm vi dữ liệu mới còn các khung nội dung (x-show) vẫn gắn phạm vi cũ, nên bấm tab nào nội dung cũng kẹt ở tab đầu. --}}
-<div class="ss-tabs-wrap" wire:key="{{ $uid }}-{{ md5((string) $default) }}" x-data="studioTabs(@js($default), @js($persist))" data-tabs="{{ $uid }}">
+<div class="ss-tabs-wrap" wire:key="{{ $uid }}-{{ md5((string) $default) }}" x-data="studioTabs(@js($default), @js($persist))" data-tabs="{{ $uid }}" @if ($lazy) data-lazy-tabs="1" @endif>
     <div class="ss-tabs-scroller" x-bind:class="{ 'has-start': canStart, 'has-end': canEnd }">
     <div class="ss-tabs" role="tablist" aria-label="{{ $label }}" x-ref="strip" x-on:keydown="onKey($event)" x-on:scroll.passive="measure()">
         @foreach ($tabs as $t)

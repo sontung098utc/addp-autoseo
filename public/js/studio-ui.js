@@ -40,8 +40,10 @@ document.addEventListener('alpine:init', () => {
     // Chỉ các tab của CHÍNH thanh này (tab lồng bên trong một panel, ví dụ các phần của phiên chạy trong tab Phiên chạy của bài, có thanh riêng).
     keys() { return [...(this.$refs.strip || this.$el).querySelectorAll('[role=tab]')].map((e) => e.dataset.key); },
     // Trang dùng nạp-tab-theo-nhu-cầu (Livewire có loadTabs): xin nạp ngay tab vừa chọn, không chờ lượt nạp nền.
+    // CHỈ khi trang bật nạp-theo-tab (data-lazy-tabs). Không dò bằng typeof $wire.loadTabs: $wire của Livewire trả về một hàm cho MỌI tên, nên phép dò
+    // luôn đúng và các trang khác gọi một hàm không tồn tại (lỗi 500 "Public method [loadTabs] not found").
     want(k) {
-      if (this.$wire && typeof this.$wire.loadTabs === 'function' && !(this._asked ||= {})[k]) { this._asked[k] = true; try { this.$wire.loadTabs([k]); } catch (e) { /* bỏ qua */ } }
+      if (this.$el.dataset.lazyTabs === '1' && this.$wire && !(this._asked ||= {})[k]) { this._asked[k] = true; try { this.$wire.loadTabs([k]); } catch (e) { /* bỏ qua */ } }
     },
     set(k) {
       this.active = k;
