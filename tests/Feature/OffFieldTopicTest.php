@@ -97,9 +97,27 @@ class OffFieldTopicTest extends TestCase
     public function test_no_comparison_data_or_sensitive_topic_is_never_off_field(): void
     {
         $ctx = BrainContext::forArticle($this->article('x'));
-        $this->assertFalse(TopicScope::clearlyOffField('cách viết thư xin học bổng', null, $ctx)); // không có hồ sơ: giữ như cũ
+        $this->assertFalse(TopicScope::clearlyOffField('cách viết thư xin học bổng', null, new BrainContext([]))); // không có gì để so sánh: giữ như cũ
         $this->assertFalse(TopicScope::clearlyOffField('đầu tư chứng khoán cho người mới', $this->brand, $ctx)); // dính luật rủi ro tài chính
         $this->assertFalse(TopicScope::clearlyOffField('', $this->brand, $ctx));
+        $this->brand->update(['business_field' => null]); // chưa có lĩnh vực trong hồ sơ: không đủ bằng chứng, giữ nghiêm
+        $this->assertFalse(TopicScope::clearlyOffField('cách viết thư xin học bổng', $this->brand->fresh(), $ctx));
+        $this->brand->update(['business_field' => 'Dược phẩm và thiết bị y tế']);
         $this->assertTrue(TopicScope::clearlyOffField('cách viết thư xin học bổng', $this->brand, $ctx));
+    }
+
+    public function test_website_level_medical_brains_do_not_raise_unrelated_article(): void
+    {
+                foreach ([['Đái tháo đường (tiểu đường)', 'high', 'must_cite'], ['Tim mạch và tăng huyết áp', 'high', 'must_cite'], ['Trí tuệ của ADDP', 'low', 'numbers']] as $i => [$n, $risk, $rel]) {
+            $b = Brain::create(['name' => $n, 'slug' => 'b'.$i, 'domain_key' => 'k'.$i, 'language' => 'vi', 'status' => 'active', 'description' => '', 'settings' => ['risk_class' => $risk, 'ai_reliance' => $rel]]);
+            $this->site->brains()->attach($b->id, ['priority' => 20 + $i]);
+        }
+        $off = ArticleReadiness::for($this->article('cách viết thư xin học bổng'));
+        $this->assertSame('low', $off['risk']['level']);
+        $this->assertSame(['Trí tuệ của ADDP'], array_column($off['brains']['attached'], 'name')); // Trí tuệ thương hiệu vẫn áp dụng, Trí tuệ y tế thì không
+        $this->assertSame('high', ArticleReadiness::for($this->article('tiểu đường ăn gì'))['risk']['level']);
+        $ctx = BrainContext::forArticle($this->article('x'));
+        $this->assertSame('high', $ctx->riskFloor());
+        $this->assertSame('low', $ctx->withoutStrict()->riskFloor());
     }
 }

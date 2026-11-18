@@ -42,7 +42,10 @@ final class ArticleReadiness
 
         $assess = (new RiskClassifier)->assess($keyword);
         $offField = $site && $keyword !== '' && \App\Services\Agent\Risk\TopicScope::clearlyOffField($keyword, BrandProfileData::forWebsite($site->id), $ctx);
-        $level = $offField ? $assess->level : $ctx->raise($assess->level); // bài chắc chắn ngoài lĩnh vực: hạng theo chủ đề, không theo ngành của Trí tuệ
+        if ($offField) {
+            $ctx = $ctx->withoutStrict();
+        }
+        $level = $ctx->raise($assess->level); // bài chắc chắn ngoài lĩnh vực: hạng theo chủ đề, không theo ngành của Trí tuệ
         $reasons = $assess->reasons;
         if ($level !== $assess->level) {
             $reasons[] = 'Nâng hạng theo cấu hình của Trí tuệ: '.$ctx->names().'.';

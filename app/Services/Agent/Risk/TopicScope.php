@@ -13,7 +13,7 @@ use App\Services\Knowledge\Discover\SourceDiscoveryService;
  * lĩnh vực thương hiệu trong prompt ảnh) lên một bài chẳng liên quan (vd. "cách viết thư xin học bổng" trên website dược).
  *
  * Nguyên tắc AN TOÀN: chỉ trả true khi CHẮC CHẮN lệch. Mọi nghi ngờ đều trả false (giữ nghiêm như cũ), nên không bao giờ hạ mức an toàn của bài y tế thật:
- *  - thiếu hồ sơ/lĩnh vực/Trí tuệ để so sánh => false;
+ *  - hồ sơ doanh nghiệp chưa có lĩnh vực => false (không đủ bằng chứng);
  *  - từ khóa dính luật rủi ro (sức khỏe, tài chính, pháp lý...), cụm sản phẩm sức khỏe/dược hoặc từ vựng y tế rộng => false;
  *  - từ khóa có chung từ với lĩnh vực của hồ sơ hoặc với tên/mô tả của bất kỳ Trí tuệ nào => false.
  */
@@ -25,7 +25,10 @@ final class TopicScope
     public static function clearlyOffField(string $keyword, ?BrandProfile $brand, ?BrainContext $ctx = null): bool
     {
         $keyword = trim($keyword);
-        if ($keyword === '' || ! BrandProfileData::looksOffTopic($brand, $keyword)) {
+        $hasField = trim((string) $brand?->business_field) !== '';
+        $brains = $ctx->brains ?? [];
+        // Cần bằng chứng dương về lĩnh vực của website (hồ sơ có lĩnh vực) và từ khóa không chung từ với nó; tên Trí tuệ một mình không đủ để kết luận lệch.
+        if ($keyword === '' || ! $hasField || ! BrandProfileData::looksOffTopic($brand, $keyword)) {
             return false;
         }
         $a = (new RiskClassifier)->assess($keyword);
@@ -38,7 +41,7 @@ final class TopicScope
         }
         // Trí tuệ đã gắn cũng phải không chạm chủ đề (tên, mô tả, mã lĩnh vực): bài chung từ với một Trí tuệ thì coi là thuộc phạm vi của nó.
         $kw = self::tokens($keyword);
-        foreach ($ctx->brains ?? [] as $b) {
+        foreach ($brains as $b) {
             $bw = self::tokens($b->name.' '.$b->description.' '.str_replace('-', ' ', (string) $b->domain_key));
             if (self::overlap($kw, $bw)) {
                 return false;
@@ -62,7 +65,7 @@ final class TopicScope
     /** @return list<string> */
     private static function tokens(string $s): array
     {
-        return array_values(array_filter(preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($s)) ?: [], fn ($w) => mb_strlen($w) >= 3));
+        return array_values(array_filter(preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($s)) ?: [], fn ($w) => mb_strlen($w) >= 3 && ! in_array($w, ['của', 'cho', 'và', 'các', 'những', 'trí', 'tuệ', 'công', 'ty', 'với', 'trong'], true)));
     }
 
     /** @param list<string> $a @param list<string> $b */

@@ -74,6 +74,12 @@ final class BrainContext
         return implode(', ', array_map(fn (Brain $b) => $b->name, $this->brains));
     }
 
+    /** Bản chỉ giữ Trí tuệ thường (rủi ro thấp, không bắt buộc nguồn): dùng cho bài ngoài lĩnh vực của các Trí tuệ y tế/nghiêm. */
+    public function withoutStrict(): self
+    {
+        return new self(array_values(array_filter($this->brains, fn (Brain $b) => $b->riskClass() === 'low' && $b->reliance() !== 'must_cite')));
+    }
+
     /** Mức nghiêm nhất trong các Trí tuệ: must_cite > numbers > free. */
     public function reliance(): ?string
     {

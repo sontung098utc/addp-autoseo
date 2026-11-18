@@ -369,6 +369,12 @@ final class AgentRunOrchestrator
         }
         $this->brandProfile = BrandProfileData::forWebsite($article->website_id);
         $this->brainCtx = BrainContext::forArticle($article, $this->campaignId); // AG-B1
+        // Trí tuệ gắn theo website không đồng nghĩa liên quan tới MỌI bài: bài chắc chắn ngoài lĩnh vực chỉ giữ Trí tuệ thường (thương hiệu), bỏ các Trí tuệ rủi ro cao/bắt buộc nguồn (y tế) để không nâng hạng, không nhồi bối cảnh/disclaimer y tế vào lời nhắc viết, nguồn và ảnh.
+        $offField = \App\Services\Agent\Risk\TopicScope::clearlyOffField((string) $article->primary_keyword, $this->brandProfile, $this->brainCtx);
+        $droppedBrains = $offField ? array_values(array_map(fn ($b) => $b->name, array_filter($this->brainCtx->brains, fn ($b) => $b->riskClass() !== 'low' || $b->reliance() === 'must_cite'))) : [];
+        if ($droppedBrains !== []) {
+            $this->brainCtx = $this->brainCtx->withoutStrict();
+        }
         $this->kb = (new KnowledgeContext())->scopeToBrains($this->writerBrainScope($this->brainCtx->ids())); // AG-S20: mỗi lượt chạy truy xuất kiến thức riêng; AG-B1: trong phạm vi Trí tuệ
         $this->assets = new ContextAssets();
 
@@ -392,14 +398,13 @@ final class AgentRunOrchestrator
         $assess = $this->risk->assess($article->primary_keyword);
         // AG-B1: Trí tuệ có thể NÂNG hạng (must_cite: tối thiểu vừa; hoặc theo risk_class), không bao giờ hạ hạng đã tính.
         // Bài CHẮC CHẮN ngoài lĩnh vực của website/Trí tuệ (vd. thư xin học bổng trên website dược): Trí tuệ không nâng hạng theo ngành; hạng theo chính chủ đề. Nghi ngờ thì vẫn nâng như cũ.
-        $offField = \App\Services\Agent\Risk\TopicScope::clearlyOffField((string) $article->primary_keyword, $this->brandProfile, $this->brainCtx);
-        $raised = $offField ? $assess->level : $this->brainCtx->raise($assess->level);
+        $raised = $this->brainCtx->raise($assess->level);
         $brainRaise = $raised !== $assess->level ? ' Hạng được nâng từ '.$this->levelLabel($assess->level).' lên '.$this->levelLabel($raised).' theo cấu hình của Trí tuệ ('.$this->brainCtx->names().').' : '';
         if ($raised !== $assess->level) {
             $assess = new \App\Services\Agent\Risk\RiskAssessment($raised, $assess->reasons, $assess->sensitiveClaims);
         }
         $run->update(['risk_level' => $assess->level]);
-        $offFieldNote = $offField ? ' Cảnh báo: chủ đề này nằm ngoài lĩnh vực của website'.($this->brandProfile?->business_field ? ' ('.mb_substr((string) $this->brandProfile->business_field, 0, 80).')' : '').' nên hạng rủi ro và ảnh minh họa theo chính chủ đề, không theo ngành của website. Người duyệt nên cân nhắc có nên đăng bài này trên website này không.' : '';
+        $offFieldNote = $offField ? ' Cảnh báo: chủ đề này nằm ngoài lĩnh vực của website'.($this->brandProfile?->business_field ? ' ('.mb_substr((string) $this->brandProfile->business_field, 0, 80).')' : '').' nên hạng rủi ro, lời nhắc viết và ảnh minh họa theo chính chủ đề, không theo ngành của website'.($droppedBrains !== [] ? ' (không dùng các Trí tuệ: '.implode(', ', array_slice($droppedBrains, 0, 6)).')' : '').'. Người duyệt nên cân nhắc có nên đăng bài này trên website này không.' : '';
         $this->step($run, 'risk', 'editor', $assess->level === 'high' || $offField ? 'warn' : 'ok', 'Hạng rủi ro: '.$this->levelLabel($assess->level),
             ($assess->reasons === [] && $brainRaise === '' ? 'Chủ đề thường, không chạm nhóm nhạy cảm.' : implode(' ', $assess->reasons).$brainRaise).($assess->level === 'high' ? ' Bài cần người có chuyên môn duyệt.' : '').$offFieldNote,
             ['level' => $assess->level] + ($offField ? ['off_topic' => true, 'off_field' => true] : []) + ($brainRaise !== '' ? ['raised_by_brain' => true] : []) + $this->brainCtx->stepData());
