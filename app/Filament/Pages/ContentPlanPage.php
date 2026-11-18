@@ -2,7 +2,7 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Clusters\AgentTeam;
+use App\Filament\Support\ContentPlan\HasPlanFileImport;
 use App\Filament\Support\ContentPlan\HasPlanProposals;
 use App\Filament\Support\ContentPlan\MockTitleSuggester;
 use App\Filament\Support\ContentPlan\PlanActions;
@@ -28,25 +28,22 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Pages\SubNavigationPosition;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 
 class ContentPlanPage extends Page
 {
+    use HasPlanFileImport;
     use HasPlanProposals;
 
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
 
     protected static ?string $navigationLabel = 'Kế hoạch';
 
-    /** Kế hoạch thuộc chiến dịch: là tab "Kế hoạch" cạnh "Chiến dịch" trong cụm Đội AI, không còn mục riêng ở menu. */
-    protected static ?string $cluster = AgentTeam::class;
+    /** Mục menu lớn nằm ngay dưới "Đội AI" (cùng nhóm "Chiến dịch"): nơi lập kế hoạch, nhập file, xem các kế hoạch và chiến dịch. */
+    protected static ?string $navigationGroup = 'Chiến dịch';
 
     protected static ?int $navigationSort = 2;
-
-    /** Filament đọc vị trí từ CHÍNH trang (không kế thừa từ cụm): thiếu dòng này thì mặc định là menu dọc bên trái. */
-    protected static SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
     protected static ?string $title = 'Kế hoạch nội dung';
 
@@ -91,6 +88,7 @@ class ContentPlanPage extends Page
         $this->campaignId = '';
         $this->planTarget = null;
         $this->planPick = [];
+        $this->importPreview = null;
     }
 
     public function selectCluster(string $name): void
@@ -483,13 +481,55 @@ class ContentPlanPage extends Page
             'clusterColumns' => $this->clusterColumns(), 'clusterRows' => $clusterRows,
             'undatedColumns' => $this->undatedColumns(), 'undatedRows' => $undatedRows,
             'proposals' => $site ? (new ContentPlanner)->propose($site, 10, \App\Services\Planning\GscSignals::forWebsite($site)) : [], 'pendingAudit' => $site ? (new ContentPlanner)->pendingAuditCount($site) : 0,
+            'planGroups' => $site ? $this->planGroups($shown, $campaigns, $filter) : [], 'canOpenCampaign' => \App\Filament\Resources\CampaignResource::canViewAny(),
             'campaigns' => $campaigns, 'campaignFilter' => $filter, 'showTarget' => $filter === null,
             'demo' => $demo, 'demoOn' => DemoMode::enabled(), 'sites' => $sites, 'site' => $site, 'rows' => $rows, 'detail' => $detail,
             'allConflicts' => $allConflicts, 'byId' => $byId, 'days' => $days, 'weekCount' => $weekCount, 'undated' => $undated,
             'rangeLabel' => $start->format('d/m').' – '.$start->addDays(6)->format('d/m/Y'),
-            'limit' => PlanRules::DAILY_LIMIT, 'total' => count($articles),
+            'limit' => PlanRules::DAILY_LIMIT, 'total' => count($articles), 'fieldGroups' => \App\Services\Planning\Import\PlanFileFields::grouped(),
             'norm' => fn (string $k) => PlannedArticleCreator::normalize($k),
         ];
+    }
+
+    /**
+     * "Các kế hoạch": mỗi chiến dịch của website là một nhóm gồm các bài của nó (kèm tiến độ và khoảng ngày), bài lẻ gom riêng ở cuối.
+     * Kế hoạch không có bảng riêng: nó chính là các bài "Đã lên kế hoạch" của chiến dịch.
+     *
+     * @param  list<array<string,mixed>>  $shown  bài đã lọc theo ô chiến dịch ở đầu trang
+     * @return list<array<string,mixed>>
+     */
+    private function planGroups(array $shown, $campaigns, ?string $filter): array
+    {
+        $bucket = ['planned' => 'planned', 'drafting' => 'writing', 'rejected' => 'writing', 'needs_review' => 'review', 'approved' => 'ready'];
+        $make = function (string $key, string $name, ?Campaign $c, array $items) use ($bucket): array {
+            $counts = ['planned' => 0, 'writing' => 0, 'review' => 0, 'ready' => 0];
+            $dates = [];
+            foreach ($items as $a) {
+                $counts[$bucket[$a['status']] ?? 'planned']++;
+                if ($a['at']) {
+                    $dates[] = $a['at'];
+                }
+            }
+            usort($items, fn ($x, $y) => [$x['at'] === null, $x['at'], $x['id']] <=> [$y['at'] === null, $y['at'], $y['id']]);
+            sort($dates);
+
+            return ['key' => $key, 'name' => $name, 'campaign' => $c, 'state' => $c ? \App\Filament\Resources\CampaignResource::stateOf($c) : null,
+                'total' => count($items), 'counts' => $counts, 'from' => $dates[0] ?? null, 'to' => $dates ? $dates[count($dates) - 1] : null,
+                'items' => array_slice($items, 0, 30), 'more' => max(0, count($items) - 30)];
+        };
+        $groups = [];
+        foreach ($campaigns as $c) {
+            if ($filter === 'solo' || ($filter !== null && (int) $filter !== $c->id)) {
+                continue;
+            }
+            $groups[] = $make('c'.$c->id, $c->name, $c, array_values(array_filter($shown, fn ($a) => (int) $a['campaign_id'] === $c->id)));
+        }
+        $solo = array_values(array_filter($shown, fn ($a) => $a['campaign_id'] === null));
+        if ($solo !== [] && ($filter === null || $filter === 'solo')) {
+            $groups[] = $make('solo', 'Bài lẻ (không thuộc chiến dịch)', null, $solo);
+        }
+
+        return $groups;
     }
 
     /** @return list<array<string,mixed>> */

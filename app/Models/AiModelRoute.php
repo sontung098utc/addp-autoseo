@@ -23,6 +23,8 @@ class AiModelRoute extends Model
         'citation_check' => ['Kiểm trích dẫn', 'standard'],
         'keyword_suggest' => ['Đề xuất từ khóa', 'cheap'],
         'keyword_cluster' => ['Gom cụm từ khóa', 'cheap'],
+        // Đọc file kế hoạch người dùng tải lên (Excel/CSV), ánh xạ cột sang trường kế hoạch. Chưa cấu hình riêng thì dùng route 'summary' (KeywordAiResolver). Nên trỏ tới Claude.
+        'plan_import' => ['Đọc file kế hoạch (Excel/CSV)', 'standard'],
         // G5: làm mới bài MỘT PHẦN (PartialRefreshInterface): sinh lại meta (rẻ) và sửa các mục có lỗi (chuẩn), thay vì viết lại cả bài bằng bậc suy luận.
         'meta_regen' => ['Sinh lại tiêu đề SEO và meta', 'cheap'],
         'section_repair' => ['Sửa các mục có lỗi', 'standard'],

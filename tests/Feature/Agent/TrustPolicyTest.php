@@ -121,8 +121,8 @@ class TrustPolicyTest extends TestCase
         $this->assertSame(['admin' => true, 'approver' => true, 'writer' => false], $rows['Xem lịch xuất bản']['cells']);
         $this->assertSame(['admin' => true, 'approver' => false, 'writer' => false], $rows['Xóa bài']['cells']);
         $this->assertSame(['admin' => true, 'approver' => false, 'writer' => false], $rows['Quản lý website kết nối']['cells']);
-        // Biên tập viên vào cụm để dùng tab Kế hoạch; các tab khác tự kiểm quyền.
-        $this->assertSame(['admin' => true, 'approver' => true, 'writer' => true], $rows['Xem hub Đội AI (cả trang này)']['cells']);
+        // Kế hoạch là mục menu riêng (biên tập viên vào ở đó); cụm Đội AI chỉ còn cho người duyệt trở lên.
+        $this->assertSame(['admin' => true, 'approver' => true, 'writer' => false], $rows['Xem hub Đội AI (cả trang này)']['cells']);
         $this->assertSame(['admin' => true, 'approver' => false, 'writer' => false], $rows['Nhập / đổi khóa AI']['cells']);
         $this->assertSame(['admin' => false, 'approver' => false, 'writer' => false], $rows['Nâng lên Mức 2 (tự đăng)']['cells']);
     }

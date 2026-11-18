@@ -135,7 +135,7 @@ class ContentPlannerTest extends TestCase
         $this->assertSame('planned', Article::where('keyword_id', $k->id)->value('workflow_status'));
     }
 
-    public function test_de_xuat_la_tab_ngay_sau_lich_tuan_va_chain_context_nam_trong_tab(): void
+    public function test_lap_ke_hoach_la_tab_thu_hai_va_chain_context_nam_trong_tab(): void
     {
         $this->kw('du học úc', 300);
         $this->actingAs($this->user('writer'));
@@ -144,7 +144,7 @@ class ContentPlannerTest extends TestCase
         $keys = [];
         preg_match_all('/role="tab"[^>]*data-key="([^"]+)"/', $html, $m);
         $keys = $m[1];
-        $this->assertSame(['lich-tuan', 'de-xuat', 'cum'], array_slice($keys, 0, 3));
+        $this->assertSame(['cac-ke-hoach', 'lap-ke-hoach', 'lich-tuan', 'cum'], array_slice($keys, 0, 4)); // "Các kế hoạch" là mục đầu, "Lập kế hoạch" ngay sau
 
         $chain = strpos($html, 'data-testid="chain-context"');
         $this->assertNotFalse($chain);

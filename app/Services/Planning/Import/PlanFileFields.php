@@ -1,0 +1,219 @@
+<?php
+
+namespace App\Services\Planning\Import;
+
+use App\Filament\Support\Schedule\VnTime;
+use Carbon\CarbonImmutable;
+
+/**
+ * Danh mục các trường của kế hoạch/chiến dịch/bài viết mà một cột trong file người dùng có thể được ánh xạ tới,
+ * kèm cách chuẩn hóa giá trị ô. AI chỉ được chọn trong danh mục này (whitelist); mọi giá trị ô đều được chuẩn hóa lại ở đây.
+ */
+final class PlanFileFields
+{
+    /** khóa => [nhãn, nhóm, nhận nhiều cột?, mô tả cho AI] */
+    public const FIELDS = [
+        'primary_keyword' => ['Từ khóa chính', 'Bài viết', false, 'từ khóa/chủ đề chính mà MỘT bài nhắm tới; mỗi dòng dữ liệu thường là một bài'],
+        'title' => ['Tiêu đề gợi ý', 'Bài viết', false, 'tiêu đề hoặc tên bài dự kiến'],
+        'secondary_keywords' => ['Từ khóa phụ', 'Bài viết', true, 'các từ khóa phụ/liên quan, thường ngăn cách bằng dấu phẩy hoặc chấm phẩy'],
+        'search_intent' => ['Ý định tìm kiếm', 'Bài viết', false, 'ý định người tìm: thông tin / thương mại / giao dịch / điều hướng (hoặc viết tắt Info/Comm/Trans, TOFU/MOFU/BOFU)'],
+        'topic_cluster' => ['Cụm chủ đề', 'Bài viết', false, 'nhóm/cụm chủ đề, trụ cột nội dung, danh mục mà bài thuộc về'],
+        'guidance' => ['Ghi chú / chỉ dẫn cho đội AI', 'Bài viết', true, 'ghi chú, dàn ý, đối tượng, góc nhìn, yêu cầu riêng cho bài (mọi cột ghi chú đều về đây)'],
+        'search_volume' => ['Lượng tìm kiếm/tháng', 'Bài viết', false, 'lượng tìm kiếm mỗi tháng của từ khóa chính (một số, ví dụ 60000 hoặc 60.000)'],
+        'planned_date' => ['Ngày dự kiến đăng', 'Kế hoạch', false, 'ngày dự kiến xuất bản/đăng bài'],
+        'priority' => ['Mức ưu tiên', 'Kế hoạch', false, 'độ ưu tiên (số, cao/trung bình/thấp, hoặc P1/P2/P3)'],
+        'campaign' => ['Tên chiến dịch', 'Chiến dịch', false, 'tên chiến dịch/đợt/giai đoạn mà bài thuộc về (dùng để gom các dòng thành chiến dịch)'],
+        'campaign_description' => ['Mô tả chiến dịch', 'Chiến dịch', false, 'mục tiêu hoặc mô tả của chiến dịch'],
+        'campaign_start' => ['Chiến dịch bắt đầu', 'Chiến dịch', false, 'ngày bắt đầu của chiến dịch/giai đoạn'],
+        'campaign_end' => ['Chiến dịch kết thúc', 'Chiến dịch', false, 'ngày kết thúc của chiến dịch/giai đoạn'],
+        'ignore' => ['Bỏ qua (không nhập)', 'Khác', true, 'cột không dùng cho kế hoạch (số thứ tự, kết quả, người phụ trách, trạng thái, lượt tìm, link...)'],
+    ];
+
+    /** @return list<string> */
+    public static function keys(): array
+    {
+        return array_keys(self::FIELDS);
+    }
+
+    public static function label(string $field): string
+    {
+        return self::FIELDS[$field][0] ?? $field;
+    }
+
+    /** @return array<string,array<string,string>> nhóm => [khóa => nhãn], cho ô chọn ở giao diện */
+    public static function grouped(): array
+    {
+        $out = [];
+        foreach (self::FIELDS as $k => [$label, $group]) {
+            $out[$group][$k] = $label;
+        }
+
+        return $out;
+    }
+
+    public static function allowsMany(string $field): bool
+    {
+        return self::FIELDS[$field][2] ?? false;
+    }
+
+    /** "A" → 0, "B" → 1, "AA" → 26. null nếu không phải chữ cột. */
+    public static function colIndex(mixed $col): ?int
+    {
+        if (is_int($col)) {
+            return $col >= 0 ? $col : null;
+        }
+        $s = strtoupper(trim((string) $col));
+        if ($s === '' || ! preg_match('/^[A-Z]{1,2}$/', $s)) {
+            return null;
+        }
+        $n = 0;
+        foreach (str_split($s) as $ch) {
+            $n = $n * 26 + (ord($ch) - 64);
+        }
+
+        return $n - 1;
+    }
+
+    public static function colLetter(int $index): string
+    {
+        $s = '';
+        for ($n = $index + 1; $n > 0; $n = intdiv($n - 1, 26)) {
+            $s = chr(65 + ($n - 1) % 26).$s;
+        }
+
+        return $s;
+    }
+
+    public static function intent(string $v): string
+    {
+        $t = mb_strtolower(trim($v));
+        // viết tắt thường gặp (và phễu marketing): khớp nguyên giá trị, không khớp chuỗi con
+        $exact = ['info' => 'informational', 'i' => 'informational', 'tofu' => 'informational', 'comm' => 'commercial', 'c' => 'commercial', 'mofu' => 'commercial',
+            'trans' => 'transactional', 'tran' => 'transactional', 't' => 'transactional', 'bofu' => 'transactional', 'nav' => 'navigational', 'navi' => 'navigational', 'n' => 'navigational'];
+        if (isset($exact[$t])) {
+            return $exact[$t];
+        }
+        foreach ([
+            'transactional' => ['transaction', 'giao dịch', 'mua', 'đặt hàng', 'bán'],
+            'commercial' => ['commercial', 'thương mại', 'so sánh', 'đánh giá', 'review', 'comparison'],
+            'navigational' => ['navigation', 'điều hướng', 'thương hiệu', 'brand'],
+            'informational' => ['inform', 'thông tin', 'tìm hiểu', 'kiến thức', 'hướng dẫn'],
+        ] as $intent => $needles) {
+            foreach ($needles as $n) {
+                if ($t !== '' && str_contains($t, $n)) {
+                    return $intent;
+                }
+            }
+        }
+
+        return 'informational';
+    }
+
+    /** Số 0–100, từ cao/trung bình/thấp, hoặc P0–P5 (P1 cao hơn P3); không hiểu thì null. */
+    public static function priority(string $v): ?int
+    {
+        $t = mb_strtolower(trim($v));
+        if ($t === '') {
+            return null;
+        }
+        if (preg_match('/^p\s*([0-5])$/', $t, $m)) {
+            return [100, 90, 60, 30, 10, 5][(int) $m[1]];
+        }
+        if (in_array($t, ['tb', 'tbình'], true)) {
+            return 50;
+        }
+        if (is_numeric(str_replace(',', '.', $t))) {
+            return max(0, min(100, (int) round((float) str_replace(',', '.', $t))));
+        }
+        foreach (['cao' => 80, 'high' => 80, 'gấp' => 90, 'urgent' => 90, 'trung bình' => 50, 'medium' => 50, 'thấp' => 20, 'low' => 20] as $w => $n) {
+            if (str_contains($t, $w)) {
+                return $n;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Ngày về dạng Y-m-d (giờ Việt Nam). Chấp nhận: dd/mm/yyyy (thứ tự Việt Nam), yyyy-mm-dd, "15-Dec-2026", số ngày của Excel;
+     * chỉ tháng+năm ("T1/2027", "01/2027") lấy ngày 1; thiếu năm ("20/12", "15-Dec") lấy năm hiện tại, nếu đã qua quá 30 ngày thì năm sau.
+     */
+    public static function date(string $v): ?string
+    {
+        $t = trim($v);
+        if ($t === '') {
+            return null;
+        }
+        if (preg_match('/^\d{5}(\.\d+)?$/', $t) && (float) $t > 30000 && (float) $t < 80000) {
+            return CarbonImmutable::create(1899, 12, 30)->addDays((int) $t)->format('Y-m-d');
+        }
+        $t = preg_replace('/\s+\d{1,2}:\d{2}(:\d{2})?$/', '', $t) ?? $t;
+        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'd.m.Y', 'd/m/y', 'Y/m/d', 'j-M-Y', 'j M Y', 'M j, Y'] as $f) {
+            $d = self::strict($f, $t);
+            if ($d && (int) $d->format('Y') >= 2000) {
+                return $d->format('Y-m-d');
+            }
+        }
+        if (preg_match('#^(?:t|th|tháng)\s*\.?\s*(\d{1,2})\s*[/\-.]\s*(\d{4})$#iu', $t, $m) || preg_match('#^(\d{1,2})[/\-.](\d{4})$#', $t, $m)) {
+            return (int) $m[1] >= 1 && (int) $m[1] <= 12 ? sprintf('%04d-%02d-01', (int) $m[2], (int) $m[1]) : null;
+        }
+        foreach (['j/n', 'j-n', 'j.n', 'j-M', 'j M', 'j/M'] as $f) {
+            if ($d = self::strict($f, $t)) {
+                $now = VnTime::now();
+                $d = $d->setDate((int) $now->format('Y'), (int) $d->format('n'), (int) $d->format('j'));
+                if ($d < $now->startOfDay()->subDays(30)->toDateTimeImmutable()) {
+                    $d = $d->modify('+1 year');
+                }
+
+                return $d->format('Y-m-d');
+            }
+        }
+
+        return null;
+    }
+
+    /** Phân tích đúng định dạng, không chấp nhận ngày tràn (31/02) hay thừa ký tự. */
+    private static function strict(string $format, string $value): ?\DateTimeImmutable
+    {
+        $d = \DateTimeImmutable::createFromFormat('!'.$format, $value);
+        $err = \DateTimeImmutable::getLastErrors();
+
+        return $d && ($err === false || ($err['warning_count'] === 0 && $err['error_count'] === 0)) ? $d : null;
+    }
+
+    /** Lượng tìm kiếm: "60000", "60.000", "60,000", "3.423.500", "12k", "1,5 nghìn" -> số nguyên; không phải số thì null. */
+    public static function volume(string $v): ?int
+    {
+        $t = preg_replace('/\s+/u', '', mb_strtolower(trim($v))) ?? '';
+        if ($t === '') {
+            return null;
+        }
+        if (preg_match('/^(\d+(?:[.,]\d+)?)(k|nghìn|ngàn)$/u', $t, $m)) {
+            $n = (int) round((float) str_replace(',', '.', $m[1]) * 1000);
+        } elseif (preg_match('/^\d{1,3}(?:[.,]\d{3})+$/', $t)) {
+            $n = (int) preg_replace('/[.,]/', '', $t);
+        } elseif (preg_match('/^\d+(?:[.,]\d+)?$/', $t)) {
+            $n = (int) round((float) str_replace(',', '.', $t));
+        } else {
+            return null;
+        }
+
+        return $n >= 0 && $n <= 2_000_000_000 ? $n : null;
+    }
+
+    /** @return list<string> */
+    public static function splitList(string $v): array
+    {
+        $parts = preg_split('/[;,\n|]+/u', $v) ?: [];
+
+        return array_values(array_unique(array_filter(array_map(fn ($p) => trim((string) $p), $parts), fn ($p) => $p !== '' && mb_strlen($p) <= 120)));
+    }
+
+    /** Chuỗi một dòng, không thẻ HTML, không ký tự điều khiển. */
+    public static function text(string $v, int $max = 255): string
+    {
+        $t = preg_replace('/[\x00-\x1F\x7F]+|\s+/u', ' ', strip_tags($v)) ?? '';
+
+        return mb_substr(trim($t), 0, $max);
+    }
+}
