@@ -12,6 +12,7 @@ use App\Models\Website;
 use App\Services\Agent\Run\JobRunRecorder;
 use App\Services\Agent\Settings\AgentAi;
 use App\Services\Crawler\SitemapCrawlerService;
+use App\Services\Knowledge\Discover\SourceDiscoveryService;
 use App\Services\Knowledge\KnowledgeAiIngest;
 use App\Services\Knowledge\KnowledgeConflicts;
 use App\Services\Knowledge\KnowledgeDedupe;
@@ -174,6 +175,16 @@ final class BrainBuildService
         $out['brand_profile'] = $this->draftBrand($site, $by, $run, $resolved, $out);
         $outputRef = ['source_ids' => $out['source_ids'], 'item_ids' => array_merge($out['auto_item_ids'], $out['proposed_item_ids']), 'auto_approved' => $out['items_auto'], 'proposed' => $out['items_proposed']];
         $status = $out['stopped_reason'] === 'emergency_stop' ? 'blocked' : (($out['stopped_reason'] === 'ai_error' && $out['pages_read'] === 0) ? 'failed' : 'ready_for_review');
+        // Trang không tải được chỉ bị bỏ: có tiến triển thì "Xong, bỏ N trang", không trang nào tải được thì mới "Lỗi".
+        $failedN = (int) $out['pages_failed'];
+        if ($failedN > 0 && $out['stopped_reason'] === null) {
+            if ($out['pages_read'] === 0 && $out['pages_skipped'] === 0) {
+                $status = 'failed';
+                $out['message'] = 'Không tải được trang nào ('.$failedN.' trang lỗi). '.SourceDiscoveryService::FETCH_ADVICE;
+            } else {
+                $out['message'] = 'Xong, bỏ '.$failedN.' trang không tải được. '.SourceDiscoveryService::FETCH_ADVICE;
+            }
+        }
         JobRunRecorder::finish($run, $status, $outputRef, $out['message']);
         $out['run_id'] = $run?->id;
 
@@ -252,7 +263,7 @@ final class BrainBuildService
             $page = $this->fetcher->fetch($url, $allowed);
             if (! $page['ok']) {
                 $r['pages_failed']++;
-                JobRunRecorder::step($run, $stage, $url, 'failed', ['url' => $url, 'error' => $page['error']], null, 0, 0, $page['message']);
+                JobRunRecorder::step($run, $stage, $url, 'failed', ['url' => $url, 'error' => $page['error']], null, 0, 0, SourceDiscoveryService::explainFetchShort((string) $page['error'], (string) $page['message']));
 
                 continue;
             }
