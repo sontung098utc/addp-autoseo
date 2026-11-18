@@ -174,7 +174,7 @@ final class DashboardQueries
         $masked = preg_replace('/\b(Bearer|Basic)\s+[A-Za-z0-9._~+\/=-]+/i', '$1 ***', $error);
         $masked = preg_replace('/((?:token|secret|password|passwd|api[_-]?key|authorization)\s*[=:]\s*)\S+/i', '$1***', $masked);
         $masked = preg_replace('/\b(?:sk|pk|ghp|gho|xox[a-z])[-_][A-Za-z0-9_-]{8,}/', '***', $masked);
-        $masked = preg_replace('/\b[A-Za-z0-9_+\/=-]{24,}\b/', '***', $masked);
+        $masked = preg_replace('/\b[A-Za-z0-9_+=-]{24,}\b/', '***', $masked); // không gộp dấu "/": đường dẫn URL (GET /rest/...) là thông tin cần để chẩn đoán, không phải secret
 
         return mb_strimwidth($masked, 0, self::ERROR_PREVIEW_LENGTH, '…');
     }

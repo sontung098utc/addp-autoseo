@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\PublicationResource\Pages;
+use App\Filament\Support\Schedule\ErrorExplainer;
 use App\Filament\Support\Schedule\ErrorMasker;
 use App\Filament\Support\Schedule\PublicationHoldAction;
 use App\Filament\Support\Schedule\ReconcileAction;
@@ -242,7 +243,7 @@ class PublicationResource extends Resource
                 Tables\Columns\TextColumn::make('last_error')->toggleable()
                     ->label('Lỗi')
                     ->formatStateUsing(fn (?string $state): string => ErrorMasker::short($state, 60))
-                    ->tooltip(fn (Publication $r): ?string => $r->last_error ? ErrorMasker::mask($r->last_error) : null)
+                    ->tooltip(fn (Publication $r): ?string => $r->last_error ? ErrorExplainer::explain($r->last_error) : null)
                     ->wrap()
                     ->extraCellAttributes(['style' => 'max-width:16rem'])
                     ->placeholder('—'),
@@ -267,7 +268,7 @@ class PublicationResource extends Resource
                         ? ArticleResource::getUrl('view', ['record' => $r->articleVersion->article_id]).'#tab-publish'
                         : PublicationResource::getUrl('view', ['record' => $r])),
                 Tables\Actions\Action::make('publishNow')
-                    ->label('Đăng ngay')
+                    ->label(fn (Publication $r): string => $r->status === 'failed' ? 'Đăng lại' : 'Đăng ngay')
                     ->icon('heroicon-o-paper-airplane')
                     ->color('success')
                     ->visible(fn (Publication $r) => in_array($r->status, ['scheduled', 'failed'], true))
