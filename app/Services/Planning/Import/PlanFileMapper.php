@@ -78,10 +78,18 @@ final class PlanFileMapper
         $sheet = $this->pickSheet($pool, (string) ($data['sheet'] ?? ''));
         $header = $this->headerRow($sheet, $data['header_row'] ?? null);
         $fields = $this->fieldsByIndex($sheet, (array) ($data['columns'] ?? []));
-        if ($fields === []) {
-            throw new InvalidArgumentException('AI chưa nhận ra được cột nào trong file. Thử lại, hoặc tự chọn trường cho từng cột.');
-        }
         $notes = [];
+        // đối chiếu với dữ liệu thật (không tin AI mù quáng, nhất là model yếu): sửa dòng tiêu đề, hạ cột không khớp nội dung, bổ sung theo tên cột
+        $fixed = PlanFileHeuristics::correctHeader($sheet, $header);
+        if ($fixed !== $header) {
+            $header = $fixed;
+            $notes[] = 'Dòng tiêu đề được điều chỉnh sang dòng '.$header.' cho khớp dữ liệu thật.';
+        }
+        [$fields, $adjusted] = PlanFileHeuristics::reconcile($sheet, $header, $fields);
+        $notes = array_merge($notes, $adjusted);
+        if (! in_array('primary_keyword', array_column($fields, 'field'), true)) {
+            throw new InvalidArgumentException('AI chưa nhận ra được cột từ khóa chính trong file. Thử lại, hoặc tự chọn trường cho từng cột.');
+        }
         foreach (array_slice((array) ($data['notes'] ?? []), 0, 3) as $n) {
             $t = AiJson::clean($n, 200);
             if ($t !== '' && ! preg_match(KeywordResearchService::INJECTION, $t)) {

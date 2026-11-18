@@ -196,12 +196,12 @@ class PlanFileImportTest extends TestCase
         $this->assertSame('KeHoach', $r['sheet'], 'tên sheet bịa: lấy sheet đầu');
         $this->assertLessThanOrEqual(count($sheets[0]['rows']) - 1, $r['header_row']);
         $by = array_column($r['columns'], 'field', 'letter');
-        $this->assertSame('primary_keyword', $by['D']);
-        $this->assertSame('ignore', $by['C']);
-        $this->assertSame('ignore', $by['E'] ?? 'ignore', 'trường lạ thành bỏ qua');
-        $this->assertSame('guidance', $by['F']);
+        $this->assertSame('primary_keyword', $by['C'], 'tên cột "Từ khóa" thắng gán lệch của AI (D mới là từ khóa phụ)');
+        $this->assertSame('secondary_keywords', $by['D']);
+        $this->assertSame('planned_date', $by['E'], 'trường lạ của AI bị bỏ, rồi cột được nhận lại theo tên "Ngày đăng" và nội dung là ngày');
+        $this->assertSame('priority', $by['F'], 'AI gán "ghi chú" cho cột tên "Ưu tiên": tên cột rõ nghĩa thắng');
         $this->assertSame('guidance', $by['G']);
-        $this->assertNotContains('campaign', $by);
+        $this->assertSame('campaign', $by['B'], 'cột "Chiến dịch" AI bỏ sót được nhận theo tên cột');
     }
 
     public function test_ai_khong_nhan_ra_cot_nao_thi_bao_loi(): void
@@ -708,5 +708,101 @@ class PlanFileImportTest extends TestCase
         $this->assertStringContainsString('gán TẤT CẢ cho guidance', $p);
         $this->assertStringContainsString('search_volume', $p);
         $this->assertStringContainsString('<<<FILE-abc>>>', $p);
+    }
+
+    // ---------- model yếu / AI sai: lớp kiểm tra bằng dữ liệu thật ----------
+
+    /** Cấu trúc của file thật 100 từ khóa đái tháo đường (rút gọn). */
+    private function seoKeywordRows(): array
+    {
+        $h = ['STT', 'Phân nhóm bệnh lý', 'Từ khóa tìm kiếm', 'Lượng tìm kiếm/tháng (Google VN)', 'Tiêu đề SEO 1 (Nguyên nhân)', 'Tiêu đề SEO 2 (Mức độ)', 'Tiêu đề SEO 3 (Cách chữa)', 'Tiêu đề SEO 4 (Khi nào khám)', 'Tiêu đề SEO 5 (Dinh dưỡng/Phòng ngừa)', 'Trạng thái'];
+        $kw = [['Triệu chứng khởi phát', 'Mệt mỏi uể oải', '60000'], ['Triệu chứng khởi phát', 'Tê bì chân tay', '50000'], ['Triệu chứng khởi phát', 'Tiểu đêm nhiều lần', '45000'],
+            ['Triệu chứng khởi phát', 'Khát nước liên tục', '30000'], ['Triệu chứng khởi phát', 'Sụt cân nhanh không rõ nguyên nhân', '27500'], ['Triệu chứng khởi phát', 'Vết thương lâu lành', '22000'],
+            ['Chẩn đoán & Xét nghiệm', 'Chỉ số HbA1c là gì', '68000'], ['Chẩn đoán & Xét nghiệm', 'Đường huyết lúc đói bình thường', '40000']];
+        $rows = [$h];
+        foreach ($kw as $i => [$g, $k, $v]) {
+            $rows[] = [(string) ($i + 1), $g, $k, $v, "Nguyên nhân & Triệu chứng $k chuẩn y khoa", "$k có nguy hiểm không? Biến chứng cần biết", "Cách điều trị và khắc phục $k hiệu quả", "Khi nào cần khám bác sĩ khi bị $k?", "Chế độ dinh dưỡng và phòng ngừa $k", $i === 6 ? 'Đã hoàn thành' : ''];
+        }
+
+        return $rows;
+    }
+
+    public function test_ai_yeu_tra_sai_dong_tieu_de_va_lech_cot_van_duoc_sua_dung(): void
+    {
+        $sheets = (new SheetReader)->read($this->xlsx(['Untitled' => $this->seoKeywordRows()]), 'xlsx');
+        // đúng như ảnh chụp từ server: chọn nhầm một dòng dữ liệu làm tiêu đề, gán cột lệch (cụm -> ngày, tiêu đề dài -> từ khóa chính)
+        $garbage = ['sheet' => 'Untitled', 'header_row' => 6, 'columns' => [
+            ['col' => 'B', 'field' => 'planned_date', 'confidence' => 0.9], ['col' => 'C', 'field' => 'campaign', 'confidence' => 0.9], ['col' => 'D', 'field' => 'topic_cluster', 'confidence' => 0.9],
+            ['col' => 'E', 'field' => 'primary_keyword', 'confidence' => 0.9], ['col' => 'F', 'field' => 'title', 'confidence' => 0.9]]];
+        $m = (new PlanFileMapper($this->fakeAi($garbage)))->map($sheets);
+
+        $this->assertSame(1, $m['header_row'], 'dòng tiêu đề thật là dòng 1, không phải dòng dữ liệu số 6');
+        $by = array_column($m['columns'], 'field', 'letter');
+        $this->assertSame('ignore', $by['A']);
+        $this->assertSame('topic_cluster', $by['B'], '"Phân nhóm bệnh lý" là cụm, không phải ngày');
+        $this->assertSame('primary_keyword', $by['C'], '"Từ khóa tìm kiếm" là từ khóa chính, không phải tên chiến dịch');
+        $this->assertSame('search_volume', $by['D']);
+        $this->assertSame('guidance', $by['E'], 'tiêu đề dài không thể là từ khóa chính');
+        $this->assertSame('guidance', $by['G']);
+        $this->assertSame('guidance', $by['I']);
+        $this->assertSame('ignore', $by['J'], '"Trạng thái" không nhập');
+        $this->assertNotContains('campaign', $by, 'không có cột chiến dịch nào được nhận bừa');
+
+        $b = (new PlanFileImporter)->build($this->site, $sheets[0]['rows'], array_column($m['columns'], 'field', 'index'), $m['header_row']);
+        $this->assertSame(8, count($b['items']));
+        $this->assertSame('Mệt mỏi uể oải', $b['items'][0]['keyword']);
+        $this->assertSame('Triệu chứng khởi phát', $b['items'][0]['cluster']);
+        $this->assertSame(60000, $b['items'][0]['volume']);
+        $this->assertSame([], $b['problems']);
+    }
+
+    public function test_ai_khong_nhan_ra_cot_nao_van_co_goi_y_theo_ten_cot(): void
+    {
+        $sheets = (new SheetReader)->read($this->xlsx(['Untitled' => $this->seoKeywordRows()]), 'xlsx');
+        $m = (new PlanFileMapper($this->fakeAi(['sheet' => 'Untitled', 'header_row' => 1, 'columns' => []])))->map($sheets);
+        $by = array_column($m['columns'], 'field', 'letter');
+        $this->assertSame('primary_keyword', $by['C']);
+        $this->assertSame('topic_cluster', $by['B']);
+        $this->assertSame('search_volume', $by['D']);
+        $this->assertNotEmpty(array_filter($m['notes'], fn ($n) => str_contains($n, 'bổ sung theo tên cột')));
+    }
+
+    public function test_goi_y_theo_ten_cot_khi_khong_co_ai(): void
+    {
+        $sheets = (new SheetReader)->read($this->xlsx(['Untitled' => $this->seoKeywordRows()]), 'xlsx');
+        $seed = \App\Services\Planning\Import\PlanFileHeuristics::seed($sheets[0], 1);
+        $this->assertSame('primary_keyword', $seed[2]['field']);
+        $this->assertSame('guidance', $seed[4]['field'], 'nhiều cột tiêu đề phương án đều là chỉ dẫn viết');
+        $this->assertSame('guidance', $seed[8]['field']);
+        $this->assertSame('ignore', $seed[9]['field']);
+        $this->assertSame('planned_date', \App\Services\Planning\Import\PlanFileHeuristics::fieldForHeader('Ngày xuất bản'));
+        $this->assertSame('priority', \App\Services\Planning\Import\PlanFileHeuristics::fieldForHeader('Mức ưu tiên'));
+        $this->assertSame('secondary_keywords', \App\Services\Planning\Import\PlanFileHeuristics::fieldForHeader('Từ khóa phụ / LSI'));
+        $this->assertSame('ignore', \App\Services\Planning\Import\PlanFileHeuristics::fieldForHeader('Trạng thái duyệt Y tế'));
+        $this->assertNull(\App\Services\Planning\Import\PlanFileHeuristics::fieldForHeader('Cột lạ xyz'));
+    }
+
+    public function test_cot_ai_gan_khong_khop_noi_dung_bi_ha(): void
+    {
+        $sheets = (new SheetReader)->read($this->xlsx(['Untitled' => $this->seoKeywordRows()]), 'xlsx');
+        $ai = ['sheet' => 'Untitled', 'header_row' => 1, 'columns' => [
+            ['col' => 'C', 'field' => 'primary_keyword', 'confidence' => 0.9],
+            ['col' => 'E', 'field' => 'planned_date', 'confidence' => 0.9]]];   // cột toàn chữ, không phải ngày
+        $m = (new PlanFileMapper($this->fakeAi($ai)))->map($sheets);
+        $by = array_column($m['columns'], 'field', 'letter');
+        $this->assertNotSame('planned_date', $by['E']);
+        $this->assertSame('primary_keyword', $by['C']);
+    }
+
+    public function test_dong_tieu_de_khong_keo_len_dong_banner_it_o(): void
+    {
+        $sheets = (new SheetReader)->read($this->xlsx(['S' => [
+            ['KẾ HOẠCH 2027', 'Cập nhật 06/11'],                       // banner 2 ô: không phải tiêu đề cột
+            ['Từ khóa', 'Ngày', 'Ưu tiên', 'Ghi chú'],
+            ['kw một', '10/12/2026', 'cao', 'x'], ['kw hai', '11/12/2026', 'thấp', 'y'],
+        ]]), 'xlsx');
+        $this->assertSame(2, \App\Services\Planning\Import\PlanFileHeuristics::correctHeader($sheets[0], 2), 'AI chọn đúng dòng 2: giữ nguyên');
+        $this->assertSame(2, \App\Services\Planning\Import\PlanFileHeuristics::correctHeader($sheets[0], 4), 'AI chọn nhầm dòng dữ liệu: kéo về dòng tiêu đề thật, không phải banner');
+        $this->assertSame(0, \App\Services\Planning\Import\PlanFileHeuristics::correctHeader($sheets[0], 0), 'AI báo không có tiêu đề: giữ nguyên');
     }
 }

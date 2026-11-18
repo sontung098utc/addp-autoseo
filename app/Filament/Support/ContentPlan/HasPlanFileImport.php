@@ -7,6 +7,7 @@ use App\Models\Campaign;
 use App\Models\Website;
 use App\Services\Keywords\KeywordAiUnavailable;
 use App\Services\Planning\Import\PlanFileFields;
+use App\Services\Planning\Import\PlanFileHeuristics;
 use App\Services\Planning\Import\PlanFileImporter;
 use App\Services\Planning\Import\PlanFileLinks;
 use App\Services\Planning\Import\PlanFileMapper;
@@ -170,7 +171,7 @@ trait HasPlanFileImport
             'file' => $name,
             'sheets' => array_map(fn ($s) => ['name' => $s['name'], 'total' => $s['total'], 'truncated' => $s['truncated']], $sheets),
             'sheet' => $first['name'], 'sheet_locked' => false, 'header_row' => $header, 'is_plan' => true, 'analyzed' => false, 'notes' => [], 'section_rows' => [], 'skip_rows' => [], 'links' => [], 'ai' => null,
-            'columns' => PlanFileMapper::columns($first, $header, []),
+            'columns' => PlanFileMapper::columns($first, $header, PlanFileHeuristics::seed($first, $header)),
         ];
         $this->runAnalysis();
     }
@@ -216,7 +217,7 @@ trait HasPlanFileImport
             if ($s['name'] === $name && $this->importState !== null) {
                 $h = PlanFileMapper::guessHeaderRow($s);
                 $this->importPreview = null;
-                $this->importState = array_merge($this->importState, ['sheet' => $name, 'sheet_locked' => true, 'header_row' => $h, 'analyzed' => false, 'notes' => [], 'section_rows' => [], 'skip_rows' => [], 'links' => [], 'columns' => PlanFileMapper::columns($s, $h, [])]);
+                $this->importState = array_merge($this->importState, ['sheet' => $name, 'sheet_locked' => true, 'header_row' => $h, 'analyzed' => false, 'notes' => [], 'section_rows' => [], 'skip_rows' => [], 'links' => [], 'columns' => PlanFileMapper::columns($s, $h, PlanFileHeuristics::seed($s, $h))]);
                 $this->runAnalysis();
 
                 return;
