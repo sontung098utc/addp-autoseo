@@ -18,7 +18,9 @@ use Illuminate\Support\Facades\Http;
  *   giãn cách giữa các yêu cầu (mặc định 1 giây).
  * Chưa làm: ghim địa chỉ IP đã kiểm khi gửi yêu cầu (còn khe hở DNS đổi giữa lúc kiểm và lúc tải).
  * Trả {ok:true, url, final_url, http_status, html, fetched_at} hoặc {ok:false, url, error, message, http_status?}.
- * Mã lỗi: blocked, off_domain, too_large, not_html, robots, http_error, timeout.
+ * Mã lỗi: blocked, off_domain, too_large, not_html, robots, http_error, timeout, dns.
+ * Lỗi DNS (không tìm thấy tên miền) KHÔNG bao giờ thử lại và tên miền đó được nhớ trong lượt này (không gọi lại, kể cả robots.txt);
+ * chỉ lỗi tạm thời (hết giờ, 5xx, mất kết nối) được thử lại đúng 1 lần sau trễ ngắn.
  */
 final class SafePageFetcher
 {
@@ -31,6 +33,9 @@ final class SafePageFetcher
     public const MAX_REDIRECTS = 3;
 
     private float $lastRequestAt = 0.0;
+
+    /** @var array<string,true> tên miền đã báo lỗi DNS trong lượt này */
+    private array $deadHosts = [];
 
     /** @var array<string,?list<array{allow:bool,path:string}>> host => luật (null = không có robots.txt) */
     private array $robots = [];
@@ -81,7 +86,7 @@ final class SafePageFetcher
             if ($e = $this->robotsGate($current, $allowedHosts, $url)) {
                 return $e;
             }
-            $r = $this->get($current);
+            $r = $this->getWithRetry($current);
             if (isset($r['error'])) {
                 return $r + ['url' => $url];
             }
@@ -131,9 +136,29 @@ final class SafePageFetcher
         return null;
     }
 
+    /** Lỗi tạm thời (hết giờ, mất kết nối, 5xx) thử lại đúng 1 lần sau trễ ngắn; DNS, 4xx, chặn an toàn thì không. @return array{response: Response}|array<string,mixed> */
+    private function getWithRetry(string $url): array
+    {
+        $r = $this->get($url);
+        $transient = isset($r['error']) ? ! empty($r['transient']) : ($r['response']->status() >= 500 && $r['response']->status() < 600);
+        if (! $transient) {
+            return $r;
+        }
+        $ms = max(0, (int) config('knowledge.retry_delay_ms', 600));
+        if ($ms > 0) {
+            usleep($ms * 1000);
+        }
+
+        return $this->get($url);
+    }
+
     /** @return array{response: Response}|array<string,mixed> */
     private function get(string $url, bool $throttle = true): array
     {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        if (isset($this->deadHosts[$host])) {
+            return $this->err($url, 'dns', 'Không tìm thấy tên miền (lỗi DNS).');
+        }
         if ($throttle) {
             $this->throttle();
         }
@@ -155,18 +180,22 @@ final class SafePageFetcher
                 return $this->err($url, 'too_large', 'Trang lớn hơn 2 MB.');
             }
             if ($e instanceof ConnectionException && (str_contains($m, 'timed out') || str_contains($m, 'error 28') || str_contains($m, 'timeout'))) {
-                return $this->err($url, 'timeout', 'Hết thời gian chờ ('.self::TIMEOUT.' giây).');
+                return $this->err($url, 'timeout', 'Hết thời gian chờ ('.self::TIMEOUT.' giây).') + ['transient' => true];
+            }
+            if (str_contains($m, 'could not resolve') || str_contains($m, 'error 6') || str_contains($m, 'name or service not known') || str_contains($m, 'getaddrinfo') || str_contains($m, 'nodename nor servname')) {
+                $this->deadHosts[$host] = true;
+
+                return $this->err($url, 'dns', 'Không tìm thấy tên miền (lỗi DNS).');
             }
 
             $why = match (true) {
-                str_contains($m, 'could not resolve') || str_contains($m, 'error 6') || str_contains($m, 'name or service not known') => 'không tìm thấy tên miền (lỗi DNS)',
                 str_contains($m, 'ssl') || str_contains($m, 'certificate') || str_contains($m, 'error 60') || str_contains($m, 'error 35') => 'lỗi chứng chỉ HTTPS của máy chủ nguồn',
                 str_contains($m, 'refused') || str_contains($m, 'error 7') => 'máy chủ nguồn từ chối kết nối',
                 $e instanceof ConnectionException => 'không kết nối được tới máy chủ nguồn',
                 default => 'lỗi khi tải',
             };
 
-            return $this->err($url, 'http_error', 'Không tải được trang: '.$why.'.');
+            return $this->err($url, 'http_error', 'Không tải được trang: '.$why.'.') + (! str_contains($why, 'chứng chỉ') ? ['transient' => true] : []);
         }
         $len = (int) $resp->header('Content-Length');
         if ($len > self::MAX_BYTES) {
