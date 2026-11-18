@@ -244,7 +244,7 @@ BLADE));
             'selectedOpps' => $selected ? array_values(array_filter($report['opportunities'], fn ($o) => $o['key'] === $this->selKey)) : [],
             'websites' => Website::where('status', 'active')->orderBy('name')->get(['id', 'name', 'base_url']),
             'links' => $report ? PageArticleLinker::map() : [],
-            'oauthReady' => \App\Filament\Support\Gsc\GscOAuth::configured(),
+            'websiteEditUrl' => ($this->websiteId && Auth::user()?->isAdmin()) ? \App\Filament\Resources\WebsiteResource::getUrl('edit', ['record' => $this->websiteId]) : null,
             'authLabel' => ($src = \App\Filament\Support\Gsc\GoogleSearchConsoleSource::forWebsite($this->websiteId ? Website::find($this->websiteId) : null)) ? $src->authLabel() : null,
         ];
     }

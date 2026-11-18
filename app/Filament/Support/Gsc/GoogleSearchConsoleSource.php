@@ -19,6 +19,8 @@ final class GoogleSearchConsoleSource implements GscSource
 
     private ?string $error = null;
 
+    private bool $fresh = false;
+
     public function __construct(private readonly string $property, private readonly GscTokenProvider $auth) {}
 
     /** Thuộc tính Search Console cho website, hoặc null nếu chưa cấu hình khóa / website không có địa chỉ. */
@@ -55,6 +57,9 @@ final class GoogleSearchConsoleSource implements GscSource
 
     public static function propertyFor(Website $site): ?string
     {
+        if (is_string($own = $site->gsc_property ?? null) && trim($own) !== '') {
+            return trim($own); // đặt tay trong trang Website: ưu tiên cao nhất
+        }
         $host = strtolower((string) parse_url((string) $site->base_url, PHP_URL_HOST));
         $host = preg_replace('/^www\./', '', $host) ?? $host;
         if ($host === '') {
@@ -68,6 +73,14 @@ final class GoogleSearchConsoleSource implements GscSource
         }
 
         return config('gsc.property_type', 'domain') === 'url' ? 'https://'.$host.'/' : 'sc-domain:'.$host;
+    }
+
+    /** Bỏ qua cache khi đọc (dùng cho việc kiểm tra kết nối, để không che lỗi bằng số cũ). */
+    public function withoutCache(): self
+    {
+        $this->fresh = true;
+
+        return $this;
     }
 
     public function property(): string
@@ -92,7 +105,7 @@ final class GoogleSearchConsoleSource implements GscSource
             return [];
         }
         $ck = 'gsc:rows:'.md5($this->property.'|'.$dimension.'|'.$from->toDateString().'|'.$to->toDateString());
-        $rows = Cache::get($ck);
+        $rows = $this->fresh ? null : Cache::get($ck);
         if (! is_array($rows)) {
             try {
                 $rows = $this->fetch($dims, $from, $to);

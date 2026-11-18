@@ -63,7 +63,7 @@
                     </ul>
             </x-help>
             <span style="flex:1"></span>
-            @if ($state === 'ket-noi')
+            @if ($state === 'ket-noi' && \App\Filament\Support\Demo\DemoMode::enabled())
                 <x-filament::button size="sm" color="gray" wire:click="disconnect">Thu hồi kết nối</x-filament::button>
             @endif
             @if ($hasData)
@@ -77,10 +77,10 @@
                 @if (\App\Filament\Support\Demo\DemoMode::enabled())
                     <x-filament::button size="sm" wire:click="connect">Kết nối Google Search Console</x-filament::button>
                 @else
-                    @if ($oauthReady)
-                        <x-filament::button size="sm" wire:click="connect">Kết nối Google Search Console</x-filament::button>
+                    @if ($websiteEditUrl)
+                        <x-filament::button size="sm" tag="a" :href="$websiteEditUrl">Kết nối tại trang Website</x-filament::button>
                     @else
-                        <span class="ss-muted">Chưa có cách kết nối: cấu hình file service account (GSC_SERVICE_ACCOUNT_JSON) hoặc OAuth (GSC_OAUTH_CLIENT_ID/SECRET).</span>
+                        <span class="ss-muted">Quản trị kết nối Search Console ở trang "Website kết nối".</span>
                     @endif
                 @endif
             </div>

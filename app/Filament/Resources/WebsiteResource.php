@@ -30,6 +30,9 @@ use Throwable;
 
 class WebsiteResource extends Resource
 {
+    /** Thuộc tính Search Console hợp lệ: sc-domain:ten-mien.vn hoặc URL tiền tố có dấu / cuối. */
+    public const GSC_PROPERTY_REGEX = '/^(sc-domain:[a-z0-9.-]+|https?:\/\/\S+\/)$/i';
+
     protected static ?string $model = Website::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-globe-alt';
@@ -138,7 +141,39 @@ class WebsiteResource extends Resource
                                 ->label('Tham số xác thực')
                                 ->content(fn (?Model $record): string => $record && ! empty($record->encrypted_credentials) ? '•••• đã lưu' : 'Chưa có'),
                         ]),
+
+                Forms\Components\Section::make('Google Search Console')
+                    ->description('Nguồn số liệu truy vấn và trang cho kế hoạch nội dung. Chỉ đọc; hệ thống không sửa gì trong Search Console.')
+                    ->visibleOn('edit')
+                    ->schema([
+                        Forms\Components\Placeholder::make('gsc_status')->label('Trạng thái')
+                            ->content(fn (?Website $record): HtmlString => static::gscStatusHtml($record)),
+                        Forms\Components\TextInput::make('gsc_property')
+                            ->label('Thuộc tính Search Console')
+                            ->placeholder('Để trống = tự suy ra từ địa chỉ Website')
+                            ->helperText('Loại Miền: sc-domain:ten-mien.vn. Loại Tiền tố URL: https://ten-mien.vn/ (nhìn tên thuộc tính ở góc trái Search Console).')
+                            ->maxLength(255)
+                            ->rule('regex:'.static::GSC_PROPERTY_REGEX)
+                            ->validationMessages(['regex' => 'Nhập dạng sc-domain:ten-mien.vn hoặc https://ten-mien.vn/ (có dấu / cuối).']),
+                    ]),
             ]);
+    }
+
+    /** Trạng thái Search Console của website, không gọi Google (nút "Kiểm tra Search Console" mới gọi thật). */
+    public static function gscStatusHtml(?Website $site): HtmlString
+    {
+        if (! $site) {
+            return new HtmlString('');
+        }
+        $d = \App\Filament\Support\Gsc\GscConnectionCheck::describe($site);
+        if ($d['connected']) {
+            return new HtmlString('<b>Đã cấu hình đăng nhập bằng '.e((string) $d['label']).'</b> · thuộc tính <code>'.e((string) $d['property']).'</code><br><span style="opacity:.7">Chưa kiểm chứng với Google cho tới khi bấm "Kiểm tra Search Console".</span>');
+        }
+        $why = (! $d['oauth_ready'] && ! $d['has_service_account'])
+            ? 'Chưa cấu hình khóa Google trong .env (GSC_SERVICE_ACCOUNT_JSON hoặc GSC_OAUTH_CLIENT_ID/SECRET).'
+            : ($d['oauth_ready'] ? 'Bấm "Kết nối Google" ở đầu trang và đăng nhập tài khoản có quyền với thuộc tính này.' : 'File service account chưa đọc được.');
+
+        return new HtmlString('<b>Chưa kết nối.</b> '.e($why));
     }
 
     public static function table(Table $table): Table

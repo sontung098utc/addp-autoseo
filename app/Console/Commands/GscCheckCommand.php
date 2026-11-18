@@ -2,9 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Filament\Support\Gsc\GoogleSearchConsoleSource;
+use App\Filament\Support\Gsc\GscConnectionCheck;
 use App\Models\Website;
-use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 
 /**
@@ -30,30 +29,17 @@ class GscCheckCommand extends Command
         }
         $this->line('Website: '.$site->name.' ('.$site->base_url.')');
         $this->line('GSC_AUTH='.config('gsc.auth', 'auto'));
-        $src = GoogleSearchConsoleSource::forWebsite($site);
-        if (! $src) {
-            $this->error('Chưa có cách đăng nhập nào dùng được: không có file service account đọc được và không có kết nối Google (hoặc thiếu GSC_OAUTH_CLIENT_ID/SECRET).');
-
-            return self::FAILURE;
+        $r = GscConnectionCheck::run($site);
+        if ($r['label']) {
+            $this->line('Đăng nhập bằng: '.$r['label']);
         }
-        $this->line('Đăng nhập bằng: '.$src->authLabel());
-        $this->line('Thuộc tính: '.$src->property());
-        $to = CarbonImmutable::now()->subDays(3);
-        $rows = $src->rows('page', $to->subDays(6), $to);
-        if ($src->error() !== null) {
-            $this->error('Lỗi: '.$src->error());
+        $this->line('Thuộc tính: '.($r['property'] ?? '(không xác định được)'));
+        match ($r['level']) {
+            'ok' => $this->info('OK: '.$r['message']),
+            'empty' => $this->warn($r['message']),
+            default => $this->error($r['message']),
+        };
 
-            return self::FAILURE;
-        }
-        if ($rows === []) {
-            $this->warn('Gọi được nhưng chưa có dòng dữ liệu nào trong 7 ngày ('.$to->subDays(6)->toDateString().' đến '.$to->toDateString().').');
-
-            return self::SUCCESS;
-        }
-        $clicks = array_sum(array_column($rows, 'clicks'));
-        $impr = array_sum(array_column($rows, 'impressions'));
-        $this->info('OK: '.count($rows).' dòng (trang x ngày), '.$clicks.' clicks, '.$impr.' impressions.');
-
-        return self::SUCCESS;
+        return in_array($r['level'], ['ok', 'empty'], true) ? self::SUCCESS : self::FAILURE;
     }
 }
