@@ -240,7 +240,7 @@ class KeywordsPage extends Page
         try {
             $r = (new KeywordMetricsEnricher)->enrich($site);
         } catch (KeywordMetricsUnavailable $e) {
-            $this->fail('Chưa có nguồn số liệu', $e->getMessage());
+            $this->fail('Chưa có nguồn số liệu', \App\Support\UserFacingError::from($e));
 
             return;
         }
@@ -261,7 +261,7 @@ class KeywordsPage extends Page
         try {
             $r = (new KeywordResearchService)->suggest($site, $seeds === [] ? null : $seeds, $limit > 0 ? $limit : null);
         } catch (KeywordAiUnavailable $e) {
-            $this->fail('Chưa có AI', $e->getMessage());
+            $this->fail('Chưa có AI', \App\Support\UserFacingError::from($e));
 
             return;
         }
@@ -287,7 +287,7 @@ class KeywordsPage extends Page
         try {
             KeywordService::make()->addManual($this->newKeyword, $this->newVolume, $this->newIntent);
         } catch (InvalidArgumentException $e) {
-            $this->fail('Không thêm được từ khóa', $e->getMessage());
+            $this->fail('Không thêm được từ khóa', \App\Support\UserFacingError::from($e));
 
             return;
         }
@@ -404,7 +404,7 @@ class KeywordsPage extends Page
 
             return;
         } catch (InvalidArgumentException $e) {
-            $this->fail('Không thêm được vào kế hoạch', $e->getMessage());
+            $this->fail('Không thêm được vào kế hoạch', \App\Support\UserFacingError::from($e));
 
             return;
         }
@@ -423,7 +423,7 @@ class KeywordsPage extends Page
         try {
             KeywordService::make()->renameCluster((string) $this->renaming, $this->renameTo);
         } catch (InvalidArgumentException $e) {
-            $this->fail('Không đổi được tên cụm', $e->getMessage());
+            $this->fail('Không đổi được tên cụm', \App\Support\UserFacingError::from($e));
 
             return;
         }
@@ -441,7 +441,7 @@ class KeywordsPage extends Page
             try {
                 $r = $service->proposeWithAi();
             } catch (KeywordAiUnavailable $e) {
-                $this->fail('Chưa gom cụm được bằng AI', $e->getMessage());
+                $this->fail('Chưa gom cụm được bằng AI', \App\Support\UserFacingError::from($e));
 
                 return;
             }
@@ -472,7 +472,7 @@ class KeywordsPage extends Page
         try {
             $r = KeywordService::make()->proposeWithSerp();
         } catch (SerpUnavailable $e) {
-            $this->fail('Chưa gom cụm theo SERP được', $e->getMessage());
+            $this->fail('Chưa gom cụm theo SERP được', \App\Support\UserFacingError::from($e));
 
             return;
         }
@@ -488,7 +488,7 @@ class KeywordsPage extends Page
         try {
             $fn(KeywordService::make());
         } catch (InvalidArgumentException $e) {
-            $this->fail('Không thực hiện được', $e->getMessage());
+            $this->fail('Không thực hiện được', \App\Support\UserFacingError::from($e));
         }
     }
 

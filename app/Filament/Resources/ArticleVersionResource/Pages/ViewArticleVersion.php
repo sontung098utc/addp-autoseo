@@ -69,7 +69,7 @@ class ViewArticleVersion extends ViewRecord
                         $msg = app(CmsDraftHandoff::class)->cancel($this->record);
                         Notification::make()->title($msg)->success()->send();
                     } catch (\RuntimeException $e) {
-                        Notification::make()->title($e->getMessage())->danger()->send();
+                        Notification::make()->title(\App\Support\UserFacingError::from($e))->danger()->send();
                     }
                     $this->record->refresh();
                 }),

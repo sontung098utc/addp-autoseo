@@ -173,7 +173,7 @@ class ViewArticle extends EditArticle
                     $run = (new OutlineHold)->approve($this->record, (array) ($data['items'] ?? []), $user, $ai, AgentAi::policy());
                     Notification::make()->title('Đã duyệt dàn ý · phiên #'.$run->id)->body($run->outcome_reason ?: 'Đội AI đã viết xong bản nháp.')->success()->send();
                 } catch (\InvalidArgumentException $e) {
-                    Notification::make()->title('Chưa duyệt được dàn ý')->body($e->getMessage())->danger()->send();
+                    Notification::make()->title('Chưa duyệt được dàn ý')->body(\App\Support\UserFacingError::from($e))->danger()->send();
                 }
                 $this->refreshRecord();
             });
@@ -271,7 +271,7 @@ class ViewArticle extends EditArticle
             $pause ? $hold->pause($user, $p) : $hold->resume($user, $p);
             Notification::make()->title($pause ? 'Đã tạm dừng lượt đăng của bài này' : 'Đã cho bài này đăng tiếp')->success()->send();
         } catch (\InvalidArgumentException $e) {
-            Notification::make()->title('Không thực hiện được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Không thực hiện được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
         }
         $this->refreshRecord();
     }
@@ -374,7 +374,7 @@ class ViewArticle extends EditArticle
                     try {
                         $p = (new ReviewWorkflow)->publishNow(ReviewActions::user(), $this->latest(), Website::findOrFail($data['website_id']));
                     } catch (\InvalidArgumentException $e) {
-                        Notification::make()->title('Không đăng được')->body($e->getMessage())->danger()->send();
+                        Notification::make()->title('Không đăng được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
                         return;
                     }
@@ -479,7 +479,7 @@ class ViewArticle extends EditArticle
         try {
             $r = (new \App\Services\Brain\BrainFromSuggestion)->create($article->website, $field, $article, auth()->user());
         } catch (\Throwable $e) {
-            Notification::make()->title('Chưa tạo được Trí tuệ')->body(mb_substr($e->getMessage(), 0, 200))->danger()->send();
+            Notification::make()->title('Chưa tạo được Trí tuệ')->body(mb_substr(\App\Support\UserFacingError::from($e), 0, 200))->danger()->send();
 
             return;
         }

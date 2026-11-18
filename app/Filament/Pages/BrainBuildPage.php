@@ -182,7 +182,7 @@ class BrainBuildPage extends Page
             $this->result = (new BrainBuildService)->run($site, Auth::user(), ['max_pages' => (int) $this->maxPages, 'urls' => $this->urlsText]);
         } catch (KnowledgeError $e) {
             $this->result = null;
-            Notification::make()->title('Chưa chạy được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa chạy được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -205,7 +205,7 @@ class BrainBuildPage extends Page
         } catch (WebSearchUnavailable $e) {
             $this->candidates = [];
             $this->searchMeta = null;
-            Notification::make()->title('Chưa tìm được')->body($e->getMessage())->warning()->send();
+            Notification::make()->title('Chưa tìm được')->body(\App\Support\UserFacingError::from($e))->warning()->send();
 
             return;
         }
@@ -242,7 +242,7 @@ class BrainBuildPage extends Page
         try {
             $r = app(SourceDiscoveryService::class)->import($site, $chosen, Auth::user(), ['field' => $this->searchMeta['field'] ?? null, 'search' => $this->searchMeta ?? []]);
         } catch (KnowledgeError $e) {
-            Notification::make()->title('Chưa thêm được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa thêm được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -262,7 +262,7 @@ class BrainBuildPage extends Page
         try {
             (new BrainBuildService)->undoAuto($item, Auth::user());
         } catch (KnowledgeError $e) {
-            Notification::make()->title('Chưa hoàn tác được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa hoàn tác được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -279,7 +279,7 @@ class BrainBuildPage extends Page
         try {
             $cleared = (new BrandProfileDrafter)->undo($site, Auth::user());
         } catch (KnowledgeError $e) {
-            Notification::make()->title('Chưa hoàn tác được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa hoàn tác được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -304,7 +304,7 @@ class BrainBuildPage extends Page
         try {
             $r = (new \App\Services\Brain\BrainFromSuggestion)->create($site, (string) $sg['query'], $article, Auth::user());
         } catch (KnowledgeError|\InvalidArgumentException $e) {
-            Notification::make()->title('Chưa tạo được Trí tuệ')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa tạo được Trí tuệ')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -356,7 +356,7 @@ class BrainBuildPage extends Page
         try {
             $this->result = (new BrainBuildService)->run($site, Auth::user(), ['max_pages' => count($urls), 'urls' => $urls]);
         } catch (KnowledgeError $e) {
-            Notification::make()->title('Chưa chạy được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa chạy được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }

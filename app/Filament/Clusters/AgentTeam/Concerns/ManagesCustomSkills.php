@@ -75,7 +75,7 @@ trait ManagesCustomSkills
                         AgentProfiles::addDocument((string) $role, 'skill', (string) $data['title'], (string) $data['body'], $u, $data['description'] ?? null, (bool) ($data['enabled'] ?? true));
                     }
                 } catch (\InvalidArgumentException $e) {
-                    Notification::make()->title($e->getMessage())->danger()->send();
+                    Notification::make()->title(\App\Support\UserFacingError::from($e))->danger()->send();
                     $action->halt();
 
                     return;
@@ -101,7 +101,7 @@ trait ManagesCustomSkills
                 try {
                     AgentProfiles::updateSkill((int) ($arguments['id'] ?? 0), (string) $data['title'], $data['description'] ?? null, (string) $data['body'], (bool) ($data['enabled'] ?? true), (string) $data['role'], $u);
                 } catch (\InvalidArgumentException $e) {
-                    Notification::make()->title($e->getMessage())->danger()->send();
+                    Notification::make()->title(\App\Support\UserFacingError::from($e))->danger()->send();
                     $action->halt();
 
                     return;
@@ -133,7 +133,7 @@ trait ManagesCustomSkills
                 try {
                     AgentProfiles::deleteDocument($id, $u);
                 } catch (\InvalidArgumentException $e) {
-                    Notification::make()->title($e->getMessage())->danger()->send();
+                    Notification::make()->title(\App\Support\UserFacingError::from($e))->danger()->send();
 
                     return;
                 }
@@ -164,7 +164,7 @@ trait ManagesCustomSkills
                 $assign->saveSkills($rk, $map, $u);
             }
         } catch (\InvalidArgumentException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(\App\Support\UserFacingError::from($e))->danger()->send();
         }
     }
 }

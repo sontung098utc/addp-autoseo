@@ -62,7 +62,7 @@ final class ScanGuard
                 return null;
             }
 
-            return $e->getMessage();
+            return \App\Support\UserFacingError::from($e);
         }
 
         return null;

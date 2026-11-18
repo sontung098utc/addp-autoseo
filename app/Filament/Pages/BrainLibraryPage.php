@@ -155,7 +155,7 @@ class BrainLibraryPage extends Page
         try {
             $r = (new BrainService)->installTemplates($keys, null, Auth::user());
         } catch (KnowledgeError $e) {
-            Notification::make()->title('Chưa cài được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa cài được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -175,7 +175,7 @@ class BrainLibraryPage extends Page
         try {
             $brain = (new BrainService)->createFromTemplate((string) $this->create['name'], (string) $this->create['template'] ?: null, array_map('intval', (array) $this->create['websites']), Auth::user());
         } catch (KnowledgeError|\InvalidArgumentException $e) {
-            Notification::make()->title('Chưa tạo được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa tạo được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return null;
         }

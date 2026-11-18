@@ -204,7 +204,7 @@ class AgentRoles extends Page
         try {
             $fn($this->actor());
         } catch (\InvalidArgumentException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -520,7 +520,7 @@ class AgentRoles extends Page
             abort_unless($user instanceof User, 403);
             $switches->set($key, ! $switches->isEnabled($key), $user);
         } catch (\InvalidArgumentException $e) {
-            Notification::make()->title($e->getMessage())->danger()->send();
+            Notification::make()->title(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -577,7 +577,7 @@ class AgentRoles extends Page
                         $sw->set($role, (bool) $data['role_enabled'], $user);
                     }
                 } catch (\InvalidArgumentException $e) {
-                    Notification::make()->title($e->getMessage())->danger()->send();
+                    Notification::make()->title(\App\Support\UserFacingError::from($e))->danger()->send();
                     $action->halt();
 
                     return;
