@@ -30,7 +30,9 @@ class MediaManagement implements MediaManagementInterface
         }
 
         $mediaDirectory = $this->filesystem->getDirectoryWrite(DirectoryList::MEDIA);
-        $relativeDir = 'mageplaza/blog/post/image';
+        // Magefan_Blog hiển thị ảnh từ pub/media/<featured_img>; Mageplaza_Blog từ pub/media/mageplaza/blog/post/image.
+        $isMagefan = class_exists(\Magefan\Blog\Model\PostFactory::class);
+        $relativeDir = $isMagefan ? 'magefan_blog/autoseo' : 'mageplaza/blog/post/image';
         $mediaDirectory->create($relativeDir);
 
         $safeName = preg_replace('/[^a-zA-Z0-9_\.-]/', '_', $fileName);
@@ -46,7 +48,8 @@ class MediaManagement implements MediaManagementInterface
 
         return [
             'id' => $uniqueName,
-            'file' => $uniqueName,
+            // Magefan: 'file' là đường dẫn tương đối so với pub/media, đúng giá trị cột featured_img; Mageplaza giữ như cũ (tên file).
+            'file' => $isMagefan ? $relativePath : $uniqueName,
             'url' => '/media/' . $relativePath,
         ];
     }

@@ -65,6 +65,10 @@ class PostManagement implements PostManagementInterface
             $blogPost->setData('stores', $storeIds);
             if ($post->getImage()) {
                 $blogPost->setData('featured_img', $post->getImage());
+                // Magefan bản mới có ảnh riêng cho danh sách bài; chỉ ghi khi cột tồn tại (không làm lỗi bản cũ).
+                if ($this->hasColumn($blogPost, 'featured_list_img')) {
+                    $blogPost->setData('featured_list_img', $post->getImage());
+                }
             }
         } else {
             $blogPost->setData('name', $post->getTitle());
@@ -132,6 +136,17 @@ class PostManagement implements PostManagementInterface
             PostInterface::URL_KEY => $blogPost->getData($isMagefan ? 'identifier' : 'url_key'),
             PostInterface::STATUS => 1,
         ]);
+    }
+
+    protected function hasColumn($blogPost, string $column): bool
+    {
+        try {
+            $resource = $blogPost->getResource();
+
+            return (bool) $resource->getConnection()->tableColumnExists($resource->getMainTable(), $column);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     protected function findPostByPublicationKey($key)

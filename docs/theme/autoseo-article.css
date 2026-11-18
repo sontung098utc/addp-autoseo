@@ -4,7 +4,7 @@
    Phạm vi: chỉ .autoseo-* và vùng .addp-article-copy. Cỡ chữ theo em/rem,
    lấy thân bài 17px làm gốc. Không dùng !important, không script.
 
-   Dev1 dán (5 dòng):
+   Cách tự dán (5 dòng):
    1. Mở blog-styles.css của theme (…/main-content-style54/blog-styles.css),
       HOẶC Magento Admin > Content > Design > Configuration > (site) > HTML Head
       > Scripts and Style Sheets (dán trong <style>…</style>).

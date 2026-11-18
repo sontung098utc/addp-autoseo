@@ -14,7 +14,9 @@ use App\Models\Publication;
 use App\Models\Website;
 use App\Services\Security\UrlSafetyService;
 use GuzzleHttp\Client;
+use App\Models\MediaAsset;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class MagentoBridgeClient implements PublisherInterface
@@ -120,6 +122,10 @@ class MagentoBridgeClient implements PublisherInterface
                 'status' => 0, // Nháp (Draft)
             ],
         ];
+        // Ảnh đại diện (thumbnail ở trang danh sách blog): module Magento ghi vào featured_img; không có ảnh hoặc tải lỗi thì vẫn đăng bài.
+        if (($image = $this->featuredImagePath($website, $version)) !== null) {
+            $postPayload['post']['image'] = $image;
+        }
 
         $body = $this->sendJsonRequest('POST', $endpoint, $website->encrypted_credentials ?? [], [
             'json' => $postPayload,
@@ -135,6 +141,44 @@ class MagentoBridgeClient implements PublisherInterface
             'preview_url' => "{$baseUrl}/blog/post/view/id/{$postId}",
             'publication_key' => $publicationKey,
         ];
+    }
+
+    /**
+     * Ảnh bìa của phiên bản (ảnh đánh dấu is_featured, không có thì ảnh đầu tiên) tải lên Magento qua module một lần cho mỗi website; đường dẫn media Magento trả về được nhớ
+     * ở metadata.magento_media của ảnh nên nháp rồi đăng không tải trùng. Lỗi hoặc file mất: trả null và ghi log (ảnh đại diện chỉ là phần thêm).
+     */
+    protected function featuredImagePath(Website $website, ArticleVersion $version): ?string
+    {
+        try {
+            /** @var MediaAsset|null $asset */
+            $asset = $version->featured_media_asset;
+            if ($asset === null) {
+                return null;
+            }
+            $site = (string) $website->id;
+            $known = (array) ($asset->metadata['magento_media'] ?? []);
+            if (is_string($known[$site] ?? null) && $known[$site] !== '') {
+                return $known[$site];
+            }
+            $disk = Storage::disk($asset->disk ?: 'public');
+            if (! $disk->exists((string) $asset->file_path)) {
+                Log::warning("[Magento] Ảnh #{$asset->id} không còn trên ổ lưu trữ; đăng không kèm ảnh đại diện.");
+
+                return null;
+            }
+            $up = $this->uploadMedia($website, $disk->path((string) $asset->file_path), (string) $asset->alt_text);
+            $file = (string) ($up['file'] ?? '');
+            if ($file === '') {
+                return null;
+            }
+            $asset->update(['metadata' => array_merge((array) $asset->metadata, ['magento_media' => [$site => $file] + $known])]);
+
+            return $file;
+        } catch (Throwable $e) {
+            Log::warning("[Magento] Không tải được ảnh đại diện lên website #{$website->id}: ".get_class($e).'; đăng không kèm ảnh đại diện.');
+
+            return null;
+        }
     }
 
     public function publish(Publication $publication): array
