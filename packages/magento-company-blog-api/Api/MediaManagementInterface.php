@@ -10,7 +10,7 @@ interface MediaManagementInterface
      * @param string $fileName
      * @param string $base64Content
      * @param string $altText
-     * @return array [ 'id' => string, 'url' => string, 'file' => string ]
+     * @return mixed
      * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function upload($fileName, $base64Content, $altText = '');
