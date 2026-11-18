@@ -20,6 +20,10 @@ final class ReferenceListRenderer
         if ($t === '' || strcasecmp($t, $host) === 0 || strcasecmp(preg_replace('#^www\.#i', '', $t) ?? '', $host) === 0) {
             return '';
         }
+        $compact = preg_replace('/\s+/u', '', $t) ?? $t;
+        if (preg_match('/\p{L}{3,}/u', $t) !== 1 || preg_match_all('/\p{L}/u', $compact) < mb_strlen($compact) * 0.5) {
+            return ''; // tiêu đề trích sai: toàn số/ký hiệu (vd "≥70% ≥50% ≥70%"), không phải tên trang
+        }
         if (substr_count($t, '|') >= 2 || str_ends_with($t, '|')) {
             return ''; // mảnh bảng hoặc đoạn trích, không phải tiêu đề
         }
@@ -97,7 +101,7 @@ final class ReferenceListRenderer
             return (string) preg_replace('#(<div class="autoseo-refs">.*?)(</ol>)#su', '$1'.str_replace('$', '\$', $li).'$2', $html, 1);
         }
 
-        return $html."\n".'<div class="autoseo-refs"><p><strong>Nguồn tham khảo</strong></p><ol>'.$li.'</ol></div>';
+        return $html."\n".'<div class="autoseo-refs"><p class="autoseo-refs__title"><strong>Nguồn tham khảo</strong></p><ol>'.$li.'</ol></div>';
     }
 
     private const MARK = '/\s*\[T(\d+(?:\s*[,;]\s*T?\d+)*)\]/u';
@@ -116,7 +120,7 @@ final class ReferenceListRenderer
         }
         $offset = preg_match_all('/<li\b[^>]*\bid="nguon-\d+"/i', $html);
         $number = [];
-        $html = (string) preg_replace_callback(self::MARK, function (array $m) use ($all, $offset, &$number): string {
+        $html = MarkupText::replaceInText(self::MARK, function (array $m) use ($all, $offset, &$number): string {
             $out = '';
             foreach (preg_split('/[^\d]+/', $m[1], -1, PREG_SPLIT_NO_EMPTY) ?: [] as $d) {
                 $i = (int) $d - 1;
@@ -127,7 +131,7 @@ final class ReferenceListRenderer
                 $number[$i] ??= $offset + count($number) + 1;
                 $title = trim(strip_tags((string) ($all[$i]['title'] ?? '')));
                 $host = preg_replace('/^www\./', '', (string) parse_url($url, PHP_URL_HOST));
-                $out .= '<sup class="autoseo-cite" title="'.e('Nguồn: '.($title !== '' ? $title : $host).' ('.$host.')').'"><a href="#nguon-'.$number[$i].'">['.$number[$i].']</a></sup>';
+                $out .= '<sup class="autoseo-cite"'.TooltipAttrs::attrs('Nguồn: '.($title !== '' ? $title : $host).' ('.$host.')').'><a href="#nguon-'.$number[$i].'">['.$number[$i].']</a></sup>';
             }
 
             return $out;

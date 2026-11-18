@@ -35,7 +35,7 @@ class ReferenceListRendererTest extends TestCase
             ['title' => 'Trang C', 'domain' => 'moh.gov.vn', 'url' => 'https://moh.gov.vn/c'],
         ];
         $out = ReferenceListRenderer::apply('<p>Mốc 90/60.[T2] Khác.[T1, T2] Sai.[T9]</p>', $all, [$all[0], $all[2]]);
-        $this->assertStringContainsString('<sup class="autoseo-cite" title="Nguồn: Nghiên cứu B (nih.gov)"><a href="#nguon-1">[1]</a></sup>', $out);
+        $this->assertStringContainsString('<sup class="autoseo-cite" tabindex="0" data-tip="Nguồn: Nghiên cứu B (nih.gov)" aria-label="Nguồn: Nghiên cứu B (nih.gov)" title="Nguồn: Nghiên cứu B (nih.gov)"><a href="#nguon-1">[1]</a></sup>', $out);
         $this->assertStringContainsString('<a href="#nguon-2">[2]</a>', $out, '[T1] là nguồn thứ hai được trích nên mang số 2.');
         $this->assertStringNotContainsString('[T', $out, 'Dấu thô và mã không có thật không được lọt ra bài.');
         $this->assertStringContainsString('<li id="nguon-1"><a href="https://nih.gov/b"', $out);

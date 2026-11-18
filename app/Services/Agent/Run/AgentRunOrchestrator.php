@@ -1186,7 +1186,7 @@ final class AgentRunOrchestrator
             }
             $svc = app(\App\Services\Knowledge\Discover\SourceDiscoveryService::class);
             $imp = $svc->import($article->website, array_slice($urls, 0, 2), null, ['as_system' => true, 'brain_id' => $this->matchedBrainId, 'max_sources' => 2, 'only_trusted' => true,
-                'field' => \App\Services\Knowledge\Discover\SourceDiscoveryService::fieldFor((string) $article->primary_keyword), 'budget_cap_vnd' => $this->policy->budgetVnd * 0.1, 'purpose' => 'learn']);
+                'field' => \App\Services\Knowledge\Discover\SourceDiscoveryService::fieldFor((string) $article->primary_keyword), 'budget_cap_vnd' => $this->policy->budgetVnd * 0.1, 'purpose' => 'learn', 'topic' => (string) $article->primary_keyword]);
             $this->step($run, 'research', 'system', $imp['imported'] > 0 ? 'ok' : 'warn', 'Học vào kho: '.$imp['imported'].' nguồn mới từ tài liệu bài đã dùng',
                 'Nạp các nguồn tin cậy của bài vào Trí tuệ để các bài sau dùng ngay: '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, có đoạn nguyên văn, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.',
                 ['purpose' => 'kb_learn', 'imported' => $imp['imported'], 'items_auto' => $imp['items_auto'], 'items_proposed' => $imp['items_proposed'], 'build_run_id' => $imp['run_id']] + $this->kbStepData($imp, $this->matchedBrainId), null, 0, (float) $imp['cost_vnd']);
@@ -1874,6 +1874,11 @@ final class AgentRunOrchestrator
 
     private function persist(Article $article, array $attrs, bool $passed): ArticleVersion
     {
+        if (isset($attrs['html_content']) && is_string($attrs['html_content'])) {
+            $attrs['html_content'] = \App\Services\Content\TocPolicy::stripArticleToc($attrs['html_content']); // giao diện website tự dựng mục lục từ h2; giữ id neo của h2
+            $attrs['html_content'] = \App\Services\Content\ExternalLinks::normalize($attrs['html_content'], [(string) $article->website?->base_url]); // liên kết ngoài mở tab mới
+        }
+
         return DB::transaction(function () use ($article, $attrs, $passed) {
             $next = ($article->versions()->max('version') ?? 0) + 1;
 

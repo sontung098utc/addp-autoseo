@@ -158,7 +158,15 @@ final class SafePageFetcher
                 return $this->err($url, 'timeout', 'Hết thời gian chờ ('.self::TIMEOUT.' giây).');
             }
 
-            return $this->err($url, 'http_error', 'Không tải được trang.');
+            $why = match (true) {
+                str_contains($m, 'could not resolve') || str_contains($m, 'error 6') || str_contains($m, 'name or service not known') => 'không tìm thấy tên miền (lỗi DNS)',
+                str_contains($m, 'ssl') || str_contains($m, 'certificate') || str_contains($m, 'error 60') || str_contains($m, 'error 35') => 'lỗi chứng chỉ HTTPS của máy chủ nguồn',
+                str_contains($m, 'refused') || str_contains($m, 'error 7') => 'máy chủ nguồn từ chối kết nối',
+                $e instanceof ConnectionException => 'không kết nối được tới máy chủ nguồn',
+                default => 'lỗi khi tải',
+            };
+
+            return $this->err($url, 'http_error', 'Không tải được trang: '.$why.'.');
         }
         $len = (int) $resp->header('Content-Length');
         if ($len > self::MAX_BYTES) {

@@ -14,7 +14,9 @@ use App\Models\Publication;
 use App\Models\Website;
 use App\Services\Security\UrlSafetyService;
 use GuzzleHttp\Client;
+use App\Models\MediaAsset;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class MagentoBridgeClient implements PublisherInterface
@@ -120,6 +122,10 @@ class MagentoBridgeClient implements PublisherInterface
                 'status' => 0, // Nháp (Draft)
             ],
         ];
+        // Ảnh đại diện (thumbnail ở trang danh sách blog): module Magento ghi vào featured_img; không có ảnh hoặc tải lỗi thì vẫn đăng bài.
+        if (($image = $this->featuredImagePath($website, $version)) !== null) {
+            $postPayload['post']['image'] = $image;
+        }
 
         $body = $this->sendJsonRequest('POST', $endpoint, $website->encrypted_credentials ?? [], [
             'json' => $postPayload,
@@ -135,6 +141,92 @@ class MagentoBridgeClient implements PublisherInterface
             'preview_url' => "{$baseUrl}/blog/post/view/id/{$postId}",
             'publication_key' => $publicationKey,
         ];
+    }
+
+    /**
+     * Ảnh bìa của phiên bản (ảnh đánh dấu is_featured, không có thì ảnh đầu tiên) tải lên Magento qua module một lần cho mỗi website; đường dẫn media Magento trả về được nhớ
+     * ở metadata.magento_media của ảnh nên nháp rồi đăng không tải trùng. Lỗi hoặc file mất: trả null và ghi log (ảnh đại diện chỉ là phần thêm).
+     */
+    protected function featuredImagePath(Website $website, ArticleVersion $version): ?string
+    {
+        try {
+            /** @var MediaAsset|null $asset */
+            $asset = $version->featured_media_asset;
+            if ($asset === null) {
+                return null;
+            }
+            $site = (string) $website->id;
+            $known = (array) ($asset->metadata['magento_media'] ?? []);
+            if (is_string($known[$site] ?? null) && $known[$site] !== '') {
+                return $known[$site];
+            }
+            $disk = Storage::disk($asset->disk ?: 'public');
+            if (! $disk->exists((string) $asset->file_path)) {
+                Log::warning("[Magento] Ảnh #{$asset->id} không còn trên ổ lưu trữ; đăng không kèm ảnh đại diện.");
+
+                return null;
+            }
+            $path = $disk->path((string) $asset->file_path);
+            $tmp = null;
+            if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'webp') {
+                $tmp = $this->webpToJpeg($path); // Magento (GD2) không resize được WebP; null = không chuyển được thì bỏ ảnh bìa
+                if ($tmp === null) {
+                    Log::warning("[Magento] Ảnh #{$asset->id} là WebP và không chuyển được sang JPEG; đăng không kèm ảnh đại diện.");
+
+                    return null;
+                }
+                $path = $tmp;
+            }
+            try {
+                $up = $this->uploadMedia($website, $path, (string) $asset->alt_text);
+            } finally {
+                if ($tmp !== null) {
+                    @unlink($tmp);
+                    @rmdir(dirname($tmp));
+                }
+            }
+            $file = (string) ($up['file'] ?? '');
+            if ($file === '') {
+                return null;
+            }
+            $asset->update(['metadata' => array_merge((array) $asset->metadata, ['magento_media' => [$site => $file] + $known])]);
+
+            return $file;
+        } catch (Throwable $e) {
+            Log::warning("[Magento] Không tải được ảnh đại diện lên website #{$website->id}: ".get_class($e).'; đăng không kèm ảnh đại diện.');
+
+            return null;
+        }
+    }
+
+    /** WebP -> JPEG (chất lượng 85, nền trắng cho ảnh trong suốt) vào file tạm cùng tên đổi đuôi .jpg. Không có GD webp hoặc ảnh hỏng: null. */
+    protected function webpToJpeg(string $path): ?string
+    {
+        if (! function_exists('imagecreatefromwebp') || ! function_exists('imagejpeg')) {
+            return null;
+        }
+        $im = @imagecreatefromwebp($path);
+        if ($im === false) {
+            return null;
+        }
+        $w = imagesx($im);
+        $h = imagesy($im);
+        $canvas = imagecreatetruecolor($w, $h);
+        imagefill($canvas, 0, 0, (int) imagecolorallocate($canvas, 255, 255, 255));
+        imagecopy($canvas, $im, 0, 0, 0, 0, $w, $h);
+        $dir = sys_get_temp_dir().'/magento-cover-'.bin2hex(random_bytes(6));
+        if (! @mkdir($dir, 0700) && ! is_dir($dir)) {
+            return null;
+        }
+        $out = $dir.'/'.(preg_replace('/[^A-Za-z0-9_-]+/', '-', pathinfo($path, PATHINFO_FILENAME)) ?: 'cover').'.jpg';
+        $ok = imagejpeg($canvas, $out, 85);
+        if (! $ok) {
+            @rmdir($dir);
+
+            return null;
+        }
+
+        return $out;
     }
 
     public function publish(Publication $publication): array
