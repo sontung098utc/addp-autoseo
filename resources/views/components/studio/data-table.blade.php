@@ -52,7 +52,7 @@
                     <tr x-bind:class="rowClass(row)" x-on:click="selectRow(row)" x-bind:style="cfg.selectMethod ? 'cursor:pointer' : ''">
                         <td x-show="cfg.selectable" x-cloak><input type="checkbox" x-bind:checked="selected.includes(row.id)" x-on:change="toggle(row.id)" x-on:click.stop aria-label="Chọn dòng"></td>
                         <template x-for="c in shownCols" :key="c.key">
-                            <td x-bind:class="{ 'is-right': c.align === 'right' || c.type === 'number' || c.type === 'delta', 'is-center': c.align === 'center' }">
+                            <td x-bind:data-label="c.label" x-bind:data-title="c.key === shownCols[0].key ? '1' : null" x-bind:class="{ 'is-right': c.align === 'right' || c.type === 'number' || c.type === 'delta', 'is-center': c.align === 'center' }">
                                 <template x-if="c.type === 'badge'"><span class="ss-badge" x-bind:class="'ss-badge--' + badgeTone(row, c)" x-text="fmt(row, c)"></span></template>
                                 <template x-if="c.type === 'delta'"><span class="ss-delta" x-bind:class="deltaView(row, c).cls" x-bind:title="deltaView(row, c).label"><span aria-hidden="true" x-text="deltaView(row, c).icon"></span><span x-text="deltaView(row, c).text"></span><span class="sr-only" x-text="deltaView(row, c).label"></span></span></template>
                                 <template x-if="c.type === 'link'"><a x-bind:href="href(row, c)" target="_blank" rel="noopener noreferrer" x-on:click.stop x-text="fmt(row, c)"></a></template>
