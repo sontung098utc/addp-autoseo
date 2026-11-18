@@ -34,7 +34,9 @@ document.addEventListener('alpine:init', () => {
       const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const pad = 36; const l = t.offsetLeft - pad; const r = t.offsetLeft + t.offsetWidth + pad;
       let x = s.scrollLeft;
-      if (l < s.scrollLeft) x = Math.max(0, l); else if (r > s.scrollLeft + s.clientWidth) x = r - s.clientWidth;
+      // Màn hẹp (điện thoại): đưa tab đang chọn vào GIỮA thanh để thấy cả tab hai bên, thay vì dừng ở mép và bị cắt một nửa.
+      if (s.clientWidth < 600) x = Math.max(0, Math.min(s.scrollWidth - s.clientWidth, t.offsetLeft + t.offsetWidth / 2 - s.clientWidth / 2));
+      else if (l < s.scrollLeft) x = Math.max(0, l); else if (r > s.scrollLeft + s.clientWidth) x = r - s.clientWidth;
       if (x !== s.scrollLeft) s.scrollTo({ left: x, behavior: smooth && !reduce ? 'smooth' : 'auto' });
     },
     // Chỉ các tab của CHÍNH thanh này (tab lồng bên trong một panel, ví dụ các phần của phiên chạy trong tab Phiên chạy của bài, có thanh riêng).
@@ -168,4 +170,15 @@ document.addEventListener('alpine:init', () => {
     new MutationObserver(() => { fix(); levels(); }).observe(document.body, { childList: true, subtree: true });
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+
+/* Điện thoại/máy tính bảng dọc (< 1024px): menu trái đóng sẵn khi vào trang và sau khi chuyển trang, để không che nội dung.
+   Filament nhớ trạng thái mở trong localStorage (mặc định mở) nên lần đầu vào bằng điện thoại menu bung ra che hết trang. */
+(() => {
+  const narrow = () => window.matchMedia('(max-width: 1023px)').matches;
+  const closeIfNarrow = () => {
+    try { const s = window.Alpine && window.Alpine.store('sidebar'); if (s && narrow() && s.isOpen) s.close(); } catch (e) { /* bỏ qua */ }
+  };
+  document.addEventListener('alpine:initialized', closeIfNarrow);
+  document.addEventListener('livewire:navigated', closeIfNarrow);
 })();
