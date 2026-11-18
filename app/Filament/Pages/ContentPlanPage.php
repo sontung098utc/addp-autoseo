@@ -8,6 +8,8 @@ use App\Filament\Support\ContentPlan\MockTitleSuggester;
 use App\Filament\Support\ContentPlan\PlanActions;
 use App\Filament\Support\ContentPlan\PlanData;
 use App\Filament\Support\ContentPlan\PlanRules;
+use App\Filament\Support\ContentPlan\PlanStatus;
+use App\Filament\Resources\ArticleResource;
 use App\Filament\Support\Demo\DemoMode;
 use App\Filament\Support\Keywords\KeywordIntent;
 use App\Filament\Support\Keywords\KeywordService;
@@ -203,7 +205,9 @@ class ContentPlanPage extends Page
             ->label('Đổi ngày')
             ->modalHeading('Đổi ngày dự kiến')
             ->modalDescription('Chỉ bài "Đã lên kế hoạch", sang ngày tương lai chưa đủ '.PlanRules::DAILY_LIMIT.' bài. Giờ đăng lấy ô trống đầu tiên trong ngày (giờ VN).')
-            ->form([DatePicker::make('day')->label('Ngày mới')->native(false)->required()->minDate(fn () => VnTime::now()->startOfDay())])
+            ->modalSubmitActionLabel('Lưu')
+            ->modalCancelActionLabel('Hủy')
+            ->form([DatePicker::make('day')->label('Ngày mới')->validationAttribute('ngày mới')->native()->required()->minDate(fn () => VnTime::now()->startOfDay())])
             ->action(function (array $arguments, array $data): void {
                 $this->guard();
                 $article = Article::find($arguments['article'] ?? 0);
@@ -217,6 +221,48 @@ class ContentPlanPage extends Page
                     Notification::make()->title('Đã đổi ngày dự kiến')->body($dt.' (giờ VN)')->success()->send();
                 } catch (InvalidArgumentException $e) {
                     Notification::make()->title('Không đổi được ngày')->body($e->getMessage())->danger()->send();
+                }
+            });
+    }
+
+    /** Bài "Đã lên kế hoạch" chưa có ngày: những bài xếp được vào một ô trống của Lịch tuần. @return array<int,string> id => tên */
+    private function undatedPlannedOptions(): array
+    {
+        $site = $this->site();
+        $out = [];
+        foreach ($site ? PlanData::articles($site) : [] as $a) {
+            if ($a['status'] === 'planned' && $a['at'] === null) {
+                $out[$a['id']] = $a['title'];
+            }
+        }
+
+        return $out;
+    }
+
+    /** Bấm "Còn N ô trống" ở Lịch tuần: chọn một bài chưa có ngày để xếp vào ngày đó. */
+    public function assignDayAction(): Action
+    {
+        return Action::make('assignDay')
+            ->modalHeading(fn (array $arguments): string => 'Xếp bài vào ngày '.(($d = $arguments['day'] ?? null) ? date('d/m/Y', (int) strtotime((string) $d)) : ''))
+            ->modalDescription('Chọn một bài "Đã lên kế hoạch" chưa có ngày. Giờ đăng lấy ô trống đầu tiên trong ngày (giờ VN).')
+            ->modalSubmitActionLabel('Lưu')
+            ->modalCancelActionLabel('Hủy')
+            ->form([Select::make('article')->label('Bài')->validationAttribute('bài')->required()->searchable()
+                ->options(fn (): array => $this->undatedPlannedOptions())
+                ->helperText(fn (): ?string => $this->undatedPlannedOptions() === [] ? 'Chưa có bài nào "Đã lên kế hoạch" mà chưa có ngày. Lập kế hoạch ở tab "Lập kế hoạch" trước.' : null)])
+            ->action(function (array $arguments, array $data): void {
+                $this->guard();
+                $article = Article::find((int) ($data['article'] ?? 0));
+                if (! $article || ! $this->site() || $article->website_id !== $this->site()->id) {
+                    Notification::make()->title('Không xếp được bài')->body('Không tìm thấy bài, tải lại trang.')->danger()->send();
+
+                    return;
+                }
+                try {
+                    $dt = (new PlanActions)->reschedule(Auth::user(), $article, (string) ($arguments['day'] ?? ''));
+                    Notification::make()->title('Đã xếp bài vào lịch')->body($dt.' (giờ VN)')->success()->send();
+                } catch (InvalidArgumentException $e) {
+                    Notification::make()->title('Không xếp được bài')->body($e->getMessage())->danger()->send();
                 }
             });
     }
@@ -292,6 +338,12 @@ class ContentPlanPage extends Page
     public function exploreTopics(): void
     {
         abort_unless(Auth::user()?->isApprover() ?? false, 403);
+        if ($err = PlanRules::seedError($this->campaignSeed)) {
+            $this->addError('campaignSeed', $err);
+
+            return;
+        }
+        $this->resetErrorBag('campaignSeed');
         $site = $this->site();
         if (! $site) {
             return;
@@ -330,6 +382,12 @@ class ContentPlanPage extends Page
     public function proposeCampaign(): void
     {
         abort_unless(Auth::user()?->isApprover() ?? false, 403);
+        if ($err = PlanRules::seedError($this->campaignSeed)) {
+            $this->addError('campaignSeed', $err);
+
+            return;
+        }
+        $this->resetErrorBag('campaignSeed');
         $site = $this->site();
         if (! $site) {
             return;
@@ -452,6 +510,7 @@ class ContentPlanPage extends Page
         $dayTimes = PlanData::dayTimes($articles);
         $dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
         $today = VnTime::now()->format('Y-m-d');
+        $canOpen = ArticleResource::canViewAny();
         $days = [];
         $weekCount = 0;
         for ($i = 0; $i < 7; $i++) {
@@ -459,6 +518,8 @@ class ContentPlanPage extends Page
             $key = $d->format('Y-m-d');
             $items = array_values(array_filter($shown, fn ($a) => $a['at'] && $a['at']->format('Y-m-d') === $key && $demo !== 'tuan-trong'));
             usort($items, fn ($a, $b) => $a['at'] <=> $b['at']);
+            $nowVn = VnTime::now();
+            $items = array_map(fn ($a) => $a + ['badge' => PlanStatus::resolve($a['status'], $a['pub_status'] ?? null, $a['at'], $nowVn), 'url' => $canOpen ? ArticleResource::getUrl('view', ['record' => $a['id']]) : null], $items);
             $count = count($dayTimes[$key] ?? []);
             $weekCount += count($items);
             $days[] = ['key' => $key, 'name' => $dayNames[$i], 'label' => $d->format('d/m'), 'isToday' => $key === $today, 'isPast' => $key < $today,
