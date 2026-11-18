@@ -310,9 +310,67 @@ class ArticleResource extends Resource
     public const TAB_STATUSES = ['planned', 'drafting', 'needs_review', 'rejected', 'approved', 'scheduled', 'published'];
 
     public const TAB_LABELS = [
-        'planned' => 'Kế hoạch', 'drafting' => 'Đang viết', 'needs_review' => 'Chờ duyệt', 'rejected' => 'Cần sửa',
+        'planned' => 'Chờ viết', 'drafting' => 'Đang viết', 'needs_review' => 'Chờ duyệt', 'rejected' => 'Cần sửa',
         'approved' => 'Đã duyệt', 'scheduled' => 'Đã lên lịch', 'published' => 'Đã đăng',
     ];
+
+    /**
+     * Điều kiện "đã đăng" của một bài: trạng thái bài là 'published', hoặc bài vẫn ghi 'scheduled' nhưng có lượt đăng đã thành công
+     * (đường đăng thật chỉ cập nhật lượt đăng, không đổi trạng thái bài, nên đếm theo workflow_status sẽ nhầm bài đã đăng thành "Đã lên lịch").
+     */
+    private static function wherePublished(\Illuminate\Database\Eloquent\Builder $q): \Illuminate\Database\Eloquent\Builder
+    {
+        return $q->where(fn ($w) => $w->where('articles.workflow_status', 'published')
+            ->orWhere(fn ($x) => $x->where('articles.workflow_status', 'scheduled')->whereHas('versions.publications', fn ($p) => $p->where('status', 'published'))));
+    }
+
+    /** Lọc theo một tab trạng thái; "Đã lên lịch" loại bài đã đăng, "Đã đăng" gồm cả bài đã đăng còn ghi 'scheduled'. */
+    public static function scopeTab(\Illuminate\Database\Eloquent\Builder $q, string $status): \Illuminate\Database\Eloquent\Builder
+    {
+        return match ($status) {
+            'published' => static::wherePublished($q),
+            'scheduled' => $q->where('articles.workflow_status', 'scheduled')->whereDoesntHave('versions.publications', fn ($p) => $p->where('status', 'published')),
+            default => $q->where('articles.workflow_status', $status),
+        };
+    }
+
+    /**
+     * Số bài ở mỗi tab (khóa 'all' và từng mã trong TAB_STATUSES), cùng cách đếm với scopeTab.
+     * Tab "Chờ viết" = bài ở trạng thái 'planned', không cộng bài đã xếp lịch/đã đăng. Trang Kế hoạch cũng phải đếm "Chờ viết" đúng cách này
+     * (hiện ContentPlanPage::planGroups cộng mọi trạng thái ngoài 5 trạng thái đầu vào "Chờ viết" nên lệch).
+     *
+     * @return array<string, int>
+     */
+    public static function tabCounts(): array
+    {
+        $raw = Article::query()->selectRaw('workflow_status, count(*) as n')->groupBy('workflow_status')->pluck('n', 'workflow_status');
+        $counts = ['all' => (int) $raw->sum()];
+        foreach (self::TAB_STATUSES as $status) {
+            $counts[$status] = (int) ($raw[$status] ?? 0);
+        }
+        // Chuyển bài đã đăng (còn ghi 'scheduled') từ "Đã lên lịch" sang "Đã đăng".
+        $movedToPublished = static::scopeTab(Article::query(), 'published')->where('articles.workflow_status', 'scheduled')->count();
+        $counts['scheduled'] -= $movedToPublished;
+        $counts['published'] += $movedToPublished;
+
+        return $counts;
+    }
+
+    /** Thang lỗi chất lượng bằng lời dễ hiểu (P0/P1/P2 là mã nội bộ): nhãn + gợi ý. */
+    public const SEVERITY_LABELS = ['P0' => 'Lỗi nặng', 'P1' => 'Cần sửa', 'P2' => 'Gợi ý'];
+
+    public const SEVERITY_NOTE = 'Lỗi nặng: chặn duyệt, phải sửa hoặc nhập lý do ngoại lệ. Cần sửa: nên sửa trước khi đăng. Gợi ý: cải thiện thêm, không bắt buộc.';
+
+    /** "Lỗi nặng 0 · Cần sửa 1 · Gợi ý 0" từ bộ đếm P0/P1/P2 của kiểm chất lượng. @param array<string,int> $counts */
+    public static function severityText(array $counts): string
+    {
+        $parts = [];
+        foreach (self::SEVERITY_LABELS as $code => $label) {
+            $parts[] = $label.' '.(int) ($counts[$code] ?? 0);
+        }
+
+        return implode(' · ', $parts);
+    }
 
     /** Nút chính (duy nhất) của dòng theo trạng thái: submit_review | approve | schedule | view_version | null. */
     public static function primaryActionFor(Article $r): string
@@ -460,6 +518,8 @@ class ArticleResource extends Resource
                 static::scheduleAction(),
                 static::viewVersionAction(),
                 Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('open_article')->label('Xem bài')->icon('heroicon-o-eye')
+                        ->url(fn (Article $r) => static::getUrl('view', ['record' => $r])),
                     static::publishNowAction(),
                     static::rejectAction(),
                     Tables\Actions\Action::make('redo_agent')
@@ -554,6 +614,19 @@ class ArticleResource extends Resource
         return 'art-hint:v1:'.$v->id.':'.($v->updated_at?->timestamp ?? 0).':'.$kb;
     }
 
+    /** Dòng tóm tắt đầu hộp Duyệt: tên bài, mức rủi ro chủ đề (phiên gần nhất), số lỗi chưa đạt. @return array{title:string,risk:?string,counts:?array<string,int>} */
+    public static function approveSummary(Article $r): array
+    {
+        $q = static::qualityOf($r);
+        $risk = ArticleRows::lastRun($r)?->risk_level;
+
+        return [
+            'title' => (string) ($r->latestVersion?->title ?: $r->primary_keyword ?: 'Bài #'.$r->id),
+            'risk' => $risk ? (self::RISK_LABELS[$risk] ?? (string) $risk) : null,
+            'counts' => $q?->counts(),
+        ];
+    }
+
     /** Kiểm chất lượng bản mới nhất; null nếu bài chưa có bản nào. */
     private static function qualityOf(Article $record): ?QualityReport
     {
@@ -591,8 +664,9 @@ class ArticleResource extends Resource
             ->authorize(fn () => ReviewActions::canApprove())
             ->disabled(fn (Article $r) => ArticleRows::liveRun($r) !== null)
             ->tooltip(fn (Article $r) => ArticleRows::liveRun($r) ? 'Đội AI đang viết lại bài, chờ xong rồi duyệt bản mới.' : static::blockedHintOf($r))
-            ->modalHeading(fn (Article $r) => static::qualityOf($r)?->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi P0' : 'Duyệt nội dung')
-            ->form(fn (Article $r) => ReviewActions::approveForm((int) $r->created_by === (int) ReviewActions::user()?->id, static::qualityOf($r)))
+            ->modalHeading(fn (Article $r) => static::qualityOf($r)?->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi nặng' : 'Duyệt nội dung')
+            ->modalSubmitActionLabel('Duyệt')
+            ->form(fn (Article $r) => ReviewActions::approveForm((int) $r->created_by === (int) ReviewActions::user()?->id, static::qualityOf($r), static::approveSummary($r)))
             ->action(function (Article $r, array $data) {
                 abort_unless(ReviewActions::canApprove(), 403);
                 ReviewActions::run(fn () => (new ReviewWorkflow)->approve(ReviewActions::user(), static::latest($r), $data['note'] ?? null, $data['override_reason'] ?? null), 'Đã duyệt nội dung');

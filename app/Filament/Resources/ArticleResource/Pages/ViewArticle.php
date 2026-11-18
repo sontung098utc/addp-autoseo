@@ -332,8 +332,9 @@ class ViewArticle extends EditArticle
                 ->authorize(fn () => ReviewActions::canApprove())
                 ->disabled(fn () => \App\Filament\Support\Review\ArticleRows::liveRun($this->record) !== null)
                 ->tooltip(fn () => \App\Filament\Support\Review\ArticleRows::liveRun($this->record) ? 'Đội AI đang viết lại bài, chờ xong rồi duyệt bản mới.' : ReviewActions::blockedHint(ReviewActions::qualityFor($this->latest())))
-                ->modalHeading(fn () => ReviewActions::qualityFor($this->latest())->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi P0' : 'Duyệt nội dung')
-                ->form(fn () => ReviewActions::approveForm((int) $this->record->created_by === (int) ReviewActions::user()?->id, ReviewActions::qualityFor($this->latest())))
+                ->modalHeading(fn () => ReviewActions::qualityFor($this->latest())->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi nặng' : 'Duyệt nội dung')
+                ->modalSubmitActionLabel('Duyệt')
+                ->form(fn () => ReviewActions::approveForm((int) $this->record->created_by === (int) ReviewActions::user()?->id, ReviewActions::qualityFor($this->latest()), ArticleResource::approveSummary($this->record)))
                 ->action(function (array $data) {
                     abort_unless(ReviewActions::canApprove(), 403);
                     ReviewActions::run(fn () => (new ReviewWorkflow)->approve(ReviewActions::user(), $this->latest(), $data['note'] ?? null, $data['override_reason'] ?? null), 'Đã duyệt nội dung');
@@ -381,7 +382,14 @@ class ViewArticle extends EditArticle
                     \App\Filament\Support\Review\PublishNow::run($p);
                     $this->refreshRecord();
                 }),
-            Actions\DeleteAction::make()->visible(fn () => ArticleResource::canDeleteAny()),
+            // Nút Xóa không đứng cạnh Duyệt/Đăng: cất vào menu "Khác", và luôn hỏi xác nhận (xóa bài không hoàn tác được).
+            Actions\ActionGroup::make([
+                Actions\DeleteAction::make()->visible(fn () => ArticleResource::canDeleteAny())
+                    ->requiresConfirmation()
+                    ->modalHeading('Xóa bài này?')
+                    ->modalDescription('Xóa bài cùng các bản thảo của nó. Không hoàn tác được.')
+                    ->modalSubmitActionLabel('Xóa bài'),
+            ])->label('Khác')->icon('heroicon-m-ellipsis-horizontal')->color('gray')->button()->outlined(),
         ];
     }
 

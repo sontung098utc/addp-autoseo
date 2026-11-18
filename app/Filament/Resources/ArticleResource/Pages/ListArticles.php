@@ -42,13 +42,13 @@ class ListArticles extends ListRecords
 
     public function getTabs(): array
     {
-        $counts = Article::query()->selectRaw('workflow_status, count(*) as n')->groupBy('workflow_status')->pluck('n', 'workflow_status');
-        $tabs = ['all' => Tab::make('Tất cả')->badge((int) $counts->sum())];
+        $counts = ArticleResource::tabCounts();
+        $tabs = ['all' => Tab::make('Tất cả')->badge($counts['all'])];
         foreach (ArticleResource::TAB_STATUSES as $status) {
             $tabs[$status] = Tab::make(ArticleResource::TAB_LABELS[$status])
-                ->badge(((int) ($counts[$status] ?? 0)) ?: null)
+                ->badge($counts[$status] ?: null)
                 ->badgeColor($status === 'needs_review' ? 'warning' : 'gray')
-                ->modifyQueryUsing(fn (Builder $query) => $query->where('articles.workflow_status', $status));
+                ->modifyQueryUsing(fn (Builder $query) => ArticleResource::scopeTab($query, $status));
         }
 
         return $tabs;
