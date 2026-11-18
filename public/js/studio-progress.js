@@ -1,11 +1,13 @@
 /* SEO Studio: thanh tiến độ mảnh ở mép trên màn hình (kiểu Facebook/YouTube) để người dùng biết thao tác đã được nhận khi máy chủ phản hồi chậm.
  * - Bấm liên kết nội bộ / gửi biểu mẫu thường: thanh chạy ngay, GIỮ liên tục sang trang mới (nhớ bằng sessionStorage) và hoàn tất khi trang tải xong.
- * - Thao tác Livewire (bấm nút, lọc, lưu): hiện thanh nếu chờ quá 350 ms, ẩn khi có phản hồi. CHỈ khi chính người dùng vừa thao tác: các lượt tự làm mới nền
- *   (wire:poll, ví dụ biểu tượng "đội AI đang chạy" 5 giây/lần) không được làm thanh nháy.
+ * - Thao tác Livewire (bấm nút, lọc, lưu): hiện thanh nếu chờ quá SHOW_AFTER_MS, ẩn khi có phản hồi. CHỈ khi chính người dùng vừa thao tác NGAY TRƯỚC lượt gọi
+ *   và thao tác nằm trong đúng thành phần đó: các lượt tự làm mới nền (wire:poll của chuông, biểu tượng "đội AI đang chạy", trang đang chạy...) không làm thanh nháy,
+ *   kể cả khi tình cờ trùng lúc người dùng đang bấm chỗ khác. Tab đang ẩn thì không hiện thanh.
  * Không phụ thuộc thư viện ngoài, không chèn HTML người dùng (chỉ tạo một phần tử cố định). Tôn trọng prefers-reduced-motion. */
 (function () {
   'use strict';
-  var BACKGROUND_CALLS = ['loadTabs'], KEY = 'ss-nav-progress', KEYV = 'ss-nav-progress-v', MAX_MS = 25000, lastUser = 0, startedAt = 0;
+  var BACKGROUND_CALLS = ['loadTabs'], KEY = 'ss-nav-progress', KEYV = 'ss-nav-progress-v', MAX_MS = 25000, lastUser = 0, lastTarget = null, startedAt = 0;
+  var SHOW_AFTER_MS = 500, USER_WINDOW_MS = 400, gen = 0; // gen: lượt gọi cũ không được làm thanh của lượt mới kết thúc sớm
   var bar = null, value = 0, timer = null, active = 0, leaving = false, lastTick = 0, hideTimer = null;
   var reduced = false;
   try { reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* bỏ qua */ }
@@ -66,6 +68,7 @@
 
   function reset() {
     active = 0;
+    gen++;
     leaving = false;
     if (timer) { clearInterval(timer); timer = null; }
     if (bar) { bar.classList.remove('on'); }
@@ -129,6 +132,9 @@
   // Trang quay lại từ bộ nhớ đệm trình duyệt (nút Back): bỏ thanh đang treo.
   window.addEventListener('pageshow', function (e) { if (e.persisted) reset(); });
 
+  // Tab bị ẩn (không phải do đang chuyển trang): tắt thanh, không để nó chạy ngầm.
+  document.addEventListener('visibilitychange', function () { if (document.hidden && !leaving) reset(); });
+
   /* --- Trang mới: nếu đến từ một lần bấm, thanh tiếp tục từ ~60% và hoàn tất khi tải xong --- */
   var cameFrom = 0, prev = 0.3;
   try { cameFrom = parseInt(sessionStorage.getItem(KEY) || '0', 10); prev = parseFloat(sessionStorage.getItem(KEYV) || '0.3') || 0.3; } catch (e) { /* bỏ qua */ }
@@ -169,9 +175,22 @@
   }
 
   /* --- Ghi nhận thao tác thật của người dùng (để phân biệt với tự làm mới nền) --- */
-  ['pointerdown', 'click', 'keydown', 'input', 'change', 'submit'].forEach(function (ev) {
-    document.addEventListener(ev, function () { lastUser = Date.now(); }, true);
+  // Không tính pointerdown/di chuyển chuột: chỉ hành động đã hoàn tất (click, gõ phím, đổi giá trị, gửi biểu mẫu) mới có thể sinh ra một lượt gọi máy chủ.
+  ['click', 'keydown', 'input', 'change', 'submit'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) { lastUser = Date.now(); lastTarget = e.target; }, true);
   });
+
+  /* Lượt gọi này có phải do người dùng vừa thao tác trong chính thành phần Livewire đó không? (wire:poll không có thao tác nào ngay trước nó) */
+  function triggeredByUser(ctx) {
+    if (Date.now() - lastUser > USER_WINDOW_MS) return false;
+    try {
+      var owner = lastTarget && lastTarget.closest ? lastTarget.closest('[wire\\:id]') : null;
+      var el = ctx.component && ctx.component.el;
+      // Thao tác ngoài mọi thành phần Livewire (thanh bên, khoảng trống) không thể sinh ra lượt gọi; thao tác ở thành phần khác thì lượt này là tự làm mới nền trùng thời điểm.
+      if (!owner || (el && owner !== el)) return false;
+    } catch (e) { /* bỏ qua */ }
+    return true;
+  }
 
   /* --- Thao tác Livewire: hiện thanh nếu chờ quá 350 ms, chỉ khi người dùng vừa thao tác --- */
   document.addEventListener('livewire:init', function () {
@@ -189,9 +208,10 @@
         var calls = [];
         try { calls = (ctx.commit && ctx.commit.calls) || []; } catch (e) { /* bỏ qua */ }
         var background = calls.length > 0 && calls.every(function (c) { return c && BACKGROUND_CALLS.indexOf(c.method) !== -1; });
-        var byUser = !background && Date.now() - lastUser < 1500; // wire:poll và cập nhật nền không có thao tác trước đó
-        var t = byUser ? setTimeout(function () { shown = true; start(); }, 350) : 0;
-        var end = function () { clearTimeout(t); if (shown) { shown = false; done(); } };
+        var byUser = !background && !document.hidden && triggeredByUser(ctx); // wire:poll và cập nhật nền không có thao tác trước đó
+        var myGen = gen;
+        var t = byUser ? setTimeout(function () { if (document.hidden || myGen !== gen) return; shown = true; start(); }, SHOW_AFTER_MS) : 0;
+        var end = function () { clearTimeout(t); if (shown) { shown = false; if (myGen === gen) done(); } };
         ctx.respond(end);
         ctx.fail(end);
       });
