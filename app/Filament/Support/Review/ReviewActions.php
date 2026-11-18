@@ -132,8 +132,8 @@ class ReviewActions
             Forms\Components\DateTimePicker::make('scheduled_at_vn')
                 ->label('Thời điểm xuất bản (giờ Việt Nam)')
                 ->seconds(false)->native(false)
-                // Định dạng Việt (ngày/tháng/năm giờ:phút), tuần bắt đầu thứ Hai, bước 5 phút, mặc định 9 giờ sáng ngày mai (giờ VN) thay cho 00:00.
-                ->displayFormat('d/m/Y H:i')->firstDayOfWeek(1)->minutesStep(5)->closeOnDateSelection(false)
+                // Định dạng Việt (ngày/tháng/năm giờ:phút), tuần bắt đầu thứ Hai, phút bất kỳ (không đặt bước: step≠1 làm trình duyệt chặn gửi khi phút lẻ), mặc định 9 giờ sáng ngày mai (giờ VN) thay cho 00:00.
+                ->displayFormat('d/m/Y H:i')->firstDayOfWeek(1)->closeOnDateSelection(false)
                 ->minDate(fn () => Carbon::now(ReviewWorkflow::TIMEZONE)->startOfDay())
                 ->default(fn (): string => Carbon::now(ReviewWorkflow::TIMEZONE)->addDay()->setTime(9, 0)->format('Y-m-d H:i:s'))
                 ->live()->required()
