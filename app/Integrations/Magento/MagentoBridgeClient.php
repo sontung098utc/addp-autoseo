@@ -166,7 +166,25 @@ class MagentoBridgeClient implements PublisherInterface
 
                 return null;
             }
-            $up = $this->uploadMedia($website, $disk->path((string) $asset->file_path), (string) $asset->alt_text);
+            $path = $disk->path((string) $asset->file_path);
+            $tmp = null;
+            if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'webp') {
+                $tmp = $this->webpToJpeg($path); // Magento (GD2) không resize được WebP; null = không chuyển được thì bỏ ảnh bìa
+                if ($tmp === null) {
+                    Log::warning("[Magento] Ảnh #{$asset->id} là WebP và không chuyển được sang JPEG; đăng không kèm ảnh đại diện.");
+
+                    return null;
+                }
+                $path = $tmp;
+            }
+            try {
+                $up = $this->uploadMedia($website, $path, (string) $asset->alt_text);
+            } finally {
+                if ($tmp !== null) {
+                    @unlink($tmp);
+                    @rmdir(dirname($tmp));
+                }
+            }
             $file = (string) ($up['file'] ?? '');
             if ($file === '') {
                 return null;
@@ -179,6 +197,36 @@ class MagentoBridgeClient implements PublisherInterface
 
             return null;
         }
+    }
+
+    /** WebP -> JPEG (chất lượng 85, nền trắng cho ảnh trong suốt) vào file tạm cùng tên đổi đuôi .jpg. Không có GD webp hoặc ảnh hỏng: null. */
+    protected function webpToJpeg(string $path): ?string
+    {
+        if (! function_exists('imagecreatefromwebp') || ! function_exists('imagejpeg')) {
+            return null;
+        }
+        $im = @imagecreatefromwebp($path);
+        if ($im === false) {
+            return null;
+        }
+        $w = imagesx($im);
+        $h = imagesy($im);
+        $canvas = imagecreatetruecolor($w, $h);
+        imagefill($canvas, 0, 0, (int) imagecolorallocate($canvas, 255, 255, 255));
+        imagecopy($canvas, $im, 0, 0, 0, 0, $w, $h);
+        $dir = sys_get_temp_dir().'/magento-cover-'.bin2hex(random_bytes(6));
+        if (! @mkdir($dir, 0700) && ! is_dir($dir)) {
+            return null;
+        }
+        $out = $dir.'/'.(preg_replace('/[^A-Za-z0-9_-]+/', '-', pathinfo($path, PATHINFO_FILENAME)) ?: 'cover').'.jpg';
+        $ok = imagejpeg($canvas, $out, 85);
+        if (! $ok) {
+            @rmdir($dir);
+
+            return null;
+        }
+
+        return $out;
     }
 
     public function publish(Publication $publication): array

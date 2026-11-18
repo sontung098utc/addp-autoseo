@@ -20,3 +20,13 @@ Bạn tự làm trên server:
 - Thumbnail: `list-modern.phtml` chỉ in ảnh khi `featured_list_img` hoặc `featured_img` khác rỗng. Hệ thống nay gửi `image` = đường dẫn tương đối so với `media/magefan_blog/` do module trả về (chưa kiểm giá trị thật; kiểm bằng SQL ở README module).
 - H2 id hiện có (theme dùng cho mục lục, giữ định dạng): dinh-nghia-va-chi-dinh, phan-loai-nhom-thuoc, su-khac-biet-cac-tup, bang-tong-hop, tac-dung-phu-va-an-toan, nguyen-tac-tuan-thu, ket-hop-loi-song.
 - Mục "dán CSS vào blog-styles.css / Custom CSS" ở bản trước đã thay bằng đường dẫn trên.
+
+## Đã làm trên prod addp.vn (18/11/2026 ~15:39, theo báo cáo phiên làm trực tiếp trên site)
+- Module Company_BlogApi: `MediaManagement` lưu ảnh ở `pub/media/magefan_blog/autoseo/` và trả `file` = `magefan_blog/autoseo/<tên>`; `PostManagement` ghi `featured_img`. Bảng `magefan_blog_post` không có cột `featured_list_img` (chỉ `featured_img`, `featured_img_alt`); theme dùng `getFeaturedListImg() ?: getFeaturedImg()` nên đủ.
+- CSS theme: file riêng `addp-autoseo-article.css` đăng ký trong `Magefan_Blog/layout/blog_post_view.xml`, deploy tĩnh vi_VN/en_US; trang thật nạp được. Bản chuẩn trong repo: `docs/theme/autoseo-article.css`.
+- Bài post_id 163: xóa `autoseo-toc`, sửa `sup` ghi chú [a], bỏ nguồn lạc đề, đổi tiêu đề nguồn 4, `target=_blank` cho 7 link, ảnh đại diện chuyển JPG. Sao lưu: `~/domains/addp.vn/deploy-backup-autoseo-20261118153951` (kèm `restore-post163.sql`).
+
+## Mới trong repo (khớp prod), còn phải deploy
+- Ảnh bìa gửi sang Magento phải là JPG/PNG (GD2 của Magento không resize được WebP): Laravel tự chuyển WebP sang JPEG (chất lượng 85, nền trắng) trước khi tải; WebP hỏng thì bỏ ảnh bìa, bài vẫn đăng.
+- Bài MỚI cần deploy code Laravel (PR #42) mới có markup mới (data-tip, target=_blank, lớp `autoseo-refs__title`/`autoseo-notes__title`, không còn mục lục); CSS prod đã có luật cho hai lớp tiêu đề này.
+- Chưa kiểm: bài mới đăng thật qua API sau deploy.

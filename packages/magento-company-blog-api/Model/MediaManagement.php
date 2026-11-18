@@ -48,8 +48,9 @@ class MediaManagement implements MediaManagementInterface
 
         return [
             'id' => $uniqueName,
-            // Magefan: 'file' tương đối so với pub/media/magefan_blog (cách image helper của Magefan phân giải featured_img); Mageplaza giữ như cũ (tên file).
-            'file' => $isMagefan ? 'autoseo/' . $uniqueName : $uniqueName,
+            // Magefan: các bài hiện có lưu featured_img dạng 'magefan_blog/<tên file>' (tương đối so với pub/media; đã kiểm trong DB prod);
+            // Mageplaza giữ như cũ (tên file).
+            'file' => $isMagefan ? 'magefan_blog/autoseo/' . $uniqueName : $uniqueName,
             'url' => '/media/' . $relativePath,
         ];
     }

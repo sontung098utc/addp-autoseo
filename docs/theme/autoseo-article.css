@@ -1,26 +1,9 @@
-/* =====================================================================
-   Kiểu chữ cho bài do hệ thống auto SEO sinh ra (Nguồn tham khảo, Ghi chú,
-   chú thích [n], ghi chú [a], bảng, khung tóm tắt) trên theme ADDP.
-   Phạm vi: chỉ .autoseo-* và vùng .blog-post-view .addp-article-copy. Cỡ chữ theo em/rem,
-   lấy thân bài 17px làm gốc. Không dùng !important, không script.
-
-   Cách tự dán:
-   1. Thêm toàn bộ file này vào CUỐI file CSS của theme:
-      app/design/frontend/Codazon/unlimited/child/web/css/addp-article.css
-      (hoặc một file CSS riêng thêm vào theme). Không dán vào Custom CSS admin.
-   2. Triển khai tĩnh lại (bin/magento setup:static-content:deploy vi_VN en_US -f
-      nếu chạy production), rồi bin/magento cache:flush.
-   3. CLOUDFLARE đang giữ bản đầu của file CSS tĩnh: sửa tại chỗ sẽ không đến
-      được trình duyệt. Phải ĐỔI TÊN file (hoặc thêm query phiên bản ?v=2 vào
-      link) hoặc purge cache Cloudflare cho file đó.
-   4. Kiểm một bài mới: rê chuột/bấm [1] và [a] hiện hộp chú thích ngay; bấm
-      nguồn mở tab mới. Bài cũ chỉ đẹp lên phần kiểu chữ; tooltip tức thì và
-      tab mới cần ĐĂNG LẠI bài.
-   Lưu ý: khung viền quanh H2 là thiết kế của theme (addp-article.css dòng 59:
-   h2:target { outline } hiện khi URL có #id hoặc sau khi bấm mục lục), không phải lỗi.
-   Thứ tự: hệ thống phát markup mới trước hoặc sau CSS đều không hồi quy vì vẫn có title.
-   ===================================================================== */
-
+/* Cách đặt (đã làm trên prod addp.vn 18/11/2026): lưu thành file riêng addp-autoseo-article.css trong theme (Codazon/unlimited child, web/css/),
+   đăng ký trong layout blog_post_view.xml của Magefan_Blog: <css src="css/addp-autoseo-article.css" media="screen"/>, deploy tĩnh vi_VN/en_US, cache:flush.
+   Cloudflare giữ bản đầu của mỗi URL: khi sửa file phải đổi tên hoặc purge. Bài cũ chỉ đẹp phần kiểu chữ; tooltip tức thì và tab mới cần ĐĂNG LẠI bài.
+   Khung viền H2 là thiết kế theme (h2:target { outline }), không phải lỗi. */
+/* Bài do hệ thống auto SEO đẩy sang (autoseo.addp.vn): kiểu chữ cho chú thích [n], ghi chú [a], khối Nguồn tham khảo / Ghi chú, khung tóm tắt (aside) và bảng.
+   Phạm vi: .autoseo-* và .blog-post-view .addp-article-copy. File riêng (đổi tên khi sửa: Cloudflare giữ bản đầu của mỗi URL). Nguồn: repo addp-autoseo, docs/theme/autoseo-article.css. */
 .blog-post-view .addp-article-copy {
   --as-ink: rgb(28, 36, 51);
   --as-muted: rgb(88, 99, 120);

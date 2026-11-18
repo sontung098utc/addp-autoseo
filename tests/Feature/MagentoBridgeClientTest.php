@@ -129,11 +129,17 @@ class MagentoBridgeClientTest extends TestCase
         return new MagentoBridgeClient(new Client(['handler' => $stack]));
     }
 
-    private function featuredAsset(): MediaAsset
+    private function featuredAsset(string $name = 'cover.webp', ?string $bytes = null): MediaAsset
     {
         Storage::fake('public');
-        Storage::disk('public')->put('media/2026/11/cover.webp', 'x');
-        $a = MediaAsset::create(['website_id' => $this->website->id, 'disk' => 'public', 'file_path' => 'media/2026/11/cover.webp', 'file_name' => 'cover.webp', 'original_name' => 'cover.webp', 'mime_type' => 'image/webp', 'file_size' => 1, 'sha256' => str_repeat('a', 64), 'alt_text' => 'Bìa']);
+        if ($bytes === null) {
+            $im = imagecreatetruecolor(8, 8);
+            ob_start();
+            str_ends_with($name, '.png') ? imagepng($im) : imagewebp($im);
+            $bytes = (string) ob_get_clean();
+        }
+        Storage::disk('public')->put('media/2026/11/'.$name, $bytes);
+        $a = MediaAsset::create(['website_id' => $this->website->id, 'disk' => 'public', 'file_path' => 'media/2026/11/'.$name, 'file_name' => $name, 'original_name' => $name, 'mime_type' => 'image/x', 'file_size' => 1, 'sha256' => str_repeat('a', 64), 'alt_text' => 'Bìa']);
         $this->version->mediaAssets()->attach($a->id, ['is_featured' => true, 'position' => 0]);
 
         return $a;
@@ -145,23 +151,23 @@ class MagentoBridgeClientTest extends TestCase
         $asset = $this->featuredAsset();
         $h = [];
         $client = $this->clientWithHistory([
-            new Response(200, [], json_encode(['id' => 'a.webp', 'file' => 'autoseo/1_cover.webp', 'url' => '/media/autoseo/1_cover.webp'])),
+            new Response(200, [], json_encode(['id' => 'a.webp', 'file' => 'magefan_blog/autoseo/1_cover.jpg', 'url' => '/media/magefan_blog/autoseo/1_cover.jpg'])),
             new Response(200, [], json_encode(['post_id' => 99])),
         ], $h);
 
         $client->createDraft($this->website, $this->version);
 
         $this->assertStringEndsWith('/V1/company-blog/media', (string) $h[0]['request']->getUri());
-        $this->assertSame('cover.webp', json_decode((string) $h[0]['request']->getBody(), true)['fileName']);
+        $this->assertSame('cover.jpg', json_decode((string) $h[0]['request']->getBody(), true)['fileName']);
         $post = json_decode((string) $h[1]['request']->getBody(), true)['post'];
-        $this->assertSame('autoseo/1_cover.webp', $post['image']);
-        $this->assertSame('autoseo/1_cover.webp', $asset->fresh()->metadata['magento_media'][(string) $this->website->id]);
+        $this->assertSame('magefan_blog/autoseo/1_cover.jpg', $post['image']);
+        $this->assertSame('magefan_blog/autoseo/1_cover.jpg', $asset->fresh()->metadata['magento_media'][(string) $this->website->id]);
 
         // Lần sau (đăng sau nháp) dùng lại đường dẫn đã nhớ, không tải lại.
         $h2 = [];
         $this->clientWithHistory([new Response(200, [], json_encode(['post_id' => 99]))], $h2)->createDraft($this->website, $this->version->fresh());
         $this->assertCount(1, $h2);
-        $this->assertSame('autoseo/1_cover.webp', json_decode((string) $h2[0]['request']->getBody(), true)['post']['image']);
+        $this->assertSame('magefan_blog/autoseo/1_cover.jpg', json_decode((string) $h2[0]['request']->getBody(), true)['post']['image']);
     }
 
     public function test_create_draft_without_image_or_with_upload_failure_still_creates_post(): void
@@ -175,5 +181,31 @@ class MagentoBridgeClientTest extends TestCase
         $r = $this->clientWithHistory([new Response(500, [], '{}'), new Response(200, [], json_encode(['post_id' => 2]))], $h)->createDraft($this->website, $this->version);
         $this->assertSame('2', $r['remote_id']);
         $this->assertArrayNotHasKey('image', json_decode((string) $h[1]['request']->getBody(), true)['post']);
+    }
+
+    /** Magento (GD2) không resize được WebP: bìa WebP đổi sang JPEG (đuôi .jpg) trước khi tải; PNG giữ nguyên; WebP hỏng thì bỏ ảnh bìa, bài vẫn tạo. */
+    public function test_cover_webp_is_converted_to_jpeg_png_kept_and_corrupt_webp_skipped(): void
+    {
+        $this->featuredAsset('cover.webp');
+        $h = [];
+        $this->clientWithHistory([new Response(200, [], json_encode(['file' => 'magefan_blog/autoseo/1_cover.jpg'])), new Response(200, [], json_encode(['post_id' => 1]))], $h)->createDraft($this->website, $this->version);
+        $up = json_decode((string) $h[0]['request']->getBody(), true);
+        $this->assertSame('cover.jpg', $up['fileName']);
+        $this->assertSame("\xFF\xD8\xFF", substr((string) base64_decode($up['base64Content']), 0, 3), 'nội dung tải lên là JPEG');
+        $this->assertSame([], glob(sys_get_temp_dir().'/magento-cover-*') ?: [], 'không để thư mục tạm');
+
+        $this->version->mediaAssets()->detach();
+        $this->featuredAsset('cover.png');
+        $h = [];
+        $this->clientWithHistory([new Response(200, [], json_encode(['file' => 'magefan_blog/autoseo/2_cover.png'])), new Response(200, [], json_encode(['post_id' => 2]))], $h)->createDraft($this->website, $this->version->fresh());
+        $this->assertSame('cover.png', json_decode((string) $h[0]['request']->getBody(), true)['fileName']);
+
+        $this->version->mediaAssets()->detach();
+        $this->featuredAsset('bad.webp', 'not a webp');
+        $h = [];
+        $r = $this->clientWithHistory([new Response(200, [], json_encode(['post_id' => 3]))], $h)->createDraft($this->website, $this->version->fresh());
+        $this->assertSame('3', $r['remote_id']);
+        $this->assertCount(1, $h);
+        $this->assertArrayNotHasKey('image', json_decode((string) $h[0]['request']->getBody(), true)['post']);
     }
 }
