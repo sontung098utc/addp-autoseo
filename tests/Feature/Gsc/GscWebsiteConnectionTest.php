@@ -129,6 +129,18 @@ class GscWebsiteConnectionTest extends TestCase
         $c->assertSee('Thông tin chung')->assertSee('Xác thực bảo mật')->assertSee('Search Console')->assertDontSee('Chỉnh sửa Website');
     }
 
+    public function test_connect_button_always_visible_and_explains_when_not_configured(): void
+    {
+        $s = $this->site();
+        $this->actingAs($this->user('admin'));
+        config(['gsc.oauth.client_id' => null, 'gsc.oauth.client_secret' => null]);
+        Livewire::test(EditWebsite::class, ['record' => $s->getKey()])
+            ->assertActionVisible('gscConnect')->callAction('gscConnect')->assertNotified('Chưa thể kết nối Google')->assertNoRedirect();
+        config(['gsc.oauth.client_id' => 'cid', 'gsc.oauth.client_secret' => 'csecret']);
+        Livewire::test(EditWebsite::class, ['record' => $s->getKey()])
+            ->callAction('gscConnect')->assertRedirect(route('gsc.oauth.start', ['website' => $s->getKey()]));
+    }
+
     public function test_check_action_reports_result_and_disconnect_revokes(): void
     {
         $s = $this->site();

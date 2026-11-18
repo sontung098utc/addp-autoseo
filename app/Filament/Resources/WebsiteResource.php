@@ -151,6 +151,12 @@ class WebsiteResource extends Resource
                             ->content('Nguồn số liệu truy vấn và trang cho kế hoạch nội dung. Chỉ đọc; hệ thống không sửa gì trong Search Console.'),
                         Forms\Components\Placeholder::make('gsc_status')->label('Trạng thái')
                             ->content(fn (?Website $record): HtmlString => static::gscStatusHtml($record)),
+                        Forms\Components\Actions::make([
+                            Forms\Components\Actions\Action::make('gscConnectTab')->label('Kết nối Google')->icon('heroicon-o-link')
+                                ->action(fn ($livewire) => $livewire->connectGoogle()),
+                            Forms\Components\Actions\Action::make('gscCheckTab')->label('Kiểm tra Search Console')->icon('heroicon-o-signal')->color('gray')
+                                ->action(fn ($livewire) => $livewire->checkGsc()),
+                        ]),
                         Forms\Components\TextInput::make('gsc_property')
                             ->label('Thuộc tính Search Console')
                             ->placeholder('Để trống = tự suy ra từ địa chỉ Website')
