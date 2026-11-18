@@ -275,12 +275,24 @@ final class KeywordResearchService
 
                 continue;
             }
+            if (\App\Filament\Support\Keywords\KeywordSanitizer::check($kw)['keyword'] === null) {
+                $res['invalid']++; // có thẻ/mã: từ chối hẳn, không strip_tags rồi giữ phần còn lại
+
+                continue;
+            }
             $kw = $this->clean($kw, 1000);
             if ($kw === '' || mb_strlen($kw) > self::KEYWORD_MAX) {
                 $res['invalid']++;
 
                 continue;
             }
+            $chk = \App\Filament\Support\Keywords\KeywordSanitizer::check($kw);
+            if ($chk['keyword'] === null) {
+                $res['invalid']++;
+
+                continue;
+            }
+            $kw = $chk['keyword'];
             if (preg_match(self::INJECTION, $kw)) {
                 $res['injection']++;
 

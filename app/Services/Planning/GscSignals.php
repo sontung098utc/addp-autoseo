@@ -113,7 +113,7 @@ final class GscSignals
         foreach (array_unique(array_map(fn ($q) => PlannedArticleCreator::normalize((string) $q), $queries)) as $q) {
             $q = trim((string) $q);
             $key = Keyword::keyFor($q);
-            if ($key === '' || mb_strlen($q) > 190) {
+            if ($key === '' || mb_strlen($q) > 190 || \App\Filament\Support\Keywords\KeywordSanitizer::check($q)['keyword'] === null) {
                 $skipped[] = "{$q}: không hợp lệ";
 
                 continue;

@@ -139,9 +139,9 @@ class KeywordsPageTest extends TestCase
         $this->actingAs($this->user('writer'));
         $before = count(KeywordService::make()->repo()->all());
         $t = Livewire::test(KeywordsPage::class)
-            ->set('csvText', "keyword,volume,intent\nmột từ khóa mới <b>,12,commercial\nxấu,x,commercial\n")
+            ->set('csvText', "keyword,volume,intent\nmột từ khóa mới,12,commercial\nxấu,x,commercial\n<b>x</b>,1,commercial\n")
             ->call('previewCsv')
-            ->assertSee('Xem trước')->assertSee('Dòng 3')->assertSee('<b>')->assertDontSee('<b>', false);
+            ->assertSee('Xem trước')->assertSee('Dòng 3')->assertSee('Dòng 4')->assertSee('thẻ HTML')->assertDontSee('<b>', false);
         $this->assertSame($before, count(KeywordService::make()->repo()->all()));
         $t->call('confirmImport');
         $this->assertSame($before + 1, count(KeywordService::make()->repo()->all()));

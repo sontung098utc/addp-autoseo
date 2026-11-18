@@ -10,7 +10,10 @@ use App\Contracts\KeywordMetricsProvider;
  */
 final class KeywordMetricsResolver
 {
-    public const HOWTO = 'Đặt DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD trong .env để lấy lượt tìm thật. Hoặc nhập CSV có cột volume.';
+    public const HOWTO = 'Chưa kết nối nguồn số liệu lượt tìm. Liên hệ quản trị để kết nối, hoặc nhập CSV có cột lượt tìm.';
+
+    /** Chỉ hiện trong chú thích ⓘ dành cho quản trị, không đặt vào câu thông báo cho người dùng. */
+    public const ADMIN_HINT = 'Dành cho quản trị: đặt DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD trong .env rồi nạp lại cấu hình để bật nguồn lượt tìm thật.';
 
     /** @return array{provider: KeywordMetricsProvider, label: string, demo: bool} */
     public static function resolve(): array
