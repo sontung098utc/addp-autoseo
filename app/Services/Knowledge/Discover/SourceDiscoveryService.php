@@ -43,6 +43,9 @@ final class SourceDiscoveryService
 
     public const MIN_TEXT_CHARS = 200;
 
+    /** Cửa sổ chống trùng cho lượt hệ thống tự chạy (phút). */
+    public const DEDUPE_MINUTES = 10;
+
     /** Từ gợi ý thêm vào truy vấn theo lĩnh vực rủi ro. */
     private const HINTS = ['health' => 'hướng dẫn khuyến cáo', 'pharma' => 'GMP hướng dẫn tiêu chuẩn', 'finance' => 'quy định hướng dẫn', 'legal' => 'quy định hướng dẫn', 'education' => 'hướng dẫn'];
 
@@ -227,7 +230,11 @@ final class SourceDiscoveryService
             $list = array_values(array_filter($list, fn ($c) => $c['trust']['level'] === 'trusted'));
         }
         $list = array_slice($list, 0, (int) ($options['max_sources'] ?? self::MAX_CANDIDATES));
-        $refs = ['sources' => count($list), 'budget_vnd' => $budget === PHP_FLOAT_MAX ? null : $budget, 'purpose' => (string) ($options['purpose'] ?? 'discover')];
+        $topic = mb_substr(trim((string) ($options['topic'] ?? $options['search']['query'] ?? '')), 0, 200); // chủ đề của lượt: hiện ở danh sách và tiêu đề phiên (không có thì người xem chỉ thấy "Xây kho trí tuệ")
+        $purpose = (string) ($options['purpose'] ?? 'discover');
+        $refs = ['sources' => count($list), 'budget_vnd' => $budget === PHP_FLOAT_MAX ? null : $budget, 'purpose' => $purpose]
+            + ($topic !== '' ? ['topic' => $topic] : []) + ($brain ? ['brain_id' => $brain->id, 'brain_name' => mb_substr((string) $brain->name, 0, 120)] : [])
+            + ['run_key' => md5(mb_strtolower($topic).'|'.$purpose.'|'.($brain?->id ?? 0).'|'.implode('|', array_column($list, 'url')))];
         $out = ['run_id' => null, 'imported' => 0, 'items_auto' => 0, 'items_proposed' => 0, 'pages' => [], 'cost_vnd' => 0.0, 'stopped_reason' => null, 'auto_item_ids' => [], 'proposed_item_ids' => []];
         $searchCost = (float) ($options['search']['cost_vnd'] ?? 0);
 
@@ -239,7 +246,19 @@ final class SourceDiscoveryService
             throw new KnowledgeError($why);
         }
 
-        $ownRun = ! (($options['run'] ?? null) instanceof \App\Models\AgentRun); // quy trình Xây kho chuyên ngành truyền phiên của nó vào để các bước nằm chung một phiên
+        $ownRun = ! (($options['run'] ?? null) instanceof \App\Models\AgentRun);
+        // Chống trùng: lượt HỆ THỐNG tự chạy (đội AI tự nạp kho) cùng website, chủ đề, mục đích và danh sách nguồn trong 10 phút thì không mở phiên và không tải lại (tránh ba phiên giống hệt cùng một phút).
+        // Lượt người bấm tay không bị chặn: người dùng chủ động thử lại thì phải chạy thật.
+        if ($ownRun && ($options['as_system'] ?? false) && $list !== []) {
+            $dup = \App\Models\AgentRun::query()->where('website_id', $site->id)->where('job_type', 'brain_build')->where('created_at', '>=', now()->subMinutes(self::DEDUPE_MINUTES))->orderByDesc('id')->limit(20)->get()
+                ->first(fn ($r) => ($r->input_refs['run_key'] ?? null) === $refs['run_key']);
+            if ($dup !== null) {
+                $out['run_id'] = $dup->id;
+                $out['stopped_reason'] = 'duplicate';
+
+                return $out;
+            }
+        } // quy trình Xây kho chuyên ngành truyền phiên của nó vào để các bước nằm chung một phiên
         $run = $ownRun ? JobRunRecorder::start('brain_build', $site, $refs, $by, 'manual', $resolved['demo'] ? 'mock' : 'real') : $options['run'];
         if (isset($options['search'])) {
             $s = $options['search'];
@@ -271,8 +290,9 @@ final class SourceDiscoveryService
             $done++;
             $page = $this->fetcher->fetchExternal($url);
             if (! $page['ok']) {
-                JobRunRecorder::step($run, 'source', $url, 'failed', ['url' => $url, 'domain' => $domain, 'trust' => $trust['level'], 'error' => $page['error']], null, 0, 0, $page['message']);
-                $out['pages'][] = ['url' => $url, 'domain' => $domain, 'ok' => false, 'error' => $page['error'], 'message' => $page['message'], 'trust' => $trust['level']];
+                $why = self::explainFetch((string) $page['error'], (string) $page['message'], $domain);
+                JobRunRecorder::step($run, 'source', $domain !== '' ? $domain : $url, 'failed', ['url' => $url, 'domain' => $domain, 'trust' => $trust['level'], 'error' => $page['error'], 'phase' => 'fetch'], null, 0, 0, $why);
+                $out['pages'][] = ['url' => $url, 'domain' => $domain, 'ok' => false, 'error' => $page['error'], 'message' => $page['message'], 'why' => $why, 'trust' => $trust['level']];
 
                 continue;
             }
@@ -324,21 +344,85 @@ final class SourceDiscoveryService
             }
             $out['items_auto'] += $auto;
             $out['items_proposed'] += $prop;
-            $out['pages'][] = ['url' => $url, 'domain' => $domain, 'ok' => true, 'title' => $source->title, 'source_id' => $source->id, 'fetched_at' => $source->fetched_at?->toIso8601String(), 'trust' => $trust['level'], 'items_auto' => $auto, 'items_proposed' => $prop];
-            JobRunRecorder::step($run, 'source', $url, 'completed', ['url' => $url, 'domain' => $domain, 'source_id' => $source->id, 'trust' => $trust['level'], 'trust_reason' => $trust['reason'], 'items' => $auto + $prop, 'auto' => $auto, 'proposed' => $prop, 'fetched_at' => $source->fetched_at?->toIso8601String()],
-                $resolved['label'], (int) ($log['tokens'] ?? 0), (float) ($log['cost_vnd'] ?? 0), isset($log['error']) ? ErrorMasker::short((string) $log['error'], 200) : null);
+            $n = $auto + $prop;
+            $aiWhy = self::explainAi($log, $domain, $n);
+            $out['pages'][] = ['url' => $url, 'domain' => $domain, 'ok' => true, 'title' => $source->title, 'source_id' => $source->id, 'fetched_at' => $source->fetched_at?->toIso8601String(), 'trust' => $trust['level'], 'items_auto' => $auto, 'items_proposed' => $prop]
+                + ($aiWhy !== null ? ['why' => $aiWhy] : []);
+            // Trung thực: tải được trang nhưng AI không rút được mục nào thì bước này là LỖI (hoặc cần chú ý nếu AI chạy được nhưng không có mục hợp lệ), không ghi "Xong".
+            $stepStatus = $n > 0 ? (isset($log['error']) ? 'warn' : 'completed') : (isset($log['error']) ? 'failed' : 'warn');
+            JobRunRecorder::step($run, 'source', $domain !== '' ? $domain : $url, $stepStatus, ['url' => $url, 'domain' => $domain, 'source_id' => $source->id, 'trust' => $trust['level'], 'trust_reason' => $trust['reason'], 'items' => $n, 'auto' => $auto, 'proposed' => $prop, 'fetched_at' => $source->fetched_at?->toIso8601String(), 'phase' => 'ai']
+                + (isset($log['error']) ? ['error' => ErrorMasker::short((string) $log['error'], 200)] : []),
+                $resolved['label'], (int) ($log['tokens'] ?? 0), (float) ($log['cost_vnd'] ?? 0), $aiWhy ?? ($n > 0 ? 'Đã rút '.$n.' mục ('.$auto.' tự nhận, '.$prop.' chờ duyệt).' : null));
             if (($log['stopped'] ?? null) === 'error') {
                 $out['stopped_reason'] = 'ai_error';
                 break;
             }
         }
         if ($ownRun) {
-            JobRunRecorder::finish($run, $out['stopped_reason'] === 'emergency_stop' ? 'blocked' : (($out['stopped_reason'] === 'ai_error' && $out['imported'] === 0) ? 'failed' : 'ready_for_review'),
-                ['source_ids' => array_values(array_filter(array_column($out['pages'], 'source_id'))), 'item_ids' => array_merge($out['auto_item_ids'], $out['proposed_item_ids']), 'auto_approved' => $out['items_auto'], 'proposed' => $out['items_proposed']],
-                $out['stopped_reason'] === 'budget' ? 'Chạm trần chi phí.' : null);
+            $itemIds = array_merge($out['auto_item_ids'], $out['proposed_item_ids']);
+            $failedPages = array_values(array_filter($out['pages'], fn ($p) => empty($p['ok']) && ! in_array($p['error'] ?? '', ['too_short', 'unchanged'], true) || (! empty($p['ok']) && ! empty($p['why']) && ((int) ($p['items_auto'] ?? 0) + (int) ($p['items_proposed'] ?? 0)) === 0)));
+            [$status, $reason] = match (true) {
+                $out['stopped_reason'] === 'emergency_stop' => ['blocked', null],
+                $itemIds !== [] => ['ready_for_review', $out['stopped_reason'] === 'budget' ? 'Chạm trần chi phí.' : null],
+                $failedPages !== [] || $out['stopped_reason'] === 'ai_error' => ['failed', 'Không rút được mục nào. '.self::summarize($failedPages)],
+                default => ['ready_for_review', $out['stopped_reason'] === 'budget' ? 'Chạm trần chi phí.' : ($list === [] ? 'Không có nguồn nào để nạp (không có nguồn tin cậy trong kết quả tìm).' : 'Không có mục mới: nội dung các nguồn đã có trong kho hoặc quá ít chữ.')],
+            };
+            JobRunRecorder::finish($run, $status, ['source_ids' => array_values(array_filter(array_column($out['pages'], 'source_id'))), 'item_ids' => $itemIds, 'auto_approved' => $out['items_auto'], 'proposed' => $out['items_proposed']], $reason);
         }
         $out['run_id'] = $run?->id;
 
         return $out;
+    }
+
+    /** Gộp lý do lỗi của vài nguồn thành một câu cho "Lý do kết thúc". @param list<array<string,mixed>> $pages */
+    private static function summarize(array $pages): string
+    {
+        $parts = [];
+        foreach (array_slice($pages, 0, 3) as $p) {
+            $parts[] = ($p['domain'] ?? '').': '.rtrim((string) ($p['why'] ?? $p['message'] ?? ''), '. ');
+        }
+
+        return $parts === [] ? 'Xem từng bước để biết nguồn nào lỗi.' : implode('; ', $parts).'.';
+    }
+
+    /** Lý do tải nguồn ngoài thất bại, tiếng Việt, kèm gợi ý cho người vận hành; phân biệt chặn an toàn / robots / hết giờ / mã lỗi của máy chủ nguồn. */
+    public static function explainFetch(string $code, string $message, string $domain): string
+    {
+        $hint = match ($code) {
+            'timeout' => 'Máy chủ nguồn trả lời quá chậm hoặc chặn kết nối từ máy chủ của hệ thống; thử lại sau, hoặc kiểm tra máy chủ chạy hệ thống có ra được Internet không.',
+            'blocked' => 'Bị chặn theo quy tắc an toàn mạng (địa chỉ nội bộ hoặc giao thức không cho phép), không phải lỗi nguồn.',
+            'robots' => 'Website nguồn cấm robot đọc trang này trong robots.txt; hệ thống tôn trọng và không tải.',
+            'too_large' => 'Trang lớn hơn giới hạn 2 MB nên không tải.',
+            'not_html' => 'Nguồn không phải trang chữ (ví dụ PDF hoặc ảnh); hệ thống chưa đọc loại này.',
+            'off_domain' => 'Tên miền không nằm trong danh sách được phép tải.',
+            default => 'Máy chủ nguồn từ chối hoặc không phản hồi (có thể chặn máy chủ của hệ thống, cần đăng nhập, hoặc lỗi mạng/DNS/chứng chỉ).',
+        };
+
+        return 'Không tải được '.($domain !== '' ? $domain : 'nguồn').' (AI chưa được gọi): '.rtrim($message, '. ').'. '.$hint;
+    }
+
+    /**
+     * Lý do AI không rút được (đủ) mục từ một nguồn đã tải xong; null nếu không có gì bất thường.
+     * Phân biệt: hết hạn mức/giới hạn tốc độ, hết giờ, chưa cấu hình/khóa sai, AI trả sai cấu trúc, AI chạy được nhưng không mục nào có đoạn nguyên văn hợp lệ.
+     *
+     * @param  array<string,mixed>  $log  nhật ký của KnowledgeAiIngest::run
+     */
+    public static function explainAi(array $log, string $domain, int $items): ?string
+    {
+        $err = trim((string) ($log['error'] ?? ''));
+        if ($err === '' && $items > 0) {
+            return null;
+        }
+        $e = mb_strtolower($err);
+        $cause = match (true) {
+            $err === '' => 'AI đã đọc nhưng không có mục nào qua kiểm tra (đoạn nguyên văn không khớp trang, số liệu không có trong đoạn, nội dung trùng kho'.((int) ($log['not_vietnamese'] ?? 0) > 0 ? ' hoặc không phải tiếng Việt' : '').'). Bỏ '.((int) ($log['invalid'] ?? 0) + (int) ($log['injection_dropped'] ?? 0)).' mục không hợp lệ, '.(int) ($log['duplicates'] ?? 0).' mục trùng',
+            (bool) preg_match('/429|rate.?limit|quota|hạn mức|hết lượt|too many|overloaded|quá tải/u', $e) => 'AI hết hạn mức hoặc bị giới hạn tốc độ (429): '.$err.'. Chờ rồi chạy lại, hoặc kiểm tra hạn mức của tài khoản AI',
+            (bool) preg_match('/timed? ?out|hết thời gian|timeout/u', $e) => 'AI trả lời quá lâu (hết thời gian chờ): '.$err.'. Thử lại; nếu lặp lại thì đổi model của tác vụ «knowledge»',
+            (bool) preg_match('/401|403|unauthor|api.?key|khóa|chưa (kết nối|cấu hình)|route|không có model|credential/u', $e) => 'Chưa gọi được AI do cấu hình hoặc khóa: '.$err.'. Kiểm tra route AI «knowledge» và khóa tại Cài đặt AI',
+            (bool) preg_match('/json|cấu trúc|schema|items/u', $e) => 'AI trả sai định dạng JSON: '.$err.'. Model của tác vụ «knowledge» có thể quá yếu hoặc bị cắt cụt; thử model mạnh hơn',
+            default => 'AI gặp lỗi: '.$err,
+        };
+
+        return 'Tải được '.($domain !== '' ? $domain : 'nguồn').' nhưng '.($items > 0 ? 'chỉ rút được một phần ('.$items.' mục). ' : 'không rút được mục nào. ').$cause.'.';
     }
 }

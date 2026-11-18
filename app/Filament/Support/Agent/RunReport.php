@@ -83,7 +83,7 @@ final class RunReport
                 $links[] = ['label' => 'Xem phiên bản đã tạo', 'url' => ArticleVersionResource::getUrl('view', ['record' => $run->final_version_id])];
             }
         }
-        $lines[] = 'Chi phí AI: '.$cost.($dur ? ", thời gian {$dur}" : '').'; '.($run->status === 'failed' ? 'phiên lỗi' : 'trạng thái: '.mb_strtolower(AgentRunResource::STATUS[$run->status][0] ?? (string) $run->status)).'.';
+        $lines[] = 'Chi phí AI: '.$cost.($dur ? ", thời gian {$dur}" : '').'; '.($run->status === 'failed' ? 'phiên lỗi' : 'trạng thái: '.mb_strtolower(BuildRunLabel::outcome($run)[0] ?? AgentRunResource::STATUS[$run->status][0] ?? (string) $run->status)).'.';
         if ($run->outcome_reason) {
             $lines[] = 'Lý do kết thúc: '.$run->outcome_reason;
         }

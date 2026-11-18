@@ -10,6 +10,7 @@
     $badgeShort = ['running' => 'Đang chạy', 'ready_for_review' => 'Xong', 'held' => 'Giữ', 'blocked' => 'Bị chặn', 'failed' => 'Lỗi'];
     [, $sColor] = $statusMap[$run->status] ?? [$run->status, 'gray'];
     $sLabel = $badgeShort[$run->status] ?? $run->status;
+    if ($buildOutcome = \App\Filament\Support\Agent\BuildRunLabel::outcome($run)) { [$sLabel, $sColor] = $buildOutcome; } // phiên nạp kho không có mục nào thì không ghi "Xong" trơ trụi
     if (collect($flow['nodes'])->contains('state', 'waiting')) { [$sLabel, $sColor] = ['Chờ bạn', 'warning']; }
     if ($stale) { [$sLabel, $sColor] = ['Có thể bị treo', 'warning']; }
     $tone = ['success' => 'done', 'warning' => 'warn', 'danger' => 'failed', 'info' => 'running', 'gray' => 'idle'][$sColor] ?? 'idle';
@@ -110,6 +111,7 @@
         <div class="rvx-head" data-testid="run-status-bar">
             <div class="rvx-id" data-testid="run-meta">
                 <span class="rv-outcome" data-testid="run-badge"><x-filament::badge :color="$sColor">{{ $sLabel }}</x-filament::badge></span>
+                @if (\App\Filament\Support\Agent\BuildRunLabel::is($run) && ($bp = \App\Filament\Support\Agent\BuildRunLabel::purpose($run)))<span class="rv-sub" data-testid="run-build-purpose">{{ $run->website?->name }} · {{ $bp }}</span>@endif
                 @if (empty($embedded))<span class="rv-sub">#{{ $run->id }} · {{ $startedAt ? VnTime::format($startedAt, 'd/m/Y H:i') : '—' }}</span>@endif
                 @if ($campaign)<a class="rv-chip rv-chip--link" href="{{ \App\Filament\Resources\CampaignResource::getUrl('view', ['record' => $campaign]) }}">{{ $campaign->name }}</a>@endif
                 <x-help title="Về phiên này">

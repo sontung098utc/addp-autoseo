@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Clusters\AgentTeam;
 use App\Filament\Resources\AgentRunResource\Pages;
 use App\Filament\Support\Agent\AgentFlowBlueprint;
+use App\Filament\Support\Agent\BuildRunLabel;
 use App\Filament\Support\Agent\RunActivity;
 use App\Filament\Support\Schedule\VnTime;
 use App\Models\AgentRun;
@@ -112,15 +113,15 @@ class AgentRunResource extends Resource
             ->columns([
                 // Cột nội dung là cột quan trọng nhất: cho rộng; các cột phụ gọn lại, không xuống dòng.
                 Tables\Columns\TextColumn::make('article.primary_keyword')->label('Bài / từ khóa')->searchable()->wrap()
-                    ->state(fn (AgentRun $r) => $r->article?->primary_keyword ?: self::jobTypeLabel($r->job_type))
-                    ->description(fn (AgentRun $r) => $r->website?->name)
+                    ->state(fn (AgentRun $r) => $r->article?->primary_keyword ?: (BuildRunLabel::is($r) ? BuildRunLabel::title($r) : self::jobTypeLabel($r->job_type)))
+                    ->description(fn (AgentRun $r) => BuildRunLabel::is($r) ? collect([$r->website?->name, BuildRunLabel::purpose($r)])->filter()->implode(' · ') : $r->website?->name)
                     ->extraHeaderAttributes(['class' => 'ss-col-main'])->extraCellAttributes(['class' => 'ss-col-main']),
                 Tables\Columns\TextColumn::make('job_type')->label('Loại việc')->badge()->color('gray')->visibleFrom('xl')
                     ->formatStateUsing(fn (?string $state) => self::jobTypeLabel($state))
                     ->extraHeaderAttributes(['style' => 'width:1%;white-space:nowrap'])->extraCellAttributes(['style' => 'white-space:nowrap']),
                 Tables\Columns\TextColumn::make('status')->label('Kết quả')->badge()
-                    ->formatStateUsing(fn (string $state, AgentRun $r) => RunActivity::isStale($r) ? 'Có thể bị treo' : (self::STATUS[$state][0] ?? $state))
-                    ->color(fn (string $state, AgentRun $r) => RunActivity::isStale($r) ? 'warning' : (self::STATUS[$state][1] ?? 'gray'))
+                    ->formatStateUsing(fn (string $state, AgentRun $r) => RunActivity::isStale($r) ? 'Có thể bị treo' : (BuildRunLabel::outcome($r)[0] ?? self::STATUS[$state][0] ?? $state))
+                    ->color(fn (string $state, AgentRun $r) => RunActivity::isStale($r) ? 'warning' : (BuildRunLabel::outcome($r)[1] ?? self::STATUS[$state][1] ?? 'gray'))
                     ->icon(fn (string $state, AgentRun $r) => RunActivity::isLive($r) ? 'heroicon-o-arrow-path' : null)
                     ->extraAttributes(fn (AgentRun $r) => RunActivity::isLive($r) ? ['class' => 'ss-badge-live', 'data-running' => '1'] : [])
                     ->description(fn (AgentRun $r) => RunActivity::isLive($r) ? 'Đang ở: '.(AgentFlowBlueprint::byStage()[$cur = RunActivity::currentStageOf($r, $r->steps)]['title'] ?? JobTypeRegistry::stageLabels((string) $r->job_type, true)[$cur] ?? $cur ?? 'hoàn tất') : null)

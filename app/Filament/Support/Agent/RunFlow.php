@@ -345,9 +345,11 @@ final class RunFlow
         $bad = $nodes->first(fn ($n) => in_array($n['state'], ['failed', 'blocked'], true)) ?? ($run->status === 'held' ? $nodes->last(fn ($n) => $n['state'] === 'warn') : null);
 
         return match ($run->status) {
-            'failed' => ['tone' => 'failed', 'text' => 'Lỗi ở '.$at($bad).($reason !== '' ? ': '.Str::limit($reason, 140) : '.'), 'action' => $open],
+            'failed' => ['tone' => 'failed', 'text' => 'Lỗi ở '.$at($bad).($reason !== '' ? ': '.Str::limit($reason, 260) : '.'), 'action' => $open],
             'blocked' => ['tone' => 'warn', 'text' => 'Bị chặn '.($bad ? 'ở '.$at($bad) : 'trước khi chạy').($reason !== '' ? ': '.Str::limit($reason, 140) : '.'), 'action' => $open],
             'held' => ['tone' => 'warn', 'text' => 'Bị giữ, cần người xem'.($reason !== '' ? ': '.Str::limit($reason, 140) : '.'), 'action' => $view],
+            'ready_for_review' => BuildRunLabel::outcome($run) && BuildRunLabel::outcome($run)[1] === 'warning'
+                ? ['tone' => 'warn', 'text' => 'Không có mục kiến thức mới nào được nạp'.($reason !== '' ? ': '.Str::limit($reason, 160) : '.'), 'action' => null] : null,
             default => null,
         };
     }
