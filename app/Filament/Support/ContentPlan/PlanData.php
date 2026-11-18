@@ -66,7 +66,7 @@ final class PlanData
      */
     public static function articles(Website $site): array
     {
-        $articles = Article::with('latestVersion')->where('website_id', $site->id)->orderBy('id')->get();
+        $articles = Article::with(['latestVersion' => fn ($q) => $q->select('article_versions.id', 'article_versions.article_id', 'article_versions.version', 'article_versions.title')])->where('website_id', $site->id)->orderBy('id')->get();
         $pubs = Publication::with('articleVersion')->where('website_id', $site->id)->get()
             ->groupBy(fn (Publication $p) => $p->articleVersion?->article_id);
         $planned = self::plannedDates();

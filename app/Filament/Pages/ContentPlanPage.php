@@ -129,9 +129,22 @@ class ContentPlanPage extends Page
         return ['text' => StatusPresenter::label($status), 'tone' => self::TONES[StatusPresenter::color($status)] ?? 'muted'];
     }
 
+    /** Danh sách website hoạt động, nạp một lần cho mỗi lượt Livewire (trước đây site() truy vấn lại ~8 lần/lượt). @var ?\Illuminate\Support\Collection<int,Website> */
+    private ?\Illuminate\Support\Collection $activeSites = null;
+
+    /** Bài và cụm của lượt dựng trang hiện tại: chỉ đặt trong getViewData() (sau mọi thao tác ghi) để các closure của hộp thoại dùng lại, không nạp lần nữa. */
+    private ?array $renderArticles = null;
+
+    private ?array $renderClusters = null;
+
+    private function activeSites(): \Illuminate\Support\Collection
+    {
+        return $this->activeSites ??= Website::where('status', 'active')->orderBy('name')->get();
+    }
+
     private function site(): ?Website
     {
-        $sites = Website::where('status', 'active')->orderBy('name')->get();
+        $sites = $this->activeSites();
 
         return $sites->firstWhere('id', $this->websiteId) ?? $sites->first();
     }
@@ -151,6 +164,9 @@ class ContentPlanPage extends Page
     /** @return list<array<string,mixed>> */
     private function clusters(): array
     {
+        if ($this->renderClusters !== null) {
+            return $this->renderClusters;
+        }
         if (DemoMode::state(request()->query('demo'), ['chua-co-cum'], '') === 'chua-co-cum') {
             return [];
         }
@@ -166,7 +182,7 @@ class ContentPlanPage extends Page
         if (! $site || ! $c) {
             return [];
         }
-        $cov = PlanRules::coverage($c['keywords'], array_column(PlanData::articles($site), 'keyword'));
+        $cov = PlanRules::coverage($c['keywords'], array_column($this->renderArticles ?? PlanData::articles($site), 'keyword'));
 
         return array_combine($cov['free'], $cov['free']) ?: [];
     }
@@ -413,9 +429,13 @@ class ContentPlanPage extends Page
     public function getViewData(): array
     {
         $demo = DemoMode::state(request()->query('demo'), ['chua-co-cum', 'cum-du', 'tuan-trong'], '');
-        $sites = Website::where('status', 'active')->orderBy('name')->get();
+        $this->activeSites = null;
+        $this->renderClusters = null;
+        $this->renderArticles = null;
+        $sites = $this->activeSites();
         $site = $this->site();
-        $articles = $site ? PlanData::articles($site) : [];
+        $articles = $this->renderArticles = $site ? PlanData::articles($site) : [];
+        $this->renderClusters = $this->clusters();
         $campaigns = $site ? Campaign::query()->where('website_id', $site->id)->orderBy('name')->get() : collect();
         $filter = $this->campaignFilter();
         $shown = $filter === null ? $articles : array_values(array_filter($articles, fn ($a) => $filter === 'solo' ? $a['campaign_id'] === null : (int) $a['campaign_id'] === (int) $filter));

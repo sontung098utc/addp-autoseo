@@ -201,7 +201,7 @@ class ArticleResource extends Resource
         $run = AgentRunDispatcher::run($record, $ai, Auth::user(), policy: AgentAi::policy(), redo: $redoMessage !== null ? ['message' => $redoMessage] : null);
         $n = Notification::make()->title('Bài #'.$record->id.' · phiên #'.$run->id.': '.(AgentRunResource::STATUS[$run->status][0] ?? $run->status))
             ->body($run->outcome_reason ?: 'Đã có bản nháp chờ duyệt.')
-            ->actions([Action::make('xem')->label('Xem diễn biến')->url(AgentRunResource::viewUrl($run))]);
+            ->actions([Action::make('xem')->label('Xem diễn biến')->url(AgentRunResource::viewUrl($run, articleKnown: true))]);
         in_array($run->status, ['ready_for_review'], true) ? $n->success() : $n->warning();
         $n->send();
 
@@ -355,7 +355,11 @@ class ArticleResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with(['website', 'latestVersion', 'campaign']))
+            ->modifyQueryUsing(fn ($query) => $query->with([
+                'website', 'campaign', 'lastRun.steps',
+                // Bảng chỉ cần tiêu đề: không kéo cả html_content của bản mới nhất cho mỗi dòng.
+                'latestVersion' => fn ($q) => $q->select('article_versions.id', 'article_versions.article_id', 'article_versions.version', 'article_versions.title'),
+            ]))
             ->poll(fn () => RunActivity::anyRunning() ? RunActivity::POLL_LIVE.'s' : RunActivity::POLL_IDLE.'s')
             ->persistFiltersInSession()
             ->persistSortInSession()
@@ -417,7 +421,7 @@ class ArticleResource extends Resource
                     ->state(fn (Article $r) => ($run = ArticleRows::lastRun($r)) ? static::runSummary($run) : '—')
                     ->limit(40)
                     ->tooltip(fn (Article $r) => ($run = ArticleRows::lastRun($r)) ? static::runSummary($run).' · bấm để xem diễn biến' : null)
-                    ->url(fn (Article $r) => ($run = ArticleRows::lastRun($r)) && AgentRunResource::canViewAny() ? AgentRunResource::viewUrl($run) : null)
+                    ->url(fn (Article $r) => ($run = ArticleRows::lastRun($r)) && AgentRunResource::canViewAny() ? AgentRunResource::viewUrl($run, articleKnown: true) : null)
                     ->color('gray')
                     ->visibleFrom('2xl')),
                 static::narrow(Tables\Columns\TextColumn::make('updated_at')->label('Cập nhật')->since()->sortable()

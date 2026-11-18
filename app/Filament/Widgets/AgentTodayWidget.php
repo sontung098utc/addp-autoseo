@@ -30,7 +30,7 @@ class AgentTodayWidget extends Widget
     {
         $since = now()->startOfDay();
         $today = AgentRun::query()->where('created_at', '>=', $since);
-        $running = AgentRun::query()->where('status', 'running')->get()->filter(fn ($r) => RunActivity::isLive($r))->count();
+        $running = AgentRun::query()->where('status', 'running')->with('steps')->get()->filter(fn ($r) => RunActivity::isLive($r))->count();
         $expert = AgentRun::query()->where('created_at', '>=', now()->subDays(3))->where('status', 'ready_for_review')
             ->whereHas('steps', fn ($q) => $q->where('stage', 'decision')->where('title', 'like', '%chuyên môn%'))->count();
         $suggestions = 0;

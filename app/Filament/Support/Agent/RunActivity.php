@@ -45,7 +45,8 @@ final class RunActivity
     /** Mốc hoạt động gần nhất: bước cuối đã ghi, nếu chưa có bước thì lúc bắt đầu phiên. */
     public static function lastActivityAt(AgentRun $run): ?CarbonImmutable
     {
-        $lastStep = $run->steps()->reorder('seq', 'desc')->first();
+        // Bước đã nạp sẵn (with('steps'), đã sắp theo seq) thì lấy bước cuối từ bộ nhớ: khỏi một truy vấn cho mỗi phiên khi liệt kê nhiều phiên.
+        $lastStep = $run->relationLoaded('steps') ? $run->steps->sortBy('seq')->last() : $run->steps()->reorder('seq', 'desc')->first();
         $at = $lastStep ? VnTime::fromRaw($lastStep, 'created_at') : null;
 
         return $at ?? VnTime::fromRaw($run, 'started_at') ?? VnTime::fromRaw($run, 'created_at');
@@ -135,9 +136,9 @@ final class RunActivity
     }
 
     /** @return Collection<int, AgentRun> các phiên running còn sống */
-    public static function liveRuns(): Collection
+    public static function liveRuns(bool $withArticle = false): Collection
     {
-        return AgentRun::query()->where('status', 'running')->with('steps')->get()
+        return AgentRun::query()->where('status', 'running')->with($withArticle ? ['steps', 'article'] : ['steps'])->get()
             ->filter(fn (AgentRun $r) => self::isLive($r))->values();
     }
 

@@ -504,8 +504,15 @@ class ViewArticle extends EditArticle
         $this->loadedTabs = array_values(array_unique(array_merge($this->loadedTabs, $keys)));
     }
 
+    /** Bộ nhớ một-yêu-cầu chỉ bật trong lúc DỰNG trang (sau mọi thao tác ghi): Trí tuệ của website và tài liệu vai trò bị gọi lặp hàng chục lần mỗi lượt dựng. */
+    public function dehydrate(): void
+    {
+        \App\Support\RequestMemo::flush();
+    }
+
     protected function getViewData(): array
     {
+        \App\Support\RequestMemo::enable();
         /** @var Article $article */
         $article = $this->refreshRecord()->load('website');
         $versions = $article->versions()->with(['reviewer', 'mediaAssets'])->orderByDesc('version')->get();
