@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Filament\Support\Schedule\VnTime;
 use App\Jobs\PublishArticleJob;
 use App\Models\Publication;
 use App\Services\Publishing\EmergencyStopService;
@@ -36,7 +37,7 @@ class PublishDuePostsCommand extends Command
 
         $duePublications = Publication::with(['website', 'articleVersion'])
             ->where('status', 'scheduled')
-            ->where('scheduled_at_utc', '<=', now())
+            ->where('scheduled_at_utc', '<=', VnTime::dbString(now()))
             ->orderBy('scheduled_at_utc', 'asc')
             ->limit($limit)
             ->get();
