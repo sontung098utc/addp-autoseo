@@ -645,7 +645,7 @@ class KeywordsPage extends Page
             ['key' => 'volume', 'label' => 'Lượt tìm', 'type' => 'number', 'sortable' => true],
             ['key' => 'cluster', 'label' => 'Cụm chủ đề', 'type' => 'text', 'sortable' => true, 'filter' => true],
             ['key' => 'status', 'label' => 'Trạng thái', 'type' => 'link', 'sortable' => true, 'filter' => true],
-            ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Thêm vào kế hoạch', 'method' => 'addToPlan', 'tone' => 'primary'], ['label' => 'Xóa', 'method' => 'confirmDeleteKeyword', 'tone' => 'muted']]],
+            ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Thêm vào kế hoạch', 'method' => 'addToPlan', 'tone' => 'primary', 'showIf' => 'canPlan'], ['label' => 'Xóa', 'method' => 'confirmDeleteKeyword', 'tone' => 'muted']]],
             ['key' => 'intent', 'label' => 'Ý định', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'visible' => false, 'tones' => ['Thông tin' => 'info', 'Thương mại' => 'accent', 'Giao dịch' => 'warn', 'Điều hướng' => 'muted']],
             ['key' => 'volumeSource', 'label' => 'Nguồn số liệu', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'visible' => false, 'tones' => ['CSV' => 'info', 'DataForSEO' => 'ok', 'Nhập tay' => 'muted', 'Search Console' => 'ok', 'Giả lập' => 'warn', 'Chưa có số liệu' => 'muted']],
             ['key' => 'source', 'label' => 'Nguồn', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'visible' => false, 'tones' => ['CSV' => 'info', 'Nhập tay' => 'muted', 'AI đề xuất' => 'accent', 'Search Console' => 'ok', 'Trang đã quét' => 'muted', 'Đối thủ' => 'warn']],
@@ -681,6 +681,8 @@ class KeywordsPage extends Page
                 'volumeReal' => $r['volume'] !== null && in_array($r['volume_source'] ?? null, self::REAL_VOLUME_SOURCES, true),
                 'source' => $source,
                 'usage' => $usage,
+                // Từ khóa đã nằm trong kế hoạch hoặc đã có bài thì không thêm lần nữa; cột Trạng thái là liên kết mở bài/kế hoạch.
+                'canPlan' => $usage === 'unused',
                 'status' => ['text' => self::USAGE_LABELS[$usage], 'href' => $href],
             ];
         }, $all);

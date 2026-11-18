@@ -112,7 +112,7 @@ class KeywordsPageTest extends TestCase
         $this->actingAs($this->user('writer'));
         $d = Livewire::test(KeywordsPage::class)->viewData('kwRows');
         $this->assertContains('chỉ số đường huyết bình thường', array_column($d, 'keyword'));
-        $this->assertSame(['id', 'keyword', 'label', 'intent', 'cluster', 'volume', 'volumeSource', 'volumeReal', 'source', 'usage', 'status'], array_keys($d[0]));
+        $this->assertSame(['id', 'keyword', 'label', 'intent', 'cluster', 'volume', 'volumeSource', 'volumeReal', 'source', 'usage', 'canPlan', 'status'], array_keys($d[0]));
         $cols = collect(Livewire::test(KeywordsPage::class)->viewData('kwColumns'));
         // Cột mặc định gọn: Từ khóa | Lượt tìm | Cụm chủ đề | Trạng thái | hành động; Ý định, Nguồn số liệu, Nguồn ẩn nhưng bật được và vẫn lọc được.
         $shown = $cols->filter(fn ($c) => ($c['visible'] ?? true) !== false)->pluck('key')->all();
