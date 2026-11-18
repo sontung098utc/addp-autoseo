@@ -235,11 +235,19 @@ final class CampaignRunner
         return $u;
     }
 
-    /** Bài 'planned' (từ trang Kế hoạch nội dung) của website, chưa có phiên nào, ưu tiên (priority) cao trước (bài làm mới P0 trước), cùng mức thì cũ nhất trước. */
+    /** Chiến dịch có bật "lấy thêm bài chưa thuộc chiến dịch nào" không (mặc định TẮT: chỉ chạy bài của chính nó). */
+    public static function pullsUnassigned(Campaign $c): bool
+    {
+        return (bool) (((array) $c->settings)['pull_unassigned_plan'] ?? false);
+    }
+
+    /** Bài 'planned' của CHÍNH chiến dịch này, chưa có phiên nào, ưu tiên (priority) cao trước (bài làm mới P0 trước), cùng mức thì cũ nhất trước. Chỉ khi bật pull_unassigned_plan mới lấy thêm bài planned chưa thuộc chiến dịch nào của website. */
     public function nextPlanned(Campaign $c): ?Article
     {
+        $pull = self::pullsUnassigned($c);
+
         return Article::query()->where('website_id', $c->website_id)->where('workflow_status', 'planned')
-            ->where(fn ($q) => $q->whereNull('campaign_id')->orWhere('campaign_id', $c->id)) // bài của chiến dịch khác thì không lấy
+            ->where(fn ($q) => $pull ? $q->whereNull('campaign_id')->orWhere('campaign_id', $c->id) : $q->where('campaign_id', $c->id)) // bài của chiến dịch khác không bao giờ lấy
             ->whereNotNull('primary_keyword')->where('primary_keyword', '!=', '')
             ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('agent_runs')->whereColumn('agent_runs.article_id', 'articles.id'))
             ->orderByRaw('COALESCE(priority, 0) DESC')->orderBy('id')->first();
