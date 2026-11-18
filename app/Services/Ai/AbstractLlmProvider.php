@@ -84,7 +84,7 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             ."{\n"
             ."  \"title\": \"Tiêu đề bài viết hấp dẫn (dưới 70 ký tự)\",\n"
             ."  \"slug\": \"duong-dan-than-thien-seo-khong-dau\",\n"
-            ."  \"html_content\": \"Mã HTML ngữ nghĩa. Thẻ cho phép: h2, h3, p, ul, ol, li, strong, em, blockquote, table(thead/tbody/tr/th/td), details/summary, div, aside, sup, a, figure. Không dùng script, style, inline style, thẻ h1. Khối trình bày (tóm tắt, mục lục, bảng, khung lưu ý, hỏi đáp) theo mục BỐ CỤC bên dưới\",\n"
+            ."  \"html_content\": \"Mã HTML ngữ nghĩa. Thẻ cho phép: h2, h3, p, ul, ol, li, strong, em, blockquote, table(thead/tbody/tr/th/td), details/summary, div, aside, sup, a, figure. Không dùng script, style, inline style, thẻ h1. Khối trình bày (tóm tắt, bảng, khung lưu ý, hỏi đáp; KHÔNG tạo mục lục vì giao diện website tự dựng) theo mục BỐ CỤC bên dưới\",\n"
 
             ."  \"seo_title\": \"Tiêu đề SEO (tối đa 60 ký tự)\",\n"
             ."  \"meta_description\": \"Mô tả meta hấp dẫn chuẩn SEO (120 - 160 ký tự)\",\n"
@@ -669,7 +669,7 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             return "\n\n--- BỐ CỤC ".($options['layout_ref'] ?? '')." ---\n".mb_substr($body, 0, 4000)."\n--- HẾT BỐ CỤC ---";
         }
 
-        return "\n\nBỐ CỤC: mỗi khối trình bày phải có lý do nội dung, không chèn cho đủ bộ. Tóm tắt nhanh (div.autoseo-summary) chỉ cho bài từ ~800 từ; mục lục (ul.autoseo-toc) chỉ khi bài từ ~1200 từ và có từ 4 h2;"
+        return "\n\nBỐ CỤC: mỗi khối trình bày phải có lý do nội dung, không chèn cho đủ bộ. Tóm tắt nhanh (div.autoseo-summary) chỉ cho bài từ ~800 từ; KHÔNG viết mục lục (ul.autoseo-toc): giao diện website tự dựng mục lục từ các h2, nên mỗi h2 giữ tiêu đề rõ và id neo;"
             .' bảng chỉ khi so sánh từ 2 đối tượng theo từ 2 tiêu chí, có hàng tiêu đề và từ 2 hàng dữ liệu; khung lưu ý (aside.autoseo-callout) tối đa 2 cái, mỗi cái 1-2 câu về một cảnh báo hay điều dễ nhầm, không đặt danh sách/bảng trong khung và không lặp ý;'
             .' danh sách có thứ tự cho quy trình thật; hỏi đáp gập (details/summary) chỉ khi có câu hỏi thật. Còn lại dùng đề mục, đoạn ngắn và danh sách thường.';
     }

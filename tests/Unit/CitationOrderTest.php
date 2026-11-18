@@ -18,7 +18,8 @@ class CitationOrderTest extends TestCase
             .'<div class="autoseo-refs"><p><strong>Nguồn tham khảo</strong></p><ol><li id="nguon-1">Một</li><li id="nguon-2">Hai</li><li id="nguon-3">Ba</li><li>Chưa trích</li></ol></div>';
         $out = CitationOrder::normalize($html);
         $this->assertStringContainsString('A<sup class="autoseo-cite" title="Nguồn"><a href="#nguon-1">[1]</a></sup> B<sup class="autoseo-cite" title="Nguồn"><a href="#nguon-2">[2]</a></sup>', $out);
-        $this->assertStringContainsString('<li id="nguon-1">Hai</li><li id="nguon-2">Một</li><li id="nguon-3">Ba</li><li>Chưa trích</li>', $out, 'Nguồn thứ hai xuất hiện đầu tiên nên thành số 1.');
+        $this->assertStringContainsString('<li id="nguon-1">Hai</li><li id="nguon-2">Một</li><li id="nguon-3">Ba</li>', $out, 'Nguồn thứ hai xuất hiện đầu tiên nên thành số 1.');
+        $this->assertStringNotContainsString('Chưa trích', $out, 'Nguồn không được trích ở thân bài thì không liệt kê.');
     }
 
     public function test_bot_day_chu_thich_web_lap_trong_mot_doan_nhung_giu_chu_thich_kho(): void

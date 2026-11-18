@@ -40,3 +40,11 @@ Module REST API cầu nối cho hệ thống **Auto SEO & Tự động đăng b�
    * Access Token
    * Access Token Secret
 6. Dán 4 thông số trên vào mục cài đặt Website của AutoSEO.
+
+---
+
+## 4. Ảnh đại diện (thumbnail danh sách blog)
+* Hệ thống tải ảnh bìa qua `POST /V1/company-blog/media` rồi gửi đường dẫn ở trường `image` của bài. Với Magefan_Blog, ảnh lưu ở `pub/media/magefan_blog/autoseo/` và cột `featured_img` được ghi dạng đường dẫn tương đối so với `pub/media`, có tiền tố `magefan_blog/` (vd `magefan_blog/autoseo/1731_cover.jpg`; đã đối chiếu với các bài có thumbnail trong DB prod), không phải URL tuyệt đối. Bảng `magefan_blog_post` của ADDP không có cột `featured_list_img` (chỉ `featured_img`, `featured_img_alt`); module chỉ ghi `featured_list_img` nếu cột tồn tại. Theme in ảnh danh sách khi `featured_list_img` hoặc `featured_img` khác rỗng.
+* **Ảnh bìa phải là JPG/PNG, không WebP**: Magento 2.4.8 (GD2) không resize được WebP mà theme resize `featured_img`. Hệ thống tự chuyển WebP sang JPEG (chất lượng 85, nền trắng) ở phía Laravel trước khi tải lên; module không chuyển đổi.
+* Kiểm định dạng cột: `SELECT post_id, featured_img FROM magefan_blog_post WHERE featured_img IS NOT NULL ORDER BY post_id DESC LIMIT 5;`
+* Module không lọc nội dung bài (không có strip_tags/purifier), nên không tự bỏ `target`/`rel`.

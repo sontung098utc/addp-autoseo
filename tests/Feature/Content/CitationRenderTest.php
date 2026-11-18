@@ -23,8 +23,8 @@ class CitationRenderTest extends TestCase
         $out = CitationRenderer::render($html);
 
         $this->assertStringNotContainsString("[KB#{$a->id}]", $out);
-        $this->assertStringContainsString('<sup class="autoseo-cite" data-kb="'.$a->id.'" title="Nguồn: HbA1c mục tiêu"><a href="#nguon-1">[1]</a></sup>', $out, 'rê chuột chỉ cho biết nguồn, không nhắc lại nội dung mục');
-        $this->assertStringContainsString('data-kb="'.$b->id.'" title="Nguồn: Đường huyết đói"><a href="#nguon-2">[2]</a></sup><sup class="autoseo-cite" data-kb="'.$a->id.'"', $out, 'nhóm [KB#b, KB#a] tách thành từng chú thích riêng');
+        $this->assertStringContainsString('<sup class="autoseo-cite" data-kb="'.$a->id.'" tabindex="0" data-tip="Nguồn: HbA1c mục tiêu" aria-label="Nguồn: HbA1c mục tiêu" title="Nguồn: HbA1c mục tiêu"><a href="#nguon-1">[1]</a></sup>', $out, 'rê chuột chỉ cho biết nguồn, không nhắc lại nội dung mục');
+        $this->assertStringContainsString('data-kb="'.$b->id.'" tabindex="0" data-tip="Nguồn: Đường huyết đói" aria-label="Nguồn: Đường huyết đói" title="Nguồn: Đường huyết đói"><a href="#nguon-2">[2]</a></sup><sup class="autoseo-cite" data-kb="'.$a->id.'"', $out, 'nhóm [KB#b, KB#a] tách thành từng chú thích riêng');
         $this->assertStringContainsString('<li id="nguon-1"', $out);
         $this->assertStringContainsString('[KB#999999]', $out);
         $this->assertStringContainsString('Nguồn tham khảo', $out);

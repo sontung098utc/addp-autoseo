@@ -87,13 +87,15 @@ final class QualityRubric
             'TXT01' => self::entry('TXT01', 'Lỗi chữ (ký tự lạ, từ dính liền)', 'Cờ P1 khi có chữ cái ngoài bảng chữ Latin lẫn trong bài (vd "mỗiσ") hoặc từ tiếng Việt dính liền từ tiếng Anh (vd "vàqualified").', [], 'heuristic',
                 'Lỗi do mô hình sinh ra nhìn là biết bài chưa được soát.', 'internal', [],
                 'Heuristic theo độ dài âm tiết tiếng Việt (tối đa 7 chữ cái); có thể báo nhầm tên riêng nước ngoài có dấu. Không chặn.'),
+            'TAG01' => self::entry('TAG01', 'Mảnh thẻ HTML lọt vào chữ', 'Chặn (P0) khi văn bản hiển thị, sau khi bỏ thẻ, còn mảnh thẻ như `">`, `\'>`, `<tag` hoặc `class="`, `href="`, `title="`.', [], 'internal',
+                'Thẻ bị vỡ làm người đọc thấy ký tự rác giữa câu, nhất là ở bài y khoa nơi độ tin cậy là điều kiện đăng.', 'internal', [], 'Quy tắc nội bộ, tất định. Có thể báo nhầm nếu bài cố ý viết mã HTML làm ví dụ (hiếm ở blog sức khỏe).'),
             'LEAK01' => self::entry('LEAK01', 'Nhãn cấu trúc rò vào bài', 'Cờ P1 khi tiêu đề/đoạn bắt đầu bằng nhãn như "H2:" hay "Heading 2 -".', [], 'internal',
                 'Nhãn của dàn ý lọt ra bài hiển thị cho người đọc.', 'internal', [], 'Quy tắc nội bộ, tất định. Không chặn.'),
             'CITE02' => self::entry('CITE02', 'Trích dẫn hỗ trợ đúng câu', 'Chỉ khi Trí tuệ của bài ở mức "Bắt buộc nguồn": (1) số liệu có đơn vị trong đoạn có trích dẫn phải có trong chính mục được trích (kiểm chữ, tất định); (2) lượt AI kiểm lại (kỹ năng editor/citation-support) kết luận mục được trích không nói điều đoạn khẳng định thì cờ P1. Không chặn nhưng đưa vào vòng sửa.', [],
                 'Quy tắc nội bộ của Kho trí tuệ chuyên ngành, chưa có chuẩn bên ngoài.',
                 'Dấu trích dẫn hợp lệ chưa chứng minh câu đúng với mục được trích; gắn nhãn trích dẫn cho câu chỉ gần chủ đề làm bài trông có căn cứ mà không có.', 'internal', [],
                 'Phần số liệu tất định (chỉ nhận số có đơn vị %, mg/dL, mmol/L, mmol, mg, g/dL, kg, mmHg). Phần nghĩa do AI độc lập kiểm nên có thể sai ở cả hai hướng và chưa có phép đo độ chính xác; kết luận chỉ để cảnh báo, không thay người duyệt.'),
-            'LAY01' => self::entry('LAY01', 'Khối bố cục dùng có lý do', 'Cờ P1 khi lạm dụng khối trình bày: quá 2 khung lưu ý, khung đựng danh sách/bảng hoặc dài quá 60 từ, lặp khung miễn trừ, mục lục ở bài dưới 1.200 từ hoặc dưới 4 h2, tóm tắt ở bài dưới 800 từ, bảng dưới 2 cột hoặc 2 hàng dữ liệu.', [
+            'LAY01' => self::entry('LAY01', 'Khối bố cục dùng có lý do', 'Cờ P1 khi lạm dụng khối trình bày: quá 2 khung lưu ý, khung đựng danh sách/bảng hoặc dài quá 60 từ, lặp khung miễn trừ, có mục lục tự viết (giao diện website đã tự dựng), tóm tắt ở bài dưới 800 từ, bảng dưới 2 cột hoặc 2 hàng dữ liệu.', [
                 'max_callouts' => 2, 'callout_max_words' => 60, 'toc_min_words' => 1200, 'toc_min_h2' => 4, 'summary_min_words' => 800,
             ], 'heuristic',
                 'Hộp trang trí đặt bừa làm bài rối và loãng ý chính; mỗi khối phải có lý do nội dung.', 'internal', [], 'Ngưỡng là heuristic của hệ thống (kỹ năng writer/article-layout), chưa có nghiên cứu chứng minh. Không chặn nhưng đưa vào vòng sửa.'),

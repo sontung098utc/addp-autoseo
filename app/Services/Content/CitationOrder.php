@@ -56,8 +56,8 @@ final class CitationOrder
             return (string) preg_replace(['/href="#nguon-\d+"/', '/\[\d+\]/'], ['href="#nguon-'.$new.'"', '['.$new.']'], $s[0], 1);
         }, $html);
 
-        // 3. Xếp lại danh sách nguồn: đã được trích theo số mới, rồi các nguồn còn lại.
-        return (string) preg_replace_callback('#(<div class="autoseo-refs">.*?<ol>)(.*?)(</ol>)#s', function (array $m) use ($map): string {
+        // 3. Xếp lại danh sách nguồn theo số mới; nguồn không được trích bị bỏ.
+        $html = (string) preg_replace_callback('#(<div class="autoseo-refs">.*?<ol>)(.*?)(</ol>\s*</div>)#s', function (array $m) use ($map): string {
             preg_match_all('#<li\b[^>]*>.*?</li>#s', $m[2], $lis);
             $cited = [];
             $rest = [];
@@ -70,26 +70,17 @@ final class CitationOrder
                 }
             }
             ksort($cited);
-            $seenUrl = [];
-            foreach ($cited as $li) {
-                if (($u = self::hrefOf($li)) !== '') {
-                    $seenUrl[$u] = true;
-                }
+            // Nguồn không được trích ở thân bài (không còn chú thích số nào trỏ tới) không được liệt kê: danh sách chỉ gồm nguồn người đọc có thể bấm từ một chú thích.
+            $rest = [];
+
+            if ($cited === []) {
+                return ''; // không còn nguồn nào được trích: bỏ cả khối
             }
-            $rest = array_values(array_filter($rest, function (string $li) use (&$seenUrl): bool {
-                $u = self::hrefOf($li);
-                if ($u !== '' && isset($seenUrl[$u])) {
-                    return false; // cùng trang với nguồn đã trích (hoặc đã liệt kê): không liệt kê hai lần
-                }
-                if ($u !== '') {
-                    $seenUrl[$u] = true;
-                }
 
-                return true;
-            }));
-
-            return $m[1].implode('', $cited).implode('', $rest).$m[3];
+            return $m[1].implode('', $cited).$m[3];
         }, $html, 1);
+
+        return $html;
     }
 
     private static function hrefOf(string $li): string

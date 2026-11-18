@@ -27,6 +27,7 @@ use App\Services\Content\Quality\Rules\ImagePlaceholderRule;
 use App\Services\Content\Quality\Rules\ProcessLeakRule;
 use App\Services\Content\Quality\Rules\IntentSpecificityRule;
 use App\Services\Content\Quality\Rules\PaddingRule;
+use App\Services\Content\Quality\Rules\TagLeakRule;
 use App\Services\Content\Quality\Rules\TextGlitchRule;
 
 /**
@@ -68,7 +69,7 @@ class ContentQualityChecker
         return [
             new LengthRule(), new HeadingRule(), new KeywordRule(), new MetaRule(), new DuplicateRule(),
             new ImageRule(), new SafetyRule(), new FactRule(), new FaqRule(), new BannedTermsRule(), new KnowledgeFigureRule(), new LinkRule(), new EvidenceRule(), new CitationRule(), new CitationFigureRule(), new MedicalSafetyRule(), new SourceRule(),
-            new PaddingRule(), new TextGlitchRule(), new HeadingLeakRule(), new ImagePlaceholderRule(), new IntentSpecificityRule(), new LayoutRule(), new ProcessLeakRule(),
+            new PaddingRule(), new TextGlitchRule(), new HeadingLeakRule(), new ImagePlaceholderRule(), new IntentSpecificityRule(), new LayoutRule(), new ProcessLeakRule(), new TagLeakRule(),
         ];
     }
 
