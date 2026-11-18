@@ -2,6 +2,7 @@
     $sev = ['danger' => 'danger', 'warning' => 'warning', 'info' => 'info'];
 @endphp
 <x-filament-panels::page>
+    <div class="text-xs" style="opacity:.75" data-digest="window">{{ $d['window_label'] }}</div>
     @if ($d['stop'])
         <div style="border:1px solid rgba(220,38,38,.4);background:rgba(220,38,38,.08);border-radius:.5rem;padding:.6rem .8rem;font-size:.85rem">
             <strong>Đang dừng xuất bản.</strong> Mọi lượt đăng đang tạm hoãn. Lý do: {{ $d['stop']['reason'] ?? 'không ghi' }}.
