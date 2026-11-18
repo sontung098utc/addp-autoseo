@@ -21,7 +21,7 @@ final class RescheduleAction
             Forms\Components\DateTimePicker::make('scheduled_at_vn')
                 ->label('Giờ đăng mới (giờ Việt Nam)')
                 ->seconds(false)->native(false)
-                ->displayFormat('d/m/Y H:i')->firstDayOfWeek(1)->minutesStep(5)->closeOnDateSelection(false)
+                ->displayFormat('d/m/Y H:i')->firstDayOfWeek(1)->closeOnDateSelection(false)
                 ->live()->required()
                 ->default(function () use ($record): ?string {
                     $p = $record ? $record() : null;
