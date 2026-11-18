@@ -115,14 +115,21 @@ class PublishedArticleFlawsTest extends TestCase
         $this->assertStringNotContainsString('autoseo-refs', CitationOrder::normalize('<p>A<sup class="autoseo-cite" title="x"><a href="#nguon-1">[1]</a></sup></p><div class="autoseo-refs"><p><strong>Nguồn tham khảo</strong></p><ol><li><a href="https://a.vn/">Chưa trích</a></li></ol></div>'));
     }
 
-    public function test_muc_luc_rieng_cua_bai_bi_bo_voi_magento_va_giu_voi_cms_khac(): void
+    public function test_muc_luc_rieng_cua_bai_bi_bo_va_giu_id_neo(): void
     {
         $html = '<div class="autoseo-summary"><p>Tóm tắt</p></div><ul class="autoseo-toc"><li><a href="#a">A</a></li><li><a href="#b">B</a></li></ul><h2 id="a">A</h2><p>x</p>';
-        $this->assertTrue(TocPolicy::cmsHasOwnToc('magento2'));
-        $this->assertFalse(TocPolicy::cmsHasOwnToc('wordpress'));
         $out = TocPolicy::stripArticleToc($html);
         $this->assertStringNotContainsString('autoseo-toc', $out);
         $this->assertStringContainsString('autoseo-summary', $out);
         $this->assertStringContainsString('<h2 id="a">', $out);
+    }
+
+    /** HTML thật đã đăng (rút gọn): ghi chú [a] mang thẻ trích lồng trong title. TAG01 phải chặn; ghi chú sạch thì đạt. */
+    public function test_html_that_da_dang_bi_tag01_chan(): void
+    {
+        $real = '<p>kết quả xét nghiệm Hemoglobin A1c <sup class="autoseo-note" data-note="a" title="Hemoglobin A1c (HbA1c) là xét nghiệm máu phản ánh nồng độ đường gắn kết với hồng cầu, giúp đánh giá mức độ kiểm soát đường huyết trung bình trong 2 đến 3 tháng qua<sup class="autoseo-cite" data-kb="1" title="Nguồn: X (y.vn)"><a href="#nguon-4">[4]</a></sup>."><a href="#ghichu-a">[a]</a></sup>; khi chỉ số này vượt ngưỡng</p>';
+        $f = $this->tagLeak($real);
+        $this->assertSame('TAG01', $f[0]->code);
+        $this->assertTrue($f[0]->isBlocking());
     }
 }

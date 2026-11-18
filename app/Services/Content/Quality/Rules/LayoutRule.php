@@ -9,7 +9,7 @@ use App\Services\Content\Quality\RuleResult;
 /**
  * LAY01 (P1): dùng khối bố cục có lý do, không lạm dụng (kỹ năng writer/article-layout). Tất định, không AI. Không chặn nhưng ĐƯA VÀO VÒNG SỬA (QualityReport::layoutGaps).
  *  - Khung lưu ý (autoseo-callout) tối đa 2 cái (khung miễn trừ y tế không tính); không đựng danh sách/bảng; không dài quá 60 từ; không lặp câu miễn trừ.
- *  - Mục lục chỉ ở bài từ 1.200 từ và có từ 4 h2; tóm tắt nhanh chỉ ở bài từ 800 từ.
+ *  - Không tự viết mục lục (giao diện đã có); tóm tắt nhanh chỉ ở bài từ 800 từ.
  *  - Bảng phải có từ 2 cột và từ 2 hàng dữ liệu.
  * Ngưỡng là heuristic của hệ thống, chưa có nghiên cứu chứng minh; chỉ cảnh báo.
  */
@@ -69,8 +69,8 @@ class LayoutRule implements QualityRule
         }
 
         $h2 = $xp->query('//h2')->length;
-        if ($xp->query('//*['.self::hasClass('autoseo-toc').']')->length > 0 && ($words < self::TOC_MIN_WORDS || $h2 < self::TOC_MIN_H2)) {
-            $issues[] = 'Mục lục chỉ dùng cho bài từ '.self::TOC_MIN_WORDS.' từ và từ '.self::TOC_MIN_H2.' đề mục h2 (bài này '.$words.' từ, '.$h2.' h2): bỏ mục lục.';
+        if ($xp->query('//*['.self::hasClass('autoseo-toc').']')->length > 0) {
+            $issues[] = 'Mục lục tự viết (autoseo-toc) làm trang hiện hai mục lục vì giao diện website đã tự dựng: bỏ mục lục khỏi bài, giữ nguyên đề mục h2 và id neo.';
         }
         if ($xp->query('//*['.self::hasClass('autoseo-summary').']')->length > 0 && $words < self::SUMMARY_MIN_WORDS) {
             $issues[] = 'Tóm tắt nhanh chỉ dùng cho bài từ '.self::SUMMARY_MIN_WORDS.' từ (bài này '.$words.' từ): bỏ khối tóm tắt.';

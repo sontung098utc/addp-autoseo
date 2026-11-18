@@ -53,7 +53,7 @@ class LayoutRuleTest extends TestCase
     {
         $html = '<div class="autoseo-summary"><ul><li>a</li></ul></div><ul class="autoseo-toc"><li>a</li></ul><h2>A</h2><p>ngắn</p><table><tr><th>X</th></tr><tr><td>1</td></tr></table>';
         $gaps = implode(' | ', $this->lay($html)->layoutGaps());
-        $this->assertStringContainsString('Mục lục chỉ dùng', $gaps);
+        $this->assertStringContainsString('Mục lục tự viết', $gaps);
         $this->assertStringContainsString('Tóm tắt nhanh chỉ dùng', $gaps);
         $this->assertStringContainsString('Bảng chỉ có 1 cột', $gaps);
     }

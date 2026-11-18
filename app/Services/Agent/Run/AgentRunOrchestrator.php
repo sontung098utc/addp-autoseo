@@ -1874,8 +1874,8 @@ final class AgentRunOrchestrator
 
     private function persist(Article $article, array $attrs, bool $passed): ArticleVersion
     {
-        if (isset($attrs['html_content']) && is_string($attrs['html_content']) && \App\Services\Content\TocPolicy::cmsHasOwnToc($article->website?->cms_type)) {
-            $attrs['html_content'] = \App\Services\Content\TocPolicy::stripArticleToc($attrs['html_content']); // theme Magento đã có mục lục riêng
+        if (isset($attrs['html_content']) && is_string($attrs['html_content'])) {
+            $attrs['html_content'] = \App\Services\Content\TocPolicy::stripArticleToc($attrs['html_content']); // giao diện website tự dựng mục lục từ h2; giữ id neo của h2
         }
 
         return DB::transaction(function () use ($article, $attrs, $passed) {
