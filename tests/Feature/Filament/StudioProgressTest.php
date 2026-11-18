@@ -37,6 +37,20 @@ class StudioProgressTest extends TestCase
         $this->assertStringNotContainsString('innerHTML', $js, 'Không chèn HTML.');
     }
 
+    /** Logic thuần JavaScript chạy trong trình duyệt nên PHPUnit chỉ kiểm hằng số/dấu vết mã; hành vi thật đã đo tay (xem báo cáo PR). */
+    public function test_thanh_chi_hien_cho_thao_tac_nguoi_dung_khong_hien_cho_poll_nen(): void
+    {
+        $js = (string) file_get_contents(public_path('js/studio-progress.js'));
+        $this->assertMatchesRegularExpression('/SHOW_AFTER_MS = 500\b/', $js, 'Chờ ≥ 0,5 giây mới hiện thanh để việc nhanh không nháy.');
+        $this->assertMatchesRegularExpression('/USER_WINDOW_MS = 400\b/', $js, 'Cửa sổ "vừa thao tác" hẹp: poll tình cờ trùng lúc đang bấm không bị tính là việc người dùng.');
+        $this->assertStringContainsString('function triggeredByUser', $js);
+        $this->assertStringContainsString("closest('[wire\\\\:id]')", $js, 'Thao tác phải nằm trong đúng thành phần Livewire phát lượt gọi (poll của chuông/biểu tượng đội AI thuộc thành phần khác).');
+        $this->assertStringNotContainsString("'pointerdown'", $js, 'Không coi pointerdown là thao tác: chỉ click/phím/đổi giá trị/gửi biểu mẫu mới sinh lượt gọi.');
+        $this->assertStringContainsString("addEventListener('visibilitychange'", $js, 'Tab ẩn thì tắt thanh.');
+        $this->assertStringContainsString('!document.hidden', $js, 'Tab ẩn thì không bật thanh cho lượt gọi mới.');
+        $this->assertStringContainsString('myGen !== gen', $js, 'Lượt gọi cũ không được kết thúc nhầm thanh của lượt mới sau khi reset.');
+    }
+
     public function test_moi_file_tinh_cua_giao_dien_co_so_phien_ban_theo_ngay_sua(): void
     {
         $html = $this->get('/admin/login')->assertOk()->getContent();
