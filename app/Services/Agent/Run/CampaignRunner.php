@@ -250,7 +250,7 @@ final class CampaignRunner
             ->where(fn ($q) => $pull ? $q->whereNull('campaign_id')->orWhere('campaign_id', $c->id) : $q->where('campaign_id', $c->id)) // bài của chiến dịch khác không bao giờ lấy
             ->whereNotNull('primary_keyword')->where('primary_keyword', '!=', '')
             ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('agent_runs')->whereColumn('agent_runs.article_id', 'articles.id'))
-            ->orderByRaw('COALESCE(priority, 0) DESC')->orderBy('id')->first();
+            ->orderByRaw('COALESCE(priority, 0) DESC')->orderByRaw('planned_at IS NULL')->orderBy('planned_at')->orderBy('id')->first();
     }
 
     /** Ghi một mục chờ bổ sung hạn 24 giờ (không trùng mục đang mở, không lặp lại trong 24 giờ sau khi đã bỏ qua/hết hạn). */

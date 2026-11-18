@@ -112,4 +112,21 @@ class CampaignOnlyOwnArticlesTest extends TestCase
         $this->assertSame('no_keywords', $r['result']);
         $this->assertSame(2, Article::count());
     }
+
+    public function test_thu_tu_trong_bai_cua_chien_dich_la_priority_roi_ngay_du_kien_roi_id(): void
+    {
+        $c = $this->fixture(own: 0);
+        $mk = function (string $k, ?int $p, ?string $at) use ($c) {
+            $a = Article::create(['website_id' => $c->website_id, 'primary_keyword' => $k, 'workflow_status' => 'planned', 'campaign_id' => $c->id, 'priority' => $p]);
+            $a->forceFill(['planned_at' => $at])->save();
+        };
+        $mk('không ngày', null, null);
+        $mk('ngày muộn', null, '2026-12-05 08:00:00');
+        $mk('ngày sớm', null, '2026-12-01 08:00:00');
+        $mk('ưu tiên cao', 80, null);
+
+        $this->runner()->tick($c, CarbonImmutable::now());
+
+        $this->assertSame(['ưu tiên cao', 'ngày sớm', 'ngày muộn', 'không ngày'], $this->spawned);
+    }
 }
