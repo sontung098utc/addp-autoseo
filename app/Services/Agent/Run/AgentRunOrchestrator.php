@@ -1874,6 +1874,10 @@ final class AgentRunOrchestrator
 
     private function persist(Article $article, array $attrs, bool $passed): ArticleVersion
     {
+        if (isset($attrs['html_content']) && is_string($attrs['html_content']) && \App\Services\Content\TocPolicy::cmsHasOwnToc($article->website?->cms_type)) {
+            $attrs['html_content'] = \App\Services\Content\TocPolicy::stripArticleToc($attrs['html_content']); // theme Magento đã có mục lục riêng
+        }
+
         return DB::transaction(function () use ($article, $attrs, $passed) {
             $next = ($article->versions()->max('version') ?? 0) + 1;
 

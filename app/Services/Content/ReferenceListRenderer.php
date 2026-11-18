@@ -20,6 +20,10 @@ final class ReferenceListRenderer
         if ($t === '' || strcasecmp($t, $host) === 0 || strcasecmp(preg_replace('#^www\.#i', '', $t) ?? '', $host) === 0) {
             return '';
         }
+        $compact = preg_replace('/\s+/u', '', $t) ?? $t;
+        if (preg_match('/\p{L}{3,}/u', $t) !== 1 || preg_match_all('/\p{L}/u', $compact) < mb_strlen($compact) * 0.5) {
+            return ''; // tiêu đề trích sai: toàn số/ký hiệu (vd "≥70% ≥50% ≥70%"), không phải tên trang
+        }
         if (substr_count($t, '|') >= 2 || str_ends_with($t, '|')) {
             return ''; // mảnh bảng hoặc đoạn trích, không phải tiêu đề
         }
@@ -116,7 +120,7 @@ final class ReferenceListRenderer
         }
         $offset = preg_match_all('/<li\b[^>]*\bid="nguon-\d+"/i', $html);
         $number = [];
-        $html = (string) preg_replace_callback(self::MARK, function (array $m) use ($all, $offset, &$number): string {
+        $html = MarkupText::replaceInText(self::MARK, function (array $m) use ($all, $offset, &$number): string {
             $out = '';
             foreach (preg_split('/[^\d]+/', $m[1], -1, PREG_SPLIT_NO_EMPTY) ?: [] as $d) {
                 $i = (int) $d - 1;

@@ -63,9 +63,12 @@ final class NoteRenderer
         return $html."\n".'<aside class="autoseo-notes"><p><strong>Ghi chú</strong></p><ol type="a">'.$li.'</ol></aside>';
     }
 
-    /** Tooltip không mang dấu trích dẫn thô. */
+    /** Tooltip không mang dấu trích dẫn thô: [KB#12], [T4], [T1, T2] (và chú thích số [3] đã đổi). Các dấu này sẽ được đổi thành thẻ có dấu " nên không được nằm trong giá trị thuộc tính. */
     private static function plain(string $t): string
     {
-        return trim(preg_replace('/\s*\[KB#[^\]]*\]/u', '', $t) ?? $t);
+        $t = preg_replace('/\s*\[\s*(?:KB#|T)\s*\d[^\]]*\]/u', '', $t) ?? $t;
+        $t = preg_replace('/\s*\[\d+(?:\s*[,;]\s*\d+)*\]/u', '', $t) ?? $t;
+
+        return trim($t);
     }
 }
