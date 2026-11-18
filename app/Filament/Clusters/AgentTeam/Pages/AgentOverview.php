@@ -108,7 +108,7 @@ class AgentOverview extends Page
         $week = now()->subDays(7);
         $failed = ReviewQueue::problemRunCount($week);
         $held = AgentRun::query()->where('status', 'held')->where('created_at', '>=', $week)->count();
-        $stale = AgentRun::query()->where('status', 'running')->get()->filter(fn ($r) => RunActivity::isStale($r))->count();
+        $stale = AgentRun::query()->where('status', 'running')->with('steps')->get()->filter(fn ($r) => RunActivity::isStale($r))->count();
         $drafts = ReviewQueue::waitingCount();
         $waits = Schema::hasTable('campaign_waits') ? CampaignWait::query()->where('status', 'open')->where('expires_at', '>', now())->count() : 0;
 
@@ -125,7 +125,7 @@ class AgentOverview extends Page
         return [
             'ai' => $ai,
             'liveCount' => $liveCount,
-            'live' => RunActivity::liveRuns(5),
+            'live' => RunActivity::liveRuns(withArticle: true),
             'pollSeconds' => $liveCount > 0 ? RunActivity::POLL_LIVE : RunActivity::POLL_IDLE,
             'attention' => $attention,
             'today' => [

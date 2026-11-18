@@ -51,6 +51,17 @@ class StudioProgressTest extends TestCase
         $this->assertStringContainsString('myGen !== gen', $js, 'Lượt gọi cũ không được kết thúc nhầm thanh của lượt mới sau khi reset.');
     }
 
+    public function test_nut_vua_bam_hien_dang_xu_ly_va_khoa_bam_lai(): void
+    {
+        $js = (string) file_get_contents(public_path('js/studio-progress.js'));
+        $this->assertStringContainsString("setAttribute('data-ss-busy'", $js, 'Nút người dùng vừa bấm được đánh dấu bận ngay khi gửi lượt Livewire.');
+        $this->assertStringContainsString("removeAttribute('data-ss-busy')", $js, 'Mở lại khi có phản hồi hoặc lỗi.');
+        $this->assertStringContainsString('[data-ss-busy]{opacity:.7;cursor:progress!important;pointer-events:none}', $js);
+        $this->assertStringContainsString("e.target.closest('[data-ss-busy]')", $js, 'Phím Enter/Space trên nút bận không gửi lượt thứ hai.');
+        $this->assertStringContainsString('prefers-reduced-motion', $js);
+        $this->assertMatchesRegularExpression('/byUser \? busyControl\(\)/', $js, 'Chỉ lượt do người dùng bấm mới khóa nút, wire:poll nền thì không.');
+    }
+
     public function test_moi_file_tinh_cua_giao_dien_co_so_phien_ban_theo_ngay_sua(): void
     {
         $html = $this->get('/admin/login')->assertOk()->getContent();
