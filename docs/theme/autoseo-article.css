@@ -1,24 +1,27 @@
 /* =====================================================================
    Kiểu chữ cho bài do hệ thống auto SEO sinh ra (Nguồn tham khảo, Ghi chú,
    chú thích [n], ghi chú [a], bảng, khung tóm tắt) trên theme ADDP.
-   Phạm vi: chỉ .autoseo-* và vùng .addp-article-copy. Cỡ chữ theo em/rem,
+   Phạm vi: chỉ .autoseo-* và vùng .blog-post-view .addp-article-copy. Cỡ chữ theo em/rem,
    lấy thân bài 17px làm gốc. Không dùng !important, không script.
 
-   Cách tự dán (5 dòng):
-   1. Mở blog-styles.css của theme (…/main-content-style54/blog-styles.css),
-      HOẶC Magento Admin > Content > Design > Configuration > (site) > HTML Head
-      > Scripts and Style Sheets (dán trong <style>…</style>).
-   2. Dán TOÀN BỘ nội dung file này vào CUỐI file/ô đó.
-   3. Xóa cache: bin/magento cache:flush (và cache static nếu có CDN).
-   4. Kiểm một bài mới (bài sinh sau khi hệ thống cập nhật): rê chuột/bấm vào
-      [1] và [a] phải hiện hộp chú thích ngay; bấm nguồn phải mở tab mới.
-   5. Bài đã đăng cũ chưa có thuộc tính data-tip nên chỉ đẹp lên phần kiểu chữ;
-      tooltip tức thì và tab mới cần ĐĂNG LẠI bài.
-   Thứ tự triển khai: (a) hệ thống phát markup mới → (b) dán CSS này. Làm ngược
-   lại cũng không hồi quy: chưa có CSS thì vẫn còn tooltip gốc (thuộc tính title).
+   Cách tự dán:
+   1. Thêm toàn bộ file này vào CUỐI file CSS của theme:
+      app/design/frontend/Codazon/unlimited/child/web/css/addp-article.css
+      (hoặc một file CSS riêng thêm vào theme). Không dán vào Custom CSS admin.
+   2. Triển khai tĩnh lại (bin/magento setup:static-content:deploy vi_VN en_US -f
+      nếu chạy production), rồi bin/magento cache:flush.
+   3. CLOUDFLARE đang giữ bản đầu của file CSS tĩnh: sửa tại chỗ sẽ không đến
+      được trình duyệt. Phải ĐỔI TÊN file (hoặc thêm query phiên bản ?v=2 vào
+      link) hoặc purge cache Cloudflare cho file đó.
+   4. Kiểm một bài mới: rê chuột/bấm [1] và [a] hiện hộp chú thích ngay; bấm
+      nguồn mở tab mới. Bài cũ chỉ đẹp lên phần kiểu chữ; tooltip tức thì và
+      tab mới cần ĐĂNG LẠI bài.
+   Lưu ý: khung viền quanh H2 là thiết kế của theme (addp-article.css dòng 59:
+   h2:target { outline } hiện khi URL có #id hoặc sau khi bấm mục lục), không phải lỗi.
+   Thứ tự: hệ thống phát markup mới trước hoặc sau CSS đều không hồi quy vì vẫn có title.
    ===================================================================== */
 
-.addp-article-copy {
+.blog-post-view .addp-article-copy {
   --as-ink: rgb(28, 36, 51);
   --as-muted: rgb(88, 99, 120);
   --as-line: rgb(214, 222, 235);
@@ -27,8 +30,8 @@
 }
 
 /* ---- chú thích [n] và ghi chú [a] trong thân bài ---- */
-.addp-article-copy sup.autoseo-cite,
-.addp-article-copy sup.autoseo-note {
+.blog-post-view .addp-article-copy sup.autoseo-cite,
+.blog-post-view .addp-article-copy sup.autoseo-note {
   position: relative;
   font-size: 0.75em;
   line-height: 0;
@@ -38,30 +41,30 @@
   top: -0.5em;
   cursor: help;
 }
-.addp-article-copy sup.autoseo-cite a,
-.addp-article-copy sup.autoseo-note a {
+.blog-post-view .addp-article-copy sup.autoseo-cite a,
+.blog-post-view .addp-article-copy sup.autoseo-note a {
   text-decoration: none;
   color: var(--as-accent);
   font-weight: 600;
 }
-.addp-article-copy sup.autoseo-cite:hover a,
-.addp-article-copy sup.autoseo-cite:focus a,
-.addp-article-copy sup.autoseo-note:hover a,
-.addp-article-copy sup.autoseo-note:focus a {
+.blog-post-view .addp-article-copy sup.autoseo-cite:hover a,
+.blog-post-view .addp-article-copy sup.autoseo-cite:focus a,
+.blog-post-view .addp-article-copy sup.autoseo-note:hover a,
+.blog-post-view .addp-article-copy sup.autoseo-note:focus a {
   text-decoration: underline;
 }
-.addp-article-copy sup.autoseo-cite:focus-visible,
-.addp-article-copy sup.autoseo-note:focus-visible {
+.blog-post-view .addp-article-copy sup.autoseo-cite:focus-visible,
+.blog-post-view .addp-article-copy sup.autoseo-note:focus-visible {
   outline: 2px solid var(--as-accent);
   outline-offset: 2px;
   border-radius: 3px;
 }
 
 /* ---- hộp chú thích hiện tức thì (đọc thuộc tính data-tip) ---- */
-.addp-article-copy sup.autoseo-cite[data-tip]:hover::after,
-.addp-article-copy sup.autoseo-cite[data-tip]:focus::after,
-.addp-article-copy sup.autoseo-note[data-tip]:hover::after,
-.addp-article-copy sup.autoseo-note[data-tip]:focus::after {
+.blog-post-view .addp-article-copy sup.autoseo-cite[data-tip]:hover::after,
+.blog-post-view .addp-article-copy sup.autoseo-cite[data-tip]:focus::after,
+.blog-post-view .addp-article-copy sup.autoseo-note[data-tip]:hover::after,
+.blog-post-view .addp-article-copy sup.autoseo-note[data-tip]:focus::after {
   content: attr(data-tip);
   position: absolute;
   left: -0.5em;
@@ -83,15 +86,15 @@
 }
 
 /* ---- khối Nguồn tham khảo và Ghi chú ---- */
-.addp-article-copy .autoseo-refs,
-.addp-article-copy .autoseo-notes {
+.blog-post-view .addp-article-copy .autoseo-refs,
+.blog-post-view .addp-article-copy .autoseo-notes {
   margin: 2rem 0 1.25rem;
   padding-top: 1rem;
   border-top: 1px solid var(--as-line);
   color: var(--as-ink);
 }
-.addp-article-copy .autoseo-refs__title,
-.addp-article-copy .autoseo-notes__title {
+.blog-post-view .addp-article-copy .autoseo-refs__title,
+.blog-post-view .addp-article-copy .autoseo-notes__title {
   margin: 0 0 0.6rem;
   font-size: 15px;
   font-weight: 700;
@@ -99,43 +102,43 @@
   text-transform: uppercase;
   color: var(--as-muted);
 }
-.addp-article-copy .autoseo-refs__title strong,
-.addp-article-copy .autoseo-notes__title strong {
+.blog-post-view .addp-article-copy .autoseo-refs__title strong,
+.blog-post-view .addp-article-copy .autoseo-notes__title strong {
   font-weight: inherit;
 }
-.addp-article-copy .autoseo-refs ol,
-.addp-article-copy .autoseo-notes ol {
+.blog-post-view .addp-article-copy .autoseo-refs ol,
+.blog-post-view .addp-article-copy .autoseo-notes ol {
   margin: 0;
   padding-left: 1.6em;
 }
-.addp-article-copy .autoseo-refs li,
-.addp-article-copy .autoseo-notes li {
+.blog-post-view .addp-article-copy .autoseo-refs li,
+.blog-post-view .addp-article-copy .autoseo-notes li {
   margin: 0 0 0.55rem;
   padding-left: 0.2em;
   font-size: 15px;
   line-height: 1.6;
   overflow-wrap: anywhere;           /* URL/tiêu đề dài tự ngắt dòng */
 }
-.addp-article-copy .autoseo-refs li::marker,
-.addp-article-copy .autoseo-notes li::marker {
+.blog-post-view .addp-article-copy .autoseo-refs li::marker,
+.blog-post-view .addp-article-copy .autoseo-notes li::marker {
   font-weight: 700;
   color: var(--as-accent);
 }
-.addp-article-copy .autoseo-refs li a {
+.blog-post-view .addp-article-copy .autoseo-refs li a {
   color: var(--as-accent);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
   text-decoration-color: rgba(24, 90, 219, 0.4);
 }
-.addp-article-copy .autoseo-refs li a:hover,
-.addp-article-copy .autoseo-refs li a:focus-visible {
+.blog-post-view .addp-article-copy .autoseo-refs li a:hover,
+.blog-post-view .addp-article-copy .autoseo-refs li a:focus-visible {
   text-decoration-color: currentColor;
 }
 
 /* ---- khung tóm tắt / lưu ý (aside) ---- */
-.addp-article-copy aside,
-.addp-article-copy .autoseo-summary {
+.blog-post-view .addp-article-copy aside,
+.blog-post-view .addp-article-copy .autoseo-summary {
   margin: 1.25rem 0;
   padding: 0.9rem 1.1rem;
   background: var(--as-soft);
@@ -144,17 +147,17 @@
   font-size: 1em;                    /* bằng thân bài */
   line-height: inherit;
 }
-.addp-article-copy aside p,
-.addp-article-copy .autoseo-summary p {
+.blog-post-view .addp-article-copy aside p,
+.blog-post-view .addp-article-copy .autoseo-summary p {
   margin: 0 0 0.5rem;
   font-size: inherit;
 }
-.addp-article-copy aside > :last-child,
-.addp-article-copy .autoseo-summary > :last-child {
+.blog-post-view .addp-article-copy aside > :last-child,
+.blog-post-view .addp-article-copy .autoseo-summary > :last-child {
   margin-bottom: 0;
 }
 /* khối ghi chú cuối bài là aside nhưng dùng kiểu riêng ở trên */
-.addp-article-copy aside.autoseo-notes {
+.blog-post-view .addp-article-copy aside.autoseo-notes {
   background: transparent;
   border-left: 0;
   border-radius: 0;
@@ -163,14 +166,14 @@
 }
 
 /* ---- bảng: tiêu đề cột và dữ liệu cùng họ cỡ chữ ---- */
-.addp-article-copy table {
+.blog-post-view .addp-article-copy table {
   width: 100%;
   border-collapse: collapse;
   margin: 1.25rem 0;
   font-size: 0.9em;
 }
-.addp-article-copy table th,
-.addp-article-copy table td {
+.blog-post-view .addp-article-copy table th,
+.blog-post-view .addp-article-copy table td {
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--as-line);
   font-size: 1em;
@@ -178,17 +181,17 @@
   text-align: left;
   vertical-align: top;
 }
-.addp-article-copy table th {
+.blog-post-view .addp-article-copy table th {
   font-weight: 600;
   text-transform: none;
   background: var(--as-soft);
 }
-.addp-article-copy table td {
+.blog-post-view .addp-article-copy table td {
   font-weight: 400;
 }
 /* cuộn ngang khi hẹp, không đẩy bể trang */
 @media (max-width: 720px) {
-  .addp-article-copy table {
+  .blog-post-view .addp-article-copy table {
     display: block;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -197,10 +200,10 @@
 
 /* ---- điện thoại: hộp chú thích thành thanh cố định dưới màn hình ---- */
 @media (max-width: 600px) {
-  .addp-article-copy sup.autoseo-cite[data-tip]:hover::after,
-  .addp-article-copy sup.autoseo-cite[data-tip]:focus::after,
-  .addp-article-copy sup.autoseo-note[data-tip]:hover::after,
-  .addp-article-copy sup.autoseo-note[data-tip]:focus::after {
+  .blog-post-view .addp-article-copy sup.autoseo-cite[data-tip]:hover::after,
+  .blog-post-view .addp-article-copy sup.autoseo-cite[data-tip]:focus::after,
+  .blog-post-view .addp-article-copy sup.autoseo-note[data-tip]:hover::after,
+  .blog-post-view .addp-article-copy sup.autoseo-note[data-tip]:focus::after {
     position: fixed;
     left: 12px;
     right: 12px;
@@ -209,8 +212,8 @@
     width: auto;
     max-width: none;
   }
-  .addp-article-copy .autoseo-refs li,
-  .addp-article-copy .autoseo-notes li {
+  .blog-post-view .addp-article-copy .autoseo-refs li,
+  .blog-post-view .addp-article-copy .autoseo-notes li {
     font-size: 15px;
   }
 }

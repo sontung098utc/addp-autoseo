@@ -145,7 +145,7 @@ class MagentoBridgeClientTest extends TestCase
         $asset = $this->featuredAsset();
         $h = [];
         $client = $this->clientWithHistory([
-            new Response(200, [], json_encode(['id' => 'a.webp', 'file' => 'magefan_blog/autoseo/1_cover.webp', 'url' => '/media/magefan_blog/autoseo/1_cover.webp'])),
+            new Response(200, [], json_encode(['id' => 'a.webp', 'file' => 'autoseo/1_cover.webp', 'url' => '/media/autoseo/1_cover.webp'])),
             new Response(200, [], json_encode(['post_id' => 99])),
         ], $h);
 
@@ -154,14 +154,14 @@ class MagentoBridgeClientTest extends TestCase
         $this->assertStringEndsWith('/V1/company-blog/media', (string) $h[0]['request']->getUri());
         $this->assertSame('cover.webp', json_decode((string) $h[0]['request']->getBody(), true)['fileName']);
         $post = json_decode((string) $h[1]['request']->getBody(), true)['post'];
-        $this->assertSame('magefan_blog/autoseo/1_cover.webp', $post['image']);
-        $this->assertSame('magefan_blog/autoseo/1_cover.webp', $asset->fresh()->metadata['magento_media'][(string) $this->website->id]);
+        $this->assertSame('autoseo/1_cover.webp', $post['image']);
+        $this->assertSame('autoseo/1_cover.webp', $asset->fresh()->metadata['magento_media'][(string) $this->website->id]);
 
         // Lần sau (đăng sau nháp) dùng lại đường dẫn đã nhớ, không tải lại.
         $h2 = [];
         $this->clientWithHistory([new Response(200, [], json_encode(['post_id' => 99]))], $h2)->createDraft($this->website, $this->version->fresh());
         $this->assertCount(1, $h2);
-        $this->assertSame('magefan_blog/autoseo/1_cover.webp', json_decode((string) $h2[0]['request']->getBody(), true)['post']['image']);
+        $this->assertSame('autoseo/1_cover.webp', json_decode((string) $h2[0]['request']->getBody(), true)['post']['image']);
     }
 
     public function test_create_draft_without_image_or_with_upload_failure_still_creates_post(): void
