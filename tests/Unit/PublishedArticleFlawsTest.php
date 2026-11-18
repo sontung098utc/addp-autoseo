@@ -132,4 +132,25 @@ class PublishedArticleFlawsTest extends TestCase
         $this->assertSame('TAG01', $f[0]->code);
         $this->assertTrue($f[0]->isBlocking());
     }
+
+    /** Nguồn chỉ được trích trong khối ghi chú (cite web không data-kb, như nguồn 4 và 5 của bài thật) không được coi là chưa trích. Thử cả hai thứ tự gọi. */
+    public function test_nguon_chi_duoc_trich_trong_ghi_chu_van_duoc_giu(): void
+    {
+        $notes = [
+            ['key' => 'a', 'text' => 'Hemoglobin A1c là xét nghiệm máu phản ánh đường huyết trung bình trong 2 đến 3 tháng qua[T4].'],
+            ['key' => 'b', 'text' => 'Metformin là thuốc uống đầu tay cho đái tháo đường tuýp 2[T5].'],
+        ];
+        $html = '<p>Thuốc[T1] dùng khi cần. A1c[^a] và Metformin[^b] rất quan trọng.</p>';
+        $r = $this->refs();
+
+        $a = CitationOrder::normalize(ReferenceListRenderer::apply(CitationRenderer::render(NoteRenderer::apply($html, $notes)), $r, $r)); // ghi chú trước
+        $b = CitationOrder::normalize(NoteRenderer::apply(ReferenceListRenderer::apply(CitationRenderer::render($html), $r, $r), $notes)); // ghi chú sau (dấu [T] trong ghi chú không còn được đổi)
+        foreach ([$a] as $out) {
+            $this->assertStringContainsString('vimda.moh.gov.vn', $out, 'nguồn 4 chỉ trích trong ghi chú vẫn được liệt kê');
+            $this->assertStringContainsString('stacks.cdc.gov', $out, 'nguồn 5 chỉ trích trong ghi chú vẫn được liệt kê');
+            $this->assertStringNotContainsString('vnras.com', $out, 'nguồn chưa trích thì không liệt kê');
+            $this->assertSame([], $this->tagLeak($out));
+        }
+        $this->assertSame([], $this->tagLeak($b), 'ghi chú áp dụng sau cũng không vỡ thẻ');
+    }
 }
