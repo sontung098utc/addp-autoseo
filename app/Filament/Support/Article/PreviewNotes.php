@@ -30,6 +30,7 @@ final class PreviewNotes
                 $tip = $t[1];
                 $attrs = (string) preg_replace('#\stitle="[^"]*"#i', '', $attrs);
             }
+            $attrs = (string) preg_replace('#\s(?:data-tip|tabindex|aria-label)="[^"]*"#i', '', $attrs); // dùng lại hộp chú thích của khung xem trước, không nhân đôi thuộc tính
             $n = preg_match('#<a\b[^>]*\bhref="\#nguon-(\d+)"#i', $m[2], $nm) ? (int) $nm[1] : null;
             $inner = (string) preg_replace('#<a\b[^>]*>(.*?)</a>#is', '$1', $m[2]);
             if ($n !== null && isset($urls[$n])) { // chú thích số bấm được: mở trang nguồn ở tab mới (khung vẫn không chạy script)

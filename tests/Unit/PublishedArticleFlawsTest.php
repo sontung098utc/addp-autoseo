@@ -95,7 +95,7 @@ class PublishedArticleFlawsTest extends TestCase
         $r = $this->refs();
         $out = CitationOrder::normalize(ReferenceListRenderer::apply('<p>A[T4]. B[T5].</p>', $r, $r));
         $this->assertStringContainsString('Trang trên vimda.moh.gov.vn</a>', $out);
-        $this->assertStringNotContainsString('≥70%', preg_replace('#title="[^"]*"#', '', $out));
+        $this->assertStringNotContainsString('≥70%', preg_replace('#\s(?:title|data-tip|aria-label)="[^"]*"#', '', $out));
         preg_match_all('#<li\b[^>]*>(.*?)</li>#s', $out, $lis);
         foreach ($lis[1] as $li) {
             $this->assertStringContainsString('<a href="https://', $li, 'mọi nguồn trong danh sách đều có liên kết');
@@ -152,5 +152,36 @@ class PublishedArticleFlawsTest extends TestCase
             $this->assertSame([], $this->tagLeak($out));
         }
         $this->assertSame([], $this->tagLeak($b), 'ghi chú áp dụng sau cũng không vỡ thẻ');
+    }
+
+    public function test_lien_ket_ngoai_mo_tab_moi_neo_noi_bo_giu_nguyen_va_chay_lai_khong_doi(): void
+    {
+        $html = '<p><a href="#nguon-1">[1]</a> <a href="https://www.addp.vn/blog/x">trong</a> <a href="https://who.int/a?b=1&amp;c=2" rel="nofollow noopener">WHO</a> '
+            .'<a class="k" href=\'https://nih.gov/x\' target="_self" rel="author">NIH</a> <a href="mailto:a@b.vn">m</a> <a name="z">z</a> <aside>x</aside> <abbr>y</abbr></p>'
+            .'<li><a href="//cdc.gov/p">CDC</a></li>';
+        $out = \App\Services\Content\ExternalLinks::normalize($html, ['https://addp.vn']);
+        $this->assertStringContainsString('<a href="#nguon-1">', $out);
+        $this->assertStringContainsString('<a href="https://www.addp.vn/blog/x">', $out, 'cùng tên miền (bỏ www) giữ cùng tab');
+        $this->assertStringContainsString('<a href="https://who.int/a?b=1&amp;c=2" rel="nofollow noopener noreferrer" target="_blank">', $out);
+        $this->assertStringContainsString('<a class="k" href=\'https://nih.gov/x\' target="_blank" rel="nofollow noopener noreferrer author">', $out, 'target cũ bị thay, rel cũ được giữ thêm');
+        $this->assertStringContainsString('<a href="//cdc.gov/p" target="_blank" rel="nofollow noopener noreferrer">', $out);
+        $this->assertStringContainsString('<a href="mailto:a@b.vn">', $out);
+        $this->assertStringContainsString('<a name="z">', $out);
+        $this->assertStringContainsString('<aside>x</aside> <abbr>y</abbr>', $out);
+        $this->assertSame(0, preg_match('/target="_blank"[^>]*target=/', $out), 'không nhân đôi target');
+        $this->assertSame($out, \App\Services\Content\ExternalLinks::normalize($out, ['https://addp.vn']), 'idempotent');
+    }
+
+    public function test_chu_thich_va_ghi_chu_co_data_tip_tabindex_aria_label_va_giu_title(): void
+    {
+        $out = NoteRenderer::apply('<p>A1c[^a].</p>', [['key' => 'a', 'text' => 'Hemoglobin A1c là xét nghiệm máu "đặc biệt" phản ánh đường huyết.']]);
+        $this->assertMatchesRegularExpression('#<sup class="autoseo-note" data-note="a" tabindex="0" data-tip="([^"]+)" aria-label="\1" title="\1">#', $out);
+        $this->assertStringContainsString('&quot;đặc biệt&quot;', $out);
+        $this->assertStringContainsString('class="autoseo-notes__title"', $out);
+        $this->assertSame([], $this->tagLeak($out));
+        $r = $this->refs();
+        $refs = ReferenceListRenderer::apply('<p>A[T1].</p>', $r, $r);
+        $this->assertStringContainsString('data-tip="Nguồn: Diabetes (who.int)"', $refs);
+        $this->assertStringContainsString('class="autoseo-refs__title"', $refs);
     }
 }

@@ -1876,6 +1876,7 @@ final class AgentRunOrchestrator
     {
         if (isset($attrs['html_content']) && is_string($attrs['html_content'])) {
             $attrs['html_content'] = \App\Services\Content\TocPolicy::stripArticleToc($attrs['html_content']); // giao diện website tự dựng mục lục từ h2; giữ id neo của h2
+            $attrs['html_content'] = \App\Services\Content\ExternalLinks::normalize($attrs['html_content'], [(string) $article->website?->base_url]); // liên kết ngoài mở tab mới
         }
 
         return DB::transaction(function () use ($article, $attrs, $passed) {

@@ -58,7 +58,7 @@ final class CitationRenderer
                 $srcT = $it->source ? ReferenceListRenderer::readableTitle((string) $it->source->title, (string) $host0) : '';
                 // Rê chuột vào số chỉ cho biết NGUỒN (không nhắc lại nội dung câu ở thân bài); bấm để nhảy tới dòng nguồn cuối bài. Định nghĩa/khái niệm bổ sung nằm ở khối Ghi chú.
                 $tip = 'Nguồn: '.trim($srcT !== '' ? $srcT.($host0 !== '' ? ' ('.$host0.')' : '').' — '.(string) $it->title : (string) $it->title);
-                $out .= '<sup class="autoseo-cite" data-kb="'.$id.'" title="'.e($tip).'"><a href="#nguon-'.$number[$id].'">['.$number[$id].']</a></sup>';
+                $out .= '<sup class="autoseo-cite" data-kb="'.$id.'"'.TooltipAttrs::attrs($tip).'><a href="#nguon-'.$number[$id].'">['.$number[$id].']</a></sup>';
             }
 
             return $out;
@@ -85,6 +85,6 @@ final class CitationRenderer
             $li .= '<li id="nguon-'.$number[$id].'" data-kb="'.$id.'">'.($src && $srcTitle !== '' ? $from : '<strong>'.e((string) $it->title).'</strong>'.($from !== '' ? ' — '.$from : '')).(isset($titlesVi[$id]) && $src && ReferenceListRenderer::needsGloss($srcTitle) ? ' — <em>'.e($titlesVi[$id]).'</em>' : '').'</li>'; // tên trang nguồn (không phải câu trích do AI rút ra)
         }
 
-        return $html."\n".'<div class="autoseo-refs"><p><strong>Nguồn tham khảo</strong></p><ol>'.$li.'</ol></div>';
+        return $html."\n".'<div class="autoseo-refs"><p class="autoseo-refs__title"><strong>Nguồn tham khảo</strong></p><ol>'.$li.'</ol></div>';
     }
 }

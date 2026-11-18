@@ -101,7 +101,7 @@ final class ReferenceListRenderer
             return (string) preg_replace('#(<div class="autoseo-refs">.*?)(</ol>)#su', '$1'.str_replace('$', '\$', $li).'$2', $html, 1);
         }
 
-        return $html."\n".'<div class="autoseo-refs"><p><strong>Nguồn tham khảo</strong></p><ol>'.$li.'</ol></div>';
+        return $html."\n".'<div class="autoseo-refs"><p class="autoseo-refs__title"><strong>Nguồn tham khảo</strong></p><ol>'.$li.'</ol></div>';
     }
 
     private const MARK = '/\s*\[T(\d+(?:\s*[,;]\s*T?\d+)*)\]/u';
@@ -131,7 +131,7 @@ final class ReferenceListRenderer
                 $number[$i] ??= $offset + count($number) + 1;
                 $title = trim(strip_tags((string) ($all[$i]['title'] ?? '')));
                 $host = preg_replace('/^www\./', '', (string) parse_url($url, PHP_URL_HOST));
-                $out .= '<sup class="autoseo-cite" title="'.e('Nguồn: '.($title !== '' ? $title : $host).' ('.$host.')').'"><a href="#nguon-'.$number[$i].'">['.$number[$i].']</a></sup>';
+                $out .= '<sup class="autoseo-cite"'.TooltipAttrs::attrs('Nguồn: '.($title !== '' ? $title : $host).' ('.$host.')').'><a href="#nguon-'.$number[$i].'">['.$number[$i].']</a></sup>';
             }
 
             return $out;

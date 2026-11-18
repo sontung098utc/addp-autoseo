@@ -1,0 +1,216 @@
+/* =====================================================================
+   Kiểu chữ cho bài do hệ thống auto SEO sinh ra (Nguồn tham khảo, Ghi chú,
+   chú thích [n], ghi chú [a], bảng, khung tóm tắt) trên theme ADDP.
+   Phạm vi: chỉ .autoseo-* và vùng .addp-article-copy. Cỡ chữ theo em/rem,
+   lấy thân bài 17px làm gốc. Không dùng !important, không script.
+
+   Dev1 dán (5 dòng):
+   1. Mở blog-styles.css của theme (…/main-content-style54/blog-styles.css),
+      HOẶC Magento Admin > Content > Design > Configuration > (site) > HTML Head
+      > Scripts and Style Sheets (dán trong <style>…</style>).
+   2. Dán TOÀN BỘ nội dung file này vào CUỐI file/ô đó.
+   3. Xóa cache: bin/magento cache:flush (và cache static nếu có CDN).
+   4. Kiểm một bài mới (bài sinh sau khi hệ thống cập nhật): rê chuột/bấm vào
+      [1] và [a] phải hiện hộp chú thích ngay; bấm nguồn phải mở tab mới.
+   5. Bài đã đăng cũ chưa có thuộc tính data-tip nên chỉ đẹp lên phần kiểu chữ;
+      tooltip tức thì và tab mới cần ĐĂNG LẠI bài.
+   Thứ tự triển khai: (a) hệ thống phát markup mới → (b) dán CSS này. Làm ngược
+   lại cũng không hồi quy: chưa có CSS thì vẫn còn tooltip gốc (thuộc tính title).
+   ===================================================================== */
+
+.addp-article-copy {
+  --as-ink: rgb(28, 36, 51);
+  --as-muted: rgb(88, 99, 120);
+  --as-line: rgb(214, 222, 235);
+  --as-soft: rgb(243, 247, 253);
+  --as-accent: rgb(24, 90, 219);
+}
+
+/* ---- chú thích [n] và ghi chú [a] trong thân bài ---- */
+.addp-article-copy sup.autoseo-cite,
+.addp-article-copy sup.autoseo-note {
+  position: relative;
+  font-size: 0.75em;
+  line-height: 0;
+  margin: 0 0.05em;
+  padding: 0.35em 0.15em;            /* vùng rê/chạm lớn hơn chữ */
+  vertical-align: baseline;
+  top: -0.5em;
+  cursor: help;
+}
+.addp-article-copy sup.autoseo-cite a,
+.addp-article-copy sup.autoseo-note a {
+  text-decoration: none;
+  color: var(--as-accent);
+  font-weight: 600;
+}
+.addp-article-copy sup.autoseo-cite:hover a,
+.addp-article-copy sup.autoseo-cite:focus a,
+.addp-article-copy sup.autoseo-note:hover a,
+.addp-article-copy sup.autoseo-note:focus a {
+  text-decoration: underline;
+}
+.addp-article-copy sup.autoseo-cite:focus-visible,
+.addp-article-copy sup.autoseo-note:focus-visible {
+  outline: 2px solid var(--as-accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ---- hộp chú thích hiện tức thì (đọc thuộc tính data-tip) ---- */
+.addp-article-copy sup.autoseo-cite[data-tip]:hover::after,
+.addp-article-copy sup.autoseo-cite[data-tip]:focus::after,
+.addp-article-copy sup.autoseo-note[data-tip]:hover::after,
+.addp-article-copy sup.autoseo-note[data-tip]:focus::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: -0.5em;
+  top: 1.9em;
+  z-index: 20;
+  width: max-content;
+  max-width: min(22rem, 80vw);
+  padding: 0.6rem 0.8rem;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #fff;
+  background: rgb(28, 36, 51);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.25);
+  white-space: normal;
+  text-align: left;
+  pointer-events: none;
+}
+
+/* ---- khối Nguồn tham khảo và Ghi chú ---- */
+.addp-article-copy .autoseo-refs,
+.addp-article-copy .autoseo-notes {
+  margin: 2rem 0 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--as-line);
+  color: var(--as-ink);
+}
+.addp-article-copy .autoseo-refs__title,
+.addp-article-copy .autoseo-notes__title {
+  margin: 0 0 0.6rem;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--as-muted);
+}
+.addp-article-copy .autoseo-refs__title strong,
+.addp-article-copy .autoseo-notes__title strong {
+  font-weight: inherit;
+}
+.addp-article-copy .autoseo-refs ol,
+.addp-article-copy .autoseo-notes ol {
+  margin: 0;
+  padding-left: 1.6em;
+}
+.addp-article-copy .autoseo-refs li,
+.addp-article-copy .autoseo-notes li {
+  margin: 0 0 0.55rem;
+  padding-left: 0.2em;
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;           /* URL/tiêu đề dài tự ngắt dòng */
+}
+.addp-article-copy .autoseo-refs li::marker,
+.addp-article-copy .autoseo-notes li::marker {
+  font-weight: 700;
+  color: var(--as-accent);
+}
+.addp-article-copy .autoseo-refs li a {
+  color: var(--as-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  text-decoration-color: rgba(24, 90, 219, 0.4);
+}
+.addp-article-copy .autoseo-refs li a:hover,
+.addp-article-copy .autoseo-refs li a:focus-visible {
+  text-decoration-color: currentColor;
+}
+
+/* ---- khung tóm tắt / lưu ý (aside) ---- */
+.addp-article-copy aside,
+.addp-article-copy .autoseo-summary {
+  margin: 1.25rem 0;
+  padding: 0.9rem 1.1rem;
+  background: var(--as-soft);
+  border-left: 4px solid var(--as-accent);
+  border-radius: 0 8px 8px 0;
+  font-size: 1em;                    /* bằng thân bài */
+  line-height: inherit;
+}
+.addp-article-copy aside p,
+.addp-article-copy .autoseo-summary p {
+  margin: 0 0 0.5rem;
+  font-size: inherit;
+}
+.addp-article-copy aside > :last-child,
+.addp-article-copy .autoseo-summary > :last-child {
+  margin-bottom: 0;
+}
+/* khối ghi chú cuối bài là aside nhưng dùng kiểu riêng ở trên */
+.addp-article-copy aside.autoseo-notes {
+  background: transparent;
+  border-left: 0;
+  border-radius: 0;
+  padding: 1rem 0 0;
+  margin: 2rem 0 1.25rem;
+}
+
+/* ---- bảng: tiêu đề cột và dữ liệu cùng họ cỡ chữ ---- */
+.addp-article-copy table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25rem 0;
+  font-size: 0.9em;
+}
+.addp-article-copy table th,
+.addp-article-copy table td {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--as-line);
+  font-size: 1em;
+  line-height: 1.5;
+  text-align: left;
+  vertical-align: top;
+}
+.addp-article-copy table th {
+  font-weight: 600;
+  text-transform: none;
+  background: var(--as-soft);
+}
+.addp-article-copy table td {
+  font-weight: 400;
+}
+/* cuộn ngang khi hẹp, không đẩy bể trang */
+@media (max-width: 720px) {
+  .addp-article-copy table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ---- điện thoại: hộp chú thích thành thanh cố định dưới màn hình ---- */
+@media (max-width: 600px) {
+  .addp-article-copy sup.autoseo-cite[data-tip]:hover::after,
+  .addp-article-copy sup.autoseo-cite[data-tip]:focus::after,
+  .addp-article-copy sup.autoseo-note[data-tip]:hover::after,
+  .addp-article-copy sup.autoseo-note[data-tip]:focus::after {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    top: auto;
+    bottom: 12px;
+    width: auto;
+    max-width: none;
+  }
+  .addp-article-copy .autoseo-refs li,
+  .addp-article-copy .autoseo-notes li {
+    font-size: 15px;
+  }
+}
