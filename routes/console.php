@@ -22,6 +22,13 @@ Schedule::command('autoseo:reconcile-publications')
     ->withoutOverlapping()
     ->runInBackground();
 
+// Lượt đăng kẹt "Đang đăng" (job mất/chết) quá hạn: chuyển needs_reconcile (đã từng gửi) hoặc failed (chưa gửi lần nào) kèm lý do, để người dùng thấy và xử lý.
+Schedule::command('autoseo:reap-stale-publications')
+    ->everyFiveMinutes()
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // AG-S01: nhịp chiến dịch của đội AI. Không dùng AI giả lập; thiếu khóa AI thật thì mỗi nhịp chỉ ghi "chưa cấu hình". Dev1 thay bằng hàng đợi (AG-B10).
 Schedule::command('agent:tick')
     ->everyFifteenMinutes()
