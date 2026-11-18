@@ -18,7 +18,7 @@ class MediaAssetResource extends Resource
 
     protected static ?string $navigationLabel = 'Thư viện ảnh';
 
-    protected static ?string $modelLabel = 'Ảnh tư liệu';
+    protected static ?string $modelLabel = 'ảnh';
 
     protected static ?string $pluralModelLabel = 'Thư viện ảnh';
 
@@ -43,7 +43,8 @@ class MediaAssetResource extends Resource
                             ->imageEditor()
                             ->maxSize(10240)
                             ->helperText('PNG, JPG hoặc WebP · tối đa 10 MB')
-                            ->required(fn (string $context): bool => $context === 'create'),
+                            ->required(fn (string $context): bool => $context === 'create')
+                            ->validationMessages(['required' => 'Vui lòng chọn ảnh tải lên.']),
                         Forms\Components\Select::make('website_id')
                             ->label('Gán cho Website')
                             ->relationship('website', 'name')
@@ -77,12 +78,13 @@ class MediaAssetResource extends Resource
                 Tables\Columns\ImageColumn::make('file_path')
                     ->label('Xem trước')
                     ->disk('public')
+                    ->size(72)
                     ->square(),
                 Tables\Columns\TextColumn::make('title')
                     ->label('Tiêu đề')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('alt_text')->toggleable()->visibleFrom('xl')
+                Tables\Columns\TextColumn::make('alt_text')->toggleable(isToggledHiddenByDefault: true)->visibleFrom('xl')
                     ->label('Thẻ Alt SEO')
                     ->limit(35)
                     ->searchable(),
@@ -98,7 +100,12 @@ class MediaAssetResource extends Resource
                     ->formatStateUsing(fn ($record) => $record?->human_file_size ?? ''),
                 Tables\Columns\IconColumn::make('is_featured')->visibleFrom('xl')
                     ->label('Đại diện')
-                    ->boolean(),
+                    ->tooltip('Ảnh đại diện nổi bật')
+                    ->boolean()
+                    ->trueIcon('heroicon-s-star')
+                    ->falseIcon('heroicon-o-star')
+                    ->trueColor('warning')
+                    ->falseColor('gray'),
                 Tables\Columns\TextColumn::make('created_at')->toggleable()->visibleFrom('xl')
                     ->label('Ngày tải lên')
                     ->dateTime('d/m/Y H:i')

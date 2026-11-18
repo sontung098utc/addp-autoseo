@@ -2,7 +2,7 @@
     $pct = fn ($m) => $m['value'] === null ? 'Chưa có dữ liệu' : round($m['value'] * 100).'% ('.$m['n'].' phiên)';
     $num = fn ($m, $unit = '', $dec = 1) => $m['value'] === null ? 'Chưa có dữ liệu' : number_format($m['value'], $dec, ',', '.').$unit;
     $stateLab = ['met' => ['Đạt', 'success'], 'unmet' => ['Chưa đạt', 'danger'], 'nodata' => ['Chưa có dữ liệu', 'gray'], 'locked' => ['Khóa', 'warning']];
-    $dur = $metrics['seconds_to_draft']['value'] === null ? 'Chưa có dữ liệu' : ($metrics['seconds_to_draft']['value'] < 90 ? round($metrics['seconds_to_draft']['value']).' giây' : round($metrics['seconds_to_draft']['value'] / 60, 1).' phút');
+    $dur = $metrics['seconds_to_draft']['value'] === null ? 'Chưa có dữ liệu' : ($metrics['seconds_to_draft']['value'] < 90 ? round($metrics['seconds_to_draft']['value']).' giây' : number_format($metrics['seconds_to_draft']['value'] / 60, 1, ',', '.').' phút');
     $tierLab = ['high' => 'Cao (cần chuyên gia duyệt)', 'medium' => 'Vừa (cần xem kỹ)'];
 @endphp
 <x-filament-panels::page>

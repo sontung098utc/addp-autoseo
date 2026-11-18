@@ -46,7 +46,7 @@ class CampaignResource extends Resource
 
     protected static ?string $modelLabel = 'Chiến dịch';
 
-    protected static ?string $pluralModelLabel = 'Chiến dịch tự động';
+    protected static ?string $pluralModelLabel = 'Chiến dịch';
 
     /** Quy ước giao diện: câu thường ("Chiến dịch tự động"), không để Filament tự Viết Hoa Từng Chữ ở tiêu đề và breadcrumb. */
     protected static bool $hasTitleCaseModelLabel = false;
