@@ -89,12 +89,15 @@ document.addEventListener('alpine:init', () => {
     num(row, col) {
       let v = this.raw(row, col);
       if (v && typeof v === 'object') v = v.value ?? v.text;
+      if (v === null || v === undefined || v === '') return null; // chưa có số liệu: không được biến thành 0
       const n = Number(v); return Number.isFinite(n) ? n : null;
     },
     fmt(row, col) {
       if (col.type === 'number') { const n = this.num(row, col); return n === null ? '—' : n.toLocaleString('vi-VN', { maximumFractionDigits: col.decimals ?? 0, minimumFractionDigits: col.decimals ?? 0 }) + (col.suffix || ''); }
       const t = this.text(row, col); return t === '' ? '—' : t;
     },
+    // Nút theo dòng: action có `showIf` (tên khóa của dòng) chỉ hiện khi giá trị đó đúng.
+    actionsFor(row, col) { return (col.actions || []).filter((a) => !a.showIf || !!row[a.showIf]); },
     badgeTone(row, col) { const v = this.raw(row, col); if (v && typeof v === 'object' && v.tone) return v.tone; return (col.tones || {})[this.text(row, col)] || 'muted'; },
     deltaView(row, col) {
       const n = this.num(row, col);

@@ -8,8 +8,8 @@ use App\Filament\Pages\BrainBuildPage;
 use App\Filament\Resources\AgentRunResource;
 use App\Filament\Resources\ArticleResource;
 use App\Filament\Support\Agent\RunActivity;
+use App\Filament\Support\Review\ReviewQueue;
 use App\Models\AgentRun;
-use App\Models\Article;
 use App\Models\Website;
 use App\Services\Knowledge\Suggest\KnowledgeSuggestions;
 use Filament\Widgets\Widget;
@@ -31,8 +31,7 @@ class AgentTodayWidget extends Widget
         $since = now()->startOfDay();
         $today = AgentRun::query()->where('created_at', '>=', $since);
         $running = AgentRun::query()->where('status', 'running')->get()->filter(fn ($r) => RunActivity::isLive($r))->count();
-        $expert = AgentRun::query()->where('created_at', '>=', now()->subDays(3))->where('status', 'ready_for_review')
-            ->whereHas('steps', fn ($q) => $q->where('stage', 'decision')->where('title', 'like', '%chuyên môn%'))->count();
+        $expert = ReviewQueue::expertCount(now()->subDays(3));
         $suggestions = 0;
         if (class_exists(KnowledgeSuggestions::class)) {
             try {
@@ -50,9 +49,9 @@ class AgentTodayWidget extends Widget
         return [
             'isApprover' => $isApprover,
             'running' => $running,
-            'waiting' => Article::query()->where('workflow_status', 'needs_review')->count(),
+            'waiting' => ReviewQueue::waitingCount(),
             'expert' => $expert,
-            'blocked' => (clone $today)->whereIn('status', ['blocked', 'failed'])->count(),
+            'blocked' => ReviewQueue::problemRunCount($since),
             'runs' => (clone $today)->count(),
             'cost' => (float) (clone $today)->sum('cost_vnd'),
             'suggestions' => $suggestions,

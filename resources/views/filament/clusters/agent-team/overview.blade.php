@@ -15,12 +15,12 @@
                 @elseif (! $ai['connected'])
                     <span style="font-weight:600;color:#d97706">Chưa kết nối AI</span>
                 @else
-                    <span style="font-weight:600">Đang nghỉ</span>
+                    <span style="font-weight:600" data-testid="overview-idle">@if ($today['activeCampaigns'] > 0)Chưa có phiên đang chạy <span style="font-weight:400;opacity:.7">· {{ $today['activeCampaigns'] }} chiến dịch đang bật, chờ nhịp kế tiếp hoặc đã đủ bài hôm nay</span>@else Chưa có phiên đang chạy <span style="font-weight:400;opacity:.7">· chưa có chiến dịch nào đang bật</span>@endif</span>
                 @endif
             </div>
             <div class="text-sm" data-testid="today" style="display:flex;gap:1.25rem;flex-wrap:wrap">
                 @if ($today['runs'] > 0)<span><strong>{{ $today['runs'] }}</strong> bài đã giao hôm nay</span>@endif
-                @if ($today['toReview'] > 0)<span><strong>{{ $today['toReview'] }}</strong> chờ duyệt</span>@endif
+                @if ($today['toReview'] > 0)<span><strong>{{ $today['toReview'] }}</strong> phiên hôm nay đã ra bản nháp</span>@endif
                 @if ($today['cost'] > 0)<span>Chi phí <strong>{{ $fmt($today['cost']) }} ₫</strong>@if ($today['cap'] > 0) <span style="opacity:.6">/ {{ $fmt($today['cap']) }} ₫</span>@endif</span>@endif
             </div>
         </div>
