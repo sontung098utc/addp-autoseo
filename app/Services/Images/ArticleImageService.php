@@ -10,6 +10,7 @@ use App\Models\BrandProfile;
 use App\Models\MediaAsset;
 use App\Services\Agent\Refresh\HtmlSections;
 use App\Services\Agent\Risk\RiskClassifier;
+use App\Services\Agent\Risk\TopicScope;
 use App\Services\Brain\BrainContext;
 use App\Services\Media\MediaService;
 use Illuminate\Support\Str;
@@ -88,7 +89,7 @@ final class ArticleImageService
                 $out['skip_code'] = 'cost_cap';
                 break;
             }
-            $prompt = ImagePromptBuilder::build($slot['role'], (string) $article->primary_keyword, $slot['heading'], $brand, $health);
+            $prompt = ImagePromptBuilder::build($slot['role'], (string) $article->primary_keyword, $slot['heading'], $brand, $health, null, ! $this->isOffField($article, $brand));
             try {
                 $res = $generator->generate($prompt, ['aspect' => $slot['role'] === 'featured' ? '16:9' : '4:3', 'role' => $slot['role']]);
                 $asset = $this->store($media, $article, $version, $res, $slot);
@@ -360,6 +361,10 @@ final class ArticleImageService
         if (str_contains(implode(' ', $assess->reasons), 'sức khỏe')) {
             return true;
         }
+        // Bài chắc chắn ngoài lĩnh vực website/Trí tuệ (vd. thư xin học bổng trên website dược): không thừa hưởng "sức khỏe" từ ngành của website.
+        if ($this->isOffField($article, $brand)) {
+            return false;
+        }
         // Trí tuệ đã gắn (kể cả tự gắn) xếp bài vào hạng rủi ro cao (lĩnh vực sức khỏe...) thì cũng coi là sức khỏe: bộ từ khóa của RiskClassifier không phủ hết thuật ngữ.
         try {
             if (BrainContext::forArticle($article)->riskFloor() === 'high') {
@@ -371,6 +376,18 @@ final class ArticleImageService
         $f = Str::lower(Str::ascii((string) $brand?->business_field));
 
         return (bool) preg_match('/\b(y te|suc khoe|benh vien|phong kham|duoc pham|nha thuoc|dieu tri)\b/', $f);
+    }
+
+    /** Bài ngoài lĩnh vực của website (chỉ true khi chắc chắn; xem TopicScope). Không có bảng Trí tuệ thì chỉ xét hồ sơ. */
+    public function isOffField(Article $article, ?BrandProfile $brand): bool
+    {
+        try {
+            $ctx = BrainContext::forArticle($article);
+        } catch (\Throwable) {
+            $ctx = null;
+        }
+
+        return TopicScope::clearlyOffField((string) $article->primary_keyword, $brand, $ctx);
     }
 
     private static function money(float $v): string
