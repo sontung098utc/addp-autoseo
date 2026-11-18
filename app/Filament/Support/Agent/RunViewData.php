@@ -16,6 +16,11 @@ final class RunViewData
     /** Tên hiển thị: bài viết (tiêu đề bản bài, không có thì từ khóa chính); phiên không gắn bài thì tên loại việc. */
     public static function articleName(AgentRun $run): string
     {
+        if (BuildRunLabel::is($run)) {
+            $run->loadMissing('steps');
+
+            return BuildRunLabel::title($run);
+        }
         if (! $run->article_id && $run->job_type && $run->job_type !== 'article_write') {
             return JobTypeRegistry::find($run->job_type)['title'] ?? $run->job_type;
         }

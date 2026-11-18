@@ -86,7 +86,7 @@ final class BrainFromSuggestion
                         BrainAutoAttach::attach($site, $b, 'Nguồn tìm được khi viết bài thuộc lĩnh vực của Trí tuệ này', 100, $article, $by);
                     }
                     $imp = app(SourceDiscoveryService::class)->import($site, array_slice($g['refs'], 0, self::MAX_SEED), $by, ['brain_id' => $b->id, 'max_sources' => self::MAX_SEED, 'only_trusted' => true,
-                        'field' => SourceDiscoveryService::fieldFor($b->name.' '.($article?->primary_keyword ?? '')), 'budget_cap_vnd' => BrainBuildService::totalBudgetVnd() * 0.2, 'purpose' => 'seed']);
+                        'field' => SourceDiscoveryService::fieldFor($b->name.' '.($article?->primary_keyword ?? '')), 'budget_cap_vnd' => BrainBuildService::totalBudgetVnd() * 0.2, 'purpose' => 'seed', 'topic' => trim($b->name.' '.($article?->primary_keyword ?? ''))]);
                     $res['imported'] += (int) $imp['imported'];
                     $res['items_auto'] += (int) $imp['items_auto'];
                     $res['items_proposed'] += (int) $imp['items_proposed'];
