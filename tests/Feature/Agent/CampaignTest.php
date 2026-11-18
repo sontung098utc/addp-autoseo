@@ -230,7 +230,7 @@ class CampaignTest extends TestCase
 
     public function test_nguon_plan_uu_tien_bai_planned_chua_co_phien(): void
     {
-        $c = $this->campaign();
+        $c = $this->campaign(['settings' => ['pull_unassigned_plan' => true]]); // lấy bài chưa thuộc chiến dịch nào là tùy chọn, mặc định tắt
         $planned = Article::create(['website_id' => $c->website_id, 'primary_keyword' => 'bài từ kế hoạch', 'workflow_status' => 'planned']);
 
         $r = $this->runner()->tick($c);

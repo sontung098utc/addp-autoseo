@@ -217,7 +217,7 @@ class AuditSuggestionTest extends TestCase
 
     public function test_campaign_runner_uu_tien_refresh_p0(): void
     {
-        $camp = \App\Models\Campaign::create(['website_id' => $this->site->id, 'name' => 'CD', 'status' => 'active', 'daily_limit' => 5, 'source' => 'plan', 'keywords' => []]);
+        $camp = \App\Models\Campaign::create(['website_id' => $this->site->id, 'name' => 'CD', 'status' => 'active', 'daily_limit' => 5, 'source' => 'plan', 'keywords' => [], 'settings' => ['pull_unassigned_plan' => true]]);
         Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'bài thường', 'workflow_status' => 'planned']);
         $p1 = Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'refresh p1', 'workflow_status' => 'planned', 'kind' => 'refresh', 'origin' => 'audit', 'priority' => 60]);
         $p0 = Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'refresh p0', 'workflow_status' => 'planned', 'kind' => 'refresh', 'origin' => 'audit', 'priority' => 90]);
