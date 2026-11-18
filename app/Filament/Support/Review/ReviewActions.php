@@ -77,25 +77,47 @@ class ReviewActions
             : null;
     }
 
-    /** @return array<int, Forms\Components\Component> */
-    public static function approveForm(bool $selfApproval, ?QualityReport $quality = null): array
+    /**
+     * Khung tóm tắt đầu hộp Duyệt: tên bài, rủi ro chủ đề, số lỗi chưa đạt (bằng lời), để người duyệt biết đang duyệt gì.
+     *
+     * @param  array{title:string,risk:?string,counts:?array<string,int>}  $summary
+     */
+    public static function summaryHtml(array $summary): HtmlString
+    {
+        $html = '<div><strong>' . e($summary['title']) . '</strong></div>';
+        $html .= '<div>Rủi ro chủ đề: ' . e($summary['risk'] ?? 'chưa phân hạng') . '</div>';
+        $html .= '<div>Lỗi chưa đạt: ' . e($summary['counts'] === null ? 'chưa kiểm' : \App\Filament\Resources\ArticleResource::severityText($summary['counts'])) . '</div>';
+
+        return new HtmlString($html);
+    }
+
+    /**
+     * Ghi chú duyệt chỉ BẮT BUỘC khi người duyệt cũng là người tạo bài (chính sách tự duyệt, AuditRecorder cũng chặn nếu thiếu); còn lại không bắt buộc.
+     *
+     * @param  array{title:string,risk:?string,counts:?array<string,int>}|null  $summary
+     * @return array<int, Forms\Components\Component>
+     */
+    public static function approveForm(bool $selfApproval, ?QualityReport $quality = null, ?array $summary = null): array
     {
         $fields = [];
+        if ($summary !== null) {
+            $fields[] = Forms\Components\Placeholder::make('approve_summary')->label('Bài đang duyệt')->content(self::summaryHtml($summary));
+        }
         if ($quality?->hasBlocking()) {
             $items = '';
             foreach ($quality->blocking() as $r) {
                 $items .= '<li><strong>' . e($r->code) . '</strong> — ' . e($r->message) . ($r->measured ? ' (' . e($r->measured) . ', yêu cầu ' . e((string) $r->threshold) . ')' : '') . '</li>';
             }
             $fields[] = Forms\Components\Placeholder::make('quality_blockers')
-                ->label('Bài còn lỗi chặn duyệt (P0)')
+                ->label('Bài còn lỗi nặng (chặn duyệt)')
                 ->content(new HtmlString('<ul style="list-style:disc;padding-left:1.25rem">' . $items . '</ul>'));
             $fields[] = Forms\Components\Textarea::make('override_reason')
                 ->label('Lý do duyệt ngoại lệ (bắt buộc)')
-                ->helperText('Chỉ người có quyền duyệt được bỏ qua lỗi P0. Lý do và mã lỗi được ghi vào log audit.')
+                ->helperText('Chỉ người có quyền duyệt được bỏ qua lỗi nặng. Lý do và mã lỗi được ghi vào log audit.')
                 ->required()->minLength(ReviewWorkflow::MIN_OVERRIDE_REASON);
         }
         $fields[] = Forms\Components\Textarea::make('note')
-            ->label($selfApproval ? 'Ghi chú tự duyệt (bắt buộc)' : 'Ghi chú (không bắt buộc)')
+            ->label($selfApproval ? 'Lý do tự duyệt (bắt buộc vì bài do chính bạn tạo)' : 'Ghi chú (không bắt buộc)')
             ->helperText($selfApproval ? 'Bạn đang duyệt bài do chính mình tạo; hệ thống ghi log tự duyệt.' : null)
             ->required($selfApproval);
 

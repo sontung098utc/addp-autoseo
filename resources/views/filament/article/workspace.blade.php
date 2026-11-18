@@ -72,7 +72,7 @@
         ['key' => 'write', 'tab' => 'content', 'label' => 'Viết', 'state' => $latest ? 'done' : 'todo',
             'text' => $latest ? $versions->count().' phiên bản · '.$images->count().' ảnh' : 'Chưa có bản nào'],
         ['key' => 'check', 'tab' => 'content', 'label' => 'Kiểm và duyệt', 'state' => ! $latest ? 'todo' : ($reviewed ? 'done' : ($quality->hasBlocking() || $article->workflow_status === 'rejected' ? 'warn' : 'todo')),
-            'text' => ! $latest ? 'Chưa có gì để kiểm' : 'P0 '.$qCounts['P0'].' · P1 '.$qCounts['P1'].' · '.$statusLabel],
+            'text' => ! $latest ? 'Chưa có gì để kiểm' : ArticleResource::severityText($qCounts).' · '.$statusLabel],
         ['key' => 'publish', 'tab' => 'publish', 'label' => 'Xuất bản', 'state' => $pubDone ? 'done' : ($publications->contains(fn ($p) => filled($p->last_error)) ? 'warn' : 'todo'),
             'text' => $pubDone ? 'Đã đăng '.VnTime::format($pubDone->published_at_utc) : ($pubNext ? 'Lịch '.VnTime::format($pubNext->scheduled_at_utc) : 'Chưa có lịch')],
     ];
@@ -176,7 +176,7 @@
             @if ($article->website)<span class="aw-chip">{{ $article->website->name }}</span>@endif
         </div>
 
-        <x-studio.tabs :persist="$showPreflight ? null : 'bai-viet-v4-'.$article->id" :default="$tabDefault" :tabs="$tabs" :lazy="$lazyTabs">
+        <x-studio.tabs :persist="$showPreflight || $article->workflow_status === 'needs_review' ? null : 'bai-viet-v4-'.$article->id" :default="$tabDefault" :tabs="$tabs" :lazy="$lazyTabs">
             {{-- Tổng quan: việc tiếp theo + một nút chính, tiến trình, thông tin bài. Giải thích cất vào (i). --}}
             <x-studio.panel key="overview">
                 @if ($tabLoaded('overview'))
@@ -661,7 +661,8 @@
                             <h2 class="ss-review-card__title">Các phiên bản</h2>
                             @if ($latest)
                                 <x-help title="Đọc điểm và duyệt">
-                                    <p data-testid="aw-content-score-note">Điểm hình thức ({{ $qCounts['P0'] }} lỗi P0 · {{ $qCounts['P1'] }} P1 · {{ $qCounts['P2'] }} P2): {{ ArticleResource::SCORE_NOTE }}</p>
+                                    <p data-testid="aw-content-score-note">Điểm hình thức ({{ ArticleResource::severityText($qCounts) }}): {{ ArticleResource::SCORE_NOTE }}</p>
+                                    <p data-testid="aw-severity-note">{{ ArticleResource::SEVERITY_NOTE }}</p>
                                     <p>Bấm Xem để đọc toàn bộ nội dung, thẻ SEO, kiểm chất lượng và so sánh với bản trước. Các nút duyệt ở đầu trang áp dụng cho bản mới nhất.</p>
                                 </x-help>
                             @endif
@@ -672,7 +673,7 @@
                         @else
                             <div class="aw-scroll">
                                 <table class="aw-table" data-testid="aw-versions">
-                                    <thead><tr><th>Bản</th><th>Tiêu đề</th><th>Trạng thái</th><th>Chưa đạt</th><th>Số từ</th><th>Ảnh</th><th>Tạo bởi</th><th>Tạo lúc</th><th></th></tr></thead>
+                                    <thead><tr><th>Bản</th><th>Tiêu đề</th><th>Trạng thái</th><th>Lỗi chưa đạt</th><th style="white-space:nowrap">Số từ</th><th>Ảnh</th><th>Tạo bởi</th><th>Tạo lúc</th><th></th></tr></thead>
                                     <tbody>
                                         @foreach ($versions as $v)
                                             @php $q = $versionQuality[$v->id]; $vr = $versionRun->get($v->id); @endphp
@@ -683,8 +684,8 @@
                                                     @if (filled($v->review_notes))<div class="aw-muted">Ghi chú duyệt: {{ Str::limit($v->review_notes, 160) }}</div>@endif
                                                 </td>
                                                 <td>{{ StatusPresenter::label($v->review_status, 'article') }}@if ($v->reviewer)<div class="aw-muted">{{ $v->reviewer->name }}</div>@endif</td>
-                                                <td>P0 {{ $q['P0'] }} · P1 {{ $q['P1'] }} · P2 {{ $q['P2'] }}</td>
-                                                <td>{{ $num(count(preg_split('/\s+/u', trim(strip_tags((string) $v->html_content)), -1, PREG_SPLIT_NO_EMPTY))) }}</td>
+                                                <td title="{{ ArticleResource::SEVERITY_NOTE }}">{{ ArticleResource::severityText($q) }}</td>
+                                                <td style="white-space:nowrap">{{ $num(count(preg_split('/\s+/u', trim(strip_tags((string) $v->html_content)), -1, PREG_SPLIT_NO_EMPTY))) }}</td>
                                                 <td>{{ $v->mediaAssets->count() }}</td>
                                                 <td>@if ($vr && AgentRunResource::canViewAny())<a class="aw-link" href="{{ AgentRunResource::viewUrl($vr) }}">Phiên AI #{{ $vr->id }}</a>@elseif ($vr) Phiên AI #{{ $vr->id }} @else {{ $v->ai_model ? 'AI' : 'Người viết' }} @endif</td>
                                                 <td>{{ VnTime::format($v->created_at) }}</td>
