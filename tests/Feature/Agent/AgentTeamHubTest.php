@@ -55,7 +55,6 @@ class AgentTeamHubTest extends TestCase
     {
         $pages = [
             AgentTeam::class,
-            ContentPlanPage::class,
             AgentOverview::class,
             AgentRoles::class,
             AgentSkills::class,
@@ -66,8 +65,8 @@ class AgentTeamHubTest extends TestCase
         foreach ($pages as $class) {
             $this->assertSame(SubNavigationPosition::Top, (new \ReflectionClass($class))->getProperty('subNavigationPosition')->getValue(), $class.' phải dùng hàng tab ngang');
         }
-        $this->actingAs($this->user('writer'));
-        $html = $this->get('/admin/doi-ai/ke-hoach')->assertOk()->getContent();
+        $this->actingAs($this->user('approver'));
+        $html = $this->get('/admin/doi-ai/chien-dich')->assertOk()->getContent();
         $this->assertStringContainsString('fi-page-sub-navigation-tabs', $html);
         $this->assertStringNotContainsString('fi-page-sub-navigation-sidebar', $html);
     }

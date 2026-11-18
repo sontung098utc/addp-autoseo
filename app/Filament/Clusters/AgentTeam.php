@@ -8,7 +8,7 @@ use Filament\Pages\SubNavigationPosition;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * AG-S01d: MỘT mục menu "Đội AI" gom mọi thứ liên quan: tổng quan luồng, chiến dịch (cha của bài viết), kế hoạch nội dung của chiến dịch, phiên chạy, kết nối AI.
+ * AG-S01d: MỘT mục menu "Đội AI" gom mọi thứ liên quan: tổng quan luồng, chiến dịch (cha của bài viết), phiên chạy, vai trò, kỹ năng. Kế hoạch là mục menu riêng ngay dưới.
  * Người dùng đi theo thứ tự các tab: Kết nối AI → Chiến dịch → (hệ thống tự chạy) → Phiên chạy → Duyệt bài (ngoài cụm).
  */
 class AgentTeam extends Cluster
@@ -31,7 +31,7 @@ class AgentTeam extends Cluster
     {
         $u = Auth::user();
 
-        // Biên tập viên vào được tab Kế hoạch; mỗi tab tự kiểm quyền riêng (Chiến dịch, Phiên chạy... vẫn chỉ cho người duyệt).
-        return $u instanceof User && $u->is_active && $u->isWriter();
+        // Kế hoạch đã tách thành mục menu riêng ngay dưới "Đội AI" (biên tập viên vào ở đó); các tab còn lại của cụm chỉ cho người duyệt.
+        return $u instanceof User && $u->is_active && $u->isApprover();
     }
 }

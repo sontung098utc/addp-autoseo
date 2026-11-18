@@ -4,7 +4,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/admin/doi-ai/ket-noi-ai', '/admin/cau-hinh-ai#tab-tich-hop-ai', 301);
-Route::redirect('/admin/ke-hoach-noi-dung', '/admin/doi-ai/ke-hoach', 301); // Kế hoạch nay là tab của cụm Đội AI
+Route::redirect('/admin/ke-hoach-noi-dung', '/admin/ke-hoach', 301); // đường dẫn đầu tiên
+Route::redirect('/admin/doi-ai/ke-hoach', '/admin/ke-hoach', 301); // Kế hoạch từng là tab của cụm Đội AI, nay là mục menu riêng ngay dưới Đội AI
 Route::redirect('/admin/tich-hop-ai', '/admin/cau-hinh-ai#tab-tich-hop-ai', 301);
 // "Chi phí AI" đổi tên thành "Cấu hình AI": URL cũ chuyển về trang mới, ?tab=cau-hinh về tab Tích hợp AI.
 Route::get('/admin/chi-phi-ai', fn (Request $r) => redirect('/admin/cau-hinh-ai'.($r->query('tab') === 'cau-hinh' ? '#tab-tich-hop-ai' : ''), 301));

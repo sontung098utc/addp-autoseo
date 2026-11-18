@@ -65,8 +65,9 @@
     @media (prefers-reduced-motion: reduce) { .cpz-card { transition: none; } }
 </style>
 <div class="ss-card cpz" data-campaign-proposal><div class="ss-card__b">
-    <h3 class="cpz-title">Đề xuất chiến dịch</h3>
-    <p class="cpz-sub">Nhập một chủ đề, hệ thống đề xuất một <b>bài trụ</b> và các <b>bài vệ tinh</b> dẫn về nó. Bấm đề xuất chưa tạo gì; bạn chọn bài rồi mới tạo chiến dịch, và chiến dịch tạo ra ở trạng thái tạm dừng.</p>
+    <h3 class="cpz-title">Từ một chủ đề
+        <x-help title="Đề xuất chiến dịch"><p>Nhập một chủ đề, hệ thống đề xuất một <b>bài trụ</b> và các <b>bài vệ tinh</b> dẫn về nó.</p><p>Bấm đề xuất chưa tạo gì; bạn chọn bài rồi mới tạo chiến dịch, và chiến dịch tạo ra ở trạng thái tạm dừng.</p></x-help>
+    </h3>
     <form wire:submit="proposeCampaign" class="cpz-form">
         <input class="cpz-in" type="text" wire:model="campaignSeed" maxlength="120" placeholder="Chủ đề chiến dịch, ví dụ: tiểu đường" aria-label="Chủ đề chiến dịch" data-campaign-seed>
         <x-filament::button type="submit" wire:loading.attr="disabled" wire:target="proposeCampaign">
