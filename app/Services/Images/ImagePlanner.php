@@ -25,6 +25,7 @@ final class ImagePlanner
         $brand = array_key_exists('brand', $options) ? $options['brand'] : BrandProfile::query()->where('website_id', $article->website_id)->first();
         $health = (bool) ($options['health'] ?? false);
         $libraryCover = (bool) ($options['library_cover'] ?? false);
+        $withField = ! (bool) ($options['off_field'] ?? false); // bài ngoài lĩnh vực website: không nhồi lĩnh vực thương hiệu vào prompt ảnh
         $keyword = (string) $article->primary_keyword;
         $out = ['status' => 'ok', 'skip_code' => null, 'reason' => null, 'slots' => [], 'library_cover' => $libraryCover];
 
@@ -42,7 +43,7 @@ final class ImagePlanner
             $out['slots'][] = [
                 'id' => 'cover', 'role' => 'featured', 'section_order' => null, 'section_heading' => null, 'aspect' => '16:9',
                 'why' => 'Ảnh bìa của bài: làm ảnh đại diện trên website, không nằm trong nội dung.',
-                'prompt' => ImagePromptBuilder::build('featured', $keyword, null, $brand, $health, is_array($h1) ? self::hint($h1) : null),
+                'prompt' => ImagePromptBuilder::build('featured', $keyword, null, $brand, $health, is_array($h1) ? self::hint($h1) : null, $withField),
                 'alt' => 'Hình minh họa chủ đề '.ImagePromptBuilder::clean($keyword, $brand),
             ];
         }
@@ -52,7 +53,7 @@ final class ImagePlanner
             $out['slots'][] = [
                 'id' => 's'.($i + 1), 'role' => 'inline', 'section_order' => $s['order'], 'section_heading' => $s['heading'], 'aspect' => '4:3',
                 'why' => 'Minh họa mục "'.$s['heading'].'"'.($s['purpose'] !== '' ? ': '.Str::limit($s['purpose'], 140, '…') : '').'. Đặt ngay sau đoạn mở đầu của mục.',
-                'prompt' => ImagePromptBuilder::build('inline', $keyword, $s['heading'], $brand, $health, $s['hint']),
+                'prompt' => ImagePromptBuilder::build('inline', $keyword, $s['heading'], $brand, $health, $s['hint'], $withField),
                 'alt' => 'Hình minh họa mục '.ImagePromptBuilder::clean($s['heading'], null),
             ];
         }

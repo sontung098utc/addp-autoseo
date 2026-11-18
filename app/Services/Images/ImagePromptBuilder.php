@@ -19,11 +19,11 @@ final class ImagePromptBuilder
     private const BEFORE_AFTER = '/(tr[uư][oơ]́?c\s*(và|va|&|-)\s*sau|before\s*(and|&|-)\s*after)/iu';
 
     /** $hint: gợi ý cảnh từ dàn ý (mục đích mục, ý chính), đã làm sạch như chủ đề; bỏ trống thì như trước. */
-    public static function build(string $role, string $keyword, ?string $heading, ?BrandProfile $brand, bool $health = false, ?string $hint = null): string
+    public static function build(string $role, string $keyword, ?string $heading, ?BrandProfile $brand, bool $health = false, ?string $hint = null, bool $withField = true): string
     {
         $topic = self::clean($keyword, $brand);
         $theme = $heading !== null ? self::clean($heading, $brand) : '';
-        $field = $brand && $brand->business_field ? self::clean((string) $brand->business_field, $brand) : '';
+        $field = $withField && $brand && $brand->business_field ? self::clean((string) $brand->business_field, $brand) : '';
 
         $p = $role === 'featured'
             ? "Wide editorial cover illustration for a Vietnamese blog article about \"{$topic}\"."
