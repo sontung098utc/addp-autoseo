@@ -86,4 +86,21 @@ final class PlanRules
 
         return null;
     }
+
+    /** Lỗi của ô chủ đề (null = hợp lệ), kiểm ngay trên máy chủ web, không gọi AI/SERP. */
+    public static function seedError(string $seed): ?string
+    {
+        $seed = trim((string) preg_replace('/[\x00-\x1F\x7F]+|\s+/u', ' ', strip_tags($seed)));
+        if ($seed === '') {
+            return 'Hãy nhập chủ đề của chiến dịch, ví dụ: tiểu đường.';
+        }
+        if (mb_strlen($seed) > 120) {
+            return 'Chủ đề dài quá 120 ký tự, hãy rút gọn.';
+        }
+        if (preg_match(\App\Services\Keywords\KeywordResearchService::INJECTION, $seed)) {
+            return 'Chủ đề trông giống một chỉ dẫn cho máy, hãy nhập lại bằng tên chủ đề thông thường.';
+        }
+
+        return null;
+    }
 }
