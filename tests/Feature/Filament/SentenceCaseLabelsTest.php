@@ -31,7 +31,9 @@ class SentenceCaseLabelsTest extends TestCase
     {
         $u = User::create(['name' => 'a', 'email' => 'a@x.vn', 'password' => 'secret123', 'role' => 'approver', 'is_active' => true]);
         $html = $this->actingAs($u)->get('/admin/doi-ai/chien-dich')->assertOk()->getContent();
-        $this->assertStringContainsString('Chiến dịch tự động', $html);
+        $this->assertStringContainsString('Chiến dịch', $html);
         $this->assertStringNotContainsString('Chiến Dịch Tự Động', $html);
+        $this->assertStringNotContainsString('Chiến dịch tự động', $html);
+        $this->assertStringNotContainsString('Chiến dịch của đội AI', $html);
     }
 }
