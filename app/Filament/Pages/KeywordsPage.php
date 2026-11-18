@@ -308,17 +308,38 @@ class KeywordsPage extends Page
         return Action::make('deleteKeywordConfirm')
             ->requiresConfirmation()
             ->modalHeading('Xóa từ khóa này?')
-            ->modalDescription('Bài viết đã tạo từ từ khóa này không bị ảnh hưởng. Việc xóa không hoàn tác được.')
+            ->modalDescription(fn (array $arguments) => $this->deleteWarning((int) ($arguments['id'] ?? 0)))
             ->modalSubmitActionLabel('Xóa từ khóa')
             ->color('danger')
             ->action(fn (array $arguments) => $this->deleteKeyword((int) ($arguments['id'] ?? 0)));
+    }
+
+    /** Nói rõ trước khi xóa: từ khóa đang gắn bài/kế hoạch thì chỉ gỡ khỏi kho, bài và kế hoạch vẫn giữ nguyên. */
+    public function deleteWarning(int $id): string
+    {
+        $base = 'Việc xóa không hoàn tác được.';
+        $kw = null;
+        foreach (KeywordService::make()->repo()->all() as $r) {
+            if ((int) $r['id'] === $id) {
+                $kw = $r['keyword'];
+            }
+        }
+        if ($kw === null) {
+            return $base;
+        }
+        $l = KeywordArticleLinks::for(KeywordService::defaultSite(), [$kw])[Keyword::keyFor($kw)] ?? KeywordArticleLinks::none();
+        if ($l['article_id'] !== null) {
+            return '"'.$kw.'" đang gắn với một bài viết trong '.($l['status'] === 'planned' ? 'Kế hoạch' : 'danh sách bài').'. Xóa chỉ gỡ từ khóa khỏi kho từ khóa; bài và kế hoạch vẫn giữ nguyên. '.$base;
+        }
+
+        return 'Từ khóa này chưa gắn với bài nào. '.$base;
     }
 
     public function deleteKeyword(int $id): void
     {
         $this->guard();
         KeywordService::make()->delete($id);
-        Notification::make()->title('Đã xóa từ khóa')->body('Bài viết đã tạo từ từ khóa này không bị ảnh hưởng.')->success()->send();
+        Notification::make()->title('Đã xóa từ khóa')->body('Chỉ từ khóa bị gỡ khỏi kho; bài viết và kế hoạch đã tạo từ nó không bị ảnh hưởng.')->success()->send();
     }
 
     /** Nút "Thêm vào kế hoạch" ở bảng chỉ mở hộp chọn chiến dịch; việc tạo bài nằm ở addToPlanNow. */

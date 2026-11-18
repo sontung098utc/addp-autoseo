@@ -76,6 +76,11 @@ final class KeywordService
         $next = (int) max([0, ...array_column($list, 'id')]) + 1;
         $added = 0;
         foreach ($rows as $r) {
+            $chk = KeywordSanitizer::check((string) $r['keyword']);
+            if ($chk['keyword'] === null) {
+                continue; // lối vào nào cũng qua một bộ lọc: từ khóa có thẻ/mã bị bỏ, không lưu
+            }
+            $r['keyword'] = $chk['keyword'];
             $k = CsvKeywordParser::key($r['keyword']);
             if (isset($seen[$k])) {
                 continue;
@@ -92,15 +97,16 @@ final class KeywordService
     /** Thêm tay một từ khóa; ném InvalidArgumentException với lý do rõ ràng. */
     public function addManual(string $keyword, string $volume, string $intent): void
     {
-        $kw = CsvKeywordParser::normalizeKeyword($keyword);
-        if ($kw === '' || mb_strlen($kw) > CsvKeywordParser::MAX_KEYWORD_LENGTH) {
-            throw new InvalidArgumentException('Từ khóa không được để trống và tối đa 255 ký tự.');
+        $chk = KeywordSanitizer::check($keyword);
+        if ($chk['keyword'] === null) {
+            throw new InvalidArgumentException($chk['reason'] === 'Thiếu từ khóa.' ? 'Từ khóa không được để trống và tối đa 255 ký tự.' : (string) $chk['reason']);
         }
+        $kw = $chk['keyword'];
         $vol = null;
         if (trim($volume) !== '') {
             $vol = CsvKeywordParser::parseVolume(trim($volume));
             if ($vol === null) {
-                throw new InvalidArgumentException('Volume phải là số nguyên không âm.');
+                throw new InvalidArgumentException('Lượt tìm phải là số nguyên không âm (ví dụ 1200 hoặc 1.200).');
             }
         }
         $in = KeywordIntent::normalize($intent);

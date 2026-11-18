@@ -11,7 +11,10 @@ use Illuminate\Support\Facades\Cache;
  */
 final class SerpInsights
 {
-    public const HOWTO = 'Đặt DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD trong .env để lấy câu hỏi liên quan và top 10 thật. Gợi ý tự động của Google không cần khóa (SERP_AUTOCOMPLETE).';
+    public const HOWTO = 'Chưa kết nối nguồn kết quả tìm kiếm (câu hỏi liên quan, top 10). Liên hệ quản trị để kết nối. Gợi ý tự động của Google vẫn dùng được.';
+
+    /** Chỉ hiện cho quản trị (chú thích ⓘ), không đặt vào câu thông báo cho người dùng. */
+    public const ADMIN_HINT = 'Dành cho quản trị: đặt DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD trong .env để lấy câu hỏi liên quan và top 10 thật. Gợi ý tự động của Google không cần khóa (SERP_AUTOCOMPLETE).';
 
     /** @param list<SerpInsightsProvider> $providers */
     public function __construct(private readonly array $providers) {}

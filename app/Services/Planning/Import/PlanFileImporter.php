@@ -274,7 +274,9 @@ final class PlanFileImporter
                 $kw = $stored->get(Keyword::keyFor($it['keyword']));
                 // lượng tìm kiếm trong file: điền vào kho từ khóa (chỉ chỗ còn trống, không ghi đè số liệu từ nguồn khác); từ khóa chưa có trong kho thì thêm vào
                 if (($it['volume'] ?? null) !== null) {
-                    if ($kw === null) {
+                    if ($kw === null && \App\Filament\Support\Keywords\KeywordSanitizer::check((string) $it['keyword'])['keyword'] === null) {
+                        // từ khóa có thẻ/mã: không đưa vào kho từ khóa
+                    } elseif ($kw === null) {
                         $kw = Keyword::create(['website_id' => $site->id, 'keyword' => $it['keyword'], 'keyword_key' => Keyword::keyFor($it['keyword']), 'volume' => $it['volume'], 'volume_source' => 'csv',
                             'intent' => $it['intent'], 'source' => 'csv', 'status' => 'new', 'created_by' => $actor->id]);
                         $stored->put($kw->keyword_key, $kw);
