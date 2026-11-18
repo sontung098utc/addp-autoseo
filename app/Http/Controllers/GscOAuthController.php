@@ -37,7 +37,7 @@ final class GscOAuthController
         $request->session()->forget(self::RETURN_KEY);
         $site = ctype_digit((string) $request->query('website')) ? Website::find((int) $request->query('website')) : null;
         if ($site && Auth::user()?->isAdmin()) {
-            $request->session()->put(self::RETURN_KEY, WebsiteResource::getUrl('edit', ['record' => $site]));
+            $request->session()->put(self::RETURN_KEY, WebsiteResource::getUrl('edit', ['record' => $site]).'?tab=website-search-console-tab');
         }
 
         return redirect()->away(GscOAuth::authorizeUrl($state));

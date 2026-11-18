@@ -87,7 +87,8 @@ class WebsiteResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Thông tin chung')
+                Forms\Components\Tabs::make('Website')->id('website')->persistTabInQueryString()->columnSpanFull()->tabs([
+                Forms\Components\Tabs\Tab::make('Thông tin chung')->id('thong-tin')->icon('heroicon-o-information-circle')
                     ->schema([
                         Forms\Components\TextInput::make('name')
                             ->label('Tên website')
@@ -123,7 +124,8 @@ class WebsiteResource extends Resource
                             ->content(fn (?Website $record): HtmlString => static::statusBadgeHtml($record?->status)),
                     ])->columns(2),
 
-                Forms\Components\Section::make('Xác thực bảo mật (Mã hóa AES-256)')
+                Forms\Components\Tabs\Tab::make('Xác thực bảo mật')->id('xac-thuc')->icon('heroicon-o-lock-closed')
+                    ->badge('AES-256')
                     ->schema(fn (string $operation): array => $operation === 'create'
                         ? [
                             Forms\Components\Placeholder::make('credentials_hint')->hiddenLabel()
@@ -142,10 +144,11 @@ class WebsiteResource extends Resource
                                 ->content(fn (?Model $record): string => $record && ! empty($record->encrypted_credentials) ? '•••• đã lưu' : 'Chưa có'),
                         ]),
 
-                Forms\Components\Section::make('Google Search Console')
-                    ->description('Nguồn số liệu truy vấn và trang cho kế hoạch nội dung. Chỉ đọc; hệ thống không sửa gì trong Search Console.')
+                Forms\Components\Tabs\Tab::make('Search Console')->id('search-console')->icon('heroicon-o-magnifying-glass-circle')
                     ->visibleOn('edit')
                     ->schema([
+                        Forms\Components\Placeholder::make('gsc_description')->hiddenLabel()
+                            ->content('Nguồn số liệu truy vấn và trang cho kế hoạch nội dung. Chỉ đọc; hệ thống không sửa gì trong Search Console.'),
                         Forms\Components\Placeholder::make('gsc_status')->label('Trạng thái')
                             ->content(fn (?Website $record): HtmlString => static::gscStatusHtml($record)),
                         Forms\Components\TextInput::make('gsc_property')
@@ -156,6 +159,7 @@ class WebsiteResource extends Resource
                             ->rule('regex:'.static::GSC_PROPERTY_REGEX)
                             ->validationMessages(['regex' => 'Nhập dạng sc-domain:ten-mien.vn hoặc https://ten-mien.vn/ (có dấu / cuối).']),
                     ]),
+                ]),
             ]);
     }
 

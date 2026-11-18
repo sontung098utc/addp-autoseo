@@ -14,6 +14,12 @@ class EditWebsite extends EditRecord
 {
     protected static string $resource = WebsiteResource::class;
 
+    /** Tiêu đề trang là tên website đang xem, không phải "Chỉnh sửa Website". */
+    public function getTitle(): string|\Illuminate\Contracts\Support\Htmlable
+    {
+        return (string) ($this->record->name ?? 'Website');
+    }
+
     protected function getHeaderActions(): array
     {
         return [

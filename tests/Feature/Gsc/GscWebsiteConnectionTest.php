@@ -113,11 +113,20 @@ class GscWebsiteConnectionTest extends TestCase
         $s = $this->site();
         $this->actingAs($this->user('admin'));
         Livewire::test(EditWebsite::class, ['record' => $s->getKey()])
-            ->assertSee('Google Search Console')->assertSee('Chưa kết nối')
+            ->assertSee('Search Console')->assertSee('Chưa kết nối')
             ->assertActionVisible('gscCheck')->assertActionVisible('gscConnect')->assertActionHidden('gscDisconnect')
             ->set('data.gsc_property', 'khong-hop-le')->call('save')->assertHasErrors(['data.gsc_property'])
             ->set('data.gsc_property', 'https://addp.vn/')->call('save')->assertHasNoErrors();
         $this->assertSame('https://addp.vn/', $s->fresh()->gsc_property);
+    }
+
+    public function test_edit_page_title_is_website_name_and_has_three_tabs(): void
+    {
+        $s = $this->site(['name' => 'Trang Dược ABC']);
+        $this->actingAs($this->user('admin'));
+        $c = Livewire::test(EditWebsite::class, ['record' => $s->getKey()]);
+        $this->assertSame('Trang Dược ABC', (string) $c->instance()->getTitle());
+        $c->assertSee('Thông tin chung')->assertSee('Xác thực bảo mật')->assertSee('Search Console')->assertDontSee('Chỉnh sửa Website');
     }
 
     public function test_check_action_reports_result_and_disconnect_revokes(): void
@@ -138,7 +147,7 @@ class GscWebsiteConnectionTest extends TestCase
         $s = $this->site();
         $this->actingAs($this->user('admin'));
         $this->get('/admin/search-console/oauth/start?website='.$s->getKey())->assertRedirectContains('accounts.google.com');
-        $this->assertSame(WebsiteResource::getUrl('edit', ['record' => $s]), session('gsc_oauth_return'));
+        $this->assertSame(WebsiteResource::getUrl('edit', ['record' => $s]).'?tab=website-search-console-tab', session('gsc_oauth_return'));
         $this->get('/admin/search-console/oauth/start?website=999999');
         $this->assertNull(session('gsc_oauth_return'));
 
