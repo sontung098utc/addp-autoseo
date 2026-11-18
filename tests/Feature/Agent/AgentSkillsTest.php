@@ -50,6 +50,19 @@ class AgentSkillsTest extends TestCase
         }
     }
 
+    public function test_ky_nang_nhap_ghi_trung_thuc_va_an_ma_noi_bo_vao_chi_tiet_ky_thuat(): void
+    {
+        $this->actingAs($this->user('admin'));
+        $t = Livewire::test(AgentSkills::class);
+        $t->assertSee('chưa qua bộ mẫu kiểm (nháp)')->assertSee('lượt tự động theo lịch bỏ qua')
+            ->assertSee('Chỉ dùng khi chạy tay')->assertSee('Chi tiết kỹ thuật')->assertSee('Xem ghi công (NOTICE)');
+        $html = $t->html();
+        $this->assertStringContainsString('data-testid="skill-tech"', $html);
+        $this->assertStringNotContainsString('class="text-xs" style="width:100%;border-collapse', $html);
+        $ref = (new PlaybookLoader())->all()[0]->ref();
+        $this->assertMatchesRegularExpression('/<details[^>]*data-testid="skill-tech".*?'.preg_quote($ref, '/').'/s', $html);
+    }
+
     public function test_playbook_hong_khong_lam_vo_trang(): void
     {
         $dir = $this->tmpDir(['writer/article-draft.v1.md' => $this->pb('writer', 'article-draft'), 'writer/hong.v1.md' => "khong co frontmatter\n"]);

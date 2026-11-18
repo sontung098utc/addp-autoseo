@@ -267,7 +267,7 @@ final class PipelineVisual
                 'subject' => $r->article ? 'Bài: '.($r->article->primary_keyword ?: $r->article->title ?? '#'.$r->article_id) : ($r->website ? 'Website: '.$r->website->name : 'Không gắn bài hay website'),
                 'current' => $current ? ($labels[$current] ?? $current) : null, 'bar' => $bar, 'who' => $who,
                 'elapsed' => RunActivity::formatElapsed(RunActivity::elapsedSeconds($r, $r->status === 'running' ? null : (VnTime::fromRaw($r, 'finished_at') ?? null))),
-                'cost' => (float) $r->cost_vnd,
+                'cost' => (float) $r->cost_vnd, 'reason' => trim((string) $r->outcome_reason),
                 'result_url' => self::resultUrl($r, $jt),
             ];
         }

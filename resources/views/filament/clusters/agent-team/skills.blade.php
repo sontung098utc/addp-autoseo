@@ -4,13 +4,18 @@
 @endphp
 <x-filament-panels::page>
     <div data-testid="agent-skills" class="space-y-4">
-        <p class="text-sm" style="opacity:.85" data-testid="skills-summary">
-            {{ $total }} kỹ năng học từ claude-seo (MIT) · {{ $drafts }} đang là nháp
+        <p class="text-sm" style="opacity:.85;font-size:.8125rem" data-testid="skills-summary">
+            {{ $total }} kỹ năng học từ claude-seo (MIT) · {{ $drafts }} chưa qua bộ mẫu kiểm (nháp)
             @if ($errors > 0) · <span style="color:#b91c1c">{{ $errors }} file lỗi</span>@endif
             · <a href="#" wire:click.prevent="mountAction('notice')" style="text-decoration:underline" data-testid="skills-notice-link">Xem ghi công (NOTICE)</a>
             @if ($canEdit)<button type="button" wire:click="mountAction('createSkill')" data-testid="skills-add" style="float:right;display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .8rem;border-radius:.5rem;background:#2563eb;color:#fff;border:0;cursor:pointer"><x-filament::icon icon="heroicon-m-plus" style="width:1rem;height:1rem" /> Thêm kỹ năng</button>@endif
             <x-help text="Kỹ năng mặc định chỉ bật/tắt được, không xóa; nội dung do hệ thống cấp. Kỹ năng nháp chỉ dùng cho lượt chạy thủ công, lượt tự động bỏ qua. Kỹ năng tự tạo thêm/sửa/xóa ngay tại đây." />
         </p>
+        @if ($drafts > 0)
+            <p style="font-size:.8125rem;padding:.4rem .6rem;border-radius:.5rem;background:rgba(217,119,6,.12)" data-testid="skills-draft-note">
+                Lưu ý: kỹ năng nháp có công tắc BẬT vẫn được dùng khi bạn chạy tay; lượt tự động theo lịch bỏ qua chúng và dùng chỉ dẫn mặc định. Tắt công tắc để kỹ năng không được dùng ở cả hai trường hợp.
+            </p>
+        @endif
 
         <div style="display:flex;gap:.5rem;flex-wrap:wrap">
             <input type="search" wire:model.live.debounce.300ms="search" placeholder="Tìm theo tên kỹ năng" class="text-sm" data-testid="skills-search"
@@ -28,7 +33,7 @@
         @forelse ($groups as $roleName => $skills)
             <div data-testid="skills-group">
                 <div class="text-sm" style="font-weight:600;margin-bottom:.3rem">{{ $roleName }}</div>
-                <div style="overflow-x:auto"><table class="text-xs" style="width:100%;border-collapse:collapse">
+                <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.8125rem">
                     <tbody>
                     @foreach ($skills as $s)
                         @php $pb = $s['playbook']; @endphp
@@ -37,22 +42,23 @@
                                 <button type="button" wire:click="mountAction('detail', {{ \Illuminate\Support\Js::from(['ref' => $s['ref']]) }})" style="text-align:left;background:transparent;border:0;color:inherit;cursor:pointer;padding:0">
                                     <strong style="text-decoration:underline">{{ $s['title'] }}</strong>
                                 </button>
-                                <div style="opacity:.7"><code>{{ $s['ref'] }}</code></div>
+                                @if ($canEdit)
+                                    <details style="font-size:.75rem;opacity:.8" data-testid="skill-tech"><summary style="cursor:pointer">Chi tiết kỹ thuật</summary>
+                                        <div><code>{{ $s['ref'] }}</code></div>
+                                        @if ($pb)<div>Luật chất lượng: {{ $pb->rubricRefs ? implode(', ', $pb->rubricRefs) : '—' }}</div>
+                                        <div>Nguồn: {{ $pb->lineage['source'] }} v{{ $pb->lineage['source_version'] }} · {{ $pb->lineage['license'] }}</div>@endif
+                                    </details>
+                                @endif
                                 @if ($s['error'])<div style="color:#b91c1c">{{ $s['error'] }}</div>@endif
                             </td>
                             <td style="width:1%;white-space:nowrap;padding:.4rem .5rem">
                                 <x-studio.badge :tone="$statusLabel[$s['status']][1]">{{ $statusLabel[$s['status']][0] }}</x-studio.badge>
+                                @if ($s['status'] === 'draft')<div style="font-size:.75rem;opacity:.8;margin-top:.15rem" data-testid="skill-draft-hint">{{ $s['enabled'] === false ? 'Đang tắt' : 'Chỉ dùng khi chạy tay' }}</div>@endif
                             </td>
                             <td style="width:1%;white-space:nowrap;padding:.4rem .5rem">{{ $pb ? ($tierLabel[$pb->modelTier] ?? $pb->modelTier) : '—' }}</td>
-                            <td style="padding:.4rem .5rem">
-                                @if ($pb)<div style="display:flex;gap:.25rem;flex-wrap:wrap">@forelse ($pb->rubricRefs as $c)<x-studio.badge tone="info">{{ $c }}</x-studio.badge>@empty — @endforelse</div>@endif
-                            </td>
-                            <td style="width:1%;white-space:nowrap;padding:.4rem 0 .4rem .5rem;opacity:.75">
-                                @if ($pb){{ $pb->lineage['source'] }} v{{ $pb->lineage['source_version'] }} · {{ $pb->lineage['license'] }}@endif
-                            </td>
                             <td style="width:1%;padding:.4rem 0 .4rem .5rem">
                                 @if ($canEdit && $s['enabled'] !== null)
-                                    <button type="button" role="switch" aria-checked="{{ $s['enabled'] ? 'true' : 'false' }}" aria-label="Bật/tắt {{ $s['title'] }}" title="{{ $s['enabled'] ? 'Đang bật: bấm để tắt' : 'Đang tắt: bấm để bật' }}" data-testid="skill-switch" wire:click="toggleSkill('{{ $s['base'] }}', {{ $s['enabled'] ? 'false' : 'true' }})"
+                                    <button type="button" role="switch" aria-checked="{{ $s['enabled'] ? 'true' : 'false' }}" aria-label="Bật/tắt {{ $s['title'] }}" title="{{ $s['enabled'] ? 'Đang bật'.($s['status'] === 'draft' ? ' (nháp: chỉ dùng khi chạy tay)' : '').': bấm để tắt' : 'Đang tắt: bấm để bật' }}" data-testid="skill-switch" wire:click="toggleSkill('{{ $s['base'] }}', {{ $s['enabled'] ? 'false' : 'true' }})"
                                             style="position:relative;width:2rem;height:1.15rem;border-radius:999px;border:0;cursor:pointer;background:{{ $s['enabled'] ? '#16a34a' : 'rgba(128,128,128,.4)' }}"><i style="position:absolute;top:.15rem;left:{{ $s['enabled'] ? '1.0' : '.15' }}rem;width:.85rem;height:.85rem;border-radius:50%;background:#fff"></i></button>
                                 @endif
                             </td>
