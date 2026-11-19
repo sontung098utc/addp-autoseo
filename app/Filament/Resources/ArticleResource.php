@@ -18,6 +18,7 @@ use App\Models\Website;
 use App\Services\Agent\Readiness\ArticleReadiness;
 use App\Services\Agent\Refresh\AgentRunDispatcher;
 use App\Services\Agent\Run\BackgroundRun;
+use App\Services\Agent\Run\RedoScope;
 use App\Services\Agent\Settings\AgentAi;
 use App\Services\Brain\BrainContext;
 use App\Services\Content\Quality\QualityReport;
@@ -110,13 +111,51 @@ class ArticleResource extends Resource
             && $record->versions()->exists();
     }
 
-    /** Biểu mẫu lời nhắn của "Giao làm lại" (dùng chung cho bảng và trang bài). @return list<\Filament\Forms\Components\Component> */
-    public static function redoForm(): array
+    public const REDO_NOTE = 'Chỉ dẫn lưu cho mọi lần chạy; yêu cầu này chỉ cho lần này.';
+
+    public const REDO_DESCRIPTION = 'Chưa vừa ý với bản hiện tại? Nêu yêu cầu cho lần làm lại này. Điều phối đọc yêu cầu và chỉ làm lại phần được nêu (dàn ý, bài viết, ảnh, nguồn/kho); không nói rõ thì chỉ viết lại bài viết, giữ nguyên ảnh và nguồn. Mọi quy tắc an toàn, nguồn và từ cấm vẫn áp dụng.';
+
+    /** Yêu cầu thực tế của lần làm lại: ô để trống thì dùng chỉ dẫn đã lưu của bài. */
+    public static function redoMessage(Article $record, array $data): string
     {
+        $m = trim((string) ($data['message'] ?? ''));
+
+        return $m !== '' ? $m : trim((string) $record->guidance);
+    }
+
+    /** Phạm vi dự kiến + ước tính chi phí theo phạm vi (luật từ khóa, không gọi AI; điều phối có thể điều chỉnh khi chạy, nhưng chỉ trong 4 phần cố định). */
+    public static function redoPreview(Article $record, string $message): string
+    {
+        $message = trim($message) !== '' ? $message : trim((string) $record->guidance);
+        $scope = RedoScope::resolve($message);
+        $full = static::readiness($record)['cost']['estimate_vnd'] ?? null;
+        $est = RedoScope::estimate($full === null ? null : (float) $full, $scope['parts']);
+
+        return 'Dự kiến: '.RedoScope::describe($scope['parts']).'. Chi phí '.($est === null ? 'chưa có số liệu để ước lượng' : 'ước tính khoảng '.static::vnd($est).' (thô, theo tỷ trọng các bước; chưa gồm vòng sửa)').'.'
+            .($scope['defaulted'] ? ' Muốn làm lại cả ảnh hoặc nguồn, hãy nói rõ trong yêu cầu.' : '');
+    }
+
+    /** Thông báo sau khi giao làm lại: nói rõ phạm vi dự kiến (phạm vi cuối do điều phối chốt, ghi trong diễn biến phiên). */
+    public static function redoAssignedBody(string $message): string
+    {
+        $scope = RedoScope::resolve($message);
+
+        return 'Đã giao: '.RedoScope::describe($scope['parts']).'. Phạm vi cuối do điều phối chốt, xem diễn biến phiên.'
+            .($scope['defaulted'] ? ' Muốn làm lại cả ảnh hoặc nguồn? Giao lại và nói rõ trong yêu cầu.' : '');
+    }
+
+    /** Biểu mẫu "Giao làm lại" (dùng chung cho bảng và trang bài): MỘT ô yêu cầu cho lần này, điền sẵn từ chỉ dẫn đã lưu. @return list<\Filament\Forms\Components\Component> */
+    public static function redoForm(Article $record): array
+    {
+        $hasGuidance = trim((string) $record->guidance) !== '';
+
         return [
-            Forms\Components\Textarea::make('message')->label('Lời nhắn cho điều phối')->required()->minLength(10)->maxLength(1500)->rows(5)
-                ->placeholder('Ví dụ: Mở bài dài dòng; mục 2 thiếu số liệu; ảnh bìa chưa hợp chủ đề; giọng văn quá trang trọng…')
-                ->helperText('Nói rõ chưa vừa ý ở đâu. Điều phối đọc lời nhắn, quyết định làm lại phần nào (dàn ý, bài viết, ảnh) và báo từng bộ phận. Bản mới được lưu thành phiên bản mới, bản cũ vẫn còn.'),
+            Forms\Components\Textarea::make('message')->label('Yêu cầu lần làm lại này')->rows(5)->maxLength(1500)->minLength(10)
+                ->default($record->guidance)->required(! $hasGuidance)->live(onBlur: true)
+                ->placeholder('Ví dụ: Mở bài dài dòng; mục 2 thiếu số liệu; giữ nguyên ảnh…')
+                ->helperText(static::REDO_NOTE.($hasGuidance ? ' Đã điền sẵn từ chỉ dẫn đã lưu, bạn có thể sửa hoặc để trống để dùng nguyên chỉ dẫn.' : '').' Bản mới được lưu thành phiên bản mới, bản cũ vẫn còn.'),
+            Forms\Components\Placeholder::make('scope_preview')->label('Phạm vi và chi phí')
+                ->content(fn (Get $get) => static::redoPreview($record, (string) ($get('message') ?? ''))),
         ];
     }
 
@@ -195,7 +234,7 @@ class ArticleResource extends Resource
                 return static::getUrl('view', ['record' => $record]);
             }
             Notification::make()->title($redoMessage !== null ? 'Đã giao bài #'.$record->id.' làm lại' : 'Đã giao bài #'.$record->id.' cho đội AI')
-                ->body($started ? 'Phiên #'.$started->id.' đang chạy, theo dõi diễn biến ngay tại đây.' : ($outcome === 'queued' ? 'Bài đã xếp hàng, sẽ bắt đầu chạy trong khoảng 1 phút (máy chủ web không tự mở được tiến trình nền nên việc khởi chạy đi qua hàng đợi). Xem tiến trình ở trang bài.' : 'Phiên đang khởi động, xem tiến trình ở trang bài.'))->success()->send();
+                ->body(($redoMessage !== null ? static::redoAssignedBody($redoMessage).' ' : '').($started ? 'Phiên #'.$started->id.' đang chạy, theo dõi diễn biến ngay tại đây.' : ($outcome === 'queued' ? 'Bài đã xếp hàng, sẽ bắt đầu chạy trong khoảng 1 phút (máy chủ web không tự mở được tiến trình nền nên việc khởi chạy đi qua hàng đợi). Xem tiến trình ở trang bài.' : 'Phiên đang khởi động, xem tiến trình ở trang bài.')))->success()->send();
 
             return $started ? AgentRunResource::viewUrl($started) : static::getUrl('view', ['record' => $record]);
         }
@@ -567,11 +606,11 @@ class ArticleResource extends Resource
                         ->icon('heroicon-o-arrow-path')
                         ->visible(fn (Article $record) => static::canRedoWithAgent($record))
                         ->modalHeading('Giao bài này làm lại')
-                        ->modalDescription('Chưa vừa ý với bản hiện tại? Gửi lời nhắn cho điều phối: đội AI làm lại theo đó và giữ những phần đã đạt. Mọi quy tắc an toàn, nguồn và từ cấm vẫn áp dụng.')
-                        ->form(static::redoForm())
+                        ->modalDescription(static::REDO_DESCRIPTION)
+                        ->form(fn (Article $record) => static::redoForm($record))
                         ->modalSubmitActionLabel('Giao làm lại')
                         ->action(function (Article $record, array $data, Tables\Actions\Action $action) {
-                            $url = static::assignToAgent($record, background: true, redoMessage: (string) $data['message']);
+                            $url = static::assignToAgent($record, background: true, redoMessage: static::redoMessage($record, $data));
                             $url ? $action->redirect($url) : null;
                         }),
                     Tables\Actions\Action::make('run_agent')
