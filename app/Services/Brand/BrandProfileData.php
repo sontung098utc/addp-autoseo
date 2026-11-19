@@ -19,6 +19,34 @@ final class BrandProfileData
     /** Trường bắt buộc để coi là "đủ": nhãn hiển thị. */
     public const REQUIRED = ['business_field' => 'Lĩnh vực & sản phẩm', 'audience' => 'Khách hàng mục tiêu', 'voice' => 'Giọng thương hiệu', 'key_messages' => 'Thông điệp chính'];
 
+    /** Nhãn tiếng Việt của MỌI trường hồ sơ doanh nghiệp: không bao giờ hiện tên trường nội bộ (snake_case) cho người dùng. */
+    public const LABELS = [
+        'business_field' => 'Lĩnh vực & sản phẩm',
+        'audience' => 'Khách hàng mục tiêu',
+        'voice' => 'Giọng thương hiệu',
+        'voice_notes' => 'Ghi chú về giọng',
+        'forbidden_terms' => 'Từ cấm dùng',
+        'allowed_claims' => 'Điều được phép nói',
+        'avoid_competitors' => 'Đối thủ cần tránh nhắc',
+        'key_messages' => 'Thông điệp chính',
+    ];
+
+    public static function label(string $field): string
+    {
+        return self::LABELS[$field] ?? 'Trường khác';
+    }
+
+    /** @param iterable<string> $fields */
+    public static function labels(iterable $fields): string
+    {
+        $out = [];
+        foreach ($fields as $f) {
+            $out[] = self::label((string) $f);
+        }
+
+        return implode(', ', $out);
+    }
+
     public static function forWebsite(?int $websiteId): ?BrandProfile
     {
         return $websiteId ? BrandProfile::query()->where('website_id', $websiteId)->first() : null;

@@ -239,7 +239,7 @@
                             <div class="aw-chips" data-testid="pf-chips">
                                 <span class="aw-chip @if ($riskLevel === 'high') aw-chip--warn @endif" data-testid="pf-risk">Rủi ro: <strong>{{ $riskLabel }}</strong></span>
                                 {{-- Chỉ chip có số liệu giúp quyết định; số 0 / "chưa có" đã có ghi chú kèm liên kết bên dưới. --}}
-                                @if ($readiness['knowledge']['count'] > 0)<span class="aw-chip" data-testid="pf-kb">Kho: {{ $readiness['knowledge']['count'] }} mục</span>@endif
+                                @if ($readiness['knowledge']['count'] > 0)<span class="aw-chip" data-testid="pf-kb" title="Mục kiến thức ĐÃ DUYỆT khớp chủ đề, tối đa 5 mục (ước tính trước khi chạy). Mục mới nạp đang chờ duyệt không tính.">Kho: {{ $readiness['knowledge']['count'] }} mục đã duyệt khớp chủ đề</span>@endif
                                 @if ($readiness['products']['count'] > 0)<span class="aw-chip" data-testid="pf-products">Sản phẩm: {{ $readiness['products']['count'] }}</span>@endif
                                 @if ($readiness['brand']['percent'] > 0)<span class="aw-chip" data-testid="pf-brand">Hồ sơ: {{ $readiness['brand']['percent'] }}%</span>@endif
                                 @if ($readiness['cost']['estimate_vnd'] !== null)<span class="aw-chip" data-testid="pf-cost">Ước tính: ~{{ $money($readiness['cost']['estimate_vnd']) }}</span>@endif
