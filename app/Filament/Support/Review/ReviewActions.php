@@ -78,9 +78,21 @@ class ReviewActions
     }
 
     /** @return array<int, Forms\Components\Component> */
-    public static function approveForm(bool $selfApproval, ?QualityReport $quality = null): array
+    public static function instructionLine(?ArticleVersion $version): ?string
+    {
+        if (! $version || ! filled($version->article?->guidance)) {
+            return null;
+        }
+
+        return \App\Services\Content\Quality\GuidanceConstraints::summaryLine((string) $version->article->guidance, (string) $version->html_content);
+    }
+
+    public static function approveForm(bool $selfApproval, ?QualityReport $quality = null, ?ArticleVersion $version = null): array
     {
         $fields = [];
+        if (($line = self::instructionLine($version)) !== null) {
+            $fields[] = Forms\Components\Placeholder::make('instruction_line')->label('Chỉ dẫn của người phụ trách')->content($line);
+        }
         if ($quality?->hasBlocking()) {
             $items = '';
             foreach ($quality->blocking() as $r) {

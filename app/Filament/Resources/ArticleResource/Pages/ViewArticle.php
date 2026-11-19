@@ -333,7 +333,7 @@ class ViewArticle extends EditArticle
                 ->disabled(fn () => \App\Filament\Support\Review\ArticleRows::liveRun($this->record) !== null)
                 ->tooltip(fn () => \App\Filament\Support\Review\ArticleRows::liveRun($this->record) ? 'Đội AI đang viết lại bài, chờ xong rồi duyệt bản mới.' : ReviewActions::blockedHint(ReviewActions::qualityFor($this->latest())))
                 ->modalHeading(fn () => ReviewActions::qualityFor($this->latest())->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi P0' : 'Duyệt nội dung')
-                ->form(fn () => ReviewActions::approveForm((int) $this->record->created_by === (int) ReviewActions::user()?->id, ReviewActions::qualityFor($this->latest())))
+                ->form(fn () => ReviewActions::approveForm((int) $this->record->created_by === (int) ReviewActions::user()?->id, ReviewActions::qualityFor($this->latest()), $this->latest()))
                 ->action(function (array $data) {
                     abort_unless(ReviewActions::canApprove(), 403);
                     ReviewActions::run(fn () => (new ReviewWorkflow)->approve(ReviewActions::user(), $this->latest(), $data['note'] ?? null, $data['override_reason'] ?? null), 'Đã duyệt nội dung');

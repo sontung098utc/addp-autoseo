@@ -666,6 +666,7 @@
                                 </x-help>
                             @endif
                         </div>
+                        @if ($latest && ($insLine = \App\Filament\Support\Review\ReviewActions::instructionLine($latest)))<div class="aw-note" data-testid="aw-instruction-line">{{ $insLine }}</div>@endif
                         @if ($latest && $noGrounding)<div class="aw-note" data-testid="aw-content-gap" style="color:#b45309">Bài chưa có căn cứ từ kho kiến thức. <x-help tone="warning" title="Vì sao cần xem lại"><p>{{ ArticleResource::GAP_NOTE }}</p></x-help></div>@endif
                         @if ($versions->isEmpty())
                             <p>Bài chưa có nội dung.</p>
@@ -684,7 +685,7 @@
                                                 </td>
                                                 <td>{{ StatusPresenter::label($v->review_status, 'article') }}@if ($v->reviewer)<div class="aw-muted">{{ $v->reviewer->name }}</div>@endif</td>
                                                 <td>P0 {{ $q['P0'] }} · P1 {{ $q['P1'] }} · P2 {{ $q['P2'] }}</td>
-                                                <td>{{ $num(count(preg_split('/\s+/u', trim(strip_tags((string) $v->html_content)), -1, PREG_SPLIT_NO_EMPTY))) }}</td>
+                                                <td>{{ $num(\App\Services\Content\VietnameseText::bodyWordCountHtml((string) $v->html_content)) }}</td>
                                                 <td>{{ $v->mediaAssets->count() }}</td>
                                                 <td>@if ($vr && AgentRunResource::canViewAny())<a class="aw-link" href="{{ AgentRunResource::viewUrl($vr) }}">Phiên AI #{{ $vr->id }}</a>@elseif ($vr) Phiên AI #{{ $vr->id }} @else {{ $v->ai_model ? 'AI' : 'Người viết' }} @endif</td>
                                                 <td>{{ VnTime::format($v->created_at) }}</td>
