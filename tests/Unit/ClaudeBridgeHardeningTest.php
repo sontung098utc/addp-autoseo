@@ -43,7 +43,9 @@ class ClaudeBridgeHardeningTest extends TestCase
         foreach (['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions', '--allow-dangerously-skip-permissions'] as $bad) {
             $this->assertStringNotContainsString($bad, $this->src, "Cờ bỏ qua quyền bị cấm: {$bad}");
         }
-        // Tìm web chỉ được phép hai công cụ chỉ-đọc, không thêm công cụ khác.
-        $this->assertStringContainsString('"--allowedTools", "WebSearch,WebFetch"', $this->src);
+        // Tìm web chỉ được phép WebSearch (WebFetch tải từ máy này, không chặn IP nội bộ).
+        $this->assertStringContainsString('"--tools", "WebSearch",', $this->src);
+        $this->assertStringContainsString('"--allowedTools", "WebSearch",', $this->src);
+        $this->assertStringNotContainsString('WebFetch,', str_replace('không WebFetch', '', $this->src));
     }
 }
