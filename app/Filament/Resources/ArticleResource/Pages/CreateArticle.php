@@ -54,7 +54,7 @@ class CreateArticle extends CreateRecord
             $dup = Article::find($e->existingArticleId);
             $d = $dup ? KeywordDuplicateGuard::describe($dup) : null;
             $n = Notification::make()->title('Từ khóa này đã có bài')->danger()
-                ->body($d ? 'Bài #'.$d['id'].' (trạng thái: '.$d['status_label'].') đang dùng từ khóa này trên website đã chọn.'.($d['reopenable'] ? ' Tích ô xác nhận nếu vẫn muốn tạo thêm.' : '') : $e->getMessage());
+                ->body($d ? 'Bài #'.$d['id'].' (trạng thái: '.$d['status_label'].') đang dùng từ khóa này trên website đã chọn.'.($d['reopenable'] ? ' Tích ô xác nhận nếu vẫn muốn tạo thêm.' : '') : \App\Support\UserFacingError::from($e));
             if ($d && $d['url']) {
                 $n->actions([\Filament\Notifications\Actions\Action::make('open')->label('Mở bài đó')->url($d['url'])]);
             }
