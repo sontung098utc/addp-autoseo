@@ -187,6 +187,7 @@ final class BrainBuildService
         }
         JobRunRecorder::finish($run, $status, $outputRef, $out['message']);
         $out['run_id'] = $run?->id;
+        $out['no_items_reason'] = self::explainNoItems($out);
 
         return $out;
     }
@@ -209,7 +210,7 @@ final class BrainBuildService
             $res = ['applied' => false, 'fields' => [], 'reason' => 'Lỗi khi tự điền hồ sơ doanh nghiệp: '.class_basename($e)];
         }
         JobRunRecorder::step($run, 'brand', 'Tự điền hồ sơ doanh nghiệp', $res['applied'] ? 'completed' : 'skipped', ['applied' => $res['applied'], 'fields' => $res['fields']], $resolved['label'], 0, 0,
-            $res['applied'] ? 'Đã tự điền: '.implode(', ', $res['fields']).'. Hoàn tác được trên trang Xây kho.' : $res['reason']);
+            $res['applied'] ? 'Đã tự điền: '.\App\Services\Brand\BrandProfileData::labels($res['fields']).'. Hoàn tác được trên trang Xây kho.' : $res['reason']);
 
         return $res;
     }
@@ -241,7 +242,8 @@ final class BrainBuildService
         $total = count($urls);
         $budget = $this->budget();
         $r = ['run_id' => null, 'pages_planned' => $total, 'pages_read' => 0, 'pages_skipped' => 0, 'pages_failed' => 0, 'items_auto' => 0, 'items_proposed' => 0, 'cost_vnd' => 0.0,
-            'stopped_reason' => null, 'message' => null, 'source_ids' => [], 'auto_item_ids' => [], 'proposed_item_ids' => [], 'rejected_urls' => $pasted['rejected'], 'label' => $resolved['label'], 'demo' => $resolved['demo']];
+            'stopped_reason' => null, 'message' => null, 'source_ids' => [], 'auto_item_ids' => [], 'proposed_item_ids' => [], 'rejected_urls' => $pasted['rejected'], 'label' => $resolved['label'], 'demo' => $resolved['demo'],
+            'pages_short' => 0, 'pages_unchanged' => 0, 'pages_no_items' => 0];
         JobRunRecorder::step($run, 'select', 'Chọn trang', 'completed', ['pages' => $total, 'from_sitemap' => count($urls) - count($pasted['ok']), 'pasted' => count($pasted['ok']), 'rejected_urls' => $pasted['rejected']], null, 0, 0, 'Đã chọn '.$total.' trang trên '.implode(', ', $allowed).'.');
 
         $done = 0;
@@ -270,6 +272,7 @@ final class BrainBuildService
             $ex = (new ReadableTextExtractor)->extract($page['html']);
             if (mb_strlen($ex['text']) < self::MIN_TEXT_CHARS) {
                 $r['pages_skipped']++;
+                $r['pages_short']++;
                 JobRunRecorder::step($run, $stage, $url, 'skipped', ['url' => $url, 'reason' => 'too_short', 'chars' => mb_strlen($ex['text'])], null, 0, 0, 'Trang có quá ít chữ để rút kiến thức.');
 
                 continue;
@@ -277,6 +280,7 @@ final class BrainBuildService
             $hash = KnowledgeDedupe::hash('', $ex['text']);
             if (KnowledgeSource::query()->where('website_id', $site->id)->where('kind', 'url')->where('content_hash', $hash)->exists()) {
                 $r['pages_skipped']++;
+                $r['pages_unchanged']++;
                 JobRunRecorder::step($run, $stage, $url, 'skipped', ['url' => $url, 'reason' => 'unchanged'], null, 0, 0, 'Trang không đổi so với lần đọc trước.');
 
                 continue;
@@ -310,6 +314,9 @@ final class BrainBuildService
             }
             $r['items_auto'] += $auto;
             $n = array_sum($tiers);
+            if ($n === 0 && ! isset($log['error'])) {
+                $r['pages_no_items']++;
+            }
             $r['items_proposed'] += $n - $auto;
             JobRunRecorder::step($run, $stage, $url, 'completed', ['url' => $url, 'source_id' => $source->id, 'items' => $n, 'tiers' => $tiers, 'auto' => $auto, 'http_status' => $page['http_status']],
                 $resolved['label'], (int) ($log['tokens'] ?? 0), (float) ($log['cost_vnd'] ?? 0), isset($log['error']) ? ErrorMasker::short((string) $log['error'], 200) : null);
@@ -322,6 +329,40 @@ final class BrainBuildService
         }
 
         return $r;
+    }
+
+    /**
+     * Vì sao lượt chạy không có mục nào (0 tự nhận và 0 chờ duyệt): chỉ dùng số đếm THẬT của từng trang trong lượt, không đoán. null khi có mục hoặc chưa đủ dữ liệu để nói.
+     *
+     * @param  array<string,mixed>  $r  kết quả run()
+     */
+    public static function explainNoItems(array $r): ?string
+    {
+        if (((int) ($r['items_auto'] ?? 0)) + ((int) ($r['items_proposed'] ?? 0)) > 0) {
+            return null;
+        }
+        $parts = [];
+        if (($r['stopped_reason'] ?? null) === 'ai_error') {
+            $parts[] = 'AI báo lỗi nên dừng giữa chừng';
+        } elseif (($r['stopped_reason'] ?? null) === 'budget') {
+            $parts[] = 'dừng vì chạm trần chi phí';
+        } elseif (($r['stopped_reason'] ?? null) === 'emergency_stop') {
+            $parts[] = 'đang dừng khẩn cấp';
+        }
+        if (($n = (int) ($r['pages_no_items'] ?? 0)) > 0) {
+            $parts[] = $n.' trang đã đọc nhưng không có câu khẳng định cụ thể nào rút được (thường là trang chủ, menu, trang giới thiệu chung hoặc ít thông tin)';
+        }
+        if (($n = (int) ($r['pages_short'] ?? 0)) > 0) {
+            $parts[] = $n.' trang có quá ít chữ';
+        }
+        if (($n = (int) ($r['pages_unchanged'] ?? 0)) > 0) {
+            $parts[] = $n.' trang không đổi so với lần đọc trước';
+        }
+        if (($n = (int) ($r['pages_failed'] ?? 0)) > 0) {
+            $parts[] = $n.' trang không tải được';
+        }
+
+        return $parts === [] ? null : 'Không có mục nào vì: '.implode('; ', $parts).'.';
     }
 
     /** @return list<string> */

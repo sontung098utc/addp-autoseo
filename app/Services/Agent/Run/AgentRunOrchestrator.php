@@ -906,7 +906,7 @@ final class AgentRunOrchestrator
         $brand = $this->brandData();
         $gap = (bool) ($kbData['knowledge']['gap'] ?? false);
         $this->step($run, 'research', 'system', $gap ? 'warn' : 'ok', 'Chuẩn bị tài liệu',
-            'Đã nạp '.$kbData['knowledge']['count'].' mục kiến thức đã duyệt, '.$nImg.' ảnh gợi ý, '.$nLink.' liên kết nội bộ gợi ý, '.count($citableData).' nguồn được phép trích'
+            'Đã nạp '.$kbData['knowledge']['count'].' mục kiến thức đã duyệt khớp chủ đề (mục chờ duyệt không tính), '.$nImg.' ảnh gợi ý, '.$nLink.' liên kết nội bộ gợi ý, '.count($citableData).' nguồn được phép trích'
             .(($brand['brand_profile_fields'] ?? 0) > 0 ? ', hồ sơ doanh nghiệp ('.$brand['brand_profile_fields'].' trường).' : ', chưa có hồ sơ doanh nghiệp.')
             .($gap ? ' Kho kiến thức chưa có mục đã duyệt phù hợp; đã ghi khoảng trống kiến thức.' : ''),
             $kbData + $assetData + ['citable_sources' => $citableData] + $brand + $this->brainCtx->stepData() + ($this->needsExpert ? ['needs_expert' => true, 'reason' => 'high_risk_no_knowledge'] : []));
@@ -1039,7 +1039,7 @@ final class AgentRunOrchestrator
             .count((array) $plan['conflicts']).' mâu thuẫn giữa nguồn; góc tiếp cận: '.mb_substr((string) $plan['angle'], 0, 160).'; độ dài mục tiêu ~'.(int) $plan['length_words'].' từ.'.$extra
             .($plan['gaps'] !== [] ? ' Còn thiếu căn cứ: '.implode('; ', array_slice((array) $plan['gaps'], 0, 3)).'.' : ''),
             ['plan' => $plan, 'sources' => $r['sources'], 'kb_items' => count($kb), 'web_references' => count($this->references)], $r['model'], $tokens, $cost);
-        $this->decision($run, 'synthesis', 'Điều phối: chốt hướng nội dung từ '.count($this->references).' tài liệu web và '.count($kb).' mục kho',
+        $this->decision($run, 'synthesis', 'Điều phối: chốt hướng nội dung từ '.count($this->references).' tài liệu web và '.count($kb).' mục kho đã duyệt khớp chủ đề (mục mới nạp đang chờ duyệt chưa tính)',
             'Dùng chắc '.($use['dung'] ?? 0).' luận điểm, dùng thận trọng '.($use['than_trong'] ?? 0).', bỏ '.($use['bo'] ?? 0).'; góc tiếp cận: '.mb_substr((string) $plan['angle'], 0, 140).'.'.($extra !== '' ? $extra : '').($plan['gaps'] !== [] ? ' Còn thiếu căn cứ cho: '.implode('; ', array_slice((array) $plan['gaps'], 0, 3)).'.' : ''),
             ['sources' => $r['sources']]);
     }
@@ -1412,7 +1412,7 @@ final class AgentRunOrchestrator
             $imp = $svc->import($article->website, $trusted, null, ['as_system' => true, 'brain_id' => $this->matchedBrainId, 'max_sources' => 2, 'only_trusted' => true, 'field' => $d['field'], 'budget_cap_vnd' => $cap, 'purpose' => 'gap',
                 'search' => ['query' => $d['query'], 'results' => count($d['candidates']), 'cost_vnd' => $d['cost_vnd'], 'provider' => $d['provider']]]);
             $this->step($run, 'research', 'system', $imp['imported'] > 0 ? 'ok' : 'warn', 'Nạp bổ sung kho cho phần còn thiếu: '.$imp['imported'].' nguồn',
-                'Điều phối chạy luồng nạp cho khoảng trống "'.mb_substr($topics[0], 0, 120).'": '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt.',
+                'Điều phối chạy luồng nạp cho khoảng trống "'.mb_substr($topics[0], 0, 120).'": '.$imp['items_auto'].' mục tự nhận (nguồn tin cậy, hoàn tác được), '.$imp['items_proposed'].' mục chờ người duyệt (chưa dùng được cho bài này cho tới khi được duyệt).',
                 ['purpose' => 'kb_topup', 'imported' => $imp['imported'], 'items_auto' => $imp['items_auto'], 'items_proposed' => $imp['items_proposed'], 'build_run_id' => $imp['run_id']] + $this->kbStepData($imp, $this->matchedBrainId), null, 0, (float) $imp['cost_vnd']);
             $added += (int) $imp['items_auto'];
         } catch (Throwable $e) {

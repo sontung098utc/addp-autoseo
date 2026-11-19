@@ -15,6 +15,7 @@ use App\Services\Knowledge\Discover\SourceDiscoveryService;
 use App\Services\Knowledge\KnowledgeError;
 use App\Services\Knowledge\KnowledgeReview;
 use App\Services\Knowledge\Suggest\KnowledgeSuggestions;
+use App\Services\Knowledge\Suggest\KnowledgeTodo;
 use App\Services\Onboarding\WebsiteOnboarding;
 use App\Services\Search\WebSearchResolver;
 use App\Services\Search\WebSearchUnavailable;
@@ -43,6 +44,11 @@ class BrainBuildPage extends Page
 
     protected static ?string $title = 'Tạo trí tuệ doanh nghiệp';
 
+    public function getSubheading(): ?string
+    {
+        return 'Xây kho từ website · khởi tạo nhanh · khám phá nguồn · việc cần bạn xem';
+    }
+
     protected static ?string $slug = 'tao-tri-tue-doanh-nghiep';
 
     public static function shouldRegisterNavigation(): bool
@@ -57,6 +63,8 @@ class BrainBuildPage extends Page
 
     protected static string $view = 'filament.pages.brain-build';
 
+    /** Website đang xem; ?site= cho phép banner dẫn đúng website (không rơi về website đầu tiên). */
+    #[Url(as: 'site')]
     public ?int $websiteId = null;
 
     public $maxPages = BrainBuildService::DEFAULT_PAGES;
@@ -122,7 +130,9 @@ class BrainBuildPage extends Page
     public function mount(): void
     {
         $this->guard();
-        $this->websiteId = Website::query()->where('status', 'active')->orderBy('id')->value('id');
+        if (! $this->websiteId || ! Website::query()->whereKey($this->websiteId)->exists()) {
+            $this->websiteId = Website::query()->where('status', 'active')->orderBy('id')->value('id');
+        }
     }
 
     public function note(): string
@@ -145,7 +155,7 @@ class BrainBuildPage extends Page
         $auto = KnowledgeItem::query()->with('source')->where('review_mode', 'auto')->where('status', 'approved')->when($this->websiteId, fn ($q) => $q->where('website_id', $this->websiteId))->latest('id')->limit(30)->get();
 
         $brand = $site ? BrandProfileDrafter::last($site->id) : null;
-        $suggestions = $site ? (new KnowledgeSuggestions)->forWebsite($site, 20) : [];
+        $suggestions = $site ? (new KnowledgeSuggestions)->forWebsite($site, KnowledgeTodo::LIMIT) : [];
         $brandProfile = $site ? BrandProfileData::forWebsite($site->id) : null;
 
         return ['brandAuto' => $brand, 'brandMissing' => BrandProfileData::completeness($brandProfile)['missing'], 'suggestions' => $suggestions, 'sites' => Website::query()->orderBy('name')->get(['id', 'name', 'base_url', 'status']), 'off' => $off, 'avLabel' => $av['label'], 'avDemo' => $av['demo'], 'runs' => $runs, 'autoItems' => $auto, 'statusLabels' => ['running' => 'Đang chạy', 'ready_for_review' => 'Xong', 'blocked' => 'Bị chặn', 'failed' => 'Lỗi', 'held' => 'Tạm giữ'], 'reviewUrl' => KnowledgePage::getUrl(), 'pendingCount' => KnowledgeItem::query()->where('status', 'proposed')->when($this->websiteId, fn ($q) => $q->where('website_id', $this->websiteId))->count(), 'canOnboard' => static::canOnboard(), 'onboardLinks' => ['keywords' => KeywordsPage::getUrl(), 'plan' => ContentPlanPage::getUrl()], 'webAv' => (new WebSearchResolver)->availability()];
@@ -186,7 +196,7 @@ class BrainBuildPage extends Page
 
             return;
         }
-        Notification::make()->title('Đã xây xong lượt này')->body($this->result['items_auto'].' mục tự nhận, '.$this->result['items_proposed'].' mục chờ duyệt.')->success()->send();
+        Notification::make()->title('Đã xây xong lượt này')->body(trim($this->result['items_auto'].' mục tự nhận, '.$this->result['items_proposed'].' mục chờ duyệt. '.($this->result['no_items_reason'] ?? '')))->success()->send();
     }
 
     /** "Tìm nguồn": soạn truy vấn bằng luật, tìm trên web, hiện danh sách nguồn có nhãn tin cậy và lý do. Chưa tải trang nào. */
@@ -283,7 +293,7 @@ class BrainBuildPage extends Page
 
             return;
         }
-        Notification::make()->title('Đã hoàn tác hồ sơ tự điền')->body($cleared === [] ? 'Các trường đã được sửa tay nên được giữ nguyên.' : 'Đã xóa: '.implode(', ', $cleared).'.')->success()->send();
+        Notification::make()->title('Đã hoàn tác hồ sơ tự điền')->body($cleared === [] ? 'Các trường đã được sửa tay nên được giữ nguyên.' : 'Đã xóa: '.BrandProfileData::labels($cleared).'.')->success()->send();
     }
 
     /**

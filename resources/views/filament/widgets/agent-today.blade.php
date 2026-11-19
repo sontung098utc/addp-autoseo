@@ -21,7 +21,7 @@
             @if ($isApprover && ($cost > 0 || $suggestions > 0))
                 <div class="at-foot">
                     @if ($cost > 0)<a href="{{ $urls['cost'] ?? '#' }}">Chi phí AI hôm nay {{ number_format($cost, 0, ',', '.') }} ₫ ({{ $runs }} phiên)</a>@endif
-                    @if ($suggestions > 0)<a href="{{ $urls['kb'] ?? '#' }}">{{ $suggestions }} gợi ý bổ sung kho</a>@endif
+                    @if ($suggestions > 0)<a href="{{ $urls['kb'] ?? '#' }}">{{ $suggestions }} gợi ý bổ sung kho{{ $todoSite ? ' ('.$todoSite.')' : '' }}</a>@endif
                 </div>
             @endif
         </div>

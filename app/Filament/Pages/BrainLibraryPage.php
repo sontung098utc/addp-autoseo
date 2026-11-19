@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Services\Knowledge\Suggest\KnowledgeTodo;
 use App\Filament\Clusters\KhoTriTue;
 use App\Models\Brain;
 use App\Models\BrainProfile;
@@ -228,9 +229,13 @@ class BrainLibraryPage extends Page
             ];
         });
 
+        $todo = BrainBuildPage::canAccess() ? KnowledgeTodo::busiest() : null;
+
         return [
             'kinds' => BrainKinds::all(), 'kindOk' => collect(BrainKinds::all())->map(fn ($k) => $k['mode'] !== 'flow' || BrainKinds::flowUrl($k['key']) !== null)->all(),
-            'buildUrl' => BrainBuildPage::canAccess() ? BrainBuildPage::getUrl() : null,
+            'buildUrl' => BrainBuildPage::canAccess() ? KnowledgeTodo::url($todo['site']->id ?? null) : null,
+            'todo' => $todo === null ? null : ['suggestions' => $todo['suggestions'], 'pending' => $todo['pending']],
+            'todoSite' => $todo['site']->name ?? null,
             'cards' => $cards, 'manage' => static::canManage(), 'archived' => $archived,
             'archivedCount' => Brain::query()->where('status', 'archived')->count(),
             'templates' => BrainTemplates::all(), 'sites' => Website::query()->orderBy('name')->get(['id', 'name']),

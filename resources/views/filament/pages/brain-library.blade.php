@@ -41,7 +41,7 @@
                 @if ($tot['nosrc'])<x-studio.badge tone="warn">{{ $tot['nosrc'] }} chưa có nguồn xác nhận</x-studio.badge>@endif
                 @if ($tot['nosite'])<x-studio.badge tone="muted">{{ $tot['nosite'] }} chưa gắn website</x-studio.badge>@endif
                 @if ($buildUrl)
-                    <x-filament::button size="xs" color="gray" tag="a" :href="$buildUrl" icon="heroicon-o-arrow-down-tray" style="margin-left:auto" data-testid="bl-todo">Việc cần xem và nạp thêm kiến thức</x-filament::button>
+                    <x-filament::button size="xs" color="gray" tag="a" :href="$buildUrl" icon="heroicon-o-arrow-down-tray" style="margin-left:auto" data-testid="bl-todo">Việc cần xem và nạp thêm kiến thức{{ $todo ? ' ('.$todoSite.': '.$todo['suggestions'].' gợi ý, '.$todo['pending'].' chờ duyệt)' : '' }}</x-filament::button>
                 @endif
             </div>
         @endif
