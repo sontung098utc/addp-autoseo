@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\PublicationResource\Pages;
+use App\Integrations\Magento\MagentoBlogUrl;
 use App\Filament\Support\Schedule\ErrorExplainer;
 use App\Filament\Support\Schedule\ErrorMasker;
 use App\Filament\Support\Schedule\PublicationHoldAction;
@@ -249,8 +250,9 @@ class PublicationResource extends Resource
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('published_url')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Link bài')
+                    ->getStateUsing(fn (Publication $r): ?string => MagentoBlogUrl::display($r))
                     ->limit(30)
-                    ->url(fn (Publication $r) => $r->published_url, true)
+                    ->url(fn (Publication $r) => MagentoBlogUrl::display($r), true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('publication_key')->toggleable(isToggledHiddenByDefault: true)->sortable()
                     ->label('Khóa xuất bản')
@@ -282,7 +284,7 @@ class PublicationResource extends Resource
                         if ($r->status === 'published') {
                             Notification::make()
                                 ->title('Đã xuất bản thành công lên '.($r->website?->name ?? 'CMS'))
-                                ->body($r->published_url ? 'URL: '.$r->published_url : null)
+                                ->body($r->published_url ? 'URL: '.MagentoBlogUrl::display($r) : null)
                                 ->success()
                                 ->send();
                         } else {

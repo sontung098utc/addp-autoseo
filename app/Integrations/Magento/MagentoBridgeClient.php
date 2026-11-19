@@ -251,8 +251,9 @@ class MagentoBridgeClient implements PublisherInterface
         $endpoint = "{$baseUrl}/rest/{$store}/V1/company-blog/posts/{$remoteId}/publish";
         $body = $this->sendJsonRequest('POST', $endpoint, $website->encrypted_credentials ?? [], [], isWriteOperation: true);
 
-        $urlKey = $body['url_key'] ?? $publication->articleVersion->slug;
-        $publishedUrl = "{$baseUrl}/blog/post/{$urlKey}";
+        // Link công khai: ưu tiên "url" mô-đun trả về (cùng tên miền), không có thì dựng theo nền tảng blog.
+        // Mô-đun cũ chưa trả blog_driver thì mặc định Magefan ({base}/blog/{url_key}) vì ADDP dùng Magefan_Blog.
+        $publishedUrl = MagentoBlogUrl::fromResponse($website, $body, (string) $publication->articleVersion->slug);
 
         return [
             'remote_id' => (string) $remoteId,
@@ -280,7 +281,9 @@ class MagentoBridgeClient implements PublisherInterface
                 'remote_id' => (string) $body['post_id'],
                 'status' => $body['status'] ?? 0,
                 'title' => $body['title'] ?? '',
-            ];
+            ] + (! empty($body['url_key']) || ! empty($body['url'])
+                ? ['published_url' => MagentoBlogUrl::fromResponse($website, $body, (string) ($body['url_key'] ?? ''))]
+                : []);
         }
 
         return null;

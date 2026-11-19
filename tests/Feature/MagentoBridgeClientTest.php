@@ -118,7 +118,61 @@ class MagentoBridgeClientTest extends TestCase
         $result = $client->publish($publication);
 
         $this->assertEquals('99', $result['remote_id']);
-        $this->assertEquals('https://shop.company.vn/blog/post/ao-thun-nam-cao-cap-2026', $result['published_url']);
+        // Mô-đun cũ không trả blog_driver: mặc định Magefan, link không có "/post".
+        $this->assertEquals('https://shop.company.vn/blog/ao-thun-nam-cao-cap-2026', $result['published_url']);
+    }
+
+    private function publishWith(array $body, ?array $flags = null): array
+    {
+        if ($flags !== null) {
+            $this->website->update(['capability_flags' => $flags]);
+        }
+        $publication = Publication::create([
+            'website_id' => $this->website->id,
+            'article_version_id' => $this->version->id,
+            'publication_key' => 'magento-1-art1-v1-'.uniqid(),
+            'scheduled_at_utc' => now(),
+            'status' => 'scheduled',
+            'cms_post_id' => '99',
+        ]);
+        $mock = new MockHandler([new Response(200, [], json_encode($body))]);
+
+        return (new MagentoBridgeClient(new Client(['handler' => HandlerStack::create($mock)])))->publish($publication->fresh());
+    }
+
+    public function test_publish_uses_url_returned_by_module_when_same_domain(): void
+    {
+        $r = $this->publishWith(['post_id' => 99, 'url_key' => 'ao-thun', 'url' => 'https://shop.company.vn/blog/ao-thun.html', 'blog_driver' => 'magefan']);
+        $this->assertSame('https://shop.company.vn/blog/ao-thun.html', $r['published_url']);
+    }
+
+    public function test_publish_ignores_url_from_other_domain(): void
+    {
+        $r = $this->publishWith(['post_id' => 99, 'url_key' => 'ao-thun', 'url' => 'https://evil.example.com/blog/ao-thun', 'blog_driver' => 'magefan']);
+        $this->assertSame('https://shop.company.vn/blog/ao-thun', $r['published_url']);
+
+        $r = $this->publishWith(['post_id' => 99, 'url_key' => 'ao-thun', 'url' => 'javascript:alert(1)']);
+        $this->assertSame('https://shop.company.vn/blog/ao-thun', $r['published_url']);
+    }
+
+    public function test_publish_builds_url_by_blog_driver(): void
+    {
+        $this->assertSame('https://shop.company.vn/blog/ao-thun', $this->publishWith(['post_id' => 99, 'url_key' => 'ao-thun', 'blog_driver' => 'magefan'])['published_url']);
+        $this->assertSame('https://shop.company.vn/blog/post/ao-thun', $this->publishWith(['post_id' => 99, 'url_key' => 'ao-thun', 'blog_driver' => 'mageplaza'])['published_url']);
+        // Không có gì từ mô-đun nhưng website khai báo Mageplaza
+        $this->assertSame('https://shop.company.vn/blog/post/ao-thun', $this->publishWith(['post_id' => 99, 'url_key' => 'ao-thun'], ['blog_driver' => 'mageplaza'])['published_url']);
+    }
+
+    public function test_publish_without_url_key_uses_version_slug_with_magefan_default(): void
+    {
+        $this->assertSame('https://shop.company.vn/blog/ao-thun-nam-cao-cap-2026', $this->publishWith(['post_id' => 99])['published_url']);
+    }
+
+    public function test_get_by_publication_key_returns_public_url_when_module_sends_it(): void
+    {
+        $mock = new MockHandler([new Response(200, [], json_encode(['post_id' => 99, 'status' => 1, 'title' => 'Đã có', 'url_key' => 'ao-thun', 'blog_driver' => 'magefan']))]);
+        $post = (new MagentoBridgeClient(new Client(['handler' => HandlerStack::create($mock)])))->getByPublicationKey($this->website, 'k');
+        $this->assertSame('https://shop.company.vn/blog/ao-thun', $post['published_url']);
     }
 
     private function clientWithHistory(array $responses, array &$history): MagentoBridgeClient

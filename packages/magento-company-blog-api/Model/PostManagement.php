@@ -87,6 +87,8 @@ class PostManagement implements PostManagementInterface
 
         $post->setPostId($blogPost->getId());
         $post->setStatus(0);
+        $post->setUrl($this->publicUrl($blogPost));
+        $post->setBlogDriver($this->driver);
 
         return $post;
     }
@@ -106,6 +108,8 @@ class PostManagement implements PostManagementInterface
             PostInterface::TITLE => $blogPost->getData($isMagefan ? 'title' : 'name'),
             PostInterface::URL_KEY => $blogPost->getData($isMagefan ? 'identifier' : 'url_key'),
             PostInterface::STATUS => (int) $blogPost->getData($isMagefan ? 'is_active' : 'enabled'),
+            PostInterface::URL => $this->publicUrl($blogPost),
+            PostInterface::BLOG_DRIVER => $this->driver,
         ]);
     }
 
@@ -135,7 +139,29 @@ class PostManagement implements PostManagementInterface
             PostInterface::TITLE => $blogPost->getData($isMagefan ? 'title' : 'name'),
             PostInterface::URL_KEY => $blogPost->getData($isMagefan ? 'identifier' : 'url_key'),
             PostInterface::STATUS => 1,
+            PostInterface::URL => $this->publicUrl($blogPost),
+            PostInterface::BLOG_DRIVER => $this->driver,
         ]);
+    }
+
+    /**
+     * Link công khai thật do mô-đun blog dựng (Magefan: getPostUrl(), Mageplaza: getUrl()).
+     * Không lấy được thì trả rỗng; hệ thống sẽ tự dựng từ url_key và blog_driver.
+     */
+    protected function publicUrl($blogPost): string
+    {
+        try {
+            if ($this->driver === 'magefan' && method_exists($blogPost, 'getPostUrl')) {
+                return (string) $blogPost->getPostUrl();
+            }
+            if ($this->driver === 'mageplaza' && method_exists($blogPost, 'getUrl')) {
+                return (string) $blogPost->getUrl();
+            }
+        } catch (\Throwable $e) {
+            return '';
+        }
+
+        return '';
     }
 
     protected function hasColumn($blogPost, string $column): bool

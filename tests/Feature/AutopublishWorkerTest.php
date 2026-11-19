@@ -276,6 +276,6 @@ class AutopublishWorkerTest extends TestCase
 
         $res2 = $client2->publish($pub);
         $this->assertEquals('101', $res2['remote_id']);
-        $this->assertEquals('https://shop.test-company.com/blog/post/siro-ho-bo-phe-cao-cap', $res2['published_url']);
+        $this->assertEquals('https://shop.test-company.com/blog/siro-ho-bo-phe-cao-cap', $res2['published_url']);
     }
 }

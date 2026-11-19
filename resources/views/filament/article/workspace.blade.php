@@ -847,7 +847,7 @@
                                                 </div></td>
                                             <td>{{ VnTime::format($p->scheduled_at_utc) }}</td>
                                             <td>{{ $p->published_at_utc ? VnTime::format($p->published_at_utc) : '—' }}</td>
-                                            <td>@if ($p->published_url && preg_match('#^https?://#i', $p->published_url))<a class="aw-link" href="{{ $p->published_url }}" target="_blank" rel="noopener noreferrer">Mở bài</a>@else — @endif</td>
+                                            <td>@php($pubLink = \App\Integrations\Magento\MagentoBlogUrl::display($p))@if ($pubLink && preg_match('#^https?://#i', $pubLink))<a class="aw-link" href="{{ $pubLink }}" target="_blank" rel="noopener noreferrer">Mở bài</a>@else — @endif</td>
                                             <td>{{ $dash($p->last_error ? Str::limit($p->last_error, 120) : null) }}</td>
                                         </tr>
                                     @endforeach

@@ -3,6 +3,7 @@
 namespace App\Filament\Support\Gsc;
 
 use App\Filament\Resources\ArticleResource;
+use App\Integrations\Magento\MagentoBlogUrl;
 use App\Models\Publication;
 
 /** Nối URL trang trong Search Console với bài đã đăng (publications.published_url). Không khớp -> null. */
@@ -12,12 +13,12 @@ final class PageArticleLinker
     public static function map(): array
     {
         $map = [];
-        foreach (Publication::query()->with('articleVersion')->whereNotNull('published_url')->orderBy('id')->get() as $p) {
+        foreach (Publication::query()->with(['articleVersion', 'website'])->whereNotNull('published_url')->orderBy('id')->get() as $p) {
             $v = $p->articleVersion;
             if (! $v) {
                 continue;
             }
-            $map[self::normalize((string) $p->published_url)] ??= [
+            $map[self::normalize((string) MagentoBlogUrl::display($p))] ??= [
                 'title' => (string) $v->title,
                 'url' => ArticleResource::getUrl('view', ['record' => $v->article_id]),
             ];
