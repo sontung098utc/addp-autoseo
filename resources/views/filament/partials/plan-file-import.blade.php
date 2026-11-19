@@ -58,20 +58,20 @@
     @keyframes pfm-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     @media (prefers-reduced-motion: reduce) { .pfm-orb i, .pfm-ibar i, .pfm-skel b { animation: none; } .pfm-msgs span { animation: none; } .pfm-msgs span:first-child { opacity: 1; } }
     .pfm-res { margin: .2rem 0 .6rem 1.1rem; padding: 0; list-style: disc; font-size: .88rem; color: var(--ss-text-muted, #555); display: grid; gap: .2rem; }
-    .pfm-zone { border: 1px solid var(--ss-border, #ddd); border-radius: .75rem; padding: .8rem 1rem; margin-top: .9rem; }
-    .pfm-zone--result { border-color: var(--ss-accent-fg, #2563eb); background: var(--ss-accent-bg, #eef2ff); }
-    .pfm-zone--edit { background: transparent; }
-    .pfm-zt { margin: 0 0 .45rem; font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ss-accent-fg, #3730a3); }
-    .pfm-zt--soft { color: var(--ss-text-muted, #666); }
+    .pfm-card { border: 1px solid var(--ss-accent-fg, #2563eb); background: var(--ss-accent-bg, #eef2ff); border-radius: .75rem; padding: .8rem 1rem; margin-top: .8rem; }
+    .pfm-zt { margin: 0 0 .35rem; font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ss-accent-fg, #3730a3); }
+    .pfm-where { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: .55rem 0 .15rem; }
+    .pfm-where label { font-weight: 600; font-size: .88rem; }
+    .pfm-more { margin-top: .8rem; border: 1px solid var(--ss-border, #ddd); border-radius: .75rem; }
+    .pfm-more > summary { cursor: pointer; padding: .6rem .9rem; font-weight: 600; font-size: .9rem; }
+    .pfm-more > summary .pfm-muted { font-weight: 400; }
+    .pfm-more-body { padding: 0 .9rem .8rem; }
     .pfm-head { font-size: 1.15rem; line-height: 1.4; }
-    .pfm-line { margin: .25rem 0 .1rem; }
     .pfm-attn { margin: .6rem 0; padding: .55rem .8rem; border-radius: .6rem; background: var(--ss-warn-bg, #fef3c7); color: var(--ss-warn-fg, #92400e); font-size: .88rem; }
     .pfm-attn ul { margin: .3rem 0 0 1.1rem; padding: 0; list-style: disc; display: grid; gap: .35rem; }
     .pfm-btn--go { margin-left: .4rem; border-color: var(--ss-warn-fg, #92400e); font-weight: 600; }
     .pfm-inl { display: inline-block; vertical-align: top; } .pfm-inl summary { cursor: pointer; text-decoration: underline; } .pfm-inl ul { margin-top: .3rem; font-size: .84rem; }
-    .pfm-stats { display: flex; flex-wrap: wrap; gap: .2rem 1.1rem; margin: .5rem 0; font-size: .82rem; color: var(--ss-text-muted, #555); }
-    .pfm-field label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: .3rem; }
-    .pfm-zone--result .pfm-tbl th, .pfm-zone--result .pfm-tbl td { border-bottom-color: rgb(0 0 0 / .08); }
+    .pfm-card .pfm-tbl th, .pfm-card .pfm-tbl td { border-bottom-color: rgb(0 0 0 / .08); }
     details.pfm-adv { margin-top: .9rem; font-size: .85rem; }
     details.pfm-adv summary { cursor: pointer; color: var(--ss-text-muted, #666); }
 </style>
@@ -174,7 +174,7 @@
                     };
                 @endphp
 
-                <section class="pfm-zone pfm-zone--result" aria-labelledby="pfm-z-res">
+                <section class="pfm-card" aria-labelledby="pfm-z-res">
                     <h3 class="pfm-zt" id="pfm-z-res">Kết quả khi bấm Tạo</h3>
                     @if ($pv)
                         <div class="pfm-head">
@@ -186,10 +186,25 @@
                                 <b>Chưa có bài nào để tạo</b>
                             @endif
                         </div>
-                        @if ($pv['count'] > 0)
-                            <p class="pfm-muted pfm-line">Bài ở trạng thái "Đã lên kế hoạch"@if ($importTarget === PlanFileImporter::TARGET_NEW || ($importTarget === PlanFileImporter::TARGET_BY_COLUMN && $pv['campaigns'] > 0)), chiến dịch mới ở "Tạm dừng"@endif. Chưa viết nội dung, chưa tốn token.</p>
-                        @endif
+                    @else
+                        <div class="pfm-head"><b>Chưa xem trước được</b>: chọn một cột làm "Từ khóa chính" trong mục "Chỉnh cột" bên dưới.</div>
+                    @endif
 
+                    <div class="pfm-where">
+                        <label for="pfm-target">Đưa vào</label>
+                        <select id="pfm-target" class="pfm-in" wire:model.live="importTarget">
+                            <option value="{{ PlanFileImporter::TARGET_BY_COLUMN }}">Theo chiến dịch ghi trong file</option>
+                            <option value="{{ PlanFileImporter::TARGET_NEW }}">Gom vào một chiến dịch mới</option>
+                            <option value="{{ PlanFileImporter::TARGET_SOLO }}">Bài lẻ (không thuộc chiến dịch)</option>
+                            @foreach ($campaigns as $camp)<option value="{{ $camp->id }}">Thêm vào: {{ $camp->name }}</option>@endforeach
+                        </select>
+                        @if ($importTarget === PlanFileImporter::TARGET_NEW)
+                            <input type="text" class="pfm-in" wire:model.blur="importNewName" maxlength="120" placeholder="Tên chiến dịch mới" aria-label="Tên chiến dịch mới" style="min-width:14rem">
+                        @endif
+                        <x-help title="Đưa vào đâu"><p>{{ $hint }}</p><p>Bài tạo ra ở trạng thái "Đã lên kế hoạch", chiến dịch mới ở "Tạm dừng"; chưa viết nội dung, chưa tốn token.</p></x-help>
+                    </div>
+
+                    @if ($pv)
                         @php
                             $attn = [];
                             if ($pv['count'] > 0 && $pv['solo'] > 0) {
@@ -235,57 +250,32 @@
                             </div>
                         @endif
 
-                        @if ($pv['count'] > 0)
-                            <div class="pfm-stats">
-                                <span><b>{{ $pv['dated'] }}</b>/{{ $pv['count'] }} có ngày</span>
-                                <span><b>{{ $pv['with_notes'] ?? 0 }}</b> có chỉ dẫn viết</span>
-                                <span><b>{{ $pv['with_secondary'] ?? 0 }}</b> có từ khóa phụ</span>
-                                @if (($pv['volumes'] ?? 0) > 0)<span><b>{{ $pv['volumes'] }}</b> có lượng tìm</span>@endif
-                                @foreach (($pv['link_hits'] ?? []) as $sheetName => $n)<span title="Số bài tìm thấy dòng tương ứng ở sheet «{{ $sheetName }}» (lấy ngày, tiêu đề... từ đó)">⇄ <b>{{ $n }}</b> từ «{{ \Illuminate\Support\Str::limit($sheetName, 22) }}»</span>@endforeach
-                            </div>
-                        @endif
 
                         @if ($pv['rows'])
                             <div class="pfm-wrap">
                                 <table class="pfm-tbl">
-                                    <thead><tr><th>Từ khóa chính</th><th>Chiến dịch</th><th>Ngày</th></tr></thead>
+                                    <thead><tr><th>Từ khóa chính</th><th>Chiến dịch</th>@if ($pv['dated'] > 0)<th>Ngày</th>@endif</tr></thead>
                                     <tbody>
-                                        @foreach (array_slice($pv['rows'], 0, 6) as $r)
-                                            <tr><td>{{ $r['keyword'] }}</td><td>{{ $r['campaign'] ?? 'Bài lẻ' }}</td><td>{{ $r['date'] ? \Carbon\Carbon::parse($r['date'])->format('d/m/Y') : '—' }}</td></tr>
+                                        @foreach (array_slice($pv['rows'], 0, 5) as $r)
+                                            <tr><td>{{ $r['keyword'] }}</td><td>{{ $r['campaign'] ?? 'Bài lẻ' }}</td>@if ($pv['dated'] > 0)<td>{{ $r['date'] ? \Carbon\Carbon::parse($r['date'])->format('d/m/Y') : '—' }}</td>@endif</tr>
                                         @endforeach
                                     </tbody>
                                 </table>
                             </div>
-                            @if ($pv['count'] > 6)<p class="pfm-muted" style="margin:.3rem 0 0">+{{ $pv['count'] - 6 }} bài nữa</p>@endif
+                            @if ($pv['count'] > 5)<p class="pfm-muted" style="margin:.3rem 0 0">+{{ $pv['count'] - 5 }} bài nữa</p>@endif
                         @endif
-                    @else
-                        <p class="pfm-muted" style="margin:0">Chưa xem trước được: chọn một cột làm "Từ khóa chính" ở phần "Cột trong file" bên dưới.</p>
                     @endif
                 </section>
 
-                <section class="pfm-zone pfm-zone--edit" aria-labelledby="pfm-z-edit">
-                    <h3 class="pfm-zt pfm-zt--soft" id="pfm-z-edit">Chỉnh nếu chưa đúng</h3>
-
-                    <div class="pfm-field">
-                        <label for="pfm-target">Đưa bài vào đâu</label>
-                        <div class="pfm-bar">
-                            <select id="pfm-target" class="pfm-in" wire:model.live="importTarget">
-                                <option value="{{ PlanFileImporter::TARGET_BY_COLUMN }}">Theo chiến dịch ghi trong file</option>
-                                <option value="{{ PlanFileImporter::TARGET_NEW }}">Gom vào một chiến dịch mới</option>
-                                <option value="{{ PlanFileImporter::TARGET_SOLO }}">Bài lẻ (không thuộc chiến dịch)</option>
-                                @foreach ($campaigns as $camp)<option value="{{ $camp->id }}">Thêm vào: {{ $camp->name }}</option>@endforeach
-                            </select>
-                            @if ($importTarget === PlanFileImporter::TARGET_NEW)
-                                <input type="text" class="pfm-in" wire:model.blur="importNewName" maxlength="120" placeholder="Tên chiến dịch mới" aria-label="Tên chiến dịch mới" style="min-width:15rem">
-                            @endif
-                        </div>
-                        <p class="pfm-muted pfm-line">{{ $hint }}</p>
-                    </div>
-
-                    <details class="pfm-adv" @if (! $pv) open @endif>
-                        <summary>Cột trong file <span class="pfm-muted">· dùng {{ $usedCols }}/{{ $dataCols }} cột có dữ liệu · AI đã đoán, chỉ sửa khi sai</span></summary>
-                        <p class="pfm-muted pfm-line">Ô bên phải là trường sẽ nhập vào. Cột không cần thì để "Bỏ qua". Chỉ cần có một cột "Từ khóa chính" là tạo được bài.</p>
-                <div class="pfm-wrap">
+                <details class="pfm-more" @if (! $pv) open @endif>
+                    <summary>Chỉnh cột và tùy chọn <span class="pfm-muted">· dùng {{ $usedCols }}/{{ $dataCols }} cột · AI đã đoán, chỉ sửa khi sai</span></summary>
+                    <div class="pfm-more-body">
+                        @if ($pv && $pv['count'] > 0)
+                            <p class="pfm-muted" style="margin:0 0 .5rem">{{ $pv['dated'] }}/{{ $pv['count'] }} bài có ngày · {{ $pv['with_notes'] ?? 0 }} có chỉ dẫn viết · {{ $pv['with_secondary'] ?? 0 }} có từ khóa phụ@if (($pv['volumes'] ?? 0) > 0) · {{ $pv['volumes'] }} có lượng tìm @endif
+                                @foreach (($pv['link_hits'] ?? []) as $sheetName => $n) · ⇄ {{ $n }} từ «{{ \Illuminate\Support\Str::limit($sheetName, 22) }}»@endforeach</p>
+                        @endif
+                        <p class="pfm-muted" style="margin:0 0 .5rem">Ô bên phải là trường sẽ nhập vào. Cột không cần thì để "Bỏ qua". Chỉ cần một cột "Từ khóa chính" là tạo được bài.</p>
+<div class="pfm-wrap">
                     <table class="pfm-tbl">
                         <thead><tr><th>Cột</th><th>Ví dụ</th><th>Nhập vào</th></tr></thead>
                         <tbody>
@@ -307,9 +297,7 @@
                         </tbody>
                     </table>
                 </div>
-                    </details>
-
-                <details class="pfm-adv">
+                        <details class="pfm-adv">
                     <summary>Tùy chọn</summary>
                     <div class="pfm-bar" style="margin-top:.5rem">
                         @if (count($st['sheets']) > 1)
@@ -325,7 +313,8 @@
                         <x-help title="Dòng chứa tên cột"><p>Dòng có các tên như "Từ khóa", "Ngày đăng". Hệ thống tự tìm; chỉ đổi nếu danh sách cột ở bước 1 trông sai. Nhập 0 nếu file không có dòng tên cột.</p></x-help>
                     </div>
                 </details>
-                </section>
+                    </div>
+                </details>
             @endif
         </div>
 

@@ -197,12 +197,12 @@ trait HasPlanFileImport
         try {
             $r = app(PlanFileMapper::class)->map($sheets, ($this->importState['sheet_locked'] ?? false) ? (string) $this->importState['sheet'] : null);
         } catch (InvalidArgumentException|KeywordAiUnavailable $e) {
-            $this->importError = \App\Support\UserFacingError::from($e).' Bạn vẫn có thể tự chọn cột bên dưới.';
+            $this->previewAfterAiFailure(\App\Support\UserFacingError::from($e).' Bạn vẫn có thể tự chọn cột bên dưới.');
 
             return;
         } catch (\Throwable $e) {
             report($e);
-            $this->importError = \App\Support\UserFacingError::from($e).' Bạn vẫn có thể tự chọn cột bên dưới.';
+            $this->previewAfterAiFailure(\App\Support\UserFacingError::from($e).' Bạn vẫn có thể tự chọn cột bên dưới.');
 
             return;
         }
@@ -212,6 +212,14 @@ trait HasPlanFileImport
         ]);
         $this->previewImport();
         $this->defaultTargetFromFile();
+    }
+
+    /** AI lỗi/chưa kết nối: vẫn dựng bản xem trước từ cột đã đoán bằng tên cột, để kết quả hiện ngay; lời báo lỗi AI giữ lại. */
+    private function previewAfterAiFailure(string $message): void
+    {
+        $this->previewImport();
+        $this->defaultTargetFromFile(); // dựng lại bản xem trước nên làm trước, để không xóa lời báo bên dưới
+        $this->importError = $this->importPreview !== null ? $message : ($this->importError ?? $message);
     }
 
     /**

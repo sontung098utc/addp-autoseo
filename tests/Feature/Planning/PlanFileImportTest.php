@@ -870,4 +870,21 @@ class PlanFileImportTest extends TestCase
             ->assertSet('importPreview.solo', 0)
             ->assertDontSee('sẽ thành bài lẻ');
     }
+
+    public function test_ai_loi_van_co_xem_truoc_tu_cot_da_doan_va_giu_loi_bao(): void
+    {
+        $this->app->instance(PlanFileMapper::class, new PlanFileMapper(new class implements StructuredAiInterface
+        {
+            public function generateStructured(string $system, string $user): array
+            {
+                throw new \RuntimeException('AI sập');
+            }
+        }));
+        Livewire::actingAs($this->user('approver'))->test(ContentPlanPage::class)->call('openImport')->set('planFile', $this->uploadNoCampaign())
+            ->assertSet('importState.analyzed', false)
+            ->assertSet('importPreview.count', 3)                       // kết quả hiện ngay, không đợi người dùng đổi cột
+            ->assertSet('importTarget', PlanFileImporter::TARGET_NEW)   // và vẫn áp mặc định theo nội dung file
+            ->assertSee('tự chọn cột')                                   // lời báo lỗi AI không bị xóa
+            ->assertSee('Kết quả khi bấm Tạo');
+    }
 }
