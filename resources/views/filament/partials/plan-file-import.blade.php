@@ -58,6 +58,20 @@
     @keyframes pfm-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     @media (prefers-reduced-motion: reduce) { .pfm-orb i, .pfm-ibar i, .pfm-skel b { animation: none; } .pfm-msgs span { animation: none; } .pfm-msgs span:first-child { opacity: 1; } }
     .pfm-res { margin: .2rem 0 .6rem 1.1rem; padding: 0; list-style: disc; font-size: .88rem; color: var(--ss-text-muted, #555); display: grid; gap: .2rem; }
+    .pfm-zone { border: 1px solid var(--ss-border, #ddd); border-radius: .75rem; padding: .8rem 1rem; margin-top: .9rem; }
+    .pfm-zone--result { border-color: var(--ss-accent-fg, #2563eb); background: var(--ss-accent-bg, #eef2ff); }
+    .pfm-zone--edit { background: transparent; }
+    .pfm-zt { margin: 0 0 .45rem; font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ss-accent-fg, #3730a3); }
+    .pfm-zt--soft { color: var(--ss-text-muted, #666); }
+    .pfm-head { font-size: 1.15rem; line-height: 1.4; }
+    .pfm-line { margin: .25rem 0 .1rem; }
+    .pfm-attn { margin: .6rem 0; padding: .55rem .8rem; border-radius: .6rem; background: var(--ss-warn-bg, #fef3c7); color: var(--ss-warn-fg, #92400e); font-size: .88rem; }
+    .pfm-attn ul { margin: .3rem 0 0 1.1rem; padding: 0; list-style: disc; display: grid; gap: .35rem; }
+    .pfm-btn--go { margin-left: .4rem; border-color: var(--ss-warn-fg, #92400e); font-weight: 600; }
+    .pfm-inl { display: inline-block; vertical-align: top; } .pfm-inl summary { cursor: pointer; text-decoration: underline; } .pfm-inl ul { margin-top: .3rem; font-size: .84rem; }
+    .pfm-stats { display: flex; flex-wrap: wrap; gap: .2rem 1.1rem; margin: .5rem 0; font-size: .82rem; color: var(--ss-text-muted, #555); }
+    .pfm-field label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: .3rem; }
+    .pfm-zone--result .pfm-tbl th, .pfm-zone--result .pfm-tbl td { border-bottom-color: rgb(0 0 0 / .08); }
     details.pfm-adv { margin-top: .9rem; font-size: .85rem; }
     details.pfm-adv summary { cursor: pointer; color: var(--ss-text-muted, #666); }
 </style>
@@ -134,10 +148,143 @@
                 @if ($importError)<div class="pfm-box pfm-box--warn" role="alert">{{ $importError }}</div>@endif
                 @if ($st['analyzed'] && ! ($st['is_plan'] ?? true))<div class="pfm-box pfm-box--warn">File này có vẻ không phải kế hoạch nội dung. Kiểm tra kỹ trước khi tạo.</div>@endif
 
-                @php $usedCols = count(array_filter($st['columns'], fn ($c) => ($c['field'] ?? 'ignore') !== 'ignore')); $dataCols = count(array_filter($st['columns'], fn ($c) => $c['samples'] !== [])); @endphp
-                <div class="pfm-step"><i>1</i>Cột trong file <span class="pfm-muted" style="font-weight:400">· dùng {{ $usedCols }}/{{ $dataCols }} cột có dữ liệu</span>
-                    <x-help title="Chọn trường cho từng cột"><p>Ô bên phải là trường sẽ nhập vào. Cột nào AI đoán sai thì đổi; cột không cần thì để "Bỏ qua".</p><p>Chỉ cần có một cột "Từ khóa chính" là tạo được bài.</p></x-help>
-                </div>
+
+                @php
+                    $usedCols = count(array_filter($st['columns'], fn ($c) => ($c['field'] ?? 'ignore') !== 'ignore'));
+                    $dataCols = count(array_filter($st['columns'], fn ($c) => $c['samples'] !== []));
+                    $campName = fn ($id) => (string) ($campaigns->firstWhere('id', (int) $id)?->name ?? '');
+                    $dest = null; $hint = '';
+                    if ($pv) {
+                        $names = $pv['campaign_names'] ?? [];
+                        $more = $pv['campaigns'] - count($names);
+                        $dest = match (true) {
+                            $importTarget === PlanFileImporter::TARGET_NEW => 'chiến dịch mới «'.(trim($importNewName) !== '' ? trim($importNewName) : '(chưa nhập tên)').'»',
+                            $importTarget === PlanFileImporter::TARGET_SOLO => 'bài lẻ (không thuộc chiến dịch nào)',
+                            $importTarget === PlanFileImporter::TARGET_BY_COLUMN => $pv['campaigns'] > 0
+                                ? ($pv['campaigns'] === 1 ? 'chiến dịch «'.$names[0].'»' : $pv['campaigns'].' chiến dịch: '.implode(', ', array_map(fn ($n) => '«'.$n.'»', $names)).($more > 0 ? ' và '.$more.' chiến dịch khác' : ''))
+                                : 'bài lẻ (file không ghi chiến dịch)',
+                            default => 'chiến dịch «'.$campName($importTarget).'»',
+                        };
+                    }
+                    $hint = match (true) {
+                        $importTarget === PlanFileImporter::TARGET_NEW => 'Tất cả bài vào một chiến dịch mới, ở trạng thái Tạm dừng. Bạn bật khi sẵn sàng.',
+                        $importTarget === PlanFileImporter::TARGET_SOLO => 'Bài lẻ không thuộc chiến dịch nào nên không có lịch chạy tự động.',
+                        $importTarget === PlanFileImporter::TARGET_BY_COLUMN => 'Dùng tên chiến dịch ở cột (hoặc dòng đề mục) trong file. Dòng không có tên sẽ thành bài lẻ.',
+                        default => 'Thêm tất cả bài vào chiến dịch đã chọn.',
+                    };
+                @endphp
+
+                <section class="pfm-zone pfm-zone--result" aria-labelledby="pfm-z-res">
+                    <h3 class="pfm-zt" id="pfm-z-res">Kết quả khi bấm Tạo</h3>
+                    @if ($pv)
+                        <div class="pfm-head">
+                            @if ($pv['count'] > 0 && $pv['solo'] > 0 && $pv['solo'] < $pv['count'])
+                                <b>{{ $pv['count'] }} bài</b>: <b>{{ $pv['count'] - $pv['solo'] }}</b> vào <b>{{ $dest }}</b>, <b>{{ $pv['solo'] }}</b> là bài lẻ
+                            @elseif ($pv['count'] > 0)
+                                <b>{{ $pv['count'] }} bài</b> sẽ vào <b>{{ $dest }}</b>
+                            @else
+                                <b>Chưa có bài nào để tạo</b>
+                            @endif
+                        </div>
+                        @if ($pv['count'] > 0)
+                            <p class="pfm-muted pfm-line">Bài ở trạng thái "Đã lên kế hoạch"@if ($importTarget === PlanFileImporter::TARGET_NEW || ($importTarget === PlanFileImporter::TARGET_BY_COLUMN && $pv['campaigns'] > 0)), chiến dịch mới ở "Tạm dừng"@endif. Chưa viết nội dung, chưa tốn token.</p>
+                        @endif
+
+                        @php
+                            $attn = [];
+                            if ($pv['count'] > 0 && $pv['solo'] > 0) {
+                                $attn[] = 'solo';
+                            }
+                            if ($pv['problem_count'] > 0) {
+                                $attn[] = 'problems';
+                            }
+                            if ($pv['over_limit']) {
+                                $attn[] = 'over';
+                            }
+                            if (! empty($pv['unlinked'])) {
+                                $attn[] = 'unlinked';
+                            }
+                            if (! ($pv['dates_ok'] ?? true) && $pv['dated'] > 0) {
+                                $attn[] = 'dates';
+                            }
+                        @endphp
+                        @if ($pv['count'] > 0 && $attn === [])
+                            <div class="pfm-box pfm-box--ok">✓ Không có gì cần chú ý. Bấm "Tạo {{ $pv['count'] }} bài" khi sẵn sàng.</div>
+                        @elseif ($attn !== [])
+                            <div class="pfm-attn" role="status">
+                                <strong>Cần chú ý ({{ count($attn) }})</strong>
+                                <ul>
+                                    @if (in_array('solo', $attn, true))
+                                        <li><b>{{ $pv['solo'] }} bài sẽ thành bài lẻ</b>, không thuộc chiến dịch nào nên không có lịch chạy tự động.
+                                            @if ($importTarget !== PlanFileImporter::TARGET_NEW)
+                                                <button type="button" class="pfm-btn pfm-btn--go" wire:click="importIntoNewCampaign">Gom vào chiến dịch mới</button>
+                                            @endif
+                                        </li>
+                                    @endif
+                                    @if (in_array('problems', $attn, true))
+                                        <li><b>{{ $pv['problem_count'] }} dòng bị bỏ qua</b> (trùng, thiếu từ khóa hoặc không hợp lệ).
+                                            <details class="pfm-inl"><summary>Xem lý do</summary>
+                                                <ul>@foreach ($pv['problems'] as $p)<li>Dòng {{ $p['row'] }}@if ($p['keyword'] !== '') ({{ $p['keyword'] }})@endif: {{ $p['reason'] }}</li>@endforeach</ul>
+                                            </details>
+                                        </li>
+                                    @endif
+                                    @if (in_array('over', $attn, true))<li>Mỗi lần chỉ tạo tối đa {{ PlanFileImporter::MAX_ITEMS }} bài; chạy lại file sau để tạo phần còn lại (bài đã có tự bỏ qua).</li>@endif
+                                    @if (in_array('unlinked', $attn, true))<li>Không tìm thấy trong sheet liên kết: {{ implode('; ', $pv['unlinked']) }}. Các dòng đó giữ nguyên giá trị gốc.</li>@endif
+                                    @if (in_array('dates', $attn, true))<li>Chưa lưu được ngày dự kiến: hệ thống cần chạy migration thêm cột ngày (php artisan migrate). Bài vẫn được tạo, chưa có ngày.</li>@endif
+                                </ul>
+                            </div>
+                        @endif
+
+                        @if ($pv['count'] > 0)
+                            <div class="pfm-stats">
+                                <span><b>{{ $pv['dated'] }}</b>/{{ $pv['count'] }} có ngày</span>
+                                <span><b>{{ $pv['with_notes'] ?? 0 }}</b> có chỉ dẫn viết</span>
+                                <span><b>{{ $pv['with_secondary'] ?? 0 }}</b> có từ khóa phụ</span>
+                                @if (($pv['volumes'] ?? 0) > 0)<span><b>{{ $pv['volumes'] }}</b> có lượng tìm</span>@endif
+                                @foreach (($pv['link_hits'] ?? []) as $sheetName => $n)<span title="Số bài tìm thấy dòng tương ứng ở sheet «{{ $sheetName }}» (lấy ngày, tiêu đề... từ đó)">⇄ <b>{{ $n }}</b> từ «{{ \Illuminate\Support\Str::limit($sheetName, 22) }}»</span>@endforeach
+                            </div>
+                        @endif
+
+                        @if ($pv['rows'])
+                            <div class="pfm-wrap">
+                                <table class="pfm-tbl">
+                                    <thead><tr><th>Từ khóa chính</th><th>Chiến dịch</th><th>Ngày</th></tr></thead>
+                                    <tbody>
+                                        @foreach (array_slice($pv['rows'], 0, 6) as $r)
+                                            <tr><td>{{ $r['keyword'] }}</td><td>{{ $r['campaign'] ?? 'Bài lẻ' }}</td><td>{{ $r['date'] ? \Carbon\Carbon::parse($r['date'])->format('d/m/Y') : '—' }}</td></tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            @if ($pv['count'] > 6)<p class="pfm-muted" style="margin:.3rem 0 0">+{{ $pv['count'] - 6 }} bài nữa</p>@endif
+                        @endif
+                    @else
+                        <p class="pfm-muted" style="margin:0">Chưa xem trước được: chọn một cột làm "Từ khóa chính" ở phần "Cột trong file" bên dưới.</p>
+                    @endif
+                </section>
+
+                <section class="pfm-zone pfm-zone--edit" aria-labelledby="pfm-z-edit">
+                    <h3 class="pfm-zt pfm-zt--soft" id="pfm-z-edit">Chỉnh nếu chưa đúng</h3>
+
+                    <div class="pfm-field">
+                        <label for="pfm-target">Đưa bài vào đâu</label>
+                        <div class="pfm-bar">
+                            <select id="pfm-target" class="pfm-in" wire:model.live="importTarget">
+                                <option value="{{ PlanFileImporter::TARGET_BY_COLUMN }}">Theo chiến dịch ghi trong file</option>
+                                <option value="{{ PlanFileImporter::TARGET_NEW }}">Gom vào một chiến dịch mới</option>
+                                <option value="{{ PlanFileImporter::TARGET_SOLO }}">Bài lẻ (không thuộc chiến dịch)</option>
+                                @foreach ($campaigns as $camp)<option value="{{ $camp->id }}">Thêm vào: {{ $camp->name }}</option>@endforeach
+                            </select>
+                            @if ($importTarget === PlanFileImporter::TARGET_NEW)
+                                <input type="text" class="pfm-in" wire:model.blur="importNewName" maxlength="120" placeholder="Tên chiến dịch mới" aria-label="Tên chiến dịch mới" style="min-width:15rem">
+                            @endif
+                        </div>
+                        <p class="pfm-muted pfm-line">{{ $hint }}</p>
+                    </div>
+
+                    <details class="pfm-adv" @if (! $pv) open @endif>
+                        <summary>Cột trong file <span class="pfm-muted">· dùng {{ $usedCols }}/{{ $dataCols }} cột có dữ liệu · AI đã đoán, chỉ sửa khi sai</span></summary>
+                        <p class="pfm-muted pfm-line">Ô bên phải là trường sẽ nhập vào. Cột không cần thì để "Bỏ qua". Chỉ cần có một cột "Từ khóa chính" là tạo được bài.</p>
                 <div class="pfm-wrap">
                     <table class="pfm-tbl">
                         <thead><tr><th>Cột</th><th>Ví dụ</th><th>Nhập vào</th></tr></thead>
@@ -160,58 +307,7 @@
                         </tbody>
                     </table>
                 </div>
-
-                <div class="pfm-step"><i>2</i>Đưa bài vào đâu
-                    <x-help title="Nơi nhận bài"><p>"Theo chiến dịch ghi trong file" dùng tên ở cột chiến dịch, hoặc ở dòng đề mục chia nhóm (ví dụ "GIAI ĐOẠN 1"); bài không có tên thành bài lẻ. Chiến dịch trùng tên được dùng lại, không tạo thêm.</p></x-help>
-                </div>
-                <div class="pfm-bar">
-                    <select class="pfm-in" wire:model.live="importTarget" aria-label="Đưa bài vào đâu">
-                        <option value="{{ PlanFileImporter::TARGET_BY_COLUMN }}">Theo chiến dịch ghi trong file</option>
-                        <option value="{{ PlanFileImporter::TARGET_NEW }}">Gom vào một chiến dịch mới</option>
-                        <option value="{{ PlanFileImporter::TARGET_SOLO }}">Bài lẻ (không thuộc chiến dịch)</option>
-                        @foreach ($campaigns as $camp)<option value="{{ $camp->id }}">Thêm vào: {{ $camp->name }}</option>@endforeach
-                    </select>
-                    @if ($importTarget === PlanFileImporter::TARGET_NEW)
-                        <input type="text" class="pfm-in" wire:model.blur="importNewName" maxlength="120" placeholder="Tên chiến dịch mới" aria-label="Tên chiến dịch mới" style="min-width:15rem">
-                    @endif
-                </div>
-
-                <div class="pfm-step"><i>3</i>Xem trước</div>
-                @if ($pv)
-                    <div class="pfm-sum">
-                        <span><b>{{ $pv['count'] }}</b> bài</span>
-                        @if ($pv['campaigns'])<span><b>{{ $pv['campaigns'] }}</b> chiến dịch</span>@endif
-                        <span><b>{{ $pv['dated'] }}</b> có ngày @if (! ($pv['dates_ok'] ?? true) && $pv['dated'] > 0) <x-help tone="warning" text="Chưa lưu được ngày dự kiến: hệ thống cần chạy migration thêm cột ngày cho bài (php artisan migrate). Bài vẫn được tạo, chưa có ngày." />@endif</span>
-                        @foreach (($pv['link_hits'] ?? []) as $sheetName => $n)<span title="Số bài tìm thấy dòng tương ứng ở sheet «{{ $sheetName }}» (lấy ngày, tiêu đề... từ đó)">⇄ <b>{{ $n }}</b> từ «{{ \Illuminate\Support\Str::limit($sheetName, 22) }}»</span>@endforeach
-                        <span title="Số bài có chỉ dẫn viết (tiêu đề gợi ý, ghi chú, CTA...): đội AI đọc khi lập dàn ý và viết"><b>{{ $pv['with_notes'] ?? 0 }}</b> có chỉ dẫn viết</span>
-                        <span @if (($pv['with_secondary'] ?? 0) === 0) style="opacity:.6" @endif><b>{{ $pv['with_secondary'] ?? 0 }}</b> có từ khóa phụ
-                            @if (($pv['with_secondary'] ?? 0) === 0)<x-help text="File không có cột từ khóa phụ nào được chọn. Nếu có cột từ khóa liên quan/LSI, đổi ô 'Nhập vào' của cột đó thành 'Từ khóa phụ' ở bước 1." />@endif</span>
-                        @if (($pv['volumes'] ?? 0) > 0)<span title="Lượng tìm kiếm sẽ lưu vào kho từ khóa (chỉ điền chỗ còn trống)"><b>{{ $pv['volumes'] }}</b> có lượng tìm</span>@endif
-                        @if ($pv['problem_count'])<span style="color:var(--ss-warn-fg,#92400e)"><b>{{ $pv['problem_count'] }}</b> bỏ qua</span>@endif
-                        @if (! empty($pv['unlinked']))<x-help tone="warning" :text="'Không tìm thấy trong sheet liên kết: '.implode('; ', $pv['unlinked']).'. Các dòng đó giữ nguyên giá trị gốc.'" />@endif
-                        @if ($pv['over_limit'])<x-help tone="warning" :text="'Mỗi lần chỉ tạo tối đa '.PlanFileImporter::MAX_ITEMS.' bài; chạy lại file sau để tạo phần còn lại (bài đã có tự bỏ qua).'" />@endif
-                    </div>
-                    @if ($pv['rows'])
-                        <div class="pfm-wrap">
-                            <table class="pfm-tbl">
-                                <thead><tr><th>Từ khóa chính</th><th>Chiến dịch</th><th>Ngày</th></tr></thead>
-                                <tbody>
-                                    @foreach (array_slice($pv['rows'], 0, 6) as $r)
-                                        <tr><td>{{ $r['keyword'] }}</td><td>{{ $r['campaign'] ?? '—' }}</td><td>{{ $r['date'] ? \Carbon\Carbon::parse($r['date'])->format('d/m/Y') : '—' }}</td></tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                        @if ($pv['count'] > 6)<p class="pfm-muted" style="margin:.3rem 0 0">+{{ $pv['count'] - 6 }} bài nữa</p>@endif
-                    @endif
-                    @if ($pv['problems'])
-                        <details style="margin-top:.4rem"><summary class="pfm-muted">Dòng bị bỏ qua ({{ $pv['problem_count'] }})</summary>
-                            <ul style="margin:.4rem 0 0 1.1rem;font-size:.86rem">@foreach ($pv['problems'] as $p)<li>Dòng {{ $p['row'] }}@if ($p['keyword'] !== '') ({{ $p['keyword'] }})@endif: {{ $p['reason'] }}</li>@endforeach</ul>
-                        </details>
-                    @endif
-                @else
-                    <p class="pfm-muted" style="margin:0">Chọn một cột làm "Từ khóa chính" để xem trước.</p>
-                @endif
+                    </details>
 
                 <details class="pfm-adv">
                     <summary>Tùy chọn</summary>
@@ -229,6 +325,7 @@
                         <x-help title="Dòng chứa tên cột"><p>Dòng có các tên như "Từ khóa", "Ngày đăng". Hệ thống tự tìm; chỉ đổi nếu danh sách cột ở bước 1 trông sai. Nhập 0 nếu file không có dòng tên cột.</p></x-help>
                     </div>
                 </details>
+                </section>
             @endif
         </div>
 

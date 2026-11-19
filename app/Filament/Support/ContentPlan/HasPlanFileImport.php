@@ -47,6 +47,9 @@ trait HasPlanFileImport
 
     public string $importNewName = '';
 
+    /** Người dùng đã tự đổi ô "Đưa bài vào đâu": hệ thống không đổi mặc định thay họ nữa (phân tích lại, đổi sheet...). */
+    public bool $importTargetTouched = false;
+
     /** @var array<string,mixed>|null */
     public ?array $importPreview = null;
 
@@ -208,6 +211,44 @@ trait HasPlanFileImport
             'ai' => ['label' => $r['label'], 'model' => $r['model'], 'cost_vnd' => $r['cost_vnd']],
         ]);
         $this->previewImport();
+        $this->defaultTargetFromFile();
+    }
+
+    /**
+     * File không nói bài thuộc chiến dịch nào (không có cột chiến dịch, không có dòng đề mục): mặc định gom vào MỘT chiến dịch mới
+     * (tạm dừng, tên lấy từ tên file) để bài có chỗ chạy, thay vì lặng lẽ thành "bài lẻ" không có lịch. Chỉ khi người dùng chưa tự chọn.
+     */
+    private function defaultTargetFromFile(): void
+    {
+        $pv = $this->importPreview;
+        if ($this->importTargetTouched || $this->importTarget !== PlanFileImporter::TARGET_BY_COLUMN || ! $pv || $pv['count'] === 0 || $pv['campaigns'] > 0) {
+            return;
+        }
+        $this->importTarget = PlanFileImporter::TARGET_NEW;
+        if (trim($this->importNewName) === '') {
+            $this->importNewName = $this->defaultCampaignName();
+        }
+        $this->previewImport();
+    }
+
+    private function defaultCampaignName(): string
+    {
+        $base = pathinfo((string) ($this->importState['file'] ?? ''), PATHINFO_FILENAME);
+        $base = trim((string) preg_replace('/[\s_]+/u', ' ', $base));
+
+        return PlanFileFields::text($base !== '' ? $base : 'Kế hoạch nhập từ file', 120);
+    }
+
+    /** Nút "Gom vào chiến dịch mới" ở cảnh báo bài lẻ: một chạm thay vì tự tìm ô chọn. */
+    public function importIntoNewCampaign(): void
+    {
+        $this->importGuard();
+        $this->importTargetTouched = true;
+        $this->importTarget = PlanFileImporter::TARGET_NEW;
+        if (trim($this->importNewName) === '') {
+            $this->importNewName = $this->defaultCampaignName();
+        }
+        $this->previewImport();
     }
 
     public function chooseImportSheet(string $name): void
@@ -257,6 +298,7 @@ trait HasPlanFileImport
     public function updatedImportTarget(): void
     {
         $this->importGuard();
+        $this->importTargetTouched = true;
         $this->previewImport();
     }
 
@@ -296,6 +338,8 @@ trait HasPlanFileImport
         $this->importPreview = [
             'count' => count($items),
             'campaigns' => count(array_unique(array_filter(array_column($items, 'campaign')))),
+            'campaign_names' => array_slice(array_values(array_unique(array_filter(array_column($items, 'campaign')))), 0, 5),
+            'solo' => count(array_filter($items, fn ($i) => empty($i['campaign']))),
             'dated' => count(array_filter(array_column($items, 'date'))),
             'volumes' => count(array_filter(array_column($items, 'volume'), fn ($v) => $v !== null)),
             'with_notes' => count(array_filter(array_column($items, 'guidance'))),
@@ -346,6 +390,7 @@ trait HasPlanFileImport
         $this->importPreview = null;
         $this->importError = null;
         $this->importNewName = '';
+        $this->importTargetTouched = false;
         $this->importTarget = PlanFileImporter::TARGET_BY_COLUMN;
         if ($clearResult) {
             $this->importResult = null;
