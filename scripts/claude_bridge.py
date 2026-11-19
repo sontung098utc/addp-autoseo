@@ -9,6 +9,7 @@ An toàn (cố ý, đừng nới):
   - mọi yêu cầu phải có `Authorization: Bearer <khóa>`; khóa tự sinh ở ~/.config/claude-bridge/token (quyền 0600), so sánh hằng thời gian;
   - POST /v1/search (tìm web cho ReferenceDossier): Claude chỉ được dùng WebSearch + WebFetch (chỉ đọc, không tệp/lệnh); nội dung web là dữ liệu;
   - Với trò chuyện (chat/completions), Claude chạy với TẤT CẢ công cụ tắt (--tools ""), không nạp cấu hình người dùng/dự án/hook (--setting-sources ""), không lưu phiên,
+  - mọi máy chủ MCP/connector của tài khoản claude.ai bị gỡ (--strict-mcp-config + cấu hình rỗng), vì --tools "" không chặn chúng;
     trong một thư mục tạm rỗng: nội dung do ứng dụng gửi chỉ là văn bản để trả lời, không thể đọc/ghi tệp hay chạy lệnh;
   - không dùng shell; đối số là danh sách; tên model chỉ nhận [A-Za-z0-9._-]; thân yêu cầu tối đa 4 MB; không ghi nội dung lời nhắn ra log.
 
@@ -41,6 +42,10 @@ TOKEN_FILE = os.path.expanduser("~/.config/claude-bridge/token")
 MAX_BODY = 4 * 1024 * 1024
 MAX_ARG = 100_000  # tránh vượt giới hạn một đối số của hệ điều hành (~128 KB)
 MODEL_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+# Connector (MCP) gắn với TÀI KHOẢN claude.ai (ví dụ "Claude Docs": tạo/xóa/xuất tài liệu) VẪN được nạp dù đã --tools ""
+# và --setting-sources "". Khi đó mô hình thật sự phát lời gọi công cụ và chỉ hệ thống xin quyền chặn lại. Hai cờ dưới đây gỡ hẳn
+# mọi máy chủ MCP (đã kiểm chứng: 0 công cụ, mô hình trả lời "không có công cụ"). KHÔNG bỏ khi sửa lệnh gọi Claude.
+NO_MCP = ["--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}']
 KNOWN_MODELS = ["opus", "sonnet", "haiku"]
 SEARCH_MODEL = os.environ.get("CLAUDE_BRIDGE_SEARCH_MODEL", "haiku")  # tìm web là việc nhẹ: dùng model nhỏ để dành hạn mức cho việc viết
 LIMIT_HINTS = ("rate limit", "usage limit", "session limit", "hit your", "overloaded", "429", "quota", "too many requests", "limit reached", "resets ")
@@ -88,7 +93,7 @@ def flatten(messages):
 def run_claude(model: str, system: str, user: str):
     """Trả (nội dung, token_vào, token_ra) hoặc ném RuntimeError(mã_http, thông_điệp)."""
     args = [CLAUDE, "-p", "--model", model, "--output-format", "json", "--tools", "", "--no-session-persistence",
-            "--disable-slash-commands", "--setting-sources", ""]
+            "--disable-slash-commands", "--setting-sources", ""] + NO_MCP
     stdin = user
     if system:
         if len(system.encode("utf-8")) <= MAX_ARG:
@@ -138,7 +143,7 @@ def run_search(query: str, max_results: int, include, exclude):
         ask += "\nBỏ qua các tên miền: " + ", ".join(exclude[:20]) + "."
     args = [CLAUDE, "-p", "--model", SEARCH_MODEL, "--output-format", "json", "--tools", "WebSearch,WebFetch",
             "--allowedTools", "WebSearch,WebFetch", "--no-session-persistence", "--disable-slash-commands", "--setting-sources", "",
-            "--system-prompt=" + SEARCH_SYSTEM]
+            "--system-prompt=" + SEARCH_SYSTEM] + NO_MCP
     with tempfile.TemporaryDirectory(prefix="claude-bridge-") as cwd, slots:
         try:
             p = subprocess.run(args, input=ask.encode("utf-8"), capture_output=True, timeout=TIMEOUT, cwd=cwd)
