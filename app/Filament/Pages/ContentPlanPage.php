@@ -278,7 +278,7 @@ class ContentPlanPage extends Page
                     $dt = (new PlanActions)->reschedule(Auth::user(), $article, (string) ($arguments['day'] ?? ''));
                     Notification::make()->title('Đã xếp bài vào lịch')->body($dt.' (giờ VN)')->success()->send();
                 } catch (InvalidArgumentException $e) {
-                    Notification::make()->title('Không xếp được bài')->body($e->getMessage())->danger()->send();
+                    Notification::make()->title('Không xếp được bài')->body(\App\Support\UserFacingError::from($e))->danger()->send();
                 }
             });
     }
