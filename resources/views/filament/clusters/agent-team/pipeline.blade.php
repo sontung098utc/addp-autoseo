@@ -3,7 +3,7 @@
         @include('filament.clusters.agent-team.pipeline-style')
         <x-studio.tabs persist="pipeline-view" :default="$live ? 'runs' : 'flows'" label="Cách xem pipeline" :tabs="[
             ['key' => 'flows', 'label' => 'Các luồng', 'count' => count($flows)],
-            ['key' => 'runs', 'label' => 'Đang chạy', 'count' => count($runs) ?: null, 'tone' => $live ? 'info' : null],
+            ['key' => 'runs', 'label' => 'Gần đây', 'count' => count($runs) ?: null, 'tone' => $live ? 'info' : null],
         ]">
             <x-studio.panel key="flows">
                 @include('filament.clusters.agent-team.pipeline-flows')

@@ -123,6 +123,33 @@ class PipelineVisualTest extends TestCase
         $this->assertMatchesRegularExpression('/data-testid="pipeline"[^>]*wire:poll\.'.\App\Filament\Support\Agent\RunActivity::POLL_LIVE.'s/', $html);
     }
 
+    public function test_tab_ten_gan_day_va_dem_phien_dang_chay_that(): void
+    {
+        $this->actingAs($this->user('approver'));
+        $this->makeRun('site_audit', 'ready_for_review');
+        $failed = $this->makeRun('site_audit', 'failed');
+        $failed->update(['outcome_reason' => 'Hết hạn mức AI']);
+        $html = $this->get('/admin/doi-ai/pipeline')->assertOk()->getContent();
+        preg_match_all('/role="tab" class="ss-tab" data-key="runs"[^>]*>(.*?)<\/button>/s', $html, $m);
+        $this->assertStringContainsString('Gần đây', $m[1][0] ?? '');
+        $this->assertStringNotContainsString('Đang chạy', $m[1][0] ?? '');
+        $this->assertStringContainsString('2 phiên gần đây', $html);
+        $this->assertStringContainsString('0 phiên đang thật sự chạy', $html);
+        $this->assertStringContainsString('data-testid="run-failed-tag"', $html);
+        $this->assertStringContainsString('Xem lý do', $html);
+        $this->assertStringContainsString('Hết hạn mức AI', $html);
+    }
+
+    public function test_dem_dang_chay_khop_run_activity(): void
+    {
+        $this->actingAs($this->user('approver'));
+        $this->makeRun('site_audit');
+        $this->makeRun('site_audit', 'ready_for_review');
+        $n = \App\Filament\Support\Agent\RunActivity::liveCount();
+        $html = $this->get('/admin/doi-ai/pipeline')->assertOk()->getContent();
+        $this->assertStringContainsString("{$n} phiên đang thật sự chạy", $html);
+    }
+
     public function test_khong_poll_khi_khong_co_phien_running(): void
     {
         $this->actingAs($this->user('approver'));
