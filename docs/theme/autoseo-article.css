@@ -12,11 +12,18 @@
   --as-accent: rgb(24, 90, 219);
 }
 
+/* ---- cỡ chữ đồng đều: theme có `address, p, ul, ol { font-size: 14px }` (blog-styles.css) nên li nhỏ hơn p (17px). Danh sách theo thân bài. ---- */
+.blog-post-view .addp-article-copy ul,
+.blog-post-view .addp-article-copy ol {
+  font-size: inherit;
+  line-height: inherit;
+}
+
 /* ---- chú thích [n] và ghi chú [a] trong thân bài ---- */
 .blog-post-view .addp-article-copy sup.autoseo-cite,
 .blog-post-view .addp-article-copy sup.autoseo-note {
   position: relative;
-  font-size: 0.75em;
+  font-size: 12px;                   /* cố định: 0.75em làm [1] có 4 cỡ khác nhau tùy nằm trong p, li hay bảng */
   line-height: 0;
   margin: 0 0.05em;
   padding: 0.35em 0.15em;            /* vùng rê/chạm lớn hơn chữ */
@@ -153,7 +160,7 @@
   width: 100%;
   border-collapse: collapse;
   margin: 1.25rem 0;
-  font-size: 0.9em;
+  font-size: 15px;                   /* cùng cỡ với Ghi chú / Nguồn; không dùng em để khỏi lệch theo khung chứa */
 }
 .blog-post-view .addp-article-copy table th,
 .blog-post-view .addp-article-copy table td {
