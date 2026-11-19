@@ -9,7 +9,9 @@ use App\Filament\Support\Keywords\KeywordArticleLinks;
 use App\Filament\Support\Keywords\KeywordIntent;
 use App\Filament\Support\Keywords\KeywordService;
 use App\Filament\Support\Planning\DuplicateKeywordException;
+use App\Filament\Support\Planning\KeywordDuplicateGuard;
 use App\Filament\Support\Planning\PlannedArticleCreator;
+use App\Models\Article;
 use App\Models\Campaign;
 use App\Models\Keyword;
 use App\Models\User;
@@ -399,8 +401,14 @@ class KeywordsPage extends Page
             if ($campaignId !== null) {
                 $a->update(['campaign_id' => $campaignId]);
             }
-        } catch (DuplicateKeywordException) {
-            Notification::make()->title('Từ khóa đã có bài')->body('Website đã có bài dùng từ khóa này, không tạo thêm.')->warning()->send();
+        } catch (DuplicateKeywordException $e) {
+            $d = ($dup = Article::find($e->existingArticleId)) ? KeywordDuplicateGuard::describe($dup) : null;
+            $n = Notification::make()->title('Từ khóa đã có bài')->warning()
+                ->body($d ? 'Bài #'.$d['id'].' (trạng thái: '.$d['status_label'].') đang dùng từ khóa này trên website, không tạo thêm.' : 'Website đã có bài dùng từ khóa này, không tạo thêm.');
+            if ($d && $d['url']) {
+                $n->actions([\Filament\Notifications\Actions\Action::make('open')->label('Mở bài đó')->url($d['url'])]);
+            }
+            $n->send();
 
             return;
         } catch (InvalidArgumentException $e) {
