@@ -282,7 +282,7 @@ class ViewArticle extends EditArticle
             Actions\Action::make('guidance')->label('Chỉ dẫn cho đội AI')->icon('heroicon-o-chat-bubble-left-ellipsis')->color('gray')
                 ->visible(fn () => ArticleResource::canEdit($this->record))
                 ->modalHeading('Chỉ dẫn thêm cho đội AI')
-                ->modalDescription('Định hướng riêng cho bài này: góc nhìn, đối tượng, điều cần nhấn hoặc tránh. Đội AI dùng ở lần giao kế tiếp (lập dàn ý và viết); không thay được quy tắc an toàn, nguồn và từ cấm.')
+                ->modalDescription('Định hướng riêng cho bài này: góc nhìn, đối tượng, điều cần nhấn hoặc tránh. Chỉ dẫn này lưu theo bài và áp cho MỌI lần chạy (giao đội AI, giao làm lại); không thay được quy tắc an toàn, nguồn và từ cấm. Yêu cầu riêng cho một lần làm lại nhập ở hộp "Giao làm lại".')
                 ->modalSubmitActionLabel('Lưu chỉ dẫn')
                 ->fillForm(fn () => ['guidance' => $this->record->guidance])
                 ->form([
@@ -310,11 +310,11 @@ class ViewArticle extends EditArticle
             Actions\Action::make('redo_agent')->label('Giao làm lại')->icon('heroicon-o-arrow-path')
                 ->visible(fn () => ArticleResource::canRedoWithAgent($this->record))
                 ->modalHeading('Giao bài này làm lại')
-                ->modalDescription('Chưa vừa ý với bản hiện tại? Gửi lời nhắn cho điều phối: đội AI làm lại theo đó và giữ những phần đã đạt. Mọi quy tắc an toàn, nguồn và từ cấm vẫn áp dụng.')
-                ->form(ArticleResource::redoForm())
+                ->modalDescription(ArticleResource::REDO_DESCRIPTION)
+                ->form(fn () => ArticleResource::redoForm($this->record))
                 ->modalSubmitActionLabel('Giao làm lại')
                 ->action(function (array $data, Actions\Action $action) {
-                    $url = ArticleResource::assignToAgent($this->record, background: true, redoMessage: (string) $data['message']);
+                    $url = ArticleResource::assignToAgent($this->record, background: true, redoMessage: ArticleResource::redoMessage($this->record, $data));
                     $this->refreshRecord();
                     $url ? $action->redirect($url) : null;
                 }),

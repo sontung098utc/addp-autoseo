@@ -257,6 +257,71 @@ final class ArticleImageService
         return ['attached' => $attached, 'placements' => $placements];
     }
 
+    /**
+     * GIỮ NGUYÊN ẢNH khi làm lại: gắn ảnh của bản trước vào bản mới (không tạo ảnh). Ảnh bìa chỉ gắn khi bản mới chưa có ảnh bìa; ảnh trong bài được chèn lại vào
+     * mục có cùng tên (hoặc cùng thứ tự) như ở bản trước, bỏ qua ảnh đã có sẵn trong nội dung bản mới để không chèn trùng.
+     *
+     * @return array{attached:int, placements:list<array<string,mixed>>}
+     */
+    public function carryOver(ArticleVersion $prev, ArticleVersion $version): array
+    {
+        $placements = [];
+        $bySection = [];
+        $prevSections = HtmlSections::split((string) $prev->html_content)['sections'];
+        $newSections = HtmlSections::split((string) $version->html_content)['sections'];
+        $newHtml = (string) $version->html_content;
+        $have = $version->mediaAssets()->pluck('media_assets.id')->all();
+        $hasCover = $version->mediaAssets()->get()->contains(fn (MediaAsset $a) => (bool) $a->pivot->is_featured);
+        $position = (int) ($version->mediaAssets()->max('position') ?? -1) + 1;
+        $attached = 0;
+        foreach ($prev->mediaAssets()->orderBy('position')->get() as $asset) {
+            if (in_array($asset->id, $have, true)) {
+                continue;
+            }
+            if ((bool) $asset->pivot->is_featured) {
+                if ($hasCover) {
+                    $placements[] = ['role' => 'featured', 'asset_id' => $asset->id, 'status' => 'unused', 'note' => 'bản mới đã có ảnh bìa'];
+
+                    continue;
+                }
+                $version->mediaAssets()->syncWithoutDetaching([$asset->id => ['is_featured' => true, 'position' => 0, 'custom_alt' => $asset->pivot->custom_alt ?? $asset->alt_text]]);
+                $hasCover = true;
+                $attached++;
+                $placements[] = ['role' => 'featured', 'asset_id' => $asset->id, 'status' => 'featured', 'note' => 'giữ ảnh bìa của bản trước'];
+
+                continue;
+            }
+            $version->mediaAssets()->syncWithoutDetaching([$asset->id => ['is_featured' => false, 'position' => $position++, 'custom_alt' => $asset->pivot->custom_alt ?? $asset->alt_text]]);
+            $attached++;
+            $url = (string) $asset->url;
+            if ($url !== '' && str_contains($newHtml, $url)) {
+                $placements[] = ['role' => 'inline', 'asset_id' => $asset->id, 'status' => 'present', 'note' => 'ảnh đã có trong nội dung bản mới'];
+
+                continue;
+            }
+            $from = null;
+            foreach ($prevSections as $i => $sec) {
+                if ($url !== '' && str_contains((string) $sec['html'], $url)) {
+                    $from = [$sec, $i + 1];
+                    break;
+                }
+            }
+            $idx = $from ? $this->sectionIndex($newSections, (string) $from[0]['heading'], (int) $from[1]) : null;
+            if ($idx === null) {
+                $placements[] = ['role' => 'inline', 'asset_id' => $asset->id, 'status' => 'unplaced', 'note' => 'ảnh gắn vào bài nhưng chưa tìm được mục để chèn lại'];
+
+                continue;
+            }
+            $bySection[$idx] = $asset;
+            $placements[] = ['role' => 'inline', 'asset_id' => $asset->id, 'status' => 'inserted', 'note' => 'chèn lại vào mục "'.($newSections[$idx]['heading'] ?? '').'"'];
+        }
+        if ($bySection !== [] && config('agent.images.insert_inline', true)) {
+            $version->update(['html_content' => self::insertFigures($newHtml, $bySection)]);
+        }
+
+        return ['attached' => $attached, 'placements' => $placements];
+    }
+
     /** @param list<array{index:int, heading:string, html:string}> $sections */
     private function sectionIndex(array $sections, string $heading, int $order): ?int
     {
