@@ -98,6 +98,9 @@ final class AgentRunOrchestrator
     /** AG-B1: các Trí tuệ của bài đang chạy (theo chiến dịch hoặc website) và chiến dịch giao việc. */
     private ?BrainContext $brainCtx = null;
 
+    /** Bài chắc chắn ngoài lĩnh vực của website (TopicScope): không điều phối/nạp kho theo Trí tuệ, không ghi khoảng trống. */
+    private bool $offField = false;
+
     private ?int $campaignId = null;
 
     public function __construct(
@@ -368,10 +371,11 @@ final class AgentRunOrchestrator
             }
         }
         $this->brandProfile = BrandProfileData::forWebsite($article->website_id);
-        $this->brainCtx = BrainContext::forArticle($article, $this->campaignId); // AG-B1
+        $this->brainCtx = BrainContext::forArticle($article, $this->campaignId, false); // AG-B1 (đủ mọi Trí tuệ; lọc theo chủ đề ngay dưới)
         // Trí tuệ gắn theo website không đồng nghĩa liên quan tới MỌI bài: bài chắc chắn ngoài lĩnh vực chỉ giữ Trí tuệ thường (thương hiệu), bỏ các Trí tuệ rủi ro cao/bắt buộc nguồn (y tế) để không nâng hạng, không nhồi bối cảnh/disclaimer y tế vào lời nhắc viết, nguồn và ảnh.
         $offField = \App\Services\Agent\Risk\TopicScope::clearlyOffField((string) $article->primary_keyword, $this->brandProfile, $this->brainCtx);
         $droppedBrains = $offField ? array_values(array_map(fn ($b) => $b->name, array_filter($this->brainCtx->brains, fn ($b) => $b->riskClass() !== 'low' || $b->reliance() === 'must_cite'))) : [];
+        $this->offField = $offField;
         if ($droppedBrains !== []) {
             $this->brainCtx = $this->brainCtx->withoutStrict();
         }
@@ -1036,6 +1040,11 @@ final class AgentRunOrchestrator
      */
     private function coordinateKnowledge(AgentRun $run, Article $article, string $risk): void
     {
+        if ($this->offField) {
+            $this->step($run, 'research', 'system', 'ok', 'Không điều phối kho: chủ đề ngoài lĩnh vực website', 'Chủ đề nằm ngoài lĩnh vực của website nên không nạp thêm nguồn vào kho của các Trí tuệ chuyên ngành và không ghi thành khoảng trống kiến thức; bài dùng nguồn tìm được trên web.', ['purpose' => 'kb_coordination', 'off_field' => true]);
+
+            return;
+        }
         $ai = $this->roleOff('strategist') ? null : $this->lightAi();
         if ($ai === null || $this->spent($run) >= $this->policy->budgetVnd) {
             return;

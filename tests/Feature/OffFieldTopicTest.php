@@ -120,4 +120,29 @@ class OffFieldTopicTest extends TestCase
         $this->assertSame('high', $ctx->riskFloor());
         $this->assertSame('low', $ctx->withoutStrict()->riskFloor());
     }
+
+    public function test_off_field_article_is_not_a_gap_of_medical_brain_and_has_no_evid01(): void
+    {
+        foreach ([['Dinh dưỡng và chế độ ăn', 'must_cite', 'high']] as $i => [$n, $rel, $risk]) {
+            $b = Brain::create(['name' => $n, 'slug' => 'dd'.$i, 'domain_key' => 'dd', 'language' => 'vi', 'status' => 'active', 'description' => '', 'settings' => ['risk_class' => $risk, 'ai_reliance' => $rel]]);
+            $this->site->brains()->attach($b->id, ['priority' => 30]);
+        }
+        $off = $this->article('cách pha trà xanh');
+        $health = $this->article('thực đơn cho người tiểu đường');
+
+        // Hồ sơ/Trí tuệ theo chủ đề: bài lệch không còn Trí tuệ y tế, bài y tế giữ nguyên.
+        $this->assertNotContains('Dinh dưỡng và chế độ ăn', array_map(fn ($b) => $b->name, BrainContext::forArticle($off)->brains));
+        $this->assertContains('Dinh dưỡng và chế độ ăn', array_map(fn ($b) => $b->name, BrainContext::forArticle($health)->brains));
+
+        // Không ghi khoảng trống kiến thức cho bài lệch; bài y tế vẫn ghi.
+        (new \App\Services\Knowledge\KnowledgeContext)->load($off, []);
+        $this->assertSame(0, \App\Models\KnowledgeGap::count());
+        (new \App\Services\Knowledge\KnowledgeContext)->load($health, []);
+        $this->assertSame(1, \App\Models\KnowledgeGap::count());
+
+        // EVID01 (Trí tuệ bắt buộc nguồn) không chạy trên bài lệch.
+        $rule = new \App\Services\Content\Quality\Rules\EvidenceRule;
+        $mk = fn (Article $a) => new \App\Services\Content\Quality\QualityContext(\Tests\Unit\QualityFixtures::version($a, 1, 'needs_review', ['html_content' => \Tests\Unit\QualityFixtures::goodHtml().'<p>Trà xanh giúp giảm 30% mỡ máu.</p>', 'sources_cited' => []]), $a);
+        $this->assertSame([], $rule->evaluate($mk($off)));
+    }
 }
