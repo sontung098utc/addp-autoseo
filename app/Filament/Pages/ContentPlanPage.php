@@ -7,6 +7,7 @@ use App\Filament\Support\ContentPlan\HasPlanProposals;
 use App\Filament\Support\ContentPlan\MockTitleSuggester;
 use App\Filament\Support\ContentPlan\PlanActions;
 use App\Filament\Support\ContentPlan\PlanData;
+use App\Filament\Support\ContentPlan\PlanDeleter;
 use App\Filament\Support\ContentPlan\PlanRules;
 use App\Filament\Support\ContentPlan\PlanStatus;
 use App\Filament\Resources\ArticleResource;
@@ -27,6 +28,7 @@ use App\Services\Planning\TopicExplorer;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -239,6 +241,86 @@ class ContentPlanPage extends Page
                     Notification::make()->title('Không đổi được ngày')->body(\App\Support\UserFacingError::from($e))->danger()->send();
                 }
             });
+    }
+
+    /** Xóa MỘT bài chờ viết (nút "Xóa" ở từng dòng trong tab "Các kế hoạch"). Chỉ trưởng nhóm duyệt bài trở lên. */
+    public function deletePlannedAction(): Action
+    {
+        return Action::make('deletePlanned')
+            ->requiresConfirmation()
+            ->label('Xóa')->color('danger')
+            ->modalHeading('Xóa bài khỏi kế hoạch?')
+            ->modalDescription(function (array $arguments): string {
+                $a = Article::query()->find((int) ($arguments['article'] ?? 0));
+
+                return $a ? 'Xóa bài chờ viết «'.$a->primary_keyword.'». Không hoàn tác được. Từ khóa vẫn còn trong kho từ khóa.' : 'Không tìm thấy bài, tải lại trang.';
+            })
+            ->modalSubmitActionLabel('Xóa bài')->modalCancelActionLabel('Giữ lại')
+            ->action(fn (array $arguments) => $this->runPlanDelete(fn (PlanDeleter $d, Website $site) => $d->deletePlanned(Auth::user(), $site, [(int) ($arguments['article'] ?? 0)])));
+    }
+
+    /** Xóa mọi bài chờ viết của một nhóm: "Bài lẻ" hoặc một chiến dịch (không đụng bài đã viết). */
+    public function deleteGroupAction(): Action
+    {
+        return Action::make('deleteGroup')
+            ->requiresConfirmation()
+            ->label('Xóa bài chờ viết')->color('danger')
+            ->modalHeading(fn (array $arguments): string => ($arguments['group'] ?? '') === 'solo' ? 'Xóa các bài lẻ chưa viết?' : 'Xóa các bài chờ viết của chiến dịch?')
+            ->modalDescription(function (array $arguments): string {
+                $site = $this->site();
+                $g = (string) ($arguments['group'] ?? '');
+                $q = Article::query()->where('website_id', $site?->id)->where('workflow_status', 'planned');
+                $g === 'solo' ? $q->whereNull('campaign_id') : $q->where('campaign_id', (int) $g);
+
+                return 'Sẽ xóa '.$q->count().' bài "Đã lên kế hoạch" của nhóm này. Bài đã viết hoặc đang viết được giữ nguyên. Không hoàn tác được; từ khóa vẫn còn trong kho từ khóa.';
+            })
+            ->modalSubmitActionLabel('Xóa')->modalCancelActionLabel('Giữ lại')
+            ->action(fn (array $arguments) => $this->runPlanDelete(fn (PlanDeleter $d, Website $site) => $d->deleteGroupPlanned(Auth::user(), $site, (string) ($arguments['group'] ?? ''))));
+    }
+
+    /** Xóa một chiến dịch chưa chạy; chọn xóa luôn bài chờ viết của nó hay giữ chúng thành bài lẻ. */
+    public function deleteCampaignAction(): Action
+    {
+        return Action::make('deleteCampaign')
+            ->label('Xóa chiến dịch')->color('danger')
+            ->modalHeading(fn (array $arguments): string => 'Xóa chiến dịch «'.(Campaign::query()->whereKey((int) ($arguments['campaign'] ?? 0))->value('name') ?? '').'»?')
+            ->modalDescription('Chỉ xóa được chiến dịch chưa chạy, không còn bài đã viết. Không hoàn tác được.')
+            ->form([Radio::make('mode')->label('Các bài chờ viết của chiến dịch')->options(['with' => 'Xóa luôn các bài chờ viết', 'keep' => 'Giữ lại, chuyển thành bài lẻ'])->default('with')->required()])
+            ->modalSubmitActionLabel('Xóa chiến dịch')->modalCancelActionLabel('Giữ lại')
+            ->action(function (array $arguments, array $data): void {
+                $c = Campaign::query()->find((int) ($arguments['campaign'] ?? 0));
+                $this->runPlanDelete(fn (PlanDeleter $d, Website $site) => $c
+                    ? $d->deleteCampaign(Auth::user(), $site, $c, ($data['mode'] ?? 'with') === 'with')
+                    : throw new InvalidArgumentException('Không tìm thấy chiến dịch, tải lại trang.'));
+            });
+    }
+
+    /** Chạy một thao tác xóa và báo kết quả thật (số bài xóa, bài bị bỏ qua kèm lý do). */
+    private function runPlanDelete(\Closure $do): void
+    {
+        $this->guard();
+        abort_unless(Auth::user()?->isApprover() ?? false, 403);
+        $site = $this->site();
+        if (! $site) {
+            return;
+        }
+        try {
+            $r = $do(new PlanDeleter, $site);
+        } catch (InvalidArgumentException $e) {
+            Notification::make()->title('Không xóa được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
+
+            return;
+        }
+        $title = isset($r['name'])
+            ? 'Đã xóa chiến dịch «'.$r['name'].'»'.($r['deleted'] > 0 ? " và {$r['deleted']} bài" : '').($r['kept'] > 0 ? ", giữ {$r['kept']} bài thành bài lẻ" : '')
+            : "Đã xóa {$r['deleted']} bài khỏi kế hoạch";
+        $n = Notification::make()->title($title);
+        if (! empty($r['skipped'])) {
+            $n->body('Bỏ qua '.count($r['skipped']).' bài: '.implode('; ', array_slice($r['skipped'], 0, 3)).(count($r['skipped']) > 3 ? '...' : ''))->warning();
+        } else {
+            $n->success();
+        }
+        $n->send();
     }
 
     /** Bài "Đã lên kế hoạch" chưa có ngày: những bài xếp được vào một ô trống của Lịch tuần. @return array<int,string> id => tên */

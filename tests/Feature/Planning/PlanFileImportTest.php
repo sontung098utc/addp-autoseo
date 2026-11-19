@@ -805,4 +805,86 @@ class PlanFileImportTest extends TestCase
         $this->assertSame(2, \App\Services\Planning\Import\PlanFileHeuristics::correctHeader($sheets[0], 4), 'AI chọn nhầm dòng dữ liệu: kéo về dòng tiêu đề thật, không phải banner');
         $this->assertSame(0, \App\Services\Planning\Import\PlanFileHeuristics::correctHeader($sheets[0], 0), 'AI báo không có tiêu đề: giữ nguyên');
     }
+
+    /** File chỉ có từ khóa (không cột/đề mục chiến dịch). */
+    private function uploadNoCampaign(string $name = 'ke-hoach-sua-hat.xlsx'): UploadedFile
+    {
+        $rows = [['Từ khóa'], ['sữa hạt glucare'], ['tiểu đường sụt cân'], ['thực đơn tiểu đường']];
+
+        return UploadedFile::fake()->createWithContent($name, (string) file_get_contents($this->xlsx(['KeHoach' => $rows])));
+    }
+
+    private function aiMapKeywordOnly(): array
+    {
+        return ['is_plan' => true, 'sheet' => 'KeHoach', 'header_row' => 1, 'columns' => [
+            ['col' => 'A', 'field' => 'primary_keyword', 'confidence' => 0.99, 'reason' => 'từ khóa'],
+        ], 'notes' => []];
+    }
+
+    public function test_file_khong_ghi_chien_dich_mac_dinh_gom_vao_chien_dich_moi_theo_ten_file(): void
+    {
+        $this->app->instance(PlanFileMapper::class, new PlanFileMapper($this->fakeAi($this->aiMapKeywordOnly())));
+        $page = Livewire::actingAs($this->user('approver'))->test(ContentPlanPage::class)->call('openImport')->set('planFile', $this->uploadNoCampaign())
+            ->assertSet('importTarget', PlanFileImporter::TARGET_NEW)
+            ->assertSet('importNewName', 'ke-hoach-sua-hat')
+            ->assertSet('importPreview.count', 3)
+            ->assertSet('importPreview.campaigns', 1)
+            ->assertSet('importPreview.solo', 0)
+            ->assertSee('Kết quả khi bấm Tạo')->assertSee('chiến dịch mới «ke-hoach-sua-hat»');
+        $page->call('runImport')->assertSet('importResult.created', 3);
+        $c = Campaign::where('name', 'ke-hoach-sua-hat')->first();
+        $this->assertNotNull($c, 'bài không còn thành bài lẻ lặng lẽ');
+        $this->assertSame(3, $c->articles()->count());
+        $this->assertSame('paused', $c->status);
+        $this->assertSame(0, Article::whereNull('campaign_id')->count());
+    }
+
+    public function test_nguoi_dung_da_tu_chon_bai_le_thi_phan_tich_lai_khong_doi_thay(): void
+    {
+        $this->app->instance(PlanFileMapper::class, new PlanFileMapper($this->fakeAi($this->aiMapKeywordOnly())));
+        $page = Livewire::actingAs($this->user('approver'))->test(ContentPlanPage::class)->call('openImport')->set('planFile', $this->uploadNoCampaign())
+            ->set('importTarget', PlanFileImporter::TARGET_SOLO)
+            ->assertSet('importPreview.solo', 3)
+            ->assertSee('3 bài sẽ thành bài lẻ');
+        $page->call('analyzeImport')->assertSet('importTarget', PlanFileImporter::TARGET_SOLO);
+    }
+
+    public function test_file_co_chien_dich_van_theo_cot_va_nut_mot_cham_gom_bai_le(): void
+    {
+        $rows = [['Chiến dịch', 'Từ khóa'], ['Dinh dưỡng', 'chế độ ăn dash'], ['', 'sữa hạt glucare'], ['', 'thực đơn tiểu đường']];
+        $file = UploadedFile::fake()->createWithContent('lan-hon-hop.xlsx', (string) file_get_contents($this->xlsx(['KeHoach' => $rows])));
+        $map = ['is_plan' => true, 'sheet' => 'KeHoach', 'header_row' => 1, 'columns' => [
+            ['col' => 'A', 'field' => 'campaign', 'confidence' => 0.9, 'reason' => 'chiến dịch'],
+            ['col' => 'B', 'field' => 'primary_keyword', 'confidence' => 0.99, 'reason' => 'từ khóa'],
+        ], 'notes' => []];
+        $this->app->instance(PlanFileMapper::class, new PlanFileMapper($this->fakeAi($map)));
+        $page = Livewire::actingAs($this->user('approver'))->test(ContentPlanPage::class)->call('openImport')->set('planFile', $file)
+            ->assertSet('importTarget', PlanFileImporter::TARGET_BY_COLUMN)   // file có ghi chiến dịch: giữ theo file
+            ->assertSet('importPreview.campaigns', 1)
+            ->assertSet('importPreview.solo', 2)
+            ->assertSee('2 bài sẽ thành bài lẻ')->assertSee('Gom vào chiến dịch mới')
+            ->assertSeeHtml('<b>1</b> vào <b>chiến dịch «Dinh dưỡng»</b>')->assertSee('là bài lẻ');
+        $page->call('importIntoNewCampaign')
+            ->assertSet('importTarget', PlanFileImporter::TARGET_NEW)
+            ->assertSet('importNewName', 'lan-hon-hop')
+            ->assertSet('importPreview.solo', 0)
+            ->assertDontSee('sẽ thành bài lẻ');
+    }
+
+    public function test_ai_loi_van_co_xem_truoc_tu_cot_da_doan_va_giu_loi_bao(): void
+    {
+        $this->app->instance(PlanFileMapper::class, new PlanFileMapper(new class implements StructuredAiInterface
+        {
+            public function generateStructured(string $system, string $user): array
+            {
+                throw new \RuntimeException('AI sập');
+            }
+        }));
+        Livewire::actingAs($this->user('approver'))->test(ContentPlanPage::class)->call('openImport')->set('planFile', $this->uploadNoCampaign())
+            ->assertSet('importState.analyzed', false)
+            ->assertSet('importPreview.count', 3)                       // kết quả hiện ngay, không đợi người dùng đổi cột
+            ->assertSet('importTarget', PlanFileImporter::TARGET_NEW)   // và vẫn áp mặc định theo nội dung file
+            ->assertSee('tự chọn cột')                                   // lời báo lỗi AI không bị xóa
+            ->assertSee('Kết quả khi bấm Tạo');
+    }
 }
