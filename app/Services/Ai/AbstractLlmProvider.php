@@ -389,7 +389,7 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
         }
         if ($status === 429 && self::isDailyQuota($response)) {
             // Hạn mức NGÀY: chờ vài giây vô ích. Không thử lại; báo rõ nguyên nhân và cách xử lý.
-            throw new AiQuotaExceeded('Hết hạn mức theo NGÀY của nhà cung cấp AI cho model này (HTTP 429). Thử lại sau khi hạn mức đặt lại, đổi sang model khác, hoặc bật thanh toán cho khóa API.');
+            throw AiQuotaExceeded::withStatus('Hết hạn mức theo NGÀY của nhà cung cấp AI cho model này (HTTP 429). Thử lại sau khi hạn mức đặt lại, đổi sang model khác, hoặc bật thanh toán cho khóa API.', 429);
         }
         if ($status === 408 || $status === 429 || $status >= 500) {
             $after = self::retryAfterSeconds($response);
@@ -400,14 +400,14 @@ abstract class AbstractLlmProvider implements AiProviderInterface, PartialRefres
             throw TransientAiError::withHint("Nhà cung cấp AI báo lỗi tạm thời (HTTP {$status})".($after !== null ? ", yêu cầu chờ {$after} giây" : '').'.', $status, $after);
         }
         if ($status === 401 || $status === 403) {
-            throw new AiProviderError("Khóa API bị từ chối (HTTP {$status}). Kiểm tra lại khóa hoặc quyền của khóa.");
+            throw AiProviderError::withStatus("Khóa API bị từ chối (HTTP {$status}). Kiểm tra lại khóa hoặc quyền của khóa.", $status);
         }
 
         // Chỉ lấy MÃ lý do dạng CHỮ_HOA_GẠCH_DƯỚI (vd API_KEY_INVALID, INVALID_ARGUMENT) để chẩn đoán; không đưa văn bản phản hồi vào lỗi.
         $codes = array_filter([$response->json('error.status'), $response->json('error.details.0.reason')], fn ($c) => is_string($c) && preg_match('/^[A-Z][A-Z0-9_]{2,60}$/', $c));
         $hint = $codes ? ' Mã lý do: '.implode(', ', array_unique($codes)).'.' : '';
 
-        throw new AiProviderError("Nhà cung cấp AI từ chối yêu cầu (HTTP {$status}). Kiểm tra tên model và cấu hình.".$hint);
+        throw AiProviderError::withStatus("Nhà cung cấp AI từ chối yêu cầu (HTTP {$status}). Kiểm tra tên model và cấu hình.".$hint, $status);
     }
 
     /** Gửi request; lỗi mạng/timeout thành TransientAiError (không kèm thông điệp gốc vì có thể chứa URL/khóa). */

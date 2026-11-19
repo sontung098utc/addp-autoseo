@@ -92,6 +92,12 @@ final class AgentRunOrchestrator
 
     private mixed $imageProc = null;
 
+    /** Ảnh đã lập kế hoạch nhưng CHƯA bắt đầu tạo: chỉ bắt đầu khi bản viết đầu nhận được phản hồi thành công đầu tiên (xem launchPendingImages), để bản viết lỗi không tốn tiền ảnh. */
+    private bool $imagesPending = false;
+
+    /** Tiền tố lý do của phiên bị HOÃN vì nhà cung cấp AI đang lỗi (không phải lỗi bài; chiến dịch sẽ thử lại sau, xem CampaignRunner::nextRetryable). */
+    public const DEFERRED_PREFIX = 'Hoãn: nhà cung cấp AI đang lỗi';
+
     /** Kế hoạch ảnh lập cùng dàn ý (xem imagePlanFor). */
     private array $imageCtx = [];
 
@@ -217,10 +223,11 @@ final class AgentRunOrchestrator
         try {
             return $this->execute($run, $article, $previousStatus);
         } catch (AiRetriesExhausted $e) {
-            $this->step($run, 'handoff', 'system', 'failed', 'Nhà cung cấp AI vẫn lỗi sau khi thử lại', 'Đã thử lại '.$this->policy->maxRetries.' lần, nhà cung cấp AI vẫn lỗi tạm thời ('.ErrorMasker::short($e->getMessage(), 160).'). Không thay bằng AI giả lập; bài được trả về trạng thái cũ, không có gì được đăng.', ['error' => class_basename($e), 'attempts' => $e->attempts]);
+            $why = AiFailureReason::of($e);
+            $this->step($run, 'handoff', 'system', 'failed', 'Nhà cung cấp AI vẫn lỗi sau khi thử lại', 'Đã thử '.$e->attempts.' lần, lý do: '.$why->summary().' Không thay bằng AI giả lập; bài được trả về trạng thái cũ, không có gì được đăng.'.$this->imagesNote(), ['error' => $why->code, 'http_status' => $why->status, 'attempts' => $e->attempts, 'hint' => $why->hint]);
             $article->update(['workflow_status' => $previousStatus]);
 
-            return $this->finishKeepingDraft($run, $article, 'Nhà cung cấp AI lỗi tạm thời, đã hết '.$this->policy->maxRetries.' lần thử lại. Chưa có bản nháp nào được tạo.');
+            return $this->finishKeepingDraft($run, $article, 'Nhà cung cấp AI lỗi tạm thời, đã thử '.$e->attempts.' lần: '.$why->summary().' Chưa có bản nháp nào được tạo.'.$this->imagesNote());
         } catch (AiRouteUnavailable $e) {
             $this->step($run, 'guard', 'system', 'blocked', 'Chưa cấu hình AI cho bước này', $e->getMessage().' Tác vụ không chạy và hệ thống không dùng AI giả lập thay thế. Vào Đội AI → Tích hợp AI để nhập khóa hoặc chọn model.', ['task' => $e->task]);
             $article->update(['workflow_status' => $previousStatus]);
@@ -231,15 +238,17 @@ final class AgentRunOrchestrator
 
             return $this->finishKeepingDraft($run, $article, $e->getMessage().' Phiên dừng; chưa có bản nháp nào được tạo.');
         } catch (\App\Services\Ai\AiQuotaExceeded $e) {
-            $this->step($run, 'handoff', 'system', 'failed', 'Hết hạn mức của nhà cung cấp AI', $e->getMessage().' Không thử lại vì chờ vài giây không giúp ích; không thay bằng AI giả lập, bài được trả về trạng thái cũ. Chạy lại sau khi hạn mức đặt lại.', ['error' => 'AiQuotaExceeded']);
+            $why = AiFailureReason::of($e);
+            $this->step($run, 'handoff', 'system', 'failed', 'Hết hạn mức của nhà cung cấp AI', $why->label.'. '.$e->getMessage().' Không thử lại vì chờ vài giây không giúp ích; không thay bằng AI giả lập, bài được trả về trạng thái cũ. Chạy lại sau khi hạn mức đặt lại.', ['error' => $why->code, 'http_status' => $why->status, 'hint' => $why->hint]);
             $article->update(['workflow_status' => $previousStatus]);
 
             return $this->finishKeepingDraft($run, $article, 'Hết hạn mức theo ngày của nhà cung cấp AI cho model này. Chưa có bản nháp nào được tạo; đổi model, chờ hạn mức đặt lại hoặc bật thanh toán.');
         } catch (AiProviderError $e) {
-            $this->step($run, 'handoff', 'system', 'failed', 'Nhà cung cấp AI trả lỗi', ErrorMasker::short($e->getMessage(), 200).' Lỗi này thử lại không giúp ích nên phiên dừng; không thay bằng AI giả lập.', ['error' => class_basename($e)]);
+            $why = AiFailureReason::of($e);
+            $this->step($run, 'handoff', 'system', 'failed', 'Nhà cung cấp AI trả lỗi', $why->label.'. '.ErrorMasker::short($e->getMessage(), 200).' '.$why->hint.' Lỗi này thử lại không giúp ích nên phiên dừng; không thay bằng AI giả lập.', ['error' => $why->code, 'http_status' => $why->status, 'hint' => $why->hint]);
             $article->update(['workflow_status' => $previousStatus]);
 
-            return $this->finishKeepingDraft($run, $article, 'Nhà cung cấp AI từ chối hoặc trả sai định dạng: '.ErrorMasker::short($e->getMessage(), 160));
+            return $this->finishKeepingDraft($run, $article, $why->label.': '.ErrorMasker::short($e->getMessage(), 160).' '.$why->hint);
         } catch (Throwable $e) {
             $this->logUnexpected($e, $run, $article);
             $this->step($run, 'handoff', 'system', 'failed', 'Phiên chạy gặp lỗi', 'Lỗi không lường trước; bài được trả về trạng thái cũ, không có gì được đăng.', ['error' => class_basename($e)]);
@@ -419,6 +428,16 @@ final class AgentRunOrchestrator
                     throw new AiRouteUnavailable($task, $why);
                 }
             }
+        }
+
+        // Ngắt mạch: route "viết" vừa lỗi tạm thời liên tiếp thì không bắt đầu phiên đắt (tìm nguồn, rút mục, ảnh) chỉ để chết ở bước viết.
+        [$breakerKey, $breakerLabel] = $this->writeBreaker();
+        if (($left = AiCircuitBreaker::openFor($breakerKey)) > 0) {
+            $why = self::DEFERRED_PREFIX.' ('.$breakerLabel.' vừa lỗi tạm thời liên tiếp). Chưa tốn chi phí nghiên cứu hay ảnh; chiến dịch sẽ thử lại sau, bài không bị đánh dấu lỗi.';
+            $this->step($run, 'guard', 'system', 'blocked', 'Hoãn: nhà cung cấp AI đang lỗi', $why.' Sẽ thử lại sau khoảng '.max(1, (int) ceil($left / 60)).' phút.', ['deferred' => true, 'decision' => 'deferred_provider_down', 'retry_after_seconds' => $left, 'route' => $breakerLabel]);
+            $article->update(['workflow_status' => $previousStatus === 'drafting' ? 'planned' : $previousStatus]);
+
+            return $this->finish($run, 'blocked', $why);
         }
 
         $article->update(['workflow_status' => 'drafting']);
@@ -745,6 +764,7 @@ final class AgentRunOrchestrator
     {
         $this->imageStep = null;
         $this->imageProc = null;
+        $this->imagesPending = false;
         $c = $this->imageCtx;
         $this->recordImageDesign($run);
         try {
@@ -757,6 +777,34 @@ final class AgentRunOrchestrator
                 return;
             }
             $this->skills['images'] = [null, ''];
+            // QUYẾT ĐỊNH (#36): thiết kế ảnh (rẻ) đã ghi ở trên, nhưng TẠO ảnh (tốn tiền) chờ bản viết đầu có phản hồi thành công đầu tiên; ảnh vẫn chạy song song với
+            // chấm/biên tập/sửa, chỉ không chạy song song với chính lượt gọi viết đầu. Viết lỗi thì không tốn đồng nào cho ảnh (4 phiên 19/11 mất ~25.000 ₫).
+            $this->imagesPending = true;
+        } catch (Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Chuẩn bị tạo ảnh lỗi, bỏ qua: '.class_basename($e));
+        }
+    }
+
+    /** Câu báo cho người xem khi phiên dừng trước khi ảnh được tạo (không tốn chi phí ảnh); rỗng nếu ảnh không nằm trong kế hoạch hoặc đã bắt đầu. */
+    private function imagesNote(): string
+    {
+        return $this->imagesPending ? ' Chưa tạo ảnh vì bản viết chưa thành công nên không tốn chi phí ảnh.' : '';
+    }
+
+    /** Bắt đầu tạo ảnh đã lập kế hoạch (gọi ngay sau khi bản viết đầu nhận phản hồi thành công). Lỗi ở đây không làm hỏng phiên. */
+    private function launchPendingImages(AgentRun $run, Article $article): void
+    {
+        if (! $this->imagesPending) {
+            return;
+        }
+        $this->imagesPending = false;
+        $c = $this->imageCtx;
+        // Bước ảnh chen vào giữa lượt gọi viết và bước ghi kết quả viết: giữ nguyên phần chờ AI và đồng hồ của bước viết, không để bước ảnh nuốt (thời gian tạo ảnh chạy ngay tại chỗ không tính cho bước viết).
+        $aiMs = $this->aiMs;
+        $markT = $this->markT;
+        $t0 = microtime(true);
+        $this->aiMs = 0.0;
+        try {
             $plan = $c['plan'];
             $n = count($plan['slots']);
             $cap = $this->policy->budgetVnd * (float) config('agent.images.budget_share', 0.10);
@@ -768,6 +816,9 @@ final class AgentRunOrchestrator
             \App\Services\Images\ImageJob::execute($this->imageStep, $c['resolved']['generator'] ?? null, $article);
         } catch (Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Bắt đầu tạo ảnh lỗi, bỏ qua: '.class_basename($e));
+        } finally {
+            $this->aiMs += $aiMs;
+            $this->markT = $markT + (microtime(true) - $t0);
         }
     }
 
@@ -1655,6 +1706,9 @@ final class AgentRunOrchestrator
 
             return $this->write($run, $article, $outline, $feedback, $stage, $title, $editorPb, $previousHtml);
         }
+        if ($stage === 'write') {
+            $this->launchPendingImages($run, $article); // bản viết đầu đã có phản hồi thành công: lúc này mới tốn tiền tạo ảnh
+        }
         $partialDone = false;
         if (isset($options['only_sections'])) { // sửa theo đoạn: ghép các mục đã viết lại vào bản đang giữ
             $prevHtml = (string) ($previousAttrs['html_content'] ?? '');
@@ -2176,12 +2230,12 @@ final class AgentRunOrchestrator
     private function callAiInner(AgentRun $run, string $task, string $what, \Closure $call): array
     {
         if ($this->router === null) {
-            return $this->withRetry($run, $what, fn () => $call($this->ai));
+            return $this->withRetry($run, $what, fn () => $call($this->ai), AiCircuitBreaker::key(null, 'default:'.get_class($this->ai)));
         }
         $primary = $this->router->target($task) ?? throw new AiRouteUnavailable($task, (string) $this->router->why($task));
         $used = $primary;
         try {
-            $r = $this->withRetry($run, $what, fn () => $call($primary->ai));
+            $r = $this->withRetry($run, $what, fn () => $call($primary->ai), AiCircuitBreaker::key($primary->providerId, $primary->model));
         } catch (AiRetriesExhausted|AiSchemaError $e) {
             $fb = $this->router->fallback($task);
             if ($fb === null) {
@@ -2195,7 +2249,7 @@ final class AgentRunOrchestrator
                 "Đã chuyển từ {$primary->label()} sang {$fb->label()} vì lỗi {$why}. Dự phòng là model thật, không phải AI giả lập.",
                 ['task' => $task, 'from' => ['provider' => $primary->providerName, 'model' => $primary->model], 'to' => ['provider' => $fb->providerName, 'model' => $fb->model], 'reason' => $why], $fb->model);
             $used = $fb;
-            $r = $this->withRetry($run, $what.' (dự phòng)', fn () => $call($fb->ai));
+            $r = $this->withRetry($run, $what.' (dự phòng)', fn () => $call($fb->ai), AiCircuitBreaker::key($fb->providerId, $fb->model));
         }
         $r['_provider_id'] = $used->providerId;
         if (in_array($task, ['write', 'repair'], true)) {
@@ -2210,6 +2264,20 @@ final class AgentRunOrchestrator
         }
 
         return $r;
+    }
+
+    /** Khóa ngắt mạch và nhãn của route "viết" (provider, model); không có router thì dùng nhà cung cấp duy nhất. @return array{0:string,1:string} */
+    private function writeBreaker(): array
+    {
+        try {
+            $t = $this->router?->target('write');
+            if ($t !== null) {
+                return [AiCircuitBreaker::key($t->providerId, $t->model), $t->label()];
+            }
+        } catch (Throwable) {
+        }
+
+        return [AiCircuitBreaker::key(null, 'default:'.get_class($this->ai)), 'nhà cung cấp AI'];
     }
 
     /** @return array{provider_id?: int} nhãn nhà cung cấp để thống kê chi tiêu theo provider */
@@ -2229,14 +2297,23 @@ final class AgentRunOrchestrator
      * @param \Closure(): T $call
      * @return T
      */
-    private function withRetry(AgentRun $run, string $what, \Closure $call): mixed
+    private function withRetry(AgentRun $run, string $what, \Closure $call, ?string $breaker = null): mixed
     {
         $attempt = 0;
         $waited = 0;
         while (true) {
             try {
-                return $call();
+                $r = $call();
+                if ($breaker !== null) {
+                    AiCircuitBreaker::success($breaker); // một lần thành công đóng ngắt mạch
+                }
+
+                return $r;
             } catch (Throwable $e) {
+                // Lỗi tạm thời và hết hạn mức ngày đều là "nhà cung cấp chưa dùng được": tính vào ngắt mạch (không ảnh hưởng việc thử lại bên dưới).
+                if ($breaker !== null && (TransientAiError::is($e) || $e instanceof \App\Services\Ai\AiQuotaExceeded)) {
+                    AiCircuitBreaker::failure($breaker);
+                }
                 if (! TransientAiError::is($e)) {
                     throw $e;
                 }
@@ -2254,7 +2331,7 @@ final class AgentRunOrchestrator
                 }
                 $waited += $wait;
                 $this->step($run, 'retry', 'system', 'warn', "Thử lại lần {$attempt}/{$limit}: {$what}",
-                    'Nhà cung cấp AI lỗi tạm thời ('.TransientAiError::describe($e).'; '.ErrorMasker::short($e->getMessage(), 120)."). Chờ {$wait} giây rồi thử lại, không đổi sang AI giả lập.",
+                    'Nhà cung cấp AI lỗi tạm thời ('.TransientAiError::describe($e)."). Chờ {$wait} giây rồi thử lại, không đổi sang AI giả lập.",
                     ['attempt' => $attempt, 'max' => $limit, 'wait_seconds' => $wait, 'retry_after' => $hint, 'error' => TransientAiError::describe($e)]);
                 ($this->sleep)($wait);
             }
@@ -2429,6 +2506,7 @@ final class AgentRunOrchestrator
 
     private function finish(AgentRun $run, string $status, ?string $reason): AgentRun
     {
+        $this->imagesPending = false;
         $run->update([
             'status' => $status, 'outcome_reason' => $reason, 'finished_at' => now(),
             'tokens_used' => (int) $run->steps()->sum('tokens_used'), 'cost_vnd' => $this->spent($run),

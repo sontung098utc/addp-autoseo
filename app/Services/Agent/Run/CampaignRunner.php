@@ -78,7 +78,8 @@ final class CampaignRunner
         }
 
         [$from, $to] = VnTime::dayRangeApp(VnTime::toVn($now) ?? $now);
-        $today = AgentRun::query()->where('campaign_id', $c->id)->where('started_at', '>=', $from)->where('started_at', '<', $to)->count();
+        // Phiên bị HOÃN vì nhà cung cấp AI đang lỗi không tốn gì và không phải một bài đã giao: không tính vào giới hạn bài/ngày.
+        $today = AgentRun::query()->where('campaign_id', $c->id)->where('started_at', '>=', $from)->where('started_at', '<', $to)->where(fn ($q) => $q->where('status', '!=', 'blocked')->orWhereNull('outcome_reason')->orWhere('outcome_reason', 'not like', AgentRunOrchestrator::DEFERRED_PREFIX.'%'))->count();
         if ($today >= $c->daily_limit) {
             return $this->out('limit', "Đã đủ {$today}/{$c->daily_limit} bài hôm nay, chờ ngày mai.");
         }
@@ -93,6 +94,11 @@ final class CampaignRunner
             return $this->out('cost_cap', 'Chi phí AI hôm nay đã chạm trần '.number_format((int) $c->daily_cost_cap_vnd, 0, ',', '.').' đ (đã dùng '.number_format($spent, 0, ',', '.').' đ), chờ ngày mai.');
         }
 
+        // Ngắt mạch: route "viết" đang lỗi tạm thời liên tiếp thì không giao bài nào (không đốt tiền nghiên cứu/ảnh); không đánh dấu bài lỗi, nhịp sau thử lại.
+        if (($left = $this->writeRouteDownFor()) > 0) {
+            return $this->out('deferred', AgentRunOrchestrator::DEFERRED_PREFIX.': tạm không giao bài, thử lại sau khoảng '.max(1, (int) ceil($left / 60)).' phút. Bài không bị đánh dấu lỗi.');
+        }
+
         // Autopilot (chỉ chế độ Toàn quyền): giữ hàng chờ kế hoạch đủ đầy trước khi chọn bài kế tiếp.
         $autopilot = (new AutopilotRunner)->tick($c, $now);
         $this->autopilotActions = $autopilot['actions'];
@@ -105,8 +111,9 @@ final class CampaignRunner
         $keyword = null;
         if ($c->source === 'plan') {
             $article = $this->nextPlanned($c);
-            $keyword = $article?->primary_keyword;
         }
+        $article ??= $this->nextRetryable($c);
+        $keyword = $article?->primary_keyword;
         $keyword ??= $this->nextKeyword($c);
         if ($keyword === null) {
             self::raiseWait($c, 'no_keywords', $c->source === 'plan' ? 'Chưa có bài đã lên kế hoạch hoặc từ khóa để giao' : 'Danh sách từ khóa đã giao hết',
@@ -249,8 +256,45 @@ final class CampaignRunner
         return Article::query()->where('website_id', $c->website_id)->where('workflow_status', 'planned')
             ->where(fn ($q) => $pull ? $q->whereNull('campaign_id')->orWhere('campaign_id', $c->id) : $q->where('campaign_id', $c->id)) // bài của chiến dịch khác không bao giờ lấy
             ->whereNotNull('primary_keyword')->where('primary_keyword', '!=', '')
-            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('agent_runs')->whereColumn('agent_runs.article_id', 'articles.id'))
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('agent_runs')->whereColumn('agent_runs.article_id', 'articles.id')->where(fn ($w) => $this->notRetryableRun($w)))
             ->orderByRaw('COALESCE(priority, 0) DESC')->orderByRaw('planned_at IS NULL')->orderBy('planned_at')->orderBy('id')->first();
+    }
+
+    /** Thời gian (phút) một bài bị HOÃN vì nhà cung cấp AI lỗi phải chờ trước khi được nhặt lại. */
+    public const DEFER_COOLDOWN_MINUTES = 6;
+
+    /**
+     * Phiên khiến bài KHÔNG được nhặt lại: mọi phiên trừ phiên bị hoãn vì nhà cung cấp AI đang lỗi đã qua thời gian chờ.
+     * Bài lỗi thật (kể cả hết 3 lần thử vì lỗi tạm thời) có phiên 'failed' nên KHÔNG bao giờ tự được nhặt lại: không lặp lỗi và không tốn thêm tiền trong ngày.
+     */
+    private function notRetryableRun($w): void
+    {
+        $w->where('status', '!=', 'blocked')->orWhereNull('outcome_reason')->orWhere('outcome_reason', 'not like', AgentRunOrchestrator::DEFERRED_PREFIX.'%')
+            ->orWhere('finished_at', '>', now()->subMinutes(self::DEFER_COOLDOWN_MINUTES))->orWhereNull('finished_at');
+    }
+
+    /** Bài của chiến dịch (từ khóa nhập tay hoặc kế hoạch) đã bị hoãn vì nhà cung cấp AI lỗi, qua thời gian chờ và chưa có phiên thật nào: thử lại. */
+    public function nextRetryable(Campaign $c): ?Article
+    {
+        return Article::query()->where('website_id', $c->website_id)->where('campaign_id', $c->id)->where('workflow_status', 'planned')
+            ->whereExists(fn ($q) => $q->selectRaw('1')->from('agent_runs')->whereColumn('agent_runs.article_id', 'articles.id'))
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('agent_runs')->whereColumn('agent_runs.article_id', 'articles.id')->where(fn ($w) => $this->notRetryableRun($w)))
+            ->orderBy('id')->first();
+    }
+
+    /** Số giây ngắt mạch của route "viết" còn mở; 0 = đóng, chưa cấu hình route hoặc không đọc được (không bao giờ ném lỗi). */
+    private function writeRouteDownFor(): int
+    {
+        try {
+            if (! \App\Services\Agent\Ai\AiModelRouter::isConfigured()) {
+                return 0;
+            }
+            $t = (new \App\Services\Agent\Ai\AiModelRouter)->target('write');
+
+            return $t === null ? 0 : AiCircuitBreaker::openFor(AiCircuitBreaker::key($t->providerId, $t->model));
+        } catch (\Throwable) {
+            return 0;
+        }
     }
 
     /** Ghi một mục chờ bổ sung hạn 24 giờ (không trùng mục đang mở, không lặp lại trong 24 giờ sau khi đã bỏ qua/hết hạn). */
@@ -374,6 +418,7 @@ final class CampaignRunner
     private function claimNext(Campaign $c): ?array
     {
         $article = $c->source === 'plan' ? $this->nextPlanned($c) : null;
+        $article ??= $this->nextRetryable($c);
         if ($article === null && ($keyword = $this->nextKeyword($c)) !== null) {
             $article = Article::create(['website_id' => $c->website_id, 'created_by' => $c->created_by, 'primary_keyword' => $keyword, 'workflow_status' => 'planned', 'origin' => 'keyword', 'campaign_id' => $c->id]);
         }
@@ -402,8 +447,8 @@ final class CampaignRunner
     public function continueAfter(Campaign $c, array $res): ?array
     {
         $ok = in_array($res['result'], ['ran', 'auto_approved', 'held_outline', 'blocked_gap'], true) && ! in_array($res['run']?->status, ['failed', 'held'], true);
-        if (! $ok || $c->status !== 'active') {
-            return null;
+        if (! $ok || $c->status !== 'active' || str_starts_with((string) $res['run']?->outcome_reason, AgentRunOrchestrator::DEFERRED_PREFIX)) {
+            return null; // phiên bị hoãn vì nhà cung cấp AI lỗi: không nối tiếp ngay, đợi nhịp sau
         }
 
         return $this->tick($c);
