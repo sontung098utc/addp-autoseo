@@ -202,6 +202,7 @@ class PipelineMap extends Page
             'skillsUrl' => PipelineVisual::urlOf(AgentSkills::class),
             'runs' => $runs,
             'live' => $live,
+            'liveCount' => RunActivity::liveCount(),
             'pollSeconds' => RunActivity::POLL_LIVE,
             'liveSteps' => $liveSteps,
             'names' => $this->jobNames(),

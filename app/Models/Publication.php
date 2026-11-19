@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -56,10 +59,31 @@ class Publication extends Model
     protected function casts(): array
     {
         return [
-            'scheduled_at_utc' => 'datetime',
-            'published_at_utc' => 'datetime',
             'attempt_count' => 'integer',
         ];
+    }
+
+    /**
+     * Cột *_utc luôn lưu UTC. Không dùng cast 'datetime': cast đọc/ghi theo app.timezone (mặc định Asia/Ho_Chi_Minh) nên
+     * now() ghi giờ VN vào cột UTC và đọc UTC thành giờ VN (lệch 7 giờ, nhảy sang ngày khác). Hai hàm dưới ép UTC cả hai chiều.
+     */
+    protected function scheduledAtUtc(): Attribute
+    {
+        return $this->utcColumn();
+    }
+
+    protected function publishedAtUtc(): Attribute
+    {
+        return $this->utcColumn();
+    }
+
+    private function utcColumn(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $value === null || $value === '' ? null : Carbon::parse($value, 'UTC'),
+            set: fn ($value) => $value === null || $value === '' ? null
+                : ($value instanceof CarbonInterface ? $value->copy()->utc() : Carbon::parse($value, 'UTC'))->format('Y-m-d H:i:s'),
+        );
     }
 
     /**

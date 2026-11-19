@@ -107,6 +107,34 @@ final class QualityReport
         return [];
     }
 
+    /**
+     * Chỗ chưa đạt chỉ dẫn đo được của người phụ trách (INS01, P1): đưa vào vòng sửa kèm số đo thật ("hiện 990 từ, cần rút xuống tối đa 599 từ").
+     *
+     * @return list<string>
+     */
+    public function instructionGaps(): array
+    {
+        foreach ($this->results as $r) {
+            if ($r->code === 'INS01' && ! $r->passed && $r->details !== []) {
+                return $r->details;
+            }
+        }
+
+        return [];
+    }
+
+    /** Khoảng cách tới chỉ dẫn (0 = đạt): để vòng sửa thấy tiến bộ khi số từ giảm dần dù luật vẫn trượt. */
+    public function instructionDistance(): int
+    {
+        foreach ($this->results as $r) {
+            if ($r->code === 'INS01' && ! $r->passed) {
+                return (int) ($r->data['distance'] ?? 1);
+            }
+        }
+
+        return 0;
+    }
+
     /** @return list<string> mã luật P0 chưa đạt (duy nhất) */
     public function blockingCodes(): array
     {

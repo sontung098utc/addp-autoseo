@@ -82,6 +82,9 @@ class QualityContext
     /** @var list<array{title?: string, url?: string, domain?: string}> nguồn CÓ THẬT mà hệ thống đã tìm thấy khi viết bài này (tài liệu web có địa chỉ), để SRC01 coi là nguồn thật */
     public array $knownSources = [];
 
+    /** Lời nhắn làm lại của người duyệt (ngoài articles.guidance), cũng được trích ràng buộc đo được cho INS01. */
+    public string $extraGuidance = '';
+
     /** Từ chung chung trong từ khóa dạng câu hỏi dài, không tính khi so khớp theo từ cốt lõi. */
     private const KW_FILLER = ['the', 'nao', 'la', 'gi', 'va', 'hay', 'cua', 'cho', 'cac', 'nhung', 'mot', 'co', 'khac', 'nhau', 'bao', 'nhieu', 'sao', 'nhu', 'thi', 'de', 'khi', 'nen', 'duoc', 'khong', 'hon', 'so', 'voi'];
 

@@ -92,16 +92,16 @@
                             <div class="cp-day__head ss-text-sm"><span>{{ $d['name'] }} {{ $d['label'] }}@if ($d['isToday']) · hôm nay @endif</span>
                                 <x-studio.badge :tone="$d['full'] ? 'warn' : 'muted'" title="Giới hạn {{ $limit }} bài/ngày">{{ $d['count'] }}/{{ $limit }}</x-studio.badge></div>
                             @foreach ($d['items'] as $a)
-                                <article class="cp-card cp-card--{{ StatusPresenter::color($a['status']) }} ss-text-xs" wire:key="wk-{{ $a['id'] }}">
+                                <article class="cp-card cp-card--{{ $a['badge']['color'] }} ss-text-xs" wire:key="wk-{{ $a['id'] }}" data-week-card="{{ $a['badge']['key'] }}">
                                     <strong>{{ $a['at']->format('H:i') }}</strong>
-                                    <x-studio.badge :tone="$tones[StatusPresenter::color($a['status'])] ?? 'muted'">{{ StatusPresenter::label($a['status']) }}</x-studio.badge>
-                                    <div>{{ $a['title'] }}</div>
+                                    <x-studio.badge :tone="$a['badge']['tone']">{{ $a['badge']['text'] }}</x-studio.badge>
+                                    <div>@if ($a['url'])<a class="cp-link" href="{{ $a['url'] }}" title="Mở bài">{{ $a['title'] }}</a>@else{{ $a['title'] }}@endif</div>
                                     @if ($a['status'] === 'planned' && ! $d['isPast'])<button type="button" class="cp-link" wire:click="mountAction('reschedule', { article: {{ $a['id'] }} })">Đổi ngày</button>@endif
                                 </article>
                             @endforeach
                             @if ($d['isPast'])<div class="cp-slot ss-muted ss-text-xs">Ngày đã qua</div>
                             @elseif ($d['full'])<div class="cp-slot ss-text-xs">⚠ Đã đủ {{ $limit }} bài</div>
-                            @else<div class="cp-slot ss-muted ss-text-xs">Còn {{ $limit - $d['count'] }} ô trống</div>@endif
+                            @else<button type="button" class="cp-slot ss-muted ss-text-xs cp-slot--btn" style="width:100%;text-align:left;cursor:pointer;background:none" wire:click="mountAction('assignDay', { day: '{{ $d['key'] }}' })" data-assign-day="{{ $d['key'] }}" title="Chọn một bài chưa có ngày để xếp vào ngày này">Còn {{ $limit - $d['count'] }} ô trống · + xếp bài</button>@endif
                         </div>
                     @endforeach
                 </div>

@@ -17,17 +17,13 @@ final class PlannedArticleCreator
 {
     public static function normalize(string $keyword): string
     {
-        return mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $keyword)));
+        return KeywordDuplicateGuard::normalize($keyword);
     }
 
     /** Bài đã dùng từ khóa này trên website (null nếu chưa). */
     public static function existing(Website|int $website, string $keyword): ?Article
     {
-        $websiteId = $website instanceof Website ? $website->id : $website;
-        $n = self::normalize($keyword);
-
-        return Article::where('website_id', $websiteId)->get(['id', 'primary_keyword'])
-            ->first(fn (Article $a) => self::normalize((string) $a->primary_keyword) === $n);
+        return KeywordDuplicateGuard::find($website, $keyword);
     }
 
     /** @param  list<string>  $secondary  $stored: bản ghi trong kho từ khóa (nếu có) để nối hai chiều; $origin: nguồn tạo bài */
@@ -50,19 +46,26 @@ final class PlannedArticleCreator
             throw new DuplicateKeywordException($dup->id, $keyword);
         }
 
-        $article = Article::create([
-            'website_id' => $website->id,
-            'created_by' => $actor->id,
-            'primary_keyword' => $keyword,
-            'secondary_keywords' => array_values(array_filter(array_map('trim', $secondary))),
-            'search_intent' => $intent,
-            'topic_cluster' => $cluster,
-            'workflow_status' => 'planned',
-            'kind' => 'new',
-            'origin' => $origin,
-            'keyword_id' => $stored?->id,
-            'cluster_id' => $stored?->cluster_id,
-        ]);
+        // Kiểm lại trong khóa + giao dịch: hai lần gọi gần như đồng thời chỉ một lần tạo được.
+        $article = KeywordDuplicateGuard::serialized($website, $keyword, function () use ($website, $keyword, $actor, $secondary, $intent, $cluster, $origin, $stored) {
+            if ($dup = self::existing($website, $keyword)) {
+                throw new DuplicateKeywordException($dup->id, $keyword);
+            }
+
+            return Article::create([
+                'website_id' => $website->id,
+                'created_by' => $actor->id,
+                'primary_keyword' => $keyword,
+                'secondary_keywords' => array_values(array_filter(array_map('trim', $secondary))),
+                'search_intent' => $intent,
+                'topic_cluster' => $cluster,
+                'workflow_status' => 'planned',
+                'kind' => 'new',
+                'origin' => $origin,
+                'keyword_id' => $stored?->id,
+                'cluster_id' => $stored?->cluster_id,
+            ]);
+        });
         if ($stored && $stored->status === 'new') {
             $stored->update(['status' => 'planned']);
         }

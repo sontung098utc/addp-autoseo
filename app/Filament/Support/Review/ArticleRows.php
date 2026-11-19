@@ -65,6 +65,11 @@ final class ArticleRows
             return ['Phiên lỗi, chưa có bản nháp', 'danger'];
         }
 
+        // Nhãn dữ liệu vẫn là "Cần sửa"; ở trang bài (không kèm công đoạn) nói rõ bản nào đã bị từ chối.
+        if ($state === 'rejected' && ! $withStage && ($rejected = RejectionInfo::label($a)) !== null) {
+            return [$rejected, \App\Filament\Support\StatusPresenter::color($state, 'article')];
+        }
+
         return [\App\Filament\Support\StatusPresenter::label($state, 'article'), \App\Filament\Support\StatusPresenter::color($state, 'article')];
     }
 

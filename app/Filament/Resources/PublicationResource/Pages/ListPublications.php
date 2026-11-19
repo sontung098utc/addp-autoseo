@@ -58,6 +58,8 @@ class ListPublications extends ListRecords
                             ->title('Đã khôi phục lịch xuất bản tự động')
                             ->success()
                             ->send();
+                        // Banner đỏ (hook toàn trang) và các nút bị khóa dựng lúc tải trang: tải lại ngay để hết trạng thái dừng cũ.
+                        $this->redirect(\App\Filament\Resources\PublicationResource::getUrl('index'));
                     }),
             ];
         }
@@ -69,11 +71,8 @@ class ListPublications extends ListRecords
                 ->color('danger')
                 ->visible(fn () => auth()->user()?->isApprover() ?? false)
                 ->form([
-                    Textarea::make('reason')
-                        ->label('Lý do dừng khẩn cấp')
-                        ->placeholder('Nhập lý do cụ thể (bắt buộc: ví dụ sự cố CMS, sai thông tin chiến dịch...)')
-                        ->required()
-                        ->rows(3),
+                    \App\Filament\Support\Review\ReviewActions::reasonField('reason', 'Lý do dừng khẩn cấp (bắt buộc)')
+                        ->placeholder('Nhập lý do cụ thể (ví dụ sự cố CMS, sai thông tin chiến dịch...)'),
                 ])
                 ->modalHeading('Kích hoạt Dừng khẩn cấp Lịch xuất bản')
                 ->modalDescription('Toàn bộ lượt xuất bản tự động của hệ thống sẽ lập tức tạm dừng và ĐỘI AI cũng sẽ không viết thêm bài nào (kể cả chiến dịch Toàn quyền và Autopilot) cho đến khi được khôi phục. Các bài đến hạn sẽ không được gửi sang CMS.')
@@ -86,6 +85,7 @@ class ListPublications extends ListRecords
                         ->body("Lý do: {$data['reason']}")
                         ->danger()
                         ->send();
+                    $this->redirect(\App\Filament\Resources\PublicationResource::getUrl('index'));
                 }),
         ];
     }

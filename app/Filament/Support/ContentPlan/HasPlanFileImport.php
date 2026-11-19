@@ -151,7 +151,7 @@ trait HasPlanFileImport
         try {
             $sheets = (new SheetReader)->read($file->getRealPath(), $file->getClientOriginalExtension(), $file->getSize());
         } catch (InvalidArgumentException $e) {
-            $this->importError = $e->getMessage();
+            $this->importError = \App\Support\UserFacingError::from($e);
 
             return;
         } finally {
@@ -194,12 +194,12 @@ trait HasPlanFileImport
         try {
             $r = app(PlanFileMapper::class)->map($sheets, ($this->importState['sheet_locked'] ?? false) ? (string) $this->importState['sheet'] : null);
         } catch (InvalidArgumentException|KeywordAiUnavailable $e) {
-            $this->importError = $e->getMessage().' Bạn vẫn có thể tự chọn cột bên dưới.';
+            $this->importError = \App\Support\UserFacingError::from($e).' Bạn vẫn có thể tự chọn cột bên dưới.';
 
             return;
         } catch (\Throwable $e) {
             report($e);
-            $this->importError = (ErrorMasker::mask($e->getMessage()) ?: 'Lỗi AI, thử lại sau.').' Bạn vẫn có thể tự chọn cột bên dưới.';
+            $this->importError = \App\Support\UserFacingError::from($e).' Bạn vẫn có thể tự chọn cột bên dưới.';
 
             return;
         }
@@ -280,7 +280,7 @@ trait HasPlanFileImport
         try {
             $b = (new PlanFileImporter)->build($site, $sheet['rows'], $this->importFields(), $this->importHeader($sheet), $this->importRows('section_rows'), $this->importRows('skip_rows'), $this->importLinks($sheets));
         } catch (InvalidArgumentException $e) {
-            $this->importError = $e->getMessage();
+            $this->importError = \App\Support\UserFacingError::from($e);
 
             return;
         }
@@ -326,7 +326,7 @@ trait HasPlanFileImport
             $b = $imp->build($site, $sheet['rows'], $this->importFields(), $this->importHeader($sheet), $this->importRows('section_rows'), $this->importRows('skip_rows'), $this->importLinks($sheets));
             $r = $imp->apply(Auth::user(), $site, $b['items'], $this->importTarget, $this->importNewName, (string) ($this->importState['file'] ?? ''));
         } catch (InvalidArgumentException $e) {
-            $this->importError = $e->getMessage();
+            $this->importError = \App\Support\UserFacingError::from($e);
 
             return;
         }

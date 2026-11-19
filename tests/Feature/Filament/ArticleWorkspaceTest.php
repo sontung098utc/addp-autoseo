@@ -318,7 +318,7 @@ class ArticleWorkspaceTest extends TestCase
         $svc = app(EmergencyStopService::class);
         $svc->resetForTesting();
         $svc->stop($admin, 'Sự cố kiểm thử');
-        $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()->assertSee('aw-stopped', false)->assertSee('DỪNG KHẨN CẤP')->assertSee('Sự cố kiểm thử');
+        $this->get(ArticleResource::getUrl('view', ['record' => $a]))->assertOk()->assertSee('aw-stopped', false)->assertSee('Đang dừng khẩn cấp: không giao việc/đăng được')->assertSee('Sự cố kiểm thử');
         $svc->resetForTesting();
     }
 

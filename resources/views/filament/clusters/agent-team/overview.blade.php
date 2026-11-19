@@ -15,12 +15,12 @@
                 @elseif (! $ai['connected'])
                     <span style="font-weight:600;color:#d97706">Chưa kết nối AI</span>
                 @else
-                    <span style="font-weight:600">Đang nghỉ</span>
+                    <span style="font-weight:600" data-testid="overview-idle">@if ($today['activeCampaigns'] > 0)Chưa có phiên đang chạy <span style="font-weight:400;opacity:.7">· {{ $today['activeCampaigns'] }} chiến dịch đang bật, chờ nhịp kế tiếp hoặc đã đủ bài hôm nay</span>@else Chưa có phiên đang chạy <span style="font-weight:400;opacity:.7">· chưa có chiến dịch nào đang bật</span>@endif</span>
                 @endif
             </div>
             <div class="text-sm" data-testid="today" style="display:flex;gap:1.25rem;flex-wrap:wrap">
                 @if ($today['runs'] > 0)<span><strong>{{ $today['runs'] }}</strong> bài đã giao hôm nay</span>@endif
-                @if ($today['toReview'] > 0)<span><strong>{{ $today['toReview'] }}</strong> chờ duyệt</span>@endif
+                @if ($today['toReview'] > 0)<span><strong>{{ $today['toReview'] }}</strong> phiên hôm nay đã ra bản nháp</span>@endif
                 @if ($today['cost'] > 0)<span>Chi phí <strong>{{ $fmt($today['cost']) }} ₫</strong>@if ($today['cap'] > 0) <span style="opacity:.6">/ {{ $fmt($today['cap']) }} ₫</span>@endif</span>@endif
             </div>
         </div>
@@ -43,7 +43,7 @@
                         $cur = \App\Filament\Support\Agent\RunActivity::currentStageOf($r, $r->steps);
                         $curTitle = $stages[$cur]['title'] ?? 'Hoàn tất';
                     @endphp
-                    <a href="{{ \App\Filament\Resources\AgentRunResource::viewUrl($r) }}" data-live-run="{{ $r->id }}" style="display:grid;grid-template-columns:minmax(12rem,1fr) auto auto;gap:1rem;align-items:center;text-decoration:none;color:inherit;padding:.45rem 0;border-bottom:1px solid rgba(128,128,128,.15)">
+                    <a href="{{ \App\Filament\Resources\AgentRunResource::viewUrl($r, articleKnown: (bool) $r->article) }}" data-live-run="{{ $r->id }}" style="display:grid;grid-template-columns:minmax(12rem,1fr) auto auto;gap:1rem;align-items:center;text-decoration:none;color:inherit;padding:.45rem 0;border-bottom:1px solid rgba(128,128,128,.15)">
                         <span style="font-size:.88rem;font-weight:500">{{ $r->article?->primary_keyword ?: (\App\Services\Agent\Pipeline\JobTypeRegistry::find((string) $r->job_type)['title'] ?? $r->job_type) }}</span>
                         <x-studio.running size="sm" label="{{ $curTitle }}" />
                         <span class="text-xs" style="opacity:.6;white-space:nowrap">{{ \App\Filament\Support\Agent\RunActivity::formatElapsed(\App\Filament\Support\Agent\RunActivity::elapsedSeconds($r)) }}</span>

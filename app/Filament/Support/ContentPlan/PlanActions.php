@@ -62,7 +62,7 @@ final class PlanActions
             } catch (DuplicateKeywordException $e) {
                 $results[] = ['keyword' => $k, 'status' => 'duplicate', 'message' => 'Bị chặn: website đã có bài dùng từ khóa này.', 'article_id' => $e->existingArticleId];
             } catch (InvalidArgumentException $e) {
-                $results[] = ['keyword' => $k, 'status' => 'error', 'message' => $e->getMessage(), 'article_id' => null];
+                $results[] = ['keyword' => $k, 'status' => 'error', 'message' => \App\Support\UserFacingError::from($e), 'article_id' => null];
             }
         }
 

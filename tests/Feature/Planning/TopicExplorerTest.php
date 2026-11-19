@@ -247,5 +247,29 @@ class TopicExplorerTest extends TestCase
         $this->assertNotContains('no_wikipedia', $r['topics'][0]['flags']);
         $this->assertStringContainsString('giới hạn tần suất', implode(' ', $r['notes']));
     }
+
+    public function test_loi_he_thong_khi_kham_pha_khong_lo_duong_dan_ra_giao_dien(): void
+    {
+        \Illuminate\Support\Facades\Log::spy();
+        $this->actingAs($this->user('approver'));
+        $boom = new TopicExplorer(new class implements StructuredAiInterface
+        {
+            public function generateStructured(string $system, string $user): array
+            {
+                throw new \ErrorException('file_put_contents(/home/x/app/storage/framework/cache/data/ab/cd/k): Failed to open stream: No such file or directory');
+            }
+        });
+        app()->instance(TopicExplorer::class, $boom);
+        Livewire::test(ContentPlanPage::class)->set('campaignSeed', 'tiểu đường thai kỳ')->call('exploreTopics');
+        $c = new \Filament\Notifications\Livewire\Notifications;
+        $c->mount();
+        $all = json_encode(array_map(fn ($n) => $n->toArray(), $c->notifications->all()), JSON_UNESCAPED_UNICODE);
+        $this->assertStringContainsString('Chưa khám phá được chủ đề con', $all);
+        foreach (['/home', 'storage/framework', 'file_put_contents', 'ErrorException'] as $leak) {
+            $this->assertStringNotContainsString($leak, $all);
+        }
+        $this->assertStringContainsString('Mã tham chiếu', $all);
+        \Illuminate\Support\Facades\Log::shouldHaveReceived('error')->withArgs(fn ($m, $c) => str_contains($m, $c['ref']) && str_contains($c['message'], 'file_put_contents'))->atLeast()->once();
+    }
 }
 

@@ -72,7 +72,7 @@
         ['key' => 'write', 'tab' => 'content', 'label' => 'Viết', 'state' => $latest ? 'done' : 'todo',
             'text' => $latest ? $versions->count().' phiên bản · '.$images->count().' ảnh' : 'Chưa có bản nào'],
         ['key' => 'check', 'tab' => 'content', 'label' => 'Kiểm và duyệt', 'state' => ! $latest ? 'todo' : ($reviewed ? 'done' : ($quality->hasBlocking() || $article->workflow_status === 'rejected' ? 'warn' : 'todo')),
-            'text' => ! $latest ? 'Chưa có gì để kiểm' : 'P0 '.$qCounts['P0'].' · P1 '.$qCounts['P1'].' · '.$statusLabel],
+            'text' => ! $latest ? 'Chưa có gì để kiểm' : ArticleResource::severityText($qCounts).' · '.$statusLabel],
         ['key' => 'publish', 'tab' => 'publish', 'label' => 'Xuất bản', 'state' => $pubDone ? 'done' : ($publications->contains(fn ($p) => filled($p->last_error)) ? 'warn' : 'todo'),
             'text' => $pubDone ? 'Đã đăng '.VnTime::format($pubDone->published_at_utc) : ($pubNext ? 'Lịch '.VnTime::format($pubNext->scheduled_at_utc) : 'Chưa có lịch')],
     ];
@@ -176,13 +176,21 @@
             @if ($article->website)<span class="aw-chip">{{ $article->website->name }}</span>@endif
         </div>
 
-        <x-studio.tabs :persist="$showPreflight ? null : 'bai-viet-v4-'.$article->id" :default="$tabDefault" :tabs="$tabs" :lazy="$lazyTabs">
+        <x-studio.tabs :persist="$showPreflight || $article->workflow_status === 'needs_review' ? null : 'bai-viet-v4-'.$article->id" :default="$tabDefault" :tabs="$tabs" :lazy="$lazyTabs">
             {{-- Tổng quan: việc tiếp theo + một nút chính, tiến trình, thông tin bài. Giải thích cất vào (i). --}}
             <x-studio.panel key="overview">
                 @if ($tabLoaded('overview'))
                 <div class="aw-stack">
                     @if (! empty($stopInfo))
-                        <p class="aw-note" data-testid="aw-stopped" style="color:#b91c1c;border:1px solid #b91c1c;border-radius:.5rem;padding:.5rem .75rem"><x-filament::icon icon="heroicon-o-exclamation-triangle" style="width:1.1rem;height:1.1rem;display:inline;vertical-align:-.2em" /> Hệ thống đang DỪNG KHẨN CẤP ({{ $stopInfo['reason'] ?? 'không ghi lý do' }}): đội AI sẽ không chạy cho đến khi được khôi phục ở Lịch xuất bản.</p>
+                        <p class="aw-note" data-testid="aw-stopped" style="color:#b91c1c;border:1px solid #b91c1c;border-radius:.5rem;padding:.5rem .75rem"><x-filament::icon icon="heroicon-o-exclamation-triangle" style="width:1.1rem;height:1.1rem;display:inline;vertical-align:-.2em" /> {{ \App\Filament\Support\Review\StopGate::MESSAGE }} Lý do: {{ $stopInfo['reason'] ?? 'không ghi lý do' }}.</p>
+                    @endif
+                    @if (! empty($rejection))
+                        <section class="ss-review-card" data-testid="aw-rejection" style="border-color:#b45309;background:rgba(217,119,6,.08)">
+                            <h2 class="ss-review-card__title" style="margin:0 0 .3rem">Cần sửa (đã từ chối bản v{{ $rejection['version'] }})</h2>
+                            <p style="margin:0"><strong>Lý do từ chối:</strong> {{ $rejection['reason'] }}</p>
+                            <p class="aw-muted" style="margin:.25rem 0 0">Từ chối bởi {{ $rejection['by'] ?? 'không rõ' }}@if ($rejection['at']) · {{ VnTime::format($rejection['at'], 'd/m/Y H:i') }}@endif.
+                                @if ($rejection['revised']) Đã có bản mới hơn, có thể gửi duyệt lại. @else Chưa có bản mới: sửa bài hoặc bấm "Giao làm lại" để có bản mới rồi gửi duyệt. @endif</p>
+                        </section>
                     @endif
                     @if ($outlineHold !== null)
                         <section class="ss-review-card" data-testid="aw-outline-hold" style="border-color:#d97706">
@@ -239,7 +247,7 @@
                             <div class="aw-chips" data-testid="pf-chips">
                                 <span class="aw-chip @if ($riskLevel === 'high') aw-chip--warn @endif" data-testid="pf-risk">Rủi ro: <strong>{{ $riskLabel }}</strong></span>
                                 {{-- Chỉ chip có số liệu giúp quyết định; số 0 / "chưa có" đã có ghi chú kèm liên kết bên dưới. --}}
-                                @if ($readiness['knowledge']['count'] > 0)<span class="aw-chip" data-testid="pf-kb">Kho: {{ $readiness['knowledge']['count'] }} mục</span>@endif
+                                @if ($readiness['knowledge']['count'] > 0)<span class="aw-chip" data-testid="pf-kb" title="Mục kiến thức ĐÃ DUYỆT khớp chủ đề, tối đa 5 mục (ước tính trước khi chạy). Mục mới nạp đang chờ duyệt không tính.">Kho: {{ $readiness['knowledge']['count'] }} mục đã duyệt khớp chủ đề</span>@endif
                                 @if ($readiness['products']['count'] > 0)<span class="aw-chip" data-testid="pf-products">Sản phẩm: {{ $readiness['products']['count'] }}</span>@endif
                                 @if ($readiness['brand']['percent'] > 0)<span class="aw-chip" data-testid="pf-brand">Hồ sơ: {{ $readiness['brand']['percent'] }}%</span>@endif
                                 @if ($readiness['cost']['estimate_vnd'] !== null)<span class="aw-chip" data-testid="pf-cost">Ước tính: ~{{ $money($readiness['cost']['estimate_vnd']) }}</span>@endif
@@ -291,6 +299,7 @@
                             <div class="aw-flow__head">
                                 <div>
                                     <h2 class="ss-review-card__title" style="margin:0">Luồng chạy của bài <x-help title="Luồng chạy"><p>Các bước đội AI thực hiện cho bài này ở phiên #{{ $rRun->id }}. Bước đang chạy được làm nổi bật; làm mới tự động khi phiên còn chạy.</p></x-help></h2>
+                                    @if (! empty($blockedNote))<div class="aw-muted" data-testid="aw-flow-blocked" style="font-size:.75rem;margin:.1rem 0">{{ $blockedNote }}</div>@endif
                                     <div class="aw-flow__sub">
                                         @if ($rf['live'])
                                             <x-studio.running size="sm" label="Đang chạy" />
@@ -656,23 +665,33 @@
             <x-studio.panel key="content">
                 @if ($tabLoaded('content'))
                 <div class="aw-stack">
+                    @if (! empty($rejection))
+                        <section class="ss-review-card" data-testid="aw-rejection-content" style="border-color:#b45309;background:rgba(217,119,6,.08)">
+                            <h2 class="ss-review-card__title" style="margin:0 0 .3rem">Cần sửa (đã từ chối bản v{{ $rejection['version'] }})</h2>
+                            <p style="margin:0"><strong>Lý do từ chối:</strong> {{ $rejection['reason'] }}</p>
+                            <p class="aw-muted" style="margin:.25rem 0 0">Từ chối bởi {{ $rejection['by'] ?? 'không rõ' }}@if ($rejection['at']) · {{ VnTime::format($rejection['at'], 'd/m/Y H:i') }}@endif.
+                                @if ($rejection['revised']) Đã có bản mới hơn, có thể gửi duyệt lại. @else Chưa có bản mới: sửa bài hoặc bấm "Giao làm lại" để có bản mới rồi gửi duyệt. @endif</p>
+                        </section>
+                    @endif
                     <section class="ss-review-card">
                         <div class="aw-head" style="justify-content:flex-start;gap:.4rem">
                             <h2 class="ss-review-card__title">Các phiên bản</h2>
                             @if ($latest)
                                 <x-help title="Đọc điểm và duyệt">
-                                    <p data-testid="aw-content-score-note">Điểm hình thức ({{ $qCounts['P0'] }} lỗi P0 · {{ $qCounts['P1'] }} P1 · {{ $qCounts['P2'] }} P2): {{ ArticleResource::SCORE_NOTE }}</p>
+                                    <p data-testid="aw-content-score-note">Điểm hình thức ({{ ArticleResource::severityText($qCounts) }}): {{ ArticleResource::SCORE_NOTE }}</p>
+                                    <p data-testid="aw-severity-note">{{ ArticleResource::SEVERITY_NOTE }}</p>
                                     <p>Bấm Xem để đọc toàn bộ nội dung, thẻ SEO, kiểm chất lượng và so sánh với bản trước. Các nút duyệt ở đầu trang áp dụng cho bản mới nhất.</p>
                                 </x-help>
                             @endif
                         </div>
+                        @if ($latest && ($insLine = \App\Filament\Support\Review\ReviewActions::instructionLine($latest)))<div class="aw-note" data-testid="aw-instruction-line">{{ $insLine }}</div>@endif
                         @if ($latest && $noGrounding)<div class="aw-note" data-testid="aw-content-gap" style="color:#b45309">Bài chưa có căn cứ từ kho kiến thức. <x-help tone="warning" title="Vì sao cần xem lại"><p>{{ ArticleResource::GAP_NOTE }}</p></x-help></div>@endif
                         @if ($versions->isEmpty())
                             <p>Bài chưa có nội dung.</p>
                         @else
                             <div class="aw-scroll">
                                 <table class="aw-table" data-testid="aw-versions">
-                                    <thead><tr><th>Bản</th><th>Tiêu đề</th><th>Trạng thái</th><th>Chưa đạt</th><th>Số từ</th><th>Ảnh</th><th>Tạo bởi</th><th>Tạo lúc</th><th></th></tr></thead>
+                                    <thead><tr><th>Bản</th><th>Tiêu đề</th><th>Trạng thái</th><th>Lỗi chưa đạt</th><th style="white-space:nowrap">Số từ</th><th>Ảnh</th><th>Tạo bởi</th><th>Tạo lúc</th><th></th></tr></thead>
                                     <tbody>
                                         @foreach ($versions as $v)
                                             @php $q = $versionQuality[$v->id]; $vr = $versionRun->get($v->id); @endphp
@@ -683,8 +702,8 @@
                                                     @if (filled($v->review_notes))<div class="aw-muted">Ghi chú duyệt: {{ Str::limit($v->review_notes, 160) }}</div>@endif
                                                 </td>
                                                 <td>{{ StatusPresenter::label($v->review_status, 'article') }}@if ($v->reviewer)<div class="aw-muted">{{ $v->reviewer->name }}</div>@endif</td>
-                                                <td>P0 {{ $q['P0'] }} · P1 {{ $q['P1'] }} · P2 {{ $q['P2'] }}</td>
-                                                <td>{{ $num(count(preg_split('/\s+/u', trim(strip_tags((string) $v->html_content)), -1, PREG_SPLIT_NO_EMPTY))) }}</td>
+                                                <td title="{{ ArticleResource::SEVERITY_NOTE }}">{{ ArticleResource::severityText($q) }}</td>
+                                                <td style="white-space:nowrap">{{ $num(\App\Services\Content\VietnameseText::bodyWordCountHtml((string) $v->html_content)) }}</td>
                                                 <td>{{ $v->mediaAssets->count() }}</td>
                                                 <td>@if ($vr && AgentRunResource::canViewAny())<a class="aw-link" href="{{ AgentRunResource::viewUrl($vr) }}">Phiên AI #{{ $vr->id }}</a>@elseif ($vr) Phiên AI #{{ $vr->id }} @else {{ $v->ai_model ? 'AI' : 'Người viết' }} @endif</td>
                                                 <td>{{ VnTime::format($v->created_at) }}</td>
@@ -828,7 +847,7 @@
                                                 </div></td>
                                             <td>{{ VnTime::format($p->scheduled_at_utc) }}</td>
                                             <td>{{ $p->published_at_utc ? VnTime::format($p->published_at_utc) : '—' }}</td>
-                                            <td>@if ($p->published_url && preg_match('#^https?://#i', $p->published_url))<a class="aw-link" href="{{ $p->published_url }}" target="_blank" rel="noopener noreferrer">Mở bài</a>@else — @endif</td>
+                                            <td>@php($pubLink = \App\Integrations\Magento\MagentoBlogUrl::display($p))@if ($pubLink && preg_match('#^https?://#i', $pubLink))<a class="aw-link" href="{{ $pubLink }}" target="_blank" rel="noopener noreferrer">Mở bài</a>@else — @endif</td>
                                             <td>{{ $dash($p->last_error ? Str::limit($p->last_error, 120) : null) }}</td>
                                         </tr>
                                     @endforeach

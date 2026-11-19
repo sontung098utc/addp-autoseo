@@ -4,8 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ArticleResource\Pages;
 use App\Filament\Support\Agent\RunActivity;
+use App\Filament\Support\Planning\KeywordDuplicateGuard;
 use App\Filament\Support\Review\ArticleRows;
 use App\Filament\Support\Review\ReviewActions;
+use App\Filament\Support\Review\StopGate;
 use App\Filament\Support\Review\ReviewWorkflow;
 use App\Filament\Support\StatusPresenter;
 use App\Models\AgentRun;
@@ -17,6 +19,7 @@ use App\Models\Website;
 use App\Services\Agent\Readiness\ArticleReadiness;
 use App\Services\Agent\Refresh\AgentRunDispatcher;
 use App\Services\Agent\Run\BackgroundRun;
+use App\Services\Agent\Run\RedoScope;
 use App\Services\Agent\Settings\AgentAi;
 use App\Services\Brain\BrainContext;
 use App\Services\Content\Quality\QualityReport;
@@ -109,13 +112,51 @@ class ArticleResource extends Resource
             && $record->versions()->exists();
     }
 
-    /** Biểu mẫu lời nhắn của "Giao làm lại" (dùng chung cho bảng và trang bài). @return list<\Filament\Forms\Components\Component> */
-    public static function redoForm(): array
+    public const REDO_NOTE = 'Chỉ dẫn lưu cho mọi lần chạy; yêu cầu này chỉ cho lần này.';
+
+    public const REDO_DESCRIPTION = 'Chưa vừa ý với bản hiện tại? Nêu yêu cầu cho lần làm lại này. Điều phối đọc yêu cầu và chỉ làm lại phần được nêu (dàn ý, bài viết, ảnh, nguồn/kho); không nói rõ thì chỉ viết lại bài viết, giữ nguyên ảnh và nguồn. Mọi quy tắc an toàn, nguồn và từ cấm vẫn áp dụng.';
+
+    /** Yêu cầu thực tế của lần làm lại: ô để trống thì dùng chỉ dẫn đã lưu của bài. */
+    public static function redoMessage(Article $record, array $data): string
     {
+        $m = trim((string) ($data['message'] ?? ''));
+
+        return $m !== '' ? $m : trim((string) $record->guidance);
+    }
+
+    /** Phạm vi dự kiến + ước tính chi phí theo phạm vi (luật từ khóa, không gọi AI; điều phối có thể điều chỉnh khi chạy, nhưng chỉ trong 4 phần cố định). */
+    public static function redoPreview(Article $record, string $message): string
+    {
+        $message = trim($message) !== '' ? $message : trim((string) $record->guidance);
+        $scope = RedoScope::resolve($message);
+        $full = static::readiness($record)['cost']['estimate_vnd'] ?? null;
+        $est = RedoScope::estimate($full === null ? null : (float) $full, $scope['parts']);
+
+        return 'Dự kiến: '.RedoScope::describe($scope['parts']).'. Chi phí '.($est === null ? 'chưa có số liệu để ước lượng' : 'ước tính khoảng '.static::vnd($est).' (thô, theo tỷ trọng các bước; chưa gồm vòng sửa)').'.'
+            .($scope['defaulted'] ? ' Muốn làm lại cả ảnh hoặc nguồn, hãy nói rõ trong yêu cầu.' : '');
+    }
+
+    /** Thông báo sau khi giao làm lại: nói rõ phạm vi dự kiến (phạm vi cuối do điều phối chốt, ghi trong diễn biến phiên). */
+    public static function redoAssignedBody(string $message): string
+    {
+        $scope = RedoScope::resolve($message);
+
+        return 'Đã giao: '.RedoScope::describe($scope['parts']).'. Phạm vi cuối do điều phối chốt, xem diễn biến phiên.'
+            .($scope['defaulted'] ? ' Muốn làm lại cả ảnh hoặc nguồn? Giao lại và nói rõ trong yêu cầu.' : '');
+    }
+
+    /** Biểu mẫu "Giao làm lại" (dùng chung cho bảng và trang bài): MỘT ô yêu cầu cho lần này, điền sẵn từ chỉ dẫn đã lưu. @return list<\Filament\Forms\Components\Component> */
+    public static function redoForm(Article $record): array
+    {
+        $hasGuidance = trim((string) $record->guidance) !== '';
+
         return [
-            Forms\Components\Textarea::make('message')->label('Lời nhắn cho điều phối')->required()->minLength(10)->maxLength(1500)->rows(5)
-                ->placeholder('Ví dụ: Mở bài dài dòng; mục 2 thiếu số liệu; ảnh bìa chưa hợp chủ đề; giọng văn quá trang trọng…')
-                ->helperText('Nói rõ chưa vừa ý ở đâu. Điều phối đọc lời nhắn, quyết định làm lại phần nào (dàn ý, bài viết, ảnh) và báo từng bộ phận. Bản mới được lưu thành phiên bản mới, bản cũ vẫn còn.'),
+            Forms\Components\Textarea::make('message')->label('Yêu cầu lần làm lại này')->rows(5)->maxLength(1500)->minLength(10)
+                ->default($record->guidance)->required(! $hasGuidance)->live(onBlur: true)
+                ->placeholder('Ví dụ: Mở bài dài dòng; mục 2 thiếu số liệu; giữ nguyên ảnh…')
+                ->helperText(static::REDO_NOTE.($hasGuidance ? ' Đã điền sẵn từ chỉ dẫn đã lưu, bạn có thể sửa hoặc để trống để dùng nguyên chỉ dẫn.' : '').' Bản mới được lưu thành phiên bản mới, bản cũ vẫn còn.'),
+            Forms\Components\Placeholder::make('scope_preview')->label('Phạm vi và chi phí')
+                ->content(fn (Get $get) => static::redoPreview($record, (string) ($get('message') ?? ''))),
         ];
     }
 
@@ -172,6 +213,10 @@ class ArticleResource extends Resource
     public static function assignToAgent(Article $record, bool $allowWithoutKnowledge = false /* không còn tác dụng, giữ để tương thích */, bool $background = false, ?string $redoMessage = null): ?string
     {
         abort_unless(Auth::user()?->isWriter(), 403);
+        // Đang dừng khẩn cấp: lối bấm tay không tạo phiên "Bị chặn" rác (chỉ ghi nhật ký hệ thống). Lối tự động (chiến dịch) vẫn bị orchestrator chặn như cũ.
+        if (StopGate::blocks($record->website_id, 'giao đội AI bài #'.$record->id)) {
+            return null;
+        }
         // Chống giao trùng: đã có phiên đang chạy thật thì không tạo phiên thứ hai.
         if (ArticleRows::liveRun($record) !== null) {
             Notification::make()->title('Bài này đang có phiên chạy')->body('Đợi phiên hiện tại xong rồi hãy giao lại.')->warning()->send();
@@ -194,14 +239,14 @@ class ArticleResource extends Resource
                 return static::getUrl('view', ['record' => $record]);
             }
             Notification::make()->title($redoMessage !== null ? 'Đã giao bài #'.$record->id.' làm lại' : 'Đã giao bài #'.$record->id.' cho đội AI')
-                ->body($started ? 'Phiên #'.$started->id.' đang chạy, theo dõi diễn biến ngay tại đây.' : ($outcome === 'queued' ? 'Bài đã xếp hàng, sẽ bắt đầu chạy trong khoảng 1 phút (máy chủ web không tự mở được tiến trình nền nên việc khởi chạy đi qua hàng đợi). Xem tiến trình ở trang bài.' : 'Phiên đang khởi động, xem tiến trình ở trang bài.'))->success()->send();
+                ->body(($redoMessage !== null ? static::redoAssignedBody($redoMessage).' ' : '').($started ? 'Phiên #'.$started->id.' đang chạy, theo dõi diễn biến ngay tại đây.' : ($outcome === 'queued' ? 'Bài đã xếp hàng, sẽ bắt đầu chạy trong khoảng 1 phút (máy chủ web không tự mở được tiến trình nền nên việc khởi chạy đi qua hàng đợi). Xem tiến trình ở trang bài.' : 'Phiên đang khởi động, xem tiến trình ở trang bài.')))->success()->send();
 
             return $started ? AgentRunResource::viewUrl($started) : static::getUrl('view', ['record' => $record]);
         }
         $run = AgentRunDispatcher::run($record, $ai, Auth::user(), policy: AgentAi::policy(), redo: $redoMessage !== null ? ['message' => $redoMessage] : null);
         $n = Notification::make()->title('Bài #'.$record->id.' · phiên #'.$run->id.': '.(AgentRunResource::STATUS[$run->status][0] ?? $run->status))
             ->body($run->outcome_reason ?: 'Đã có bản nháp chờ duyệt.')
-            ->actions([Action::make('xem')->label('Xem diễn biến')->url(AgentRunResource::viewUrl($run))]);
+            ->actions([Action::make('xem')->label('Xem diễn biến')->url(AgentRunResource::viewUrl($run, articleKnown: true))]);
         in_array($run->status, ['ready_for_review'], true) ? $n->success() : $n->warning();
         $n->send();
 
@@ -249,6 +294,32 @@ class ArticleResource extends Resource
             });
     }
 
+    /** Bài đang dùng từ khóa này trên website (null nếu chưa, hoặc chưa chọn website / chưa nhập từ khóa). */
+    public static function duplicateOf(mixed $websiteId, string $keyword): ?Article
+    {
+        if (! $websiteId || trim($keyword) === '') {
+            return null;
+        }
+
+        return KeywordDuplicateGuard::find((int) $websiteId, $keyword);
+    }
+
+    /** Cảnh báo ngay dưới ô "Từ khóa chính": nêu bài đang có (tên, trạng thái) và liên kết "Mở bài đó". */
+    public static function duplicateNotice(mixed $websiteId, string $keyword): ?HtmlString
+    {
+        $a = static::duplicateOf($websiteId, $keyword);
+        if ($a === null) {
+            return null;
+        }
+        $d = KeywordDuplicateGuard::describe($a);
+        $open = $d['url'] ? ' <a href="'.e($d['url']).'" class="font-semibold underline">Mở bài đó</a>' : '';
+        $msg = $d['reopenable']
+            ? 'Website này đã có bài #'.$d['id'].' "'.e($d['keyword']).'" (trạng thái: '.e($d['status_label']).') dùng từ khóa này. Bài cũ đang bị trả về, bạn có thể tạo lại bằng cách tích ô xác nhận bên dưới.'
+            : 'Website này đã có bài #'.$d['id'].' "'.e($d['keyword']).'" (trạng thái: '.e($d['status_label']).') dùng từ khóa này, nên không thể tạo thêm. Hãy mở bài đó để làm tiếp, hoặc đổi từ khóa.';
+
+        return new HtmlString('<div class="text-sm text-warning-600 dark:text-warning-400" role="alert">'.$msg.$open.'</div>');
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -264,7 +335,16 @@ class ArticleResource extends Resource
                             ->required(),
                         Forms\Components\TextInput::make('primary_keyword')
                             ->label('Từ khóa chính')
+                            ->live(onBlur: true)
                             ->required(),
+                        Forms\Components\Placeholder::make('keyword_duplicate_notice')
+                            ->hiddenLabel()
+                            ->content(fn (Get $get) => static::duplicateNotice($get('website_id'), (string) $get('primary_keyword')))
+                            ->visible(fn (Get $get, string $operation) => $operation === 'create' && static::duplicateOf($get('website_id'), (string) $get('primary_keyword')) !== null),
+                        Forms\Components\Checkbox::make('confirm_reopen')
+                            ->label('Tôi hiểu, vẫn tạo thêm một bài mới cho từ khóa này')
+                            ->dehydrated(false)
+                            ->visible(fn (Get $get, string $operation) => $operation === 'create' && ($d = static::duplicateOf($get('website_id'), (string) $get('primary_keyword'))) !== null && KeywordDuplicateGuard::isReopenable($d)),
                         Forms\Components\TagsInput::make('secondary_keywords')
                             ->label('Từ khóa phụ'),
                         Forms\Components\Select::make('search_intent')
@@ -310,9 +390,67 @@ class ArticleResource extends Resource
     public const TAB_STATUSES = ['planned', 'drafting', 'needs_review', 'rejected', 'approved', 'scheduled', 'published'];
 
     public const TAB_LABELS = [
-        'planned' => 'Kế hoạch', 'drafting' => 'Đang viết', 'needs_review' => 'Chờ duyệt', 'rejected' => 'Cần sửa',
+        'planned' => 'Chờ viết', 'drafting' => 'Đang viết', 'needs_review' => 'Chờ duyệt', 'rejected' => 'Cần sửa',
         'approved' => 'Đã duyệt', 'scheduled' => 'Đã lên lịch', 'published' => 'Đã đăng',
     ];
+
+    /**
+     * Điều kiện "đã đăng" của một bài: trạng thái bài là 'published', hoặc bài vẫn ghi 'scheduled' nhưng có lượt đăng đã thành công
+     * (đường đăng thật chỉ cập nhật lượt đăng, không đổi trạng thái bài, nên đếm theo workflow_status sẽ nhầm bài đã đăng thành "Đã lên lịch").
+     */
+    private static function wherePublished(\Illuminate\Database\Eloquent\Builder $q): \Illuminate\Database\Eloquent\Builder
+    {
+        return $q->where(fn ($w) => $w->where('articles.workflow_status', 'published')
+            ->orWhere(fn ($x) => $x->where('articles.workflow_status', 'scheduled')->whereHas('versions.publications', fn ($p) => $p->where('status', 'published'))));
+    }
+
+    /** Lọc theo một tab trạng thái; "Đã lên lịch" loại bài đã đăng, "Đã đăng" gồm cả bài đã đăng còn ghi 'scheduled'. */
+    public static function scopeTab(\Illuminate\Database\Eloquent\Builder $q, string $status): \Illuminate\Database\Eloquent\Builder
+    {
+        return match ($status) {
+            'published' => static::wherePublished($q),
+            'scheduled' => $q->where('articles.workflow_status', 'scheduled')->whereDoesntHave('versions.publications', fn ($p) => $p->where('status', 'published')),
+            default => $q->where('articles.workflow_status', $status),
+        };
+    }
+
+    /**
+     * Số bài ở mỗi tab (khóa 'all' và từng mã trong TAB_STATUSES), cùng cách đếm với scopeTab.
+     * Tab "Chờ viết" = bài ở trạng thái 'planned', không cộng bài đã xếp lịch/đã đăng. Trang Kế hoạch cũng phải đếm "Chờ viết" đúng cách này
+     * (hiện ContentPlanPage::planGroups cộng mọi trạng thái ngoài 5 trạng thái đầu vào "Chờ viết" nên lệch).
+     *
+     * @return array<string, int>
+     */
+    public static function tabCounts(): array
+    {
+        $raw = Article::query()->selectRaw('workflow_status, count(*) as n')->groupBy('workflow_status')->pluck('n', 'workflow_status');
+        $counts = ['all' => (int) $raw->sum()];
+        foreach (self::TAB_STATUSES as $status) {
+            $counts[$status] = (int) ($raw[$status] ?? 0);
+        }
+        // Chuyển bài đã đăng (còn ghi 'scheduled') từ "Đã lên lịch" sang "Đã đăng".
+        $movedToPublished = static::scopeTab(Article::query(), 'published')->where('articles.workflow_status', 'scheduled')->count();
+        $counts['scheduled'] -= $movedToPublished;
+        $counts['published'] += $movedToPublished;
+
+        return $counts;
+    }
+
+    /** Thang lỗi chất lượng bằng lời dễ hiểu (P0/P1/P2 là mã nội bộ): nhãn + gợi ý. */
+    public const SEVERITY_LABELS = ['P0' => 'Lỗi nặng', 'P1' => 'Cần sửa', 'P2' => 'Gợi ý'];
+
+    public const SEVERITY_NOTE = 'Lỗi nặng: chặn duyệt, phải sửa hoặc nhập lý do ngoại lệ. Cần sửa: nên sửa trước khi đăng. Gợi ý: cải thiện thêm, không bắt buộc.';
+
+    /** "Lỗi nặng 0 · Cần sửa 1 · Gợi ý 0" từ bộ đếm P0/P1/P2 của kiểm chất lượng. @param array<string,int> $counts */
+    public static function severityText(array $counts): string
+    {
+        $parts = [];
+        foreach (self::SEVERITY_LABELS as $code => $label) {
+            $parts[] = $label.' '.(int) ($counts[$code] ?? 0);
+        }
+
+        return implode(' · ', $parts);
+    }
 
     /** Nút chính (duy nhất) của dòng theo trạng thái: submit_review | approve | schedule | view_version | null. */
     public static function primaryActionFor(Article $r): string
@@ -355,7 +493,11 @@ class ArticleResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with(['website', 'latestVersion', 'campaign']))
+            ->modifyQueryUsing(fn ($query) => $query->with([
+                'website', 'campaign', 'lastRun.steps',
+                // Bảng chỉ cần tiêu đề: không kéo cả html_content của bản mới nhất cho mỗi dòng.
+                'latestVersion' => fn ($q) => $q->select('article_versions.id', 'article_versions.article_id', 'article_versions.version', 'article_versions.title'),
+            ]))
             ->poll(fn () => RunActivity::anyRunning() ? RunActivity::POLL_LIVE.'s' : RunActivity::POLL_IDLE.'s')
             ->persistFiltersInSession()
             ->persistSortInSession()
@@ -417,7 +559,7 @@ class ArticleResource extends Resource
                     ->state(fn (Article $r) => ($run = ArticleRows::lastRun($r)) ? static::runSummary($run) : '—')
                     ->limit(40)
                     ->tooltip(fn (Article $r) => ($run = ArticleRows::lastRun($r)) ? static::runSummary($run).' · bấm để xem diễn biến' : null)
-                    ->url(fn (Article $r) => ($run = ArticleRows::lastRun($r)) && AgentRunResource::canViewAny() ? AgentRunResource::viewUrl($run) : null)
+                    ->url(fn (Article $r) => ($run = ArticleRows::lastRun($r)) && AgentRunResource::canViewAny() ? AgentRunResource::viewUrl($run, articleKnown: true) : null)
                     ->color('gray')
                     ->visibleFrom('2xl')),
                 static::narrow(Tables\Columns\TextColumn::make('updated_at')->label('Cập nhật')->since()->sortable()
@@ -460,21 +602,23 @@ class ArticleResource extends Resource
                 static::scheduleAction(),
                 static::viewVersionAction(),
                 Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('open_article')->label('Xem bài')->icon('heroicon-o-eye')
+                        ->url(fn (Article $r) => static::getUrl('view', ['record' => $r])),
                     static::publishNowAction(),
                     static::rejectAction(),
-                    Tables\Actions\Action::make('redo_agent')
+                    StopGate::lock(Tables\Actions\Action::make('redo_agent'))
                         ->label('Giao làm lại')
                         ->icon('heroicon-o-arrow-path')
                         ->visible(fn (Article $record) => static::canRedoWithAgent($record))
                         ->modalHeading('Giao bài này làm lại')
-                        ->modalDescription('Chưa vừa ý với bản hiện tại? Gửi lời nhắn cho điều phối: đội AI làm lại theo đó và giữ những phần đã đạt. Mọi quy tắc an toàn, nguồn và từ cấm vẫn áp dụng.')
-                        ->form(static::redoForm())
+                        ->modalDescription(static::REDO_DESCRIPTION)
+                        ->form(fn (Article $record) => static::redoForm($record))
                         ->modalSubmitActionLabel('Giao làm lại')
                         ->action(function (Article $record, array $data, Tables\Actions\Action $action) {
-                            $url = static::assignToAgent($record, background: true, redoMessage: (string) $data['message']);
+                            $url = static::assignToAgent($record, background: true, redoMessage: static::redoMessage($record, $data));
                             $url ? $action->redirect($url) : null;
                         }),
-                    Tables\Actions\Action::make('run_agent')
+                    StopGate::lock(Tables\Actions\Action::make('run_agent'))
                         ->label('Giao đội AI')
                         ->icon('heroicon-o-cpu-chip')
                         ->visible(fn (Article $record) => static::canAssignToAgent($record))
@@ -554,6 +698,19 @@ class ArticleResource extends Resource
         return 'art-hint:v1:'.$v->id.':'.($v->updated_at?->timestamp ?? 0).':'.$kb;
     }
 
+    /** Dòng tóm tắt đầu hộp Duyệt: tên bài, mức rủi ro chủ đề (phiên gần nhất), số lỗi chưa đạt. @return array{title:string,risk:?string,counts:?array<string,int>} */
+    public static function approveSummary(Article $r): array
+    {
+        $q = static::qualityOf($r);
+        $risk = ArticleRows::lastRun($r)?->risk_level;
+
+        return [
+            'title' => (string) ($r->latestVersion?->title ?: $r->primary_keyword ?: 'Bài #'.$r->id),
+            'risk' => $risk ? (self::RISK_LABELS[$risk] ?? (string) $risk) : null,
+            'counts' => $q?->counts(),
+        ];
+    }
+
     /** Kiểm chất lượng bản mới nhất; null nếu bài chưa có bản nào. */
     private static function qualityOf(Article $record): ?QualityReport
     {
@@ -574,13 +731,16 @@ class ArticleResource extends Resource
 
     private static function submitAction(): Tables\Actions\Action
     {
-        return Tables\Actions\Action::make('submit_review')->size('sm')->label('Gửi duyệt')->icon('heroicon-o-paper-airplane')
+        return Tables\Actions\Action::make('submit_review')->size('sm')->label(fn (Article $r) => ReviewActions::submitLabel($r))->icon('heroicon-o-paper-airplane')
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'submit_review')
             ->authorize(fn () => ReviewActions::canSubmit())
             ->requiresConfirmation()
+            ->modalHeading(fn (Article $r) => ReviewActions::submitHeading($r))
+            ->modalDescription(fn (Article $r) => ReviewActions::submitDescription($r))
             ->action(function (Article $r) {
                 abort_unless(ReviewActions::canSubmit(), 403);
-                ReviewActions::run(fn () => (new ReviewWorkflow)->submitForReview(ReviewActions::user(), static::latest($r)), 'Đã gửi duyệt');
+                // Hộp xác nhận ở trên chính là xác nhận gửi lại nguyên bản (nêu rõ lý do bị từ chối).
+                ReviewActions::run(fn () => (new ReviewWorkflow)->submitForReview(ReviewActions::user(), static::latest($r), confirmResubmit: true), 'Đã gửi duyệt');
             });
     }
 
@@ -591,8 +751,9 @@ class ArticleResource extends Resource
             ->authorize(fn () => ReviewActions::canApprove())
             ->disabled(fn (Article $r) => ArticleRows::liveRun($r) !== null)
             ->tooltip(fn (Article $r) => ArticleRows::liveRun($r) ? 'Đội AI đang viết lại bài, chờ xong rồi duyệt bản mới.' : static::blockedHintOf($r))
-            ->modalHeading(fn (Article $r) => static::qualityOf($r)?->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi P0' : 'Duyệt nội dung')
-            ->form(fn (Article $r) => ReviewActions::approveForm((int) $r->created_by === (int) ReviewActions::user()?->id, static::qualityOf($r)))
+            ->modalHeading(fn (Article $r) => static::qualityOf($r)?->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi nặng' : 'Duyệt nội dung')
+            ->modalSubmitActionLabel('Duyệt')
+            ->form(fn (Article $r) => ReviewActions::approveForm((int) $r->created_by === (int) ReviewActions::user()?->id, static::qualityOf($r), static::approveSummary($r)))
             ->action(function (Article $r, array $data) {
                 abort_unless(ReviewActions::canApprove(), 403);
                 ReviewActions::run(fn () => (new ReviewWorkflow)->approve(ReviewActions::user(), static::latest($r), $data['note'] ?? null, $data['override_reason'] ?? null), 'Đã duyệt nội dung');
@@ -615,7 +776,7 @@ class ArticleResource extends Resource
     /** "Đăng ngay" cho bài đã duyệt (cùng điều kiện với Xếp lịch): đăng bản đã duyệt lên website ngay, không hẹn giờ. */
     private static function publishNowAction(): Tables\Actions\Action
     {
-        return Tables\Actions\Action::make('publish_now')->label('Đăng ngay')->icon('heroicon-o-paper-airplane')->color('success')
+        return StopGate::lock(Tables\Actions\Action::make('publish_now'))->label('Đăng ngay')->icon('heroicon-o-paper-airplane')->color('success')
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'schedule')
             ->authorize(fn () => ReviewActions::canApprove())
             ->modalHeading('Đăng ngay lên website')
@@ -625,10 +786,13 @@ class ArticleResource extends Resource
             ->modalSubmitActionLabel('Đăng ngay')
             ->action(function (Article $r, array $data) {
                 abort_unless(ReviewActions::canApprove(), 403);
+                if (StopGate::blocks($r->website_id, 'đăng ngay bài #'.$r->id)) {
+                    return;
+                }
                 try {
                     $p = (new ReviewWorkflow)->publishNow(ReviewActions::user(), static::latest($r), Website::findOrFail($data['website_id']));
                 } catch (\InvalidArgumentException $e) {
-                    Notification::make()->title('Không đăng được')->body($e->getMessage())->danger()->send();
+                    Notification::make()->title('Không đăng được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
                     return;
                 }
@@ -638,13 +802,16 @@ class ArticleResource extends Resource
 
     private static function scheduleAction(): Tables\Actions\Action
     {
-        return Tables\Actions\Action::make('schedule')->size('sm')->label('Xếp lịch')->icon('heroicon-o-clock')
+        return StopGate::lock(Tables\Actions\Action::make('schedule'))->size('sm')->label('Xếp lịch')->icon('heroicon-o-clock')
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'schedule')
             ->authorize(fn () => ReviewActions::canApprove())
             ->form(ReviewActions::scheduleForm())
             ->fillForm(fn (Article $r) => ['website_id' => $r->website_id])
             ->action(function (Article $r, array $data) {
                 abort_unless(ReviewActions::canApprove(), 403);
+                if (StopGate::blocks($r->website_id, 'xếp lịch bài #'.$r->id)) {
+                    return;
+                }
                 ReviewActions::run(function () use ($r, $data) {
                     $website = Website::findOrFail($data['website_id']);
                     (new ReviewWorkflow)->schedule(ReviewActions::user(), static::latest($r), ReviewActions::parseVn($data['scheduled_at_vn']), $website);

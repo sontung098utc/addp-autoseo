@@ -79,15 +79,9 @@ final class TransientAiError extends RuntimeException
         return false;
     }
 
-    /** Mô tả ngắn, an toàn để ghi nhật ký: tên lỗi + mã HTTP, không kèm thông điệp gốc (có thể chứa khóa/URL). */
+    /** Mô tả ngắn, an toàn để ghi nhật ký: lý do thật bằng tiếng Việt kèm mã HTTP (xem AiFailureReason), không tên lớp ngoại lệ và không kèm thông điệp gốc (có thể chứa khóa/URL). */
     public static function describe(Throwable $e): string
     {
-        $status = match (true) {
-            $e instanceof GuzzleRequestException => $e->getResponse()?->getStatusCode(),
-            $e instanceof HttpRequestException => $e->response->status(),
-            default => null,
-        };
-
-        return class_basename($e).($status ? " (HTTP {$status})" : '');
+        return AiFailureReason::of($e)->label;
     }
 }

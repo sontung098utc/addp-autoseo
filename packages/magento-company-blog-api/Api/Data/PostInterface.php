@@ -16,6 +16,8 @@ interface PostInterface
     const STATUS = 'status';
     const CREATED_AT = 'created_at';
     const UPDATED_AT = 'updated_at';
+    const URL = 'url';
+    const BLOG_DRIVER = 'blog_driver';
 
     /**
      * @return int|null
@@ -126,4 +128,30 @@ interface PostInterface
      * @return $this
      */
     public function setStatus($status);
+
+    /**
+     * Link công khai của bài trên site (có thể rỗng nếu không lấy được)
+     *
+     * @return string|null
+     */
+    public function getUrl();
+
+    /**
+     * @param string|null $url
+     * @return $this
+     */
+    public function setUrl($url);
+
+    /**
+     * Nền tảng blog: magefan | mageplaza
+     *
+     * @return string|null
+     */
+    public function getBlogDriver();
+
+    /**
+     * @param string|null $driver
+     * @return $this
+     */
+    public function setBlogDriver($driver);
 }

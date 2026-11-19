@@ -30,3 +30,9 @@ Bạn tự làm trên server:
 - Ảnh bìa gửi sang Magento phải là JPG/PNG (GD2 của Magento không resize được WebP): Laravel tự chuyển WebP sang JPEG (chất lượng 85, nền trắng) trước khi tải; WebP hỏng thì bỏ ảnh bìa, bài vẫn đăng.
 - Bài MỚI cần deploy code Laravel (PR #42) mới có markup mới (data-tip, target=_blank, lớp `autoseo-refs__title`/`autoseo-notes__title`, không còn mục lục); CSS prod đã có luật cho hai lớp tiêu đề này.
 - Chưa kiểm: bài mới đăng thật qua API sau deploy.
+
+## Link bài đã đăng thừa "post" (19/11/2026, trong PR #46)
+- Trước đây hệ thống lưu link Magento dạng `https://addp.vn/blog/post/<url-key>`; link thật của Magefan là `https://addp.vn/blog/<url-key>`. Nay hệ thống ưu tiên `url` mô-đun trả về (cùng tên miền), không có thì dựng theo `blog_driver`; mô-đun cũ chưa cập nhật thì mặc định Magefan, vẫn đúng cho ADDP.
+- Link cũ đã lưu: giao diện tự hiển thị đúng ngay sau deploy (không ghi DB). Sửa hẳn trong DB: `php artisan publications:fix-magento-urls` (chỉ liệt kê) rồi `php artisan publications:fix-magento-urls --force`. Chỉ đổi lượt đã xuất bản của website Magento có đúng dạng `{base_url}/blog/post/{key}`; không gọi CMS, không đăng lại.
+- Cập nhật mô-đun Company_BlogApi trên Magento (thêm `url`, `blog_driver` vào phản hồi) là tùy chọn; nếu cập nhật: `setup:di:compile` (production) và `cache:flush`.
+- Chưa kiểm trên Magento thật: giá trị `getPostUrl()` của Magefan trên addp.vn (có thể có hậu tố `.html` tùy cấu hình).

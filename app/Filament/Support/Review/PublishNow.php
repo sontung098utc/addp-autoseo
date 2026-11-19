@@ -3,6 +3,7 @@
 namespace App\Filament\Support\Review;
 
 use App\Jobs\PublishArticleJob;
+use App\Integrations\Magento\MagentoBlogUrl;
 use App\Models\Publication;
 use Filament\Notifications\Notification;
 
@@ -18,7 +19,7 @@ final class PublishNow
         $p->refresh();
         $site = $p->website?->name ?? 'CMS';
         match ($p->status) {
-            'published' => Notification::make()->title('Đã xuất bản thành công lên '.$site)->body($p->published_url ? 'URL: '.$p->published_url : null)->success()->send(),
+            'published' => Notification::make()->title('Đã xuất bản thành công lên '.$site)->body($p->published_url ? 'URL: '.MagentoBlogUrl::display($p) : null)->success()->send(),
             'needs_reconcile' => Notification::make()->title('Chưa biết bài đã lên chưa')->body('CMS không trả lời rõ (mạng/timeout). Hệ thống sẽ đối soát theo khóa xuất bản, đừng đăng lại. '.($p->last_error ?? ''))->warning()->persistent()->send(),
             'scheduled' => Notification::make()->title('Chưa đăng được')->body($p->last_error ?: 'Lượt đăng được giữ lại ở trạng thái đã xếp lịch.')->warning()->send(),
             default => Notification::make()->title('Xuất bản thất bại')->body($p->last_error ?: 'Lỗi không xác định')->danger()->persistent()->send(),

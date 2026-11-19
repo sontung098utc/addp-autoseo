@@ -106,7 +106,8 @@ class KeywordMetricsTest extends TestCase
         config(['keywords.dataforseo.login' => null, 'keywords.dataforseo.password' => null]);
         $av = KeywordMetricsResolver::availability();
         $this->assertFalse($av['ok']);
-        $this->assertStringContainsString('DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD', $av['reason']);
+        $this->assertStringContainsString('Liên hệ quản trị', $av['reason']);
+        $this->assertStringNotContainsString('DATAFORSEO', $av['reason']);
         try {
             KeywordMetricsResolver::resolve();
             $this->fail();

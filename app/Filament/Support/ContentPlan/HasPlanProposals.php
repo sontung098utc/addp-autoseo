@@ -43,7 +43,7 @@ trait HasPlanProposals
         try {
             $r = (new ContentPlanner)->create(Auth::user(), $site, array_map('intval', $this->planPick), $campaignId);
         } catch (InvalidArgumentException $e) {
-            Notification::make()->title('Chưa thêm vào kế hoạch')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa thêm vào kế hoạch')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }

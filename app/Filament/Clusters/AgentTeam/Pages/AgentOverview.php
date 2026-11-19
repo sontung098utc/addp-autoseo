@@ -7,16 +7,16 @@ use App\Filament\Pages\AiUsagePage;
 use App\Filament\Pages\BrainPage;
 use App\Filament\Pages\BrandProfilePage;
 use App\Filament\Resources\AgentRunResource;
-use App\Filament\Resources\ArticleVersionResource;
+use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\CampaignResource;
 use App\Filament\Resources\PublicationResource;
 use App\Filament\Resources\WebsiteResource;
 use App\Filament\Support\Agent\AgentFlowBlueprint;
 use App\Filament\Support\Agent\RunActivity;
+use App\Filament\Support\Review\ReviewQueue;
 use App\Filament\Support\Schedule\VnTime;
 use App\Models\AgentRun;
 use App\Models\AgentRunStep;
-use App\Models\ArticleVersion;
 use App\Models\BrandProfile;
 use App\Models\Campaign;
 use App\Models\CampaignWait;
@@ -89,7 +89,7 @@ class AgentOverview extends Page
             'life' => [
                 ['label' => 'Từ khóa chưa giao', 'n' => $active->sum(fn ($c) => CampaignResource::remaining($c)), 'url' => CampaignResource::getUrl('index'), 'who' => 'Chiến dịch'],
                 ['label' => 'Đội AI giữ nháp', 'n' => $byStatus['held'] ?? 0, 'url' => AgentRunResource::getUrl('index'), 'who' => 'Cần người xem'],
-                ['label' => 'Chờ duyệt', 'n' => ArticleVersion::query()->where('review_status', 'needs_review')->count(), 'url' => ArticleVersionResource::getUrl('index'), 'who' => 'Người duyệt'],
+                ['label' => 'Bài chờ duyệt', 'n' => ReviewQueue::waitingCount(), 'url' => ArticleResource::getUrl('index', ['activeTab' => 'needs_review']), 'who' => 'Người duyệt'],
                 ['label' => 'Đã xếp lịch', 'n' => Publication::query()->where('status', 'scheduled')->count(), 'url' => PublicationResource::listUrl(), 'who' => 'Hệ thống đăng'],
                 ['label' => 'Đã đăng', 'n' => Publication::query()->where('status', 'published')->count(), 'url' => PublicationResource::listUrl(), 'who' => 'CMS'],
             ],
@@ -106,31 +106,32 @@ class AgentOverview extends Page
         $costCap = Schema::hasColumn('campaigns', 'daily_cost_cap_vnd') ? (float) Campaign::query()->where('status', 'active')->sum('daily_cost_cap_vnd') : 0.0;
 
         $week = now()->subDays(7);
-        $failed = AgentRun::query()->where('status', 'failed')->where('created_at', '>=', $week)->count();
+        $failed = ReviewQueue::problemRunCount($week);
         $held = AgentRun::query()->where('status', 'held')->where('created_at', '>=', $week)->count();
-        $stale = AgentRun::query()->where('status', 'running')->get()->filter(fn ($r) => RunActivity::isStale($r))->count();
-        $drafts = ArticleVersion::query()->where('review_status', 'needs_review')->count();
+        $stale = AgentRun::query()->where('status', 'running')->with('steps')->get()->filter(fn ($r) => RunActivity::isStale($r))->count();
+        $drafts = ReviewQueue::waitingCount();
         $waits = Schema::hasTable('campaign_waits') ? CampaignWait::query()->where('status', 'open')->where('expires_at', '>', now())->count() : 0;
 
         // Chỉ liệt kê điều CẦN bạn; xếp theo mức nghiêm trọng. Không có gì thì trang chỉ báo bình thường, không nhồi số liệu.
         $attention = array_values(array_filter([
-            $failed > 0 ? ['tone' => 'danger', 'text' => "{$failed} phiên bị lỗi trong 7 ngày qua", 'action' => 'Xem', 'url' => AgentRunResource::getUrl('index')] : null,
+            $failed > 0 ? ['tone' => 'danger', 'text' => "{$failed} phiên bị chặn hoặc lỗi trong 7 ngày qua", 'action' => 'Xem', 'url' => AgentRunResource::getUrl('index')] : null,
             $stale > 0 ? ['tone' => 'danger', 'text' => "{$stale} phiên có thể bị treo (lâu không có bước mới)", 'action' => 'Xem', 'url' => AgentRunResource::getUrl('index')] : null,
             ! $ai['connected'] ? ['tone' => 'warning', 'text' => 'Chưa kết nối AI, lượt tự động không chạy', 'action' => 'Nhập khóa', 'url' => AiUsagePage::configUrl()] : null,
             $held > 0 ? ['tone' => 'warning', 'text' => "{$held} phiên giữ nháp, cần người xem", 'action' => 'Xem', 'url' => AgentRunResource::getUrl('index')] : null,
             $waits > 0 ? ['tone' => 'info', 'text' => "{$waits} việc đang chờ bạn bổ sung (không chặn việc khác)", 'action' => 'Xem', 'url' => CampaignResource::getUrl('index')] : null,
-            $drafts > 0 ? ['tone' => 'primary', 'text' => "{$drafts} bản nháp chờ bạn duyệt", 'action' => 'Duyệt', 'url' => ArticleVersionResource::getUrl('index')] : null,
+            $drafts > 0 ? ['tone' => 'primary', 'text' => "{$drafts} bài chờ bạn duyệt", 'action' => 'Duyệt', 'url' => ArticleResource::getUrl('index', ['activeTab' => 'needs_review'])] : null,
         ]));
 
         return [
             'ai' => $ai,
             'liveCount' => $liveCount,
-            'live' => RunActivity::liveRuns(5),
+            'live' => RunActivity::liveRuns(withArticle: true),
             'pollSeconds' => $liveCount > 0 ? RunActivity::POLL_LIVE : RunActivity::POLL_IDLE,
             'attention' => $attention,
             'today' => [
                 'runs' => (clone $today)->count(),
                 'toReview' => (clone $today)->where('status', 'ready_for_review')->count(),
+                'activeCampaigns' => Campaign::query()->where('status', 'active')->count(),
                 'cost' => (float) (clone $today)->sum('cost_vnd'),
                 'cap' => $costCap,
             ],

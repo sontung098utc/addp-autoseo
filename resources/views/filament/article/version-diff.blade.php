@@ -11,7 +11,7 @@
         <ul style="list-style:disc;padding-left:1.1rem">
             <li>Mục: {{ $s['sections_changed'] }} đã sửa · {{ $s['sections_added'] }} mới · {{ $s['sections_removed'] }} đã bỏ · thẻ meta đổi {{ $s['meta_changed'] }}</li>
             <li>Số từ: {{ $s['words_old'] }} → {{ $s['words_new'] }}</li>
-            <li>Chưa đạt: P0 {{ $qo['P0'] ?? 0 }} → {{ $qn['P0'] ?? 0 }} · P1 {{ $qo['P1'] ?? 0 }} → {{ $qn['P1'] ?? 0 }} · P2 {{ $qo['P2'] ?? 0 }} → {{ $qn['P2'] ?? 0 }}</li>
+            <li>Lỗi chưa đạt: Lỗi nặng {{ $qo['P0'] ?? 0 }} → {{ $qn['P0'] ?? 0 }} · Cần sửa {{ $qo['P1'] ?? 0 }} → {{ $qn['P1'] ?? 0 }} · Gợi ý {{ $qo['P2'] ?? 0 }} → {{ $qn['P2'] ?? 0 }}</li>
         </ul>
         @if (($qn['P0'] ?? 0) > ($qo['P0'] ?? 0))
             <p data-testid="aw-compare-warn" style="border:1px solid rgba(220,38,38,.4);background:rgba(220,38,38,.07);border-radius:.5rem;padding:.4rem .7rem">Bản mới có nhiều lỗi chặn hơn bản trước.</p>

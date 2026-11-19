@@ -392,3 +392,50 @@ select:not([multiple]) {
 /* Hàng tab của Filament (tab lọc danh sách, điều hướng cụm): cuộn ngang bằng vuốt/cuộn, không hiện thanh cuộn kèm mũi tên ở hai đầu. */
 .fi-tabs { scrollbar-width: none; -ms-overflow-style: none; }
 .fi-tabs::-webkit-scrollbar { display: none; }
+
+/* =====================================================================================================
+   ĐIỆN THOẠI (<= 767px): bảng dữ liệu dùng chung (x-studio.data-table) chuyển sang bố cục thẻ.
+   Mỗi dòng là một thẻ: ô đầu (tiêu đề bài) rộng hết thẻ, các ô còn lại là "nhãn: giá trị", ô thao tác nằm cuối thẻ.
+   Không còn cuộn ngang và không còn tiêu đề bị ngắt mỗi từ một dòng. Sắp xếp theo cột ở tiêu đề bảng chỉ có trên màn hình rộng.
+   ===================================================================================================== */
+@media (max-width: 767px) {
+  .ss-dt__bar input[type=search] { min-width: 0; flex: 1 1 100%; max-width: none; }
+  .ss-dt__bar select { flex: 1 1 9rem; min-width: 0; max-width: 100%; }
+  .ss-dt__menu { max-width: calc(100vw - 2rem); }
+  .ss-dt__scroll { overflow-x: visible; }
+  .ss-dt__table, .ss-dt__table tbody { display: block; }
+  .ss-dt__table thead { display: none; }
+  .ss-dt__table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.25rem; padding: 0.75rem; border-bottom: 1px solid var(--ss-border); }
+  .ss-dt__table td { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.5rem; padding: 0; border: 0; min-width: 0; text-align: left; overflow-wrap: anywhere; }
+  .ss-dt__table td.is-right, .ss-dt__table td.is-center { text-align: left; }
+  .ss-dt__table td[data-label]::before { content: attr(data-label); flex: none; font-size: var(--ss-fs-xs); color: var(--ss-text-muted); }
+  /* Ô tiêu đề thẻ (cột đầu): không nhãn, chữ đậm hơn; ô chọn dòng đứng trước nó. */
+  .ss-dt__table td[data-title]::before { content: none; }
+  .ss-dt__table td[data-title] { font-weight: 600; font-size: var(--ss-fs-base); }
+  .ss-dt__table td:has(> input[type=checkbox]) { order: -1; }
+  .ss-dt__table td:has(.ss-dt__act) { padding-top: 0.25rem; gap: 0.25rem 0.75rem; }
+  .ss-dt__table td:has(.ss-dt__act)::before { content: none; }
+  .ss-dt__table tr.ss-row--warn td:first-child, .ss-dt__table tr.ss-row--danger td:first-child, .ss-dt__table tr.ss-row--ok td:first-child, .ss-dt__table tr.ss-row--info td:first-child { box-shadow: none; }
+  .ss-dt__table tr.ss-row--warn { box-shadow: inset 3px 0 0 var(--ss-warn-fg); } .ss-dt__table tr.ss-row--danger { box-shadow: inset 3px 0 0 var(--ss-danger-fg); }
+  .ss-dt__table tr.ss-row--ok { box-shadow: inset 3px 0 0 var(--ss-ok-fg); } .ss-dt__table tr.ss-row--info { box-shadow: inset 3px 0 0 var(--ss-info-fg); }
+}
+
+/* Điện thoại: ô chọn của thanh lọc Kế hoạch và nút gợi ý (i) đủ vùng bấm (>= 40px) mà không đổi bố cục. */
+@media (max-width: 767px) {
+  .cp-in { min-height: 2.5rem; }
+  .hp-btn { position: relative; }
+  .hp-btn::after { content: ""; position: absolute; inset: -0.75rem; }
+}
+
+/* Trang bài / mọi nơi đặt hàng tab trong lưới: hàng tab rất dài làm cột lưới ngầm rộng bằng cả hàng (785px trên màn 375px) nên các khối bị tràn và cắt mép phải.
+   Cho phần tử con của lưới được co lại (min-width: 0) để hàng tab tự cuộn ngang trong khung. */
+.aw-stack > *, .ss-tabs-wrap { min-width: 0; max-width: 100%; }
+
+/* Điện thoại: bảng trong trang bài cuộn ngang trong khung, nhưng ô không bị bóp thành một chữ một dòng. */
+@media (max-width: 767px) {
+  .aw-table td { min-width: 6rem; }
+  .aw-table td:first-child { white-space: nowrap; min-width: 0; }
+  .aw-table[data-testid=aw-versions] td:nth-child(2) { min-width: 13rem; }
+  .aw-btn, .aw-table .aw-link { min-height: 2.25rem; display: inline-flex; align-items: center; }
+}
+.ss-dt__act { white-space: nowrap; }

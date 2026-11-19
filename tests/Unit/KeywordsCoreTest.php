@@ -36,7 +36,7 @@ class KeywordsCoreTest extends TestCase
         $this->assertCount(2, $r['duplicates']);
         $this->assertCount(3, $r['errors']);
         $this->assertSame(4, $r['errors'][0]['line']);
-        $this->assertStringContainsString('Volume', $r['errors'][0]['reason']);
+        $this->assertStringContainsString('Lượt tìm', $r['errors'][0]['reason']);
         $this->assertStringContainsString('Ý định', $r['errors'][1]['reason']);
     }
 

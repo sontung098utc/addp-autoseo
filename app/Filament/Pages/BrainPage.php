@@ -217,7 +217,7 @@ class BrainPage extends KnowledgePage implements HasForms
             $this->form->fill($this->profileToForm($p));
             Notification::make()->title('Đã lưu Hồ sơ lĩnh vực')->success()->send();
         } catch (KnowledgeError|\InvalidArgumentException $e) {
-            Notification::make()->title('Chưa lưu được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa lưu được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
         }
     }
 
@@ -231,7 +231,7 @@ class BrainPage extends KnowledgePage implements HasForms
             $svc->linkWebsites($b, collect($this->siteLinks)->filter(fn ($l) => ! empty($l['on']))->map(fn ($l) => (int) ($l['priority'] ?? 10))->all(), Auth::user());
             Notification::make()->title('Đã lưu cài đặt')->success()->send();
         } catch (KnowledgeError|\InvalidArgumentException $e) {
-            Notification::make()->title('Chưa lưu được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa lưu được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
         }
     }
 
@@ -245,7 +245,7 @@ class BrainPage extends KnowledgePage implements HasForms
             $this->reset(['srcName', 'srcDomain', 'srcTier', 'srcNote']);
             Notification::make()->title('Đã thêm vào Căn cứ chuẩn mực')->success()->send();
         } catch (KnowledgeError $e) {
-            Notification::make()->title('Chưa thêm được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa thêm được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
         }
     }
 
@@ -268,7 +268,7 @@ class BrainPage extends KnowledgePage implements HasForms
             $s = (new BrainSourceRegistry)->confirm($s, $tier, Auth::user());
             Notification::make()->title($tier === 'blocked' ? 'Đã chặn "'.$s->name.'"' : 'Đã xác nhận "'.$s->name.'" ở '.mb_strtolower(BrainSource::TIERS[$tier] ?? $tier))->success()->send();
         } catch (KnowledgeError $e) {
-            Notification::make()->title('Chưa lưu được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa lưu được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
         }
     }
 

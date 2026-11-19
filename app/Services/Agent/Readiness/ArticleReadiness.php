@@ -41,7 +41,8 @@ final class ArticleReadiness
         $ctx = BrainContext::forArticle($article, $campaignId);
 
         $assess = (new RiskClassifier)->assess($keyword);
-        $level = $ctx->raise($assess->level);
+        $offField = $site && $keyword !== '' && \App\Services\Agent\Risk\TopicScope::clearlyOffField($keyword, BrandProfileData::forWebsite($site->id), BrainContext::forArticle($article, $campaignId, false));
+        $level = $ctx->raise($assess->level); // bài chắc chắn ngoài lĩnh vực: hạng theo chủ đề, không theo ngành của Trí tuệ
         $reasons = $assess->reasons;
         if ($level !== $assess->level) {
             $reasons[] = 'Nâng hạng theo cấu hình của Trí tuệ: '.$ctx->names().'.';
@@ -84,7 +85,7 @@ final class ArticleReadiness
                 'message' => 'Hồ sơ doanh nghiệp '.($profile['percent'] === 0 ? 'chưa có' : 'chưa đủ ('.$profile['percent'].'%)').': AI thiếu giọng thương hiệu, thông điệp, từ cấm.'];
         }
         if ($site && $keyword !== '' && BrandProfileData::looksOffTopic(BrandProfileData::forWebsite($site->id), $keyword)) {
-            $issues[] = ['code' => 'off_topic', 'severity' => 'warn', 'message' => 'Chủ đề «'.mb_substr($keyword, 0, 80).'» có vẻ ngoài lĩnh vực của website (theo hồ sơ doanh nghiệp). Kiểm tra lại trước khi giao, hoặc xóa khỏi kế hoạch.'];
+            $issues[] = ['code' => 'off_topic', 'severity' => 'warn', 'message' => 'Chủ đề «'.mb_substr($keyword, 0, 80).'» có vẻ ngoài lĩnh vực của website (theo hồ sơ doanh nghiệp).'.($offField ? ' Hạng rủi ro và ảnh sẽ theo chính chủ đề, không theo ngành của website.' : '').' Kiểm tra lại trước khi giao, hoặc xóa khỏi kế hoạch.'];
         }
         if ($products['count'] === 0) {
             $issues[] = ['code' => 'no_product', 'severity' => 'info', 'message' => 'Chưa có sản phẩm nào của công ty khớp chủ đề này trong kho.'];

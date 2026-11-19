@@ -192,6 +192,34 @@
     return true;
   }
 
+  /* --- Nút đang xử lý: nút/liên kết người dùng vừa bấm hiện vòng quay + khóa bấm lại ngay (không chờ SHOW_AFTER_MS), mở lại khi máy chủ phản hồi --- */
+  function busyCss() {
+    if (document.getElementById('ss-busy-css')) return;
+    var css = document.createElement('style');
+    css.id = 'ss-busy-css';
+    css.textContent =
+      '[data-ss-busy]{opacity:.7;cursor:progress!important;pointer-events:none}' +
+      '[data-ss-busy]::after{content:"";display:inline-block;width:.85em;height:.85em;margin-left:.45em;vertical-align:-.12em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:ss-busy-spin .7s linear infinite}' +
+      '@keyframes ss-busy-spin{to{transform:rotate(360deg)}}' +
+      '@media (prefers-reduced-motion:reduce){[data-ss-busy]::after{animation:none;border-right-color:currentColor;opacity:.5}}';
+    (document.head || document.documentElement).appendChild(css);
+  }
+
+  // Phím Enter/Space trên nút đang bận vẫn bắn click: chặn ở pha bắt trước khi Livewire nhận.
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('[data-ss-busy]') : null;
+    if (b) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
+
+  /* Điều khiển người dùng vừa bấm (nút / liên kết có wire:click hoặc x-on:click gọi $wire); ô nhập và danh sách chọn không khóa. */
+  function busyControl() {
+    try {
+      var el = lastTarget && lastTarget.closest ? lastTarget.closest('button,a[wire\\:click],[wire\\:click]') : null;
+      if (!el || el.hasAttribute('data-ss-busy') || el.matches('select,input,textarea,[data-no-busy]')) return null;
+      return el;
+    } catch (e) { return null; }
+  }
+
   /* --- Thao tác Livewire: hiện thanh nếu chờ quá 350 ms, chỉ khi người dùng vừa thao tác --- */
   document.addEventListener('livewire:init', function () {
     try {
@@ -210,8 +238,10 @@
         var background = calls.length > 0 && calls.every(function (c) { return c && BACKGROUND_CALLS.indexOf(c.method) !== -1; });
         var byUser = !background && !document.hidden && triggeredByUser(ctx); // wire:poll và cập nhật nền không có thao tác trước đó
         var myGen = gen;
+        var busy = byUser ? busyControl() : null;
+        if (busy) { busyCss(); busy.setAttribute('data-ss-busy', '1'); busy.setAttribute('aria-busy', 'true'); }
         var t = byUser ? setTimeout(function () { if (document.hidden || myGen !== gen) return; shown = true; start(); }, SHOW_AFTER_MS) : 0;
-        var end = function () { clearTimeout(t); if (shown) { shown = false; if (myGen === gen) done(); } };
+        var end = function () { clearTimeout(t); if (busy) { busy.removeAttribute('data-ss-busy'); busy.removeAttribute('aria-busy'); busy = null; } if (shown) { shown = false; if (myGen === gen) done(); } };
         ctx.respond(end);
         ctx.fail(end);
       });

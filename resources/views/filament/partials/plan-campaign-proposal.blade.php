@@ -69,7 +69,8 @@
         <x-help title="Đề xuất chiến dịch"><p>Nhập một chủ đề, hệ thống đề xuất một <b>bài trụ</b> và các <b>bài vệ tinh</b> dẫn về nó.</p><p>Bấm đề xuất chưa tạo gì; bạn chọn bài rồi mới tạo chiến dịch, và chiến dịch tạo ra ở trạng thái tạm dừng.</p></x-help>
     </h3>
     <form wire:submit="proposeCampaign" class="cpz-form">
-        <input class="cpz-in" type="text" wire:model="campaignSeed" maxlength="120" placeholder="Chủ đề chiến dịch, ví dụ: tiểu đường" aria-label="Chủ đề chiến dịch" data-campaign-seed>
+        <input class="cpz-in" type="text" wire:model="campaignSeed" maxlength="120" placeholder="Chủ đề chiến dịch, ví dụ: tiểu đường" aria-label="Chủ đề chiến dịch" data-campaign-seed @error('campaignSeed') aria-invalid="true" aria-describedby="campaign-seed-err" style="border-color:rgb(var(--danger-600))" @enderror>
+        @error('campaignSeed')<p id="campaign-seed-err" class="ss-text-xs" style="flex-basis:100%;color:rgb(var(--danger-600));margin:0" role="alert" data-campaign-seed-error>{{ $message }}</p>@enderror
         <x-filament::button type="submit" wire:loading.attr="disabled" wire:target="proposeCampaign">
             <span wire:loading.remove wire:target="proposeCampaign">Đề xuất chiến dịch</span>
             <span wire:loading wire:target="proposeCampaign">Đang tra gợi ý…</span>

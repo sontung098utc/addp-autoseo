@@ -113,7 +113,7 @@ class ViewCampaign extends Page
 
             return null;
         } catch (InvalidArgumentException $e) {
-            Notification::make()->title('Không thêm được bài')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Không thêm được bài')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return null;
         }

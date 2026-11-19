@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Contracts\CmsErrorInterface;
 use App\Models\Publication;
 use App\Services\Publishing\EmergencyStopService;
+use App\Services\Publishing\PublicationStaleReaper;
 use App\Services\Publishing\PublisherManager;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -144,8 +145,10 @@ class PublishArticleJob implements ShouldQueue
             } elseif ($e->isRetryable() && $this->job && $this->attempts() < $this->tries) {
                 $delay = $this->backoff[$this->attempts() - 1] ?? 60;
                 Log::warning("[PublishArticleJob] Lỗi tạm thời [{$e->errorCode()}] cho bài #{$publication->id}: {$e->getMessage()}. Thử lại sau {$delay}s.");
+                // Giữ 'publishing' (không trả về 'scheduled'): trả về scheduled khiến lệnh quét lịch đẩy THÊM một job mới cho cùng lượt trong khi job cũ còn chờ thử lại,
+                // mỗi phút cộng thêm một lần vào attempt_count (lỗi "Số lần thử" phình lên 41). Lượt kẹt thật sẽ do PublicationStaleReaper xử lý.
                 $publication->update([
-                    'status' => Publication::STATUS_SCHEDULED,
+                    'status' => Publication::STATUS_PUBLISHING,
                     'last_error' => $e->getMessage(),
                 ]);
                 $this->release($delay);
@@ -188,5 +191,17 @@ class PublishArticleJob implements ShouldQueue
         } finally {
             $lock->release();
         }
+    }
+
+    /**
+     * Job chết hẳn (hết số lần thử khi website bận, bị kill, hết hạn...) mà lượt vẫn 'publishing' thì không để kẹt vĩnh viễn.
+     */
+    public function failed(?Throwable $e = null): void
+    {
+        $publication = Publication::query()->find($this->publication->id);
+        if (! $publication || $publication->status !== Publication::STATUS_PUBLISHING) {
+            return;
+        }
+        PublicationStaleReaper::settle($publication, 'Job đăng bài dừng đột ngột'.($e ? ' ('.get_class($e).')' : '').'.', requeueIfNeverSent: true);
     }
 }

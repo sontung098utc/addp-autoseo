@@ -1,7 +1,7 @@
 @php
     $cards = array_values(array_filter([
         $waiting > 0 ? ['n' => $waiting, 'l' => 'bài chờ duyệt', 'u' => $urls['review'], 'warn' => true] : null,
-        $expert > 0 ? ['n' => $expert, 'l' => 'chờ người có chuyên môn xem', 'u' => $urls['review'], 'warn' => true] : null,
+        $expert > 0 ? ['n' => $expert, 'l' => 'trong số đó cần người có chuyên môn xem', 'u' => $urls['review'], 'warn' => true] : null,
         $isApprover && $blocked > 0 ? ['n' => $blocked, 'l' => 'phiên bị chặn hoặc lỗi hôm nay', 'u' => $urls['runs'], 'warn' => true] : null,
         $running > 0 ? ['n' => $running, 'l' => 'đang chạy', 'u' => $urls['pipeline'] ?? '#', 'warn' => false] : null,
     ]));
@@ -21,7 +21,7 @@
             @if ($isApprover && ($cost > 0 || $suggestions > 0))
                 <div class="at-foot">
                     @if ($cost > 0)<a href="{{ $urls['cost'] ?? '#' }}">Chi phí AI hôm nay {{ number_format($cost, 0, ',', '.') }} ₫ ({{ $runs }} phiên)</a>@endif
-                    @if ($suggestions > 0)<a href="{{ $urls['kb'] ?? '#' }}">{{ $suggestions }} gợi ý bổ sung kho</a>@endif
+                    @if ($suggestions > 0)<a href="{{ $urls['kb'] ?? '#' }}">{{ $suggestions }} gợi ý bổ sung kho{{ $todoSite ? ' ('.$todoSite.')' : '' }}</a>@endif
                 </div>
             @endif
         </div>
