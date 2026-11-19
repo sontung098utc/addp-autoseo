@@ -142,7 +142,7 @@ class AiUsagePage extends Page
                     try {
                         UsageThresholds::save($data['article'] ?? null, $data['month'] ?? null);
                     } catch (InvalidArgumentException $e) {
-                        Notification::make()->title('Chưa lưu được ngưỡng')->body($e->getMessage())->danger()->send();
+                        Notification::make()->title('Chưa lưu được ngưỡng')->body(\App\Support\UserFacingError::from($e))->danger()->send();
                         $action->halt();
                     }
                     Notification::make()->title('Đã lưu ngưỡng cảnh báo')->success()->send();

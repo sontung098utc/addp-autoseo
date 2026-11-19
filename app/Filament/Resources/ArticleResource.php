@@ -706,7 +706,7 @@ class ArticleResource extends Resource
                 try {
                     $p = (new ReviewWorkflow)->publishNow(ReviewActions::user(), static::latest($r), Website::findOrFail($data['website_id']));
                 } catch (\InvalidArgumentException $e) {
-                    Notification::make()->title('Không đăng được')->body($e->getMessage())->danger()->send();
+                    Notification::make()->title('Không đăng được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
                     return;
                 }

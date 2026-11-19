@@ -132,7 +132,7 @@ BLADE));
         try {
             UpdateProposals::create(Auth::user(), $item, $this->selDim, $opps, $p['from']->format('d/m/Y').' – '.$p['to']->format('d/m/Y'));
         } catch (AuthorizationException $e) {
-            Notification::make()->title('Không có quyền')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Không có quyền')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }

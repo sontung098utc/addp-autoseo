@@ -100,7 +100,7 @@ final class GoogleSearchConsoleSource implements GscSource
             } catch (GscFailed $e) {
                 throw $e;
             } catch (\Throwable $e) {
-                throw new GscFailed('Không kết nối được Search Console: '.mb_substr($e->getMessage(), 0, 120));
+                throw new GscFailed('Không kết nối được Search Console. '.\App\Support\UserFacingError::from($e, 'gsc'));
             }
             if (! $res->successful()) {
                 throw new GscFailed('Search Console trả lỗi HTTP '.$res->status().($res->status() === 403 ? ' (service account chưa được thêm vào thuộc tính '.$this->property.').' : '.'));

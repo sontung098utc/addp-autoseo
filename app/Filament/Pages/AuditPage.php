@@ -122,7 +122,7 @@ BLADE));
         try {
             SeoAuditService::make()->rescan($site, $user);
         } catch (ScanBlocked $e) {
-            Notification::make()->title('Không quét được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Không quét được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -158,7 +158,7 @@ BLADE));
         try {
             $audit = (new RealScanService)->run($site, $user, $limit);
         } catch (ScanBlocked $e) {
-            Notification::make()->title('Không quét được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Không quét được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -253,7 +253,7 @@ BLADE));
             $ids = AuditSuggestion::query()->where('website_id', $site->id)->where('status', 'de_xuat')->whereNotNull('article_id')->pluck('id')->all();
             $r = (new AuditSuggestionService)->acceptMany($ids, $user);
         } catch (AuditSuggestionException $e) {
-            Notification::make()->title('Không chấp nhận được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Không chấp nhận được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -270,7 +270,7 @@ BLADE));
         try {
             $do(new AuditSuggestionService, $user, $s);
         } catch (AuditSuggestionException $e) {
-            Notification::make()->title('Không thực hiện được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Không thực hiện được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }

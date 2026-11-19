@@ -39,7 +39,7 @@ class ReviewActions
         try {
             $fn();
         } catch (InvalidArgumentException $e) {
-            Notification::make()->title('Không thực hiện được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Không thực hiện được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }

@@ -236,7 +236,7 @@ class ContentPlanPage extends Page
                     $dt = (new PlanActions)->reschedule(Auth::user(), $article, (string) $data['day']);
                     Notification::make()->title('Đã đổi ngày dự kiến')->body($dt.' (giờ VN)')->success()->send();
                 } catch (InvalidArgumentException $e) {
-                    Notification::make()->title('Không đổi được ngày')->body($e->getMessage())->danger()->send();
+                    Notification::make()->title('Không đổi được ngày')->body(\App\Support\UserFacingError::from($e))->danger()->send();
                 }
             });
     }
@@ -298,7 +298,7 @@ class ContentPlanPage extends Page
         try {
             $this->lastResults = (new PlanActions)->createFromCluster(Auth::user(), $site, $c, $keywords, $day, $intents, $target === 'solo' ? null : (int) $target);
         } catch (InvalidArgumentException $e) {
-            Notification::make()->title('Chưa tạo bài')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa tạo bài')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -368,12 +368,12 @@ class ContentPlanPage extends Page
         try {
             $this->topicExplore = app(TopicExplorer::class)->explore($site, $this->campaignSeed);
         } catch (InvalidArgumentException|\App\Services\Keywords\KeywordAiUnavailable $e) {
-            Notification::make()->title('Chưa khám phá được chủ đề con')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa khám phá được chủ đề con')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         } catch (\Throwable $e) {
             report($e);
-            Notification::make()->title('Chưa khám phá được chủ đề con')->body(\App\Filament\Support\Schedule\ErrorMasker::mask($e->getMessage()) ?: 'Lỗi AI, thử lại sau.')->danger()->send();
+            Notification::make()->title('Chưa khám phá được chủ đề con')->body(\App\Support\UserFacingError::from($e, 'explore-topics'))->danger()->send();
 
             return;
         }
@@ -412,7 +412,7 @@ class ContentPlanPage extends Page
             $why = null;
             $p = (new CampaignProposer)->propose($site, $this->campaignSeed, GscSignals::forWebsite($site, 28, $why));
         } catch (InvalidArgumentException $e) {
-            Notification::make()->title('Chưa đề xuất được chiến dịch')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa đề xuất được chiến dịch')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -440,7 +440,7 @@ class ContentPlanPage extends Page
         try {
             $r = (new CampaignProposer)->create(Auth::user(), $site, $this->campaignProposal, $this->campaignPick, $this->campaignName);
         } catch (InvalidArgumentException $e) {
-            Notification::make()->title('Chưa tạo được chiến dịch')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa tạo được chiến dịch')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }

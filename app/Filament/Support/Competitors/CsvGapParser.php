@@ -88,7 +88,7 @@ final class CsvGapParser
                 try {
                     $norm = CompetitorDomain::validate($dom, [], $ownBaseUrl);
                 } catch (InvalidArgumentException $e) {
-                    $out['errors'][] = ['line' => $line, 'reason' => 'Tên miền đối thủ "'.mb_substr($dom, 0, 60).'": '.$e->getMessage()];
+                    $out['errors'][] = ['line' => $line, 'reason' => 'Tên miền đối thủ "'.mb_substr($dom, 0, 60).'": '.\App\Support\UserFacingError::from($e)];
 
                     continue;
                 }

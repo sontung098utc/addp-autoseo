@@ -126,7 +126,7 @@ class KnowledgePage extends Page
             $fn();
             Notification::make()->title($ok)->success()->send();
         } catch (KnowledgeError|\InvalidArgumentException $e) {
-            Notification::make()->title('Chưa thực hiện được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa thực hiện được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
         }
     }
 
@@ -177,7 +177,7 @@ class KnowledgePage extends Page
         try {
             $r = (new KnowledgeAiIngest)->run(KnowledgeSource::query()->findOrFail($sourceId), Auth::user());
         } catch (KnowledgeError $e) {
-            Notification::make()->title('Chưa tách được bằng AI')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa tách được bằng AI')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
