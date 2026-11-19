@@ -93,11 +93,34 @@ class MagentoBridgeClient implements PublisherInterface
             ],
         ], isWriteOperation: true);
 
+        $body = $this->normalizeMediaResponse($body);
+
         return [
             'id' => $body['id'] ?? $fileName,
             'source_url' => $body['url'] ?? '',
             'file' => $body['file'] ?? '',
         ];
+    }
+
+    /**
+     * Magento (ServiceOutputProcessor::convertValue) bỏ khoá của mảng trả về từ API kiểu `array`: module trả ['id','file','url']
+     * nhưng REST gửi ra danh sách [id, file, url] (hoặc [ [..] ] nếu module bọc thêm một lớp). Nhận cả ba dạng; đã thấy dạng danh sách trên addp.vn 19/11.
+     *
+     * @return array{id?: string, file?: string, url?: string}
+     */
+    protected function normalizeMediaResponse(array $body): array
+    {
+        if (isset($body['file']) || isset($body['url'])) {
+            return $body;
+        }
+        if (isset($body[0]) && is_array($body[0])) {
+            return $body[0];
+        }
+        if (array_is_list($body) && count($body) >= 3 && is_string($body[0]) && is_string($body[1]) && is_string($body[2])) {
+            return ['id' => $body[0], 'file' => $body[1], 'url' => $body[2]];
+        }
+
+        return $body;
     }
 
     public function createDraft(Website $website, ArticleVersion $version, ?string $publicationKey = null): array
@@ -187,6 +210,8 @@ class MagentoBridgeClient implements PublisherInterface
             }
             $file = (string) ($up['file'] ?? '');
             if ($file === '') {
+                Log::warning("[Magento] Ảnh #{$asset->id} đã tải lên website #{$website->id} nhưng phản hồi không có đường dẫn file; đăng không kèm ảnh đại diện.");
+
                 return null;
             }
             $asset->update(['metadata' => array_merge((array) $asset->metadata, ['magento_media' => [$site => $file] + $known])]);

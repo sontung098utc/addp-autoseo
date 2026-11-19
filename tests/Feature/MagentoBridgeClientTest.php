@@ -224,6 +224,37 @@ class MagentoBridgeClientTest extends TestCase
         $this->assertSame('magefan_blog/autoseo/1_cover.jpg', json_decode((string) $h2[0]['request']->getBody(), true)['post']['image']);
     }
 
+    /** Magento REST bỏ khoá của mảng trả về kiểu `array`: phản hồi thật là danh sách [id, file, url] (lỗi ảnh bìa trống trên addp.vn 19/11). */
+    public function test_create_draft_reads_image_path_from_list_shaped_magento_response(): void
+    {
+        $asset = $this->featuredAsset();
+        $h = [];
+        $client = $this->clientWithHistory([
+            new Response(200, [], json_encode(['1795_cover.jpg', 'magefan_blog/autoseo/1795_cover.jpg', '/media/magefan_blog/autoseo/1795_cover.jpg'])),
+            new Response(200, [], json_encode(['post_id' => 7])),
+        ], $h);
+
+        $client->createDraft($this->website, $this->version);
+
+        $post = json_decode((string) $h[1]['request']->getBody(), true)['post'];
+        $this->assertSame('magefan_blog/autoseo/1795_cover.jpg', $post['image']);
+        $this->assertSame('magefan_blog/autoseo/1795_cover.jpg', $asset->fresh()->metadata['magento_media'][(string) $this->website->id]);
+    }
+
+    public function test_create_draft_reads_image_path_from_wrapped_list_magento_response(): void
+    {
+        $this->featuredAsset();
+        $h = [];
+        $client = $this->clientWithHistory([
+            new Response(200, [], json_encode([['id' => 'x.jpg', 'file' => 'magefan_blog/autoseo/x.jpg', 'url' => '/media/magefan_blog/autoseo/x.jpg']])),
+            new Response(200, [], json_encode(['post_id' => 8])),
+        ], $h);
+
+        $client->createDraft($this->website, $this->version);
+
+        $this->assertSame('magefan_blog/autoseo/x.jpg', json_decode((string) $h[1]['request']->getBody(), true)['post']['image']);
+    }
+
     public function test_create_draft_without_image_or_with_upload_failure_still_creates_post(): void
     {
         $h = [];
