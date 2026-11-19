@@ -26,6 +26,30 @@ final class RunActivity
 
     public const POLL_IDLE = 15;
 
+    /** Phiên bị chặn TRƯỚC khi chạy (cổng an toàn/dừng khẩn cấp/chưa cấu hình AI): không tốn token, không có bản nháp. Không đại diện cho "lần chạy gần nhất" của bài. */
+    public static function isGateBlocked(AgentRun $run): bool
+    {
+        return $run->status === 'blocked' && (float) $run->cost_vnd === 0.0 && (int) $run->tokens_used === 0 && $run->final_version_id === null;
+    }
+
+    /** Phiên thật gần nhất: bỏ qua các phiên bị chặn trước khi chạy. @param Collection<int, AgentRun> $runsNewestFirst */
+    public static function lastMeaningful(Collection $runsNewestFirst): ?AgentRun
+    {
+        return $runsNewestFirst->first(fn (AgentRun $r) => ! self::isGateBlocked($r));
+    }
+
+    /** Dòng nhỏ báo lần giao gần nhất bị chặn, vd. "Lần giao gần nhất bị chặn: Đang dừng khẩn cấp (19/11 08:32)". */
+    public static function blockedNote(AgentRun $run): ?string
+    {
+        if (! self::isGateBlocked($run)) {
+            return null;
+        }
+        $at = VnTime::fromRaw($run, 'started_at') ?? VnTime::fromRaw($run, 'created_at');
+        $why = rtrim(trim((string) $run->outcome_reason) !== '' ? trim((string) $run->outcome_reason) : 'bị chặn trước khi chạy', '. ');
+
+        return 'Lần giao gần nhất bị chặn: '.$why.($at ? ' ('.VnTime::format($at, 'd/m H:i').')' : '');
+    }
+
     /** Phiên running còn "sống" (chưa quá hạn không có bước mới). */
     public static function isLive(AgentRun $run, ?CarbonImmutable $now = null): bool
     {

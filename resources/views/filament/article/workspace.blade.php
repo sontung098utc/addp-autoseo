@@ -182,7 +182,15 @@
                 @if ($tabLoaded('overview'))
                 <div class="aw-stack">
                     @if (! empty($stopInfo))
-                        <p class="aw-note" data-testid="aw-stopped" style="color:#b91c1c;border:1px solid #b91c1c;border-radius:.5rem;padding:.5rem .75rem"><x-filament::icon icon="heroicon-o-exclamation-triangle" style="width:1.1rem;height:1.1rem;display:inline;vertical-align:-.2em" /> Hệ thống đang DỪNG KHẨN CẤP ({{ $stopInfo['reason'] ?? 'không ghi lý do' }}): đội AI sẽ không chạy cho đến khi được khôi phục ở Lịch xuất bản.</p>
+                        <p class="aw-note" data-testid="aw-stopped" style="color:#b91c1c;border:1px solid #b91c1c;border-radius:.5rem;padding:.5rem .75rem"><x-filament::icon icon="heroicon-o-exclamation-triangle" style="width:1.1rem;height:1.1rem;display:inline;vertical-align:-.2em" /> {{ \App\Filament\Support\Review\StopGate::MESSAGE }} Lý do: {{ $stopInfo['reason'] ?? 'không ghi lý do' }}.</p>
+                    @endif
+                    @if (! empty($rejection))
+                        <section class="ss-review-card" data-testid="aw-rejection" style="border-color:#b45309;background:rgba(217,119,6,.08)">
+                            <h2 class="ss-review-card__title" style="margin:0 0 .3rem">Cần sửa (đã từ chối bản v{{ $rejection['version'] }})</h2>
+                            <p style="margin:0"><strong>Lý do từ chối:</strong> {{ $rejection['reason'] }}</p>
+                            <p class="aw-muted" style="margin:.25rem 0 0">Từ chối bởi {{ $rejection['by'] ?? 'không rõ' }}@if ($rejection['at']) · {{ VnTime::format($rejection['at'], 'd/m/Y H:i') }}@endif.
+                                @if ($rejection['revised']) Đã có bản mới hơn, có thể gửi duyệt lại. @else Chưa có bản mới: sửa bài hoặc bấm "Giao làm lại" để có bản mới rồi gửi duyệt. @endif</p>
+                        </section>
                     @endif
                     @if ($outlineHold !== null)
                         <section class="ss-review-card" data-testid="aw-outline-hold" style="border-color:#d97706">
@@ -291,6 +299,7 @@
                             <div class="aw-flow__head">
                                 <div>
                                     <h2 class="ss-review-card__title" style="margin:0">Luồng chạy của bài <x-help title="Luồng chạy"><p>Các bước đội AI thực hiện cho bài này ở phiên #{{ $rRun->id }}. Bước đang chạy được làm nổi bật; làm mới tự động khi phiên còn chạy.</p></x-help></h2>
+                                    @if (! empty($blockedNote))<div class="aw-muted" data-testid="aw-flow-blocked" style="font-size:.75rem;margin:.1rem 0">{{ $blockedNote }}</div>@endif
                                     <div class="aw-flow__sub">
                                         @if ($rf['live'])
                                             <x-studio.running size="sm" label="Đang chạy" />
@@ -656,6 +665,14 @@
             <x-studio.panel key="content">
                 @if ($tabLoaded('content'))
                 <div class="aw-stack">
+                    @if (! empty($rejection))
+                        <section class="ss-review-card" data-testid="aw-rejection-content" style="border-color:#b45309;background:rgba(217,119,6,.08)">
+                            <h2 class="ss-review-card__title" style="margin:0 0 .3rem">Cần sửa (đã từ chối bản v{{ $rejection['version'] }})</h2>
+                            <p style="margin:0"><strong>Lý do từ chối:</strong> {{ $rejection['reason'] }}</p>
+                            <p class="aw-muted" style="margin:.25rem 0 0">Từ chối bởi {{ $rejection['by'] ?? 'không rõ' }}@if ($rejection['at']) · {{ VnTime::format($rejection['at'], 'd/m/Y H:i') }}@endif.
+                                @if ($rejection['revised']) Đã có bản mới hơn, có thể gửi duyệt lại. @else Chưa có bản mới: sửa bài hoặc bấm "Giao làm lại" để có bản mới rồi gửi duyệt. @endif</p>
+                        </section>
+                    @endif
                     <section class="ss-review-card">
                         <div class="aw-head" style="justify-content:flex-start;gap:.4rem">
                             <h2 class="ss-review-card__title">Các phiên bản</h2>

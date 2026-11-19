@@ -7,6 +7,7 @@ use App\Filament\Support\Agent\RunActivity;
 use App\Filament\Support\Planning\KeywordDuplicateGuard;
 use App\Filament\Support\Review\ArticleRows;
 use App\Filament\Support\Review\ReviewActions;
+use App\Filament\Support\Review\StopGate;
 use App\Filament\Support\Review\ReviewWorkflow;
 use App\Filament\Support\StatusPresenter;
 use App\Models\AgentRun;
@@ -212,6 +213,10 @@ class ArticleResource extends Resource
     public static function assignToAgent(Article $record, bool $allowWithoutKnowledge = false /* không còn tác dụng, giữ để tương thích */, bool $background = false, ?string $redoMessage = null): ?string
     {
         abort_unless(Auth::user()?->isWriter(), 403);
+        // Đang dừng khẩn cấp: lối bấm tay không tạo phiên "Bị chặn" rác (chỉ ghi nhật ký hệ thống). Lối tự động (chiến dịch) vẫn bị orchestrator chặn như cũ.
+        if (StopGate::blocks($record->website_id, 'giao đội AI bài #'.$record->id)) {
+            return null;
+        }
         // Chống giao trùng: đã có phiên đang chạy thật thì không tạo phiên thứ hai.
         if (ArticleRows::liveRun($record) !== null) {
             Notification::make()->title('Bài này đang có phiên chạy')->body('Đợi phiên hiện tại xong rồi hãy giao lại.')->warning()->send();
@@ -601,7 +606,7 @@ class ArticleResource extends Resource
                         ->url(fn (Article $r) => static::getUrl('view', ['record' => $r])),
                     static::publishNowAction(),
                     static::rejectAction(),
-                    Tables\Actions\Action::make('redo_agent')
+                    StopGate::lock(Tables\Actions\Action::make('redo_agent'))
                         ->label('Giao làm lại')
                         ->icon('heroicon-o-arrow-path')
                         ->visible(fn (Article $record) => static::canRedoWithAgent($record))
@@ -613,7 +618,7 @@ class ArticleResource extends Resource
                             $url = static::assignToAgent($record, background: true, redoMessage: static::redoMessage($record, $data));
                             $url ? $action->redirect($url) : null;
                         }),
-                    Tables\Actions\Action::make('run_agent')
+                    StopGate::lock(Tables\Actions\Action::make('run_agent'))
                         ->label('Giao đội AI')
                         ->icon('heroicon-o-cpu-chip')
                         ->visible(fn (Article $record) => static::canAssignToAgent($record))
@@ -726,13 +731,16 @@ class ArticleResource extends Resource
 
     private static function submitAction(): Tables\Actions\Action
     {
-        return Tables\Actions\Action::make('submit_review')->size('sm')->label('Gửi duyệt')->icon('heroicon-o-paper-airplane')
+        return Tables\Actions\Action::make('submit_review')->size('sm')->label(fn (Article $r) => ReviewActions::submitLabel($r))->icon('heroicon-o-paper-airplane')
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'submit_review')
             ->authorize(fn () => ReviewActions::canSubmit())
             ->requiresConfirmation()
+            ->modalHeading(fn (Article $r) => ReviewActions::submitHeading($r))
+            ->modalDescription(fn (Article $r) => ReviewActions::submitDescription($r))
             ->action(function (Article $r) {
                 abort_unless(ReviewActions::canSubmit(), 403);
-                ReviewActions::run(fn () => (new ReviewWorkflow)->submitForReview(ReviewActions::user(), static::latest($r)), 'Đã gửi duyệt');
+                // Hộp xác nhận ở trên chính là xác nhận gửi lại nguyên bản (nêu rõ lý do bị từ chối).
+                ReviewActions::run(fn () => (new ReviewWorkflow)->submitForReview(ReviewActions::user(), static::latest($r), confirmResubmit: true), 'Đã gửi duyệt');
             });
     }
 
@@ -768,7 +776,7 @@ class ArticleResource extends Resource
     /** "Đăng ngay" cho bài đã duyệt (cùng điều kiện với Xếp lịch): đăng bản đã duyệt lên website ngay, không hẹn giờ. */
     private static function publishNowAction(): Tables\Actions\Action
     {
-        return Tables\Actions\Action::make('publish_now')->label('Đăng ngay')->icon('heroicon-o-paper-airplane')->color('success')
+        return StopGate::lock(Tables\Actions\Action::make('publish_now'))->label('Đăng ngay')->icon('heroicon-o-paper-airplane')->color('success')
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'schedule')
             ->authorize(fn () => ReviewActions::canApprove())
             ->modalHeading('Đăng ngay lên website')
@@ -778,6 +786,9 @@ class ArticleResource extends Resource
             ->modalSubmitActionLabel('Đăng ngay')
             ->action(function (Article $r, array $data) {
                 abort_unless(ReviewActions::canApprove(), 403);
+                if (StopGate::blocks($r->website_id, 'đăng ngay bài #'.$r->id)) {
+                    return;
+                }
                 try {
                     $p = (new ReviewWorkflow)->publishNow(ReviewActions::user(), static::latest($r), Website::findOrFail($data['website_id']));
                 } catch (\InvalidArgumentException $e) {
@@ -791,13 +802,16 @@ class ArticleResource extends Resource
 
     private static function scheduleAction(): Tables\Actions\Action
     {
-        return Tables\Actions\Action::make('schedule')->size('sm')->label('Xếp lịch')->icon('heroicon-o-clock')
+        return StopGate::lock(Tables\Actions\Action::make('schedule'))->size('sm')->label('Xếp lịch')->icon('heroicon-o-clock')
             ->visible(fn (Article $r) => static::primaryActionFor($r) === 'schedule')
             ->authorize(fn () => ReviewActions::canApprove())
             ->form(ReviewActions::scheduleForm())
             ->fillForm(fn (Article $r) => ['website_id' => $r->website_id])
             ->action(function (Article $r, array $data) {
                 abort_unless(ReviewActions::canApprove(), 403);
+                if (StopGate::blocks($r->website_id, 'xếp lịch bài #'.$r->id)) {
+                    return;
+                }
                 ReviewActions::run(function () use ($r, $data) {
                     $website = Website::findOrFail($data['website_id']);
                     (new ReviewWorkflow)->schedule(ReviewActions::user(), static::latest($r), ReviewActions::parseVn($data['scheduled_at_vn']), $website);

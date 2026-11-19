@@ -140,7 +140,44 @@ class ReviewActions
     /** @return array<int, Forms\Components\Component> */
     public static function rejectForm(): array
     {
-        return [Forms\Components\Textarea::make('reason')->label('Lý do từ chối')->required()];
+        return [self::reasonField('reason', 'Lý do từ chối (bắt buộc)')];
+    }
+
+    /**
+     * Ô lý do bắt buộc dùng kiểm tra của Filament (thông báo tiếng Việt), KHÔNG dùng thuộc tính HTML required
+     * (trình duyệt tự hiện tiếng Anh theo ngôn ngữ máy). Máy chủ vẫn từ chối lý do trống ở ReviewWorkflow/EmergencyStopService.
+     */
+    public static function reasonField(string $name, string $label): Forms\Components\Textarea
+    {
+        return Forms\Components\Textarea::make($name)->label($label)->rows(3)
+            ->rules(['required', 'string'])
+            ->validationMessages(['required' => 'Vui lòng nhập lý do.']);
+    }
+
+    /** Bản mới nhất vừa bị từ chối và chưa sửa gì: "Gửi duyệt" chỉ tiếp tục khi người gửi xác nhận gửi lại nguyên bản. */
+    public static function resubmitOfRejected(\App\Models\Article $article): ?ArticleVersion
+    {
+        return RejectionInfo::unrevised($article);
+    }
+
+    public static function submitLabel(\App\Models\Article $article): string
+    {
+        return self::resubmitOfRejected($article) ? 'Gửi lại nguyên bản' : 'Gửi duyệt';
+    }
+
+    public static function submitHeading(\App\Models\Article $article): string
+    {
+        return self::resubmitOfRejected($article) ? 'Gửi lại bản đã bị từ chối?' : 'Gửi duyệt';
+    }
+
+    public static function submitDescription(\App\Models\Article $article): string
+    {
+        $v = self::resubmitOfRejected($article);
+        if (! $v) {
+            return 'Bạn có chắc chắn muốn thực hiện hành động này?';
+        }
+
+        return 'Bản này đã bị từ chối vì: '.(trim((string) $v->review_notes) !== '' ? trim((string) $v->review_notes) : 'không ghi lý do').'. Chưa có bản mới hơn. Chỉ gửi lại khi bạn chắc người duyệt sẽ xem xét lại nguyên bản này; nếu không, hãy sửa hoặc "Giao làm lại" để có bản mới.';
     }
 
     /** Ô chọn website đích dùng chung cho Xếp lịch và Đăng ngay. */

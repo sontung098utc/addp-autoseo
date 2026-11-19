@@ -9,6 +9,8 @@ use App\Filament\Support\Article\VersionCompareAction;
 use App\Filament\Support\Explain\WhyAction;
 use App\Filament\Support\Review\ReviewActions;
 use App\Filament\Support\Review\ReviewWorkflow;
+use App\Filament\Support\Review\StopGate;
+use App\Filament\Support\Review\RejectionInfo;
 use App\Filament\Support\Schedule\RescheduleAction;
 use App\Models\AgentRun;
 use App\Models\Article;
@@ -297,7 +299,7 @@ class ViewArticle extends EditArticle
                     Notification::make()->title($g === '' ? 'Đã xóa chỉ dẫn' : 'Đã lưu chỉ dẫn cho đội AI')->success()->send();
                     $this->refreshRecord();
                 }),
-            Actions\Action::make('run_agent')->label('Giao đội AI')->icon('heroicon-o-cpu-chip')
+            StopGate::lock(Actions\Action::make('run_agent'))->label('Giao đội AI')->icon('heroicon-o-cpu-chip')
                 ->visible(fn () => ArticleResource::canAssignToAgent($this->record))
                 ->modalHeading('Giao bài này cho đội AI')
                 ->modalDescription(fn () => ArticleResource::assignContent($this->record))
@@ -307,7 +309,7 @@ class ViewArticle extends EditArticle
                     $this->refreshRecord();
                     $url ? $action->redirect($url) : null;
                 }),
-            Actions\Action::make('redo_agent')->label('Giao làm lại')->icon('heroicon-o-arrow-path')
+            StopGate::lock(Actions\Action::make('redo_agent'))->label('Giao làm lại')->icon('heroicon-o-arrow-path')
                 ->visible(fn () => ArticleResource::canRedoWithAgent($this->record))
                 ->modalHeading('Giao bài này làm lại')
                 ->modalDescription(ArticleResource::REDO_DESCRIPTION)
@@ -318,13 +320,16 @@ class ViewArticle extends EditArticle
                     $this->refreshRecord();
                     $url ? $action->redirect($url) : null;
                 }),
-            Actions\Action::make('submit_review')->label('Gửi duyệt')->icon('heroicon-o-paper-airplane')
+            Actions\Action::make('submit_review')->label(fn () => ReviewActions::submitLabel($this->record))->icon('heroicon-o-paper-airplane')
                 ->visible(fn () => ArticleResource::primaryActionFor($this->record) === 'submit_review')
                 ->authorize(fn () => ReviewActions::canSubmit())
                 ->requiresConfirmation()
+                ->modalHeading(fn () => ReviewActions::submitHeading($this->record))
+                ->modalDescription(fn () => ReviewActions::submitDescription($this->record))
                 ->action(function () {
                     abort_unless(ReviewActions::canSubmit(), 403);
-                    ReviewActions::run(fn () => (new ReviewWorkflow)->submitForReview(ReviewActions::user(), $this->latest()), 'Đã gửi duyệt');
+                    // Hộp xác nhận nêu rõ lý do bị từ chối; bấm xác nhận = chủ động gửi lại nguyên bản (máy chủ vẫn chặn nếu gọi mà không xác nhận).
+                    ReviewActions::run(fn () => (new ReviewWorkflow)->submitForReview(ReviewActions::user(), $this->latest(), confirmResubmit: true), 'Đã gửi duyệt');
                     $this->refreshRecord();
                 }),
             Actions\Action::make('approve')->label('Duyệt')->icon('heroicon-o-check')->color('primary')
@@ -350,19 +355,22 @@ class ViewArticle extends EditArticle
                     ReviewActions::run(fn () => (new ReviewWorkflow)->reject(ReviewActions::user(), $this->latest(), $data['reason'] ?? null), 'Đã từ chối bản thảo');
                     $this->refreshRecord();
                 }),
-            Actions\Action::make('schedule')->label('Xếp lịch')->icon('heroicon-o-clock')->color('primary')
+            StopGate::lock(Actions\Action::make('schedule'))->label('Xếp lịch')->icon('heroicon-o-clock')->color('primary')
                 ->visible(fn () => $this->record->workflow_status === 'approved' && $this->latest() !== null)
                 ->authorize(fn () => ReviewActions::canApprove())
                 ->form(ReviewActions::scheduleForm())
                 ->fillForm(fn () => ['website_id' => $this->record->website_id])
                 ->action(function (array $data) {
                     abort_unless(ReviewActions::canApprove(), 403);
+                    if (StopGate::blocks($this->record->website_id, 'xếp lịch bài #'.$this->record->id)) {
+                        return;
+                    }
                     ReviewActions::run(function () use ($data) {
                         (new ReviewWorkflow)->schedule(ReviewActions::user(), $this->latest(), ReviewActions::parseVn($data['scheduled_at_vn']), Website::findOrFail($data['website_id']));
                     }, 'Đã xếp lịch xuất bản');
                     $this->refreshRecord();
                 }),
-            Actions\Action::make('publish_now')->label('Đăng ngay')->icon('heroicon-o-paper-airplane')->color('success')
+            StopGate::lock(Actions\Action::make('publish_now'))->label('Đăng ngay')->icon('heroicon-o-paper-airplane')->color('success')
                 ->visible(fn () => $this->record->workflow_status === 'approved' && $this->latest() !== null)
                 ->authorize(fn () => ReviewActions::canApprove())
                 ->modalHeading('Đăng ngay lên website')
@@ -372,6 +380,9 @@ class ViewArticle extends EditArticle
                 ->modalSubmitActionLabel('Đăng ngay')
                 ->action(function (array $data) {
                     abort_unless(ReviewActions::canApprove(), 403);
+                    if (StopGate::blocks($this->record->website_id, 'đăng ngay bài #'.$this->record->id)) {
+                        return;
+                    }
                     try {
                         $p = (new ReviewWorkflow)->publishNow(ReviewActions::user(), $this->latest(), Website::findOrFail($data['website_id']));
                     } catch (\InvalidArgumentException $e) {
@@ -543,7 +554,10 @@ class ViewArticle extends EditArticle
         $canRuns = \App\Filament\Resources\AgentRunResource::canViewAny();
         // Chi tiết phiên nặng (~0,5 s): chỉ dựng cho tab cần nó (Phiên chạy dùng runView, Tổng quan dùng latestRunView).
         $runView = $want('activity') && $selectedRun && $canRuns ? \App\Filament\Support\Agent\RunViewData::for($selectedRun) : null;
-        $latestRunView = $want('overview') && $lastRun && $canRuns ? ($selectedRun && $selectedRun->is($lastRun) && $runView ? $runView : \App\Filament\Support\Agent\RunViewData::for($lastRun)) : null;
+        // Thẻ Luồng chạy ở Tổng quan: phiên bị chặn trước khi chạy (dừng khẩn cấp, 0 chi phí) KHÔNG che phiên thật gần nhất; danh sách "Các phiên chạy" vẫn đủ.
+        $shownRun = RunActivity::lastMeaningful($runs) ?? $lastRun;
+        $blockedNote = $shownRun && $lastRun && ! $shownRun->is($lastRun) ? RunActivity::blockedNote($lastRun) : null;
+        $latestRunView = $want('overview') && $shownRun && $canRuns ? ($selectedRun && $selectedRun->is($shownRun) && $runView ? $runView : \App\Filament\Support\Agent\RunViewData::for($shownRun)) : null;
         $live = $lastRun && RunActivity::isLive($lastRun) ? $lastRun : null;
         $campaignId = $article->campaign_id ?: $lastRun?->campaign_id;
         $publications = Publication::query()->whereIn('article_version_id', $versions->pluck('id'))->with(['website', 'articleVersion'])->orderByDesc('id')->get();
@@ -593,7 +607,9 @@ class ViewArticle extends EditArticle
             'runs' => $runs,
             'live' => $live,
             'liveStage' => $live ? RunActivity::currentStage($live->steps) : null,
-            'runFlow' => $this->runFlowOf($runs->first(), $live),
+            'runFlow' => $this->runFlowOf($shownRun, $live),
+            'blockedNote' => $blockedNote,
+            'rejection' => RejectionInfo::for($article),
             // Chi tiết đầy đủ MỘT phiên (Diễn biến, Báo cáo, Chi phí và model, Dữ liệu) ngay trong trang bài; phiên đang xem theo ?phien=, mặc định phiên mới nhất.
             'selectedRun' => $selectedRun,
             'runView' => $runView,
