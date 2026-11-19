@@ -33,6 +33,10 @@
     .po-tbl { width: 100%; border-collapse: collapse; font-size: var(--ss-fs-sm); }
     .po-tbl td { padding: .4rem .3rem; border-top: 1px solid var(--ss-border); }
     .po-tbl td:last-child { text-align: right; white-space: nowrap; }
+    .po-acts { display: flex; gap: .8rem; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+    .po-more { position: relative; } .po-more > summary { list-style: none; cursor: pointer; } .po-more > summary::-webkit-details-marker { display: none; }
+    .po-menu { position: absolute; right: 0; top: 1.6rem; z-index: 5; display: grid; gap: .3rem; min-width: 12rem; padding: .5rem .7rem; border: 1px solid var(--ss-border); border-radius: .6rem; background: var(--ss-surface); box-shadow: 0 8px 24px rgb(0 0 0 / .15); }
+    .po-del { color: var(--ss-danger-fg, #b91c1c); text-align: left; background: none; border: 0; cursor: pointer; padding: 0; }
     @media (max-width: 720px) { .po-g > summary { grid-template-columns: 1fr; } }
 </style>
 
@@ -79,9 +83,23 @@
                     <div class="po-sub">{{ $g['total'] }} bài · {{ $c['planned'] }} chờ viết · {{ $c['ready'] + $c['review'] }} đã có bản viết</div>
                 </div>
                 <div>@if ($g['state'])<x-studio.badge :tone="['success' => 'ok', 'warning' => 'warn', 'info' => 'info', 'gray' => 'muted'][$g['state']['tone']] ?? 'muted'">{{ $g['state']['label'] }}</x-studio.badge>@endif</div>
-                <div>
+                <div class="po-acts">
                     @if ($g['campaign'] && $canOpenCampaign)
                         <a class="cp-link" href="{{ \App\Filament\Resources\CampaignResource::getUrl('view', ['record' => $g['campaign']]) }}" x-on:click.stop>Mở chiến dịch</a>
+                    @endif
+                    @if ($isApprover)
+                        <details class="po-more" x-on:click.stop>
+                            <summary class="cp-link" aria-label="Xóa hoặc dọn nhóm này">Xóa…</summary>
+                            <div class="po-menu">
+                                @if ($g['counts']['planned'] > 0)
+                                    <button type="button" class="cp-link po-del" wire:click="mountAction('deleteGroup', { group: '{{ $g['campaign'] ? $g['campaign']->id : 'solo' }}' })">Xóa {{ $g['counts']['planned'] }} bài chờ viết</button>
+                                @endif
+                                @if ($g['campaign'])
+                                    <button type="button" class="cp-link po-del" wire:click="mountAction('deleteCampaign', { campaign: {{ $g['campaign']->id }} })">Xóa chiến dịch này</button>
+                                @endif
+                                @if ($g['counts']['planned'] === 0 && ! $g['campaign'])<span class="po-sub">Không có bài chờ viết để xóa.</span>@endif
+                            </div>
+                        </details>
                     @endif
                 </div>
             </summary>
@@ -94,7 +112,8 @@
                             <tr>
                                 <td><a class="cp-link" href="{{ \App\Filament\Resources\ArticleResource::getUrl('view', ['record' => $a['id']]) }}">{{ $a['keyword'] }}</a></td>
                                 <td class="po-sub">{{ $a['at'] ? VnTime::format($a['at']) : 'chưa có ngày' }}</td>
-                                <td><x-studio.badge :tone="$tones[StatusPresenter::color($a['status'])] ?? 'muted'">{{ StatusPresenter::label($a['status']) }}</x-studio.badge></td>
+                                <td><x-studio.badge :tone="$tones[StatusPresenter::color($a['status'])] ?? 'muted'">{{ StatusPresenter::label($a['status']) }}</x-studio.badge>
+                                    @if ($isApprover && $a['status'] === 'planned')<button type="button" class="cp-link po-del" style="margin-left:.5rem" title="Xóa bài này khỏi kế hoạch" wire:click="mountAction('deletePlanned', { article: {{ $a['id'] }} })">Xóa</button>@endif</td>
                             </tr>
                         @endforeach
                     </table>

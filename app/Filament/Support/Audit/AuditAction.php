@@ -15,6 +15,8 @@ enum AuditAction: string
     case Reschedule = 'reschedule';
     case PausePublication = 'pause_publication';
     case ResumePublication = 'resume_publication';
+    case DeletePlan = 'delete_plan';
+    case DeleteCampaign = 'delete_campaign';
 
     /** Hành động bắt buộc có lý do không rỗng. */
     public function requiresReason(): bool
