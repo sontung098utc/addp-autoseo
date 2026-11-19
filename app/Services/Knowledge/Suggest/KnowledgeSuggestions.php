@@ -121,9 +121,20 @@ final class KnowledgeSuggestions
         foreach ($runs as $r) {
             $byArticle[$r->article_id][] = $r;
         }
+        // Một truy vấn cho mọi bài (trước đây mỗi bài một truy vấn): bước 'grade' có id lớn nhất trong các phiên của từng bài.
+        $articleOfRun = [];
+        foreach ($runs as $r) {
+            $articleOfRun[$r->id] = $r->article_id;
+        }
+        $latestGrade = [];
+        if ($articleOfRun !== []) {
+            foreach (AgentRunStep::query()->whereIn('agent_run_id', array_keys($articleOfRun))->where('stage', 'grade')->orderByDesc('id')->get() as $st) {
+                $latestGrade[$articleOfRun[$st->agent_run_id]] ??= $st;
+            }
+        }
         $out = [];
         foreach ($byArticle as $articleId => $list) {
-            $step = AgentRunStep::query()->whereIn('agent_run_id', array_map(fn ($r) => $r->id, $list))->where('stage', 'grade')->orderByDesc('id')->first();
+            $step = $latestGrade[$articleId] ?? null;
             if ($step === null) {
                 continue;
             }

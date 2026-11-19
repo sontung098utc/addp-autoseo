@@ -59,7 +59,7 @@
                         <span class="kw-step__val" data-testid="kw-step-{{ $it['key'] }}">{{ $it['value'] }}</span>
                         <span class="kw-step__hint" style="display:block">{{ $it['hint'] }}</span>
                     </button>
-                    @if (! empty($it['note']))<span class="kw-step__note">{{ $it['note'] }}</span>@endif
+                    @if (! empty($it['note']))<span class="kw-step__note">{{ $it['note'] }}</span><span class="ss-muted" title="{{ \App\Services\Keywords\KeywordMetricsResolver::ADMIN_HINT }}" aria-label="{{ \App\Services\Keywords\KeywordMetricsResolver::ADMIN_HINT }}" role="img" tabindex="0">ⓘ</span>@endif
                     <div class="kw-step__btns">
                         @if ($it['key'] === 'add')
                             <x-filament::button size="sm" :color="$isNext ? 'primary' : 'gray'" type="button" onclick="kwGoTab('nhap-them')">Nhập từ khóa</x-filament::button>
@@ -166,9 +166,10 @@
             @if ($preview['fatal'])
                 <p class="kw-err ss-text-sm">{{ $preview['fatal'] }}</p>
             @else
+                @if (! empty($preview['note']))<p class="ss-muted ss-text-sm" role="note">{{ $preview['note'] }}</p>@endif
                 <p>{{ count($preview['rows']) }} hợp lệ · {{ count($preview['errors']) }} lỗi · {{ count($preview['duplicates']) }} trùng (sẽ bỏ qua)</p>
                 <table class="ss-dt__table">
-                    <thead><tr><th>Dòng</th><th>Từ khóa</th><th class="is-right">Volume</th><th>Ý định</th></tr></thead>
+                    <thead><tr><th>Dòng</th><th>Từ khóa</th><th class="is-right">Lượt tìm</th><th>Ý định</th></tr></thead>
                     <tbody>
                     @foreach (array_slice($preview['rows'], 0, 20) as $r)
                         <tr><td>{{ $r['line'] }}</td><td>{{ $r['keyword'] }}</td><td class="is-right">{{ $r['volume'] !== null ? number_format($r['volume'], 0, ',', '.') : '—' }}</td><td>{{ $intents[$r['intent']] ?? $r['intent'] }}</td></tr>
@@ -188,10 +189,10 @@
                 <div class="ss-split">
                     <div class="ss-card"><div class="ss-card__b">
                 <div class="ss-card__h">Nhập CSV</div>
-                <div style="margin-bottom:.5rem"><x-upload-zone model="csvFile" name="csv" accept=".csv,text/csv,text/plain" :max-mb="1" hint="CSV · tối đa 1 MB" label="Kéo thả tệp CSV vào đây hoặc bấm để chọn">
+                <div style="margin-bottom:.5rem"><x-upload-zone model="csvFile" name="csv" accept=".csv,text/csv,text/plain" :max-mb="1" hint="CSV · cột từ khóa, lượt tìm, ý định (tiêu đề tiếng Việt hoặc Anh đều được) · tối đa 1 MB" label="Kéo thả tệp CSV vào đây hoặc bấm để chọn">
                     <div><x-filament::button color="gray" size="sm" wire:click="loadSample">Dùng tệp mẫu</x-filament::button></div>
                 </x-upload-zone></div>
-                <textarea class="kw-in" style="width:100%" rows="4" wire:model="csvText" placeholder="Hoặc dán nội dung CSV vào đây" aria-label="Nội dung CSV"></textarea>
+                <textarea class="kw-in" style="width:100%" rows="4" wire:model="csvText" placeholder="Hoặc dán danh sách từ khóa vào đây (mỗi dòng một từ khóa; có thể kèm cột lượt tìm)" aria-label="Nội dung CSV"></textarea>
                 <div class="kw-bar" style="margin-top:.5rem"><x-filament::button color="gray" wire:click="previewCsv">Xem trước</x-filament::button></div>
 
                     </div></div>
@@ -199,7 +200,7 @@
                 <div class="ss-card__h">Thêm tay</div>
                 <div class="kw-bar">
                     <input class="kw-in" wire:model="newKeyword" placeholder="Từ khóa" aria-label="Từ khóa mới" maxlength="255">
-                    <input class="kw-in" wire:model="newVolume" placeholder="Volume (tùy chọn)" aria-label="Volume" style="width:9rem">
+                    <input class="kw-in" wire:model="newVolume" placeholder="Lượt tìm (tùy chọn)" aria-label="Lượt tìm" style="width:9rem">
                     <select class="kw-in" wire:model="newIntent" aria-label="Ý định">
                         @foreach ($intents as $k => $l)<option value="{{ $k }}">{{ $l }}</option>@endforeach
                     </select>

@@ -117,7 +117,7 @@ class AgentSkills extends Page
                 $rows[$ref] = ['ref' => $ref, 'title' => $pb->title, 'playbook' => $pb, 'error' => null, 'status' => $pb->status];
             } catch (InvalidPlaybook $e) {
                 $ref = $dirRole.'/'.$name;
-                $rows[$ref] = ['ref' => $ref, 'title' => $name, 'playbook' => null, 'error' => $e->getMessage(), 'status' => 'error'];
+                $rows[$ref] = ['ref' => $ref, 'title' => $name, 'playbook' => null, 'error' => \App\Support\UserFacingError::from($e), 'status' => 'error'];
             }
             // Vai trò dùng kỹ năng: khai báo trong sổ vai trò theo khóa "<thư mục>/<key>" (không kèm version).
             $base = $rows[$ref]['playbook'] ? $dirRole.'/'.$rows[$ref]['playbook']->key : $dirRole.'/'.preg_replace('/\.v\d+$/', '', $name);

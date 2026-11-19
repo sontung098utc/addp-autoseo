@@ -27,10 +27,20 @@ final class BrainContext
     {
     }
 
-    public static function forArticle(Article $article, ?int $campaignId = null): self
+    /**
+     * $scoped: bài CHẮC CHẮN ngoài lĩnh vực của website (TopicScope) thì chỉ giữ Trí tuệ thường, bỏ Trí tuệ rủi ro cao/bắt buộc nguồn gắn theo website
+     * (hạng rủi ro, EVID01, kho, khoảng trống... đều dùng chung kết quả này). Truyền false để lấy đủ mọi Trí tuệ đã gắn.
+     */
+    public static function forArticle(Article $article, ?int $campaignId = null, bool $scoped = true): self
     {
-        // Chỉ phụ thuộc website và chiến dịch; trang liệt kê gọi hàng trăm lần cho các bài cùng website (bộ nhớ chỉ bật trong yêu cầu của trang đó).
-        return \App\Support\RequestMemo::remember('brainctx:'.(int) $article->website_id.':'.(int) $campaignId, fn () => self::buildForArticle($article, $campaignId));
+        // Phụ thuộc website, chiến dịch và (khi lọc theo chủ đề) từ khóa; trang liệt kê gọi hàng trăm lần cho các bài cùng website (bộ nhớ chỉ bật trong yêu cầu của trang đó).
+        $full = \App\Support\RequestMemo::remember('brainctx:'.(int) $article->website_id.':'.(int) $campaignId, fn () => self::buildForArticle($article, $campaignId));
+        if (! $scoped || $full->isEmpty()) {
+            return $full;
+        }
+
+        return \App\Support\RequestMemo::remember('brainctx-scoped:'.(int) $article->website_id.':'.(int) $campaignId.':'.md5((string) $article->primary_keyword),
+            fn () => \App\Services\Agent\Risk\TopicScope::forArticle($article, $full) ? $full->withoutStrict() : $full);
     }
 
     private static function buildForArticle(Article $article, ?int $campaignId): self
@@ -72,6 +82,12 @@ final class BrainContext
     public function names(): string
     {
         return implode(', ', array_map(fn (Brain $b) => $b->name, $this->brains));
+    }
+
+    /** Bản chỉ giữ Trí tuệ thường (rủi ro thấp, không bắt buộc nguồn): dùng cho bài ngoài lĩnh vực của các Trí tuệ y tế/nghiêm. */
+    public function withoutStrict(): self
+    {
+        return new self(array_values(array_filter($this->brains, fn (Brain $b) => $b->riskClass() === 'low' && $b->reliance() !== 'must_cite')));
     }
 
     /** Mức nghiêm nhất trong các Trí tuệ: must_cite > numbers > free. */

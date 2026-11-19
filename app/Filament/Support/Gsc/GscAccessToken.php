@@ -42,7 +42,7 @@ final class GscAccessToken
         try {
             $res = Http::asForm()->acceptJson()->timeout(30)->post($uri, ['grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer', 'assertion' => $header.'.'.$claims.'.'.self::b64($sig)]);
         } catch (\Throwable $e) {
-            throw new GscFailed('Không kết nối được Google để lấy token: '.mb_substr($e->getMessage(), 0, 120));
+            throw new GscFailed('Không kết nối được Google để lấy token. '.\App\Support\UserFacingError::from($e, 'gsc-token'));
         }
         $token = $res->successful() ? (string) ($res->json('access_token') ?? '') : '';
         if ($token === '') {

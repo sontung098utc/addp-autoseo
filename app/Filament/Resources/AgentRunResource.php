@@ -54,10 +54,11 @@ class AgentRunResource extends Resource
      * Liên kết MỘT nơi tới chi tiết phiên chạy: phiên của một bài mở tab "Phiên chạy" của trang bài (đúng phiên đó); phiên không gắn bài
      * (xây kho, khảo sát...) mở trang phiên riêng. Mọi nơi tạo liên kết tới phiên đều dùng hàm này để không loạn đường dẫn.
      */
-    public static function viewUrl(AgentRun|int $run): string
+    /** $articleKnown: bài của phiên chắc chắn còn (phiên lấy từ chính bài đó), bỏ truy vấn kiểm tra tồn tại — danh sách bài gọi mỗi dòng. */
+    public static function viewUrl(AgentRun|int $run, bool $articleKnown = false): string
     {
         $model = $run instanceof AgentRun ? $run : AgentRun::query()->find($run);
-        if ($model && $model->article_id && \App\Support\RequestMemo::remember('article-exists:'.$model->article_id, fn () => \App\Models\Article::query()->whereKey($model->article_id)->exists())) {
+        if ($model && $model->article_id && ($articleKnown || \App\Support\RequestMemo::remember('article-exists:'.$model->article_id, fn () => \App\Models\Article::query()->whereKey($model->article_id)->exists()))) {
             return ArticleResource::getUrl('view', ['record' => $model->article_id]).'?phien='.$model->id.'#tab-activity';
         }
 

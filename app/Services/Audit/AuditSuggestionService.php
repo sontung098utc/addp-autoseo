@@ -3,6 +3,7 @@
 namespace App\Services\Audit;
 
 use App\Filament\Support\Gsc\PageArticleLinker;
+use App\Integrations\Magento\MagentoBlogUrl;
 use App\Filament\Support\SeoAudit\CrawlerIssueMap;
 use App\Filament\Support\SeoAudit\DbSeoAuditSource;
 use App\Filament\Support\SeoAudit\IssueCatalog;
@@ -157,7 +158,7 @@ final class AuditSuggestionService
         $pubs = Publication::query()->where('website_id', $site->id)->where('status', 'published')->whereNotNull('published_url')->orderBy('id')->with('articleVersion')->get();
         foreach ($pubs as $p) {
             if ($p->articleVersion) {
-                $urls[PageArticleLinker::normalize((string) $p->published_url)] ??= $p->articleVersion->article_id;
+                $urls[PageArticleLinker::normalize((string) (MagentoBlogUrl::legacyFix($p->published_url, $site) ?? $p->published_url))] ??= $p->articleVersion->article_id;
             }
         }
         $slugs = [];

@@ -15,6 +15,9 @@
         ['key' => 'config', 'label' => 'Cấu hình'],
     ];
     $originLabels = ['plan' => 'Từ kế hoạch', 'keyword' => 'Từ khóa', 'audit' => 'Audit: làm mới', 'competitor' => 'Đối thủ', 'gsc' => 'Search Console', 'manual' => 'Thêm tay'];
+    $isFileArticle = fn ($a) => str_starts_with((string) $a->origin_ref, 'file:');
+    $hasFilePlan = $articles->contains($isFileArticle);
+    $outsidePlan = $hasFilePlan ? $articles->reject($isFileArticle) : collect(); // chiến dịch nhập từ file mà có bài không đến từ file
 @endphp
 <x-filament-panels::page>
     <div class="ss-page" data-campaign-view>
@@ -38,6 +41,9 @@
 
         <x-studio.tabs persist="chien-dich-{{ $c->id }}" :tabs="$tabs">
             <x-studio.panel key="articles">
+                @if ($outsidePlan->isNotEmpty())
+                    <p class="ss-text-sm" style="margin:0 0 .5rem;color:#b45309" data-outside-plan>Có {{ $outsidePlan->count() }} bài không thuộc file kế hoạch ban đầu (được thêm tay hoặc lấy từ nơi khác).</p>
+                @endif
                 @if ($articles->isEmpty())
                     <p class="ss-muted ss-text-sm">Chưa có bài. Thêm đề xuất ở tab Kế hoạch.</p>
                 @else
@@ -45,7 +51,10 @@
                         @foreach ($articles as $a)
                             <li wire:key="ca-{{ $a->id }}" style="display:flex;justify-content:space-between;gap:.5rem;padding:.4rem 0;border-bottom:1px solid rgba(128,128,128,.2)">
                                 <div><a href="{{ ArticleResource::getUrl('view', ['record' => $a]) }}" style="text-decoration:underline"><strong>{{ $a->latestVersion?->title ?: $a->primary_keyword }}</strong></a>
-                                    <div class="ss-muted ss-text-xs">{{ $a->primary_keyword }}</div></div>
+                                    <div class="ss-muted ss-text-xs">{{ $a->primary_keyword }}
+                                    @if ($isFileArticle($a))· <span data-source="file">từ file kế hoạch</span>
+                                    @elseif ($hasFilePlan)· <span data-source="outside" style="color:#b45309">không thuộc file kế hoạch ban đầu ({{ $originLabels[$a->origin] ?? 'chưa rõ nguồn' }})</span>
+                                    @else· {{ $originLabels[$a->origin] ?? 'chưa rõ nguồn' }}@endif</div></div>
                                 <x-studio.chip domain="article" :value="$a->workflow_status" />
                             </li>
                         @endforeach

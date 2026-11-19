@@ -122,4 +122,26 @@ class Post implements PostInterface
         $this->data[self::STATUS] = $status;
         return $this;
     }
+
+    public function getUrl()
+    {
+        return $this->data[self::URL] ?? null;
+    }
+
+    public function setUrl($url)
+    {
+        $this->data[self::URL] = $url;
+        return $this;
+    }
+
+    public function getBlogDriver()
+    {
+        return $this->data[self::BLOG_DRIVER] ?? null;
+    }
+
+    public function setBlogDriver($driver)
+    {
+        $this->data[self::BLOG_DRIVER] = $driver;
+        return $this;
+    }
 }

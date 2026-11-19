@@ -169,7 +169,7 @@ BLADE));
                 $this->newBrand = '';
                 Notification::make()->title('Đã thêm đối thủ')->body('Chỉ lưu tên miền; hệ thống không truy cập website đối thủ.')->success()->send();
             } catch (InvalidArgumentException $e) {
-                Notification::make()->title('Không thêm được')->body($e->getMessage())->danger()->send();
+                Notification::make()->title('Không thêm được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
             }
 
             return;
@@ -184,7 +184,7 @@ BLADE));
             $this->newDomain = '';
             Notification::make()->title('Đã thêm đối thủ')->body('Chỉ lưu tên miền; hệ thống không truy cập website đối thủ.')->success()->send();
         } catch (InvalidArgumentException $e) {
-            Notification::make()->title('Không thêm được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Không thêm được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
         }
     }
 
@@ -259,7 +259,7 @@ BLADE));
             $kw = CompetitorStore::addKeyword($site, $user, (int) $id);
             Notification::make()->title('Đã thêm vào Từ khóa')->body('"'.$kw->keyword.'" nguồn Đối thủ. Vào trang Từ khóa để Thêm vào kế hoạch.')->success()->send();
         } catch (InvalidArgumentException $e) {
-            Notification::make()->title('Không thêm được')->body($e->getMessage())->warning()->send();
+            Notification::make()->title('Không thêm được')->body(\App\Support\UserFacingError::from($e))->warning()->send();
         } catch (ModelNotFoundException) {
             Notification::make()->title('Không tìm thấy khoảng trống')->danger()->send();
         }
@@ -379,8 +379,8 @@ BLADE));
             $rows = $this->source()->fetch($domains);
         } catch (SourceUnavailableException $e) {
             // KHÔNG đụng bản lưu cũ và KHÔNG trừ hạn mức; bản cũ chỉ hiện kèm nhãn "dữ liệu cũ".
-            $this->refreshError = $e->getMessage();
-            Notification::make()->title('Không lấy được dữ liệu')->body($e->getMessage())->danger()->send();
+            $this->refreshError = \App\Support\UserFacingError::from($e);
+            Notification::make()->title('Không lấy được dữ liệu')->body($this->refreshError)->danger()->send();
 
             return;
         }
@@ -446,7 +446,7 @@ BLADE));
             } catch (DuplicateKeywordException $e) {
                 $this->results[] = ['keyword' => $g['keyword'], 'ok' => false, 'message' => 'Bị chặn vì trùng: đã có bài #'.$e->existingArticleId.' dùng từ khóa này.'];
             } catch (InvalidArgumentException $e) {
-                $this->results[] = ['keyword' => $g['keyword'], 'ok' => false, 'message' => $e->getMessage()];
+                $this->results[] = ['keyword' => $g['keyword'], 'ok' => false, 'message' => \App\Support\UserFacingError::from($e)];
             }
         }
         $failed = count($this->results) - $created;

@@ -6,7 +6,9 @@ use App\Filament\Resources\ArticleResource;
 use App\Filament\Resources\PublicationResource;
 use App\Filament\Resources\WebsiteResource;
 use App\Filament\Support\AiUsage\Vnd;
+use App\Filament\Support\AiUsage\RunCost;
 use App\Filament\Support\Dashboard\DashboardQueries;
+use App\Filament\Support\Review\ReviewQueue;
 use App\Filament\Support\Schedule\VnTime;
 use App\Models\AgentRun;
 use App\Models\AgentRunStep;
@@ -34,7 +36,7 @@ final class DigestQueries
 
     /**
      * @return array{
-     *   state: string, date_label: string, headline: string, is_approver: bool,
+     *   state: string, date_label: string, window_label: string, headline: string, is_approver: bool,
      *   stats: list<array{label: string, value: string, sub: string, n: int}>,
      *   groups: list<array{key: string, title: string, count: int, detail: string, url: string, severity: string}>,
      *   stop: ?array<string, mixed>, notes: list<string>
@@ -45,9 +47,13 @@ final class DigestQueries
         $now ??= CarbonImmutable::now();
         $vnNow = VnTime::toVn($now) ?? $now;
         $isApprover = $user->isApprover();
-        [$from, $to] = VnTime::dayRangeUtc($vnNow->subDay());
+        $day = $vnNow->subDay();
+        // Hai cách đổi cùng một ngày VN: cột *_utc (publications) lưu UTC thật; cột Eloquent tự ghi (created_at, reviewed_at, started_at)
+        // lưu theo app.timezone (mặc định giờ VN) — bind nhầm UTC sẽ lệch 7 giờ.
+        $utc = VnTime::dayRangeUtc($day);
+        $app = VnTime::dayRangeApp($day);
 
-        $stats = $isApprover ? self::managerStats($from, $to, $now) : self::writerStats($user, $now);
+        $stats = $isApprover ? self::managerStats($utc, $app, $now) : self::writerStats($user, $now);
         $groups = $isApprover ? self::managerGroups($user, $now) : self::writerGroups($user, $now);
 
         $attention = array_sum(array_column($groups, 'count'));
@@ -61,7 +67,8 @@ final class DigestQueries
         return [
             'state' => $state,
             'date_label' => self::dateLabel($vnNow),
-            'headline' => self::headline($state, $isApprover, $stats, $groups),
+            'window_label' => self::windowLabel($day),
+            'headline' => self::headline($state, $isApprover, $stats, $groups, $day),
             'is_approver' => $isApprover,
             'stats' => $stats,
             'groups' => array_slice($groups, 0, self::MAX_GROUPS),
@@ -73,17 +80,21 @@ final class DigestQueries
         ];
     }
 
-    /** @return list<array{label: string, value: string, sub: string, n: int}> */
-    private static function managerStats(string $from, string $to, CarbonImmutable $now): array
+    /**
+     * @param  array{0: string, 1: string}  $utc  cửa sổ [từ, đến) theo UTC, cho cột *_utc
+     * @param  array{0: string, 1: string}  $app  cùng cửa sổ theo app.timezone, cho cột Eloquent tự ghi
+     * @return list<array{label: string, value: string, sub: string, n: int}>
+     */
+    private static function managerStats(array $utc, array $app, CarbonImmutable $now): array
     {
+        [$from, $to] = $app;
         $created = ArticleVersion::query()->where('created_at', '>=', $from)->where('created_at', '<', $to)->count();
         $approved = ArticleVersion::query()->where('review_status', 'approved')->where('reviewed_at', '>=', $from)->where('reviewed_at', '<', $to)->count();
         $rejected = ArticleVersion::query()->where('review_status', 'rejected')->where('reviewed_at', '>=', $from)->where('reviewed_at', '<', $to)->count();
-        $published = Publication::query()->where('status', 'published')->where('published_at_utc', '>=', $from)->where('published_at_utc', '<', $to)->count();
-        $cost = (float) ArticleVersion::query()->where('created_at', '>=', $from)->where('created_at', '<', $to)->sum('cost_vnd');
-        $upcoming = Publication::query()->where('status', 'scheduled')
-            ->where('scheduled_at_utc', '>=', VnTime::dbString($now))
-            ->where('scheduled_at_utc', '<', VnTime::dbString($now->addDay()))->count();
+        // Đã đăng = lượt đăng trạng thái published có published_at_utc (giờ đăng thật) trong cửa sổ — không dùng giờ xếp lịch.
+        $published = Publication::query()->where('status', 'published')->where('published_at_utc', '>=', $utc[0])->where('published_at_utc', '<', $utc[1])->count();
+        $writeCost = (float) ArticleVersion::query()->where('created_at', '>=', $from)->where('created_at', '<', $to)->sum('cost_vnd');
+        $upcoming = self::upcomingCount($now);
 
         $team = self::agentStats($from, $to);
 
@@ -91,9 +102,17 @@ final class DigestQueries
             ['label' => 'Bản bài mới', 'value' => (string) $created, 'sub' => '', 'n' => $created],
             ['label' => 'Đã duyệt / từ chối', 'value' => $approved.' / '.$rejected, 'sub' => '', 'n' => $approved + $rejected],
             ['label' => 'Đã đăng', 'value' => (string) $published, 'sub' => $upcoming.' lượt sắp đăng trong 24 giờ tới', 'n' => $published],
-            ['label' => 'Chi phí AI', 'value' => Vnd::format($cost), 'sub' => '', 'n' => (int) round($cost)],
+            ['label' => 'Chi phí viết bài', 'value' => Vnd::format($writeCost), 'sub' => 'chỉ bước viết của các bản bài mới; chi phí cả luồng đội AI ở mục dưới', 'n' => (int) round($writeCost)],
             ...$team,
         ];
+    }
+
+    /** Lượt đăng đã xếp lịch (chưa đăng) có giờ đăng trong 24 giờ tới kể từ $now. */
+    public static function upcomingCount(CarbonImmutable $now): int
+    {
+        return Publication::query()->where('status', 'scheduled')
+            ->where('scheduled_at_utc', '>=', VnTime::dbString($now))
+            ->where('scheduled_at_utc', '<', VnTime::dbString($now->addDay()))->count();
     }
 
     /**
@@ -111,14 +130,14 @@ final class DigestQueries
         $mock = (clone $runs)->where('ai_mode', 'mock')->count();
         $repairs = (int) (clone $runs)->sum('repair_rounds');
         $retries = AgentRunStep::query()->where('stage', 'retry')->whereIn('agent_run_id', (clone $runs)->select('id'))->count();
-        $cost = (float) (clone $runs)->sum('cost_vnd');
+        $cost = RunCost::between($from, $to, 'started_at');
 
         return [
             ['label' => 'Phiên chạy của đội AI', 'value' => (string) $total, 'sub' => ltrim(($failed > 0 ? ", {$failed} phiên lỗi" : '').($mock > 0 ? ", {$mock} phiên dùng AI giả lập" : ''), ', '), 'n' => $total],
             ['label' => 'Đội AI đưa tới chờ duyệt', 'value' => (string) $ready, 'sub' => 'bản nháp đạt mọi luật bắt buộc', 'n' => $ready],
             ['label' => 'Đội AI giữ nháp', 'value' => (string) $held, 'sub' => 'còn lỗi chặn, chưa vào hàng chờ duyệt', 'n' => $held],
             ['label' => 'Tự thử lại / tự sửa', 'value' => $retries.' / '.$repairs, 'sub' => 'lần thử lại khi AI lỗi tạm thời / vòng sửa', 'n' => $retries + $repairs],
-            ['label' => 'Chi phí đội AI', 'value' => Vnd::format($cost), 'sub' => '', 'n' => (int) round($cost)],
+            ['label' => 'Chi phí đội AI', 'value' => Vnd::format($cost), 'sub' => 'cả luồng: dàn ý, nghiên cứu, viết, chấm', 'n' => (int) round($cost)],
         ];
     }
 
@@ -143,9 +162,8 @@ final class DigestQueries
     /** @return list<array{key: string, title: string, count: int, detail: string, url: string, severity: string}> */
     private static function managerGroups(User $user, CarbonImmutable $now): array
     {
-        $decisions = DashboardQueries::decisions($user, $now);
-        $overdue = $decisions->where('kind', 'review')->where('overdue', true)->count();
-        $queue = $decisions->where('kind', 'review')->where('overdue', false)->count();
+        $overdue = DashboardQueries::decisions($user, $now)->where('kind', 'review')->where('overdue', true)->count();
+        $waiting = ReviewQueue::waitingCount(); // cùng hàm với Tổng quan, Đội AI, Kế hoạch
         $problems = DashboardQueries::publicationProblems($user)->count();
         $badSites = Website::query()->where('status', '!=', 'active')->count();
 
@@ -153,14 +171,12 @@ final class DigestQueries
         if ($problems > 0) {
             $groups[] = self::group('publication_problems', 'Lượt đăng lỗi hoặc chờ đối soát', $problems, 'Cần kiểm tra trước khi đăng lại; hệ thống không tự đăng lại.', PublicationResource::listUrl(), 'danger');
         }
-        if ($overdue > 0) {
-            $groups[] = self::group('overdue_review', 'Bài chờ duyệt quá '.DashboardQueries::OVERDUE_AFTER_HOURS.' giờ', $overdue, 'Đang giữ cả chuỗi phía sau.', ArticleResource::getUrl('index', ['activeTab' => 'needs_review']), 'warning');
-        }
         if ($badSites > 0) {
             $groups[] = self::group('website_issue', 'Website không hoạt động', $badSites, 'Lượt đăng vào website này sẽ báo lỗi khi tới giờ.', WebsiteResource::getUrl('index'), 'warning');
         }
-        if ($queue > 0) {
-            $groups[] = self::group('review_queue', 'Bài đang chờ duyệt', $queue, '', ArticleResource::getUrl('index', ['activeTab' => 'needs_review']), 'info');
+        if ($waiting > 0) {
+            $detail = $overdue > 0 ? "Trong đó {$overdue} bài đã chờ quá ".DashboardQueries::OVERDUE_AFTER_HOURS.' giờ, đang giữ cả chuỗi phía sau.' : '';
+            $groups[] = self::group('review_queue', 'Bài đang chờ duyệt', $waiting, $detail, ArticleResource::getUrl('index', ['activeTab' => 'needs_review']), $overdue > 0 ? 'warning' : 'info');
         }
 
         return $groups;
@@ -189,7 +205,7 @@ final class DigestQueries
         return $stop->isStopped() ? $stop->getStopInfo() : null;
     }
 
-    private static function headline(string $state, bool $isApprover, array $stats, array $groups): string
+    private static function headline(string $state, bool $isApprover, array $stats, array $groups, CarbonImmutable $day): string
     {
         if ($state === 'empty') {
             return 'Chưa có hoạt động nào để báo';
@@ -199,9 +215,15 @@ final class DigestQueries
         }
         $published = (int) explode(' ', $stats[2]['value'])[0];
         $created = (int) $stats[0]['value'];
-        $base = "Hôm qua: {$created} bản bài mới, {$published} bài đã đăng";
+        $base = "Hôm qua ({$day->format('d/m')}): {$created} bản bài mới, {$published} bài đã đăng";
 
         return $base; // số nhóm việc nằm ở tiêu đề khối bên dưới, không nhắc lại ở đây
+    }
+
+    /** Cửa sổ thời gian mà mọi số liệu "hôm qua" của bản tin dùng; hiện ngay dưới tiêu đề. */
+    private static function windowLabel(CarbonImmutable $day): string
+    {
+        return 'Số liệu tính từ 00:00 đến 24:00 ngày '.$day->format('d/m/Y').' (giờ Việt Nam), tức ngày hôm qua; ngày ở đầu trang là hôm nay.';
     }
 
     private static function dateLabel(CarbonImmutable $vn): string

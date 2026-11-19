@@ -46,7 +46,7 @@ class CampaignResource extends Resource
 
     protected static ?string $modelLabel = 'Chiến dịch';
 
-    protected static ?string $pluralModelLabel = 'Chiến dịch tự động';
+    protected static ?string $pluralModelLabel = 'Chiến dịch';
 
     /** Quy ước giao diện: câu thường ("Chiến dịch tự động"), không để Filament tự Viết Hoa Từng Chữ ở tiêu đề và breadcrumb. */
     protected static bool $hasTitleCaseModelLabel = false;
@@ -156,7 +156,10 @@ class CampaignResource extends Resource
                     ->helperText(fn (?Model $record) => $record?->mode === 'autonomous' ? 'Chiến dịch này đã xác nhận chính sách trước đó.' : null)
                     ->default(fn (?Model $record) => $record?->mode === 'autonomous'),
                 Forms\Components\Select::make('source')->label('Nguồn từ khóa')->options(['plan' => 'Kế hoạch nội dung (hết thì dùng danh sách nhập tay)', 'keywords' => 'Danh sách nhập tay'])->default('plan')->live()->required()
-                    ->hintIcon('heroicon-o-information-circle', 'Kế hoạch nội dung: lấy bài đã lên kế hoạch trước. Danh sách nhập tay: chỉ dùng các từ khóa bạn nhập ở trên.'),
+                    ->hintIcon('heroicon-o-information-circle', 'Kế hoạch nội dung: chỉ chạy các bài đã lên kế hoạch THUỘC chiến dịch này. Danh sách nhập tay: chỉ dùng các từ khóa bạn nhập ở trên.'),
+                Forms\Components\Toggle::make('settings.pull_unassigned_plan')->label('Lấy thêm bài chưa thuộc chiến dịch nào')->default(false)
+                    ->visible(fn (Get $get): bool => $get('source') === 'plan')
+                    ->helperText('Tắt (khuyên dùng): chiến dịch chỉ chạy bài của chính nó, hết bài thì dừng. Bật: khi hết bài, lấy thêm bài "Đã lên kế hoạch" chưa gắn chiến dịch nào của website.'),
                 Forms\Components\TextInput::make('daily_cost_cap_vnd')->label('Trần chi phí AI mỗi ngày (đ)')->numeric()->minValue(0)->maxValue(100000000)->default(150000)->required()
                     ->hintIcon('heroicon-o-information-circle', 'Chạm trần thì chiến dịch dừng giao bài tới ngày mai (giờ Việt Nam).'),
                 Forms\Components\TextInput::make('daily_draft_cap')->label('Trần bài đẩy nháp mỗi ngày')->numeric()->minValue(1)->maxValue(50)->default(5)->required()

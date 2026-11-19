@@ -50,7 +50,7 @@
             </div>
         </div></div>
         <div class="ss-card" style="margin-top:1rem" x-data="{ open: true }" id="tu-website" data-testid="bb-site"><div class="ss-card__b">
-            <div style="display:flex;align-items:center;gap:.4rem"><button type="button" class="kh-h" @click="open = ! open" :aria-expanded="open">Từ website công ty <x-filament::icon icon="heroicon-o-chevron-down" class="kh-chev" style="width:1.1rem;height:1.1rem" /></button><x-help title="Xây kho hoạt động thế nào"><p data-testid="bb-note">{{ $this->note() }}</p><p>Chạy nền và chạy theo lịch chưa có: lượt xây chạy ngay trong trang và dừng nếu bạn đóng trang giữa chừng.</p></x-help></div>
+            <div style="display:flex;align-items:center;gap:.4rem"><button type="button" class="kh-h" @click="open = ! open" :aria-expanded="open">Từ website công ty (Xây kho từ website) <x-filament::icon icon="heroicon-o-chevron-down" class="kh-chev" style="width:1.1rem;height:1.1rem" /></button><x-help title="Xây kho hoạt động thế nào"><p data-testid="bb-note">{{ $this->note() }}</p><p>Chạy nền và chạy theo lịch chưa có: lượt xây chạy ngay trong trang và dừng nếu bạn đóng trang giữa chừng.</p></x-help></div>
             <div x-show="open" x-cloak>
             <div class="bb-row">
                     <input class="bb-in" type="number" min="1" max="50" wire:model.live="maxPages" style="width:8rem">
@@ -60,8 +60,8 @@
                 <textarea class="bb-in" rows="3" wire:model="urlsText" placeholder="https://..."></textarea>
             </label>
             <div class="bb-row" style="margin-top:.75rem">
-                <x-filament::button wire:click="confirmBuild" wire:loading.attr="disabled" :disabled="$off !== null">Bắt đầu xây kho</x-filament::button>
-                <span wire:loading wire:target="build" class="ss-muted ss-text-sm">Đang đọc trang…</span>
+                <x-filament::button wire:click="confirmBuild" wire:loading.attr="disabled" wire:target="callMountedAction,build,fillGap" :disabled="$off !== null">Bắt đầu xây kho</x-filament::button>
+                <span wire:loading wire:target="callMountedAction,build,fillGap" class="ss-alert ss-alert--warn" role="status" data-testid="bb-running">Đang đọc từng trang và nhờ AI rút kiến thức, thường mất 30–90 giây (tối đa vài phút). Đừng đóng hoặc tải lại trang trong lúc này; nút Bắt đầu đã khóa để không chạy trùng.</span>
                 @if ($off)<span class="ss-muted ss-text-sm" data-testid="bb-off">{{ $off }}</span>@elseif ($avDemo)<x-studio.badge tone="warn">AI giả lập (local)</x-studio.badge>@elseif ($avLabel)<x-studio.badge tone="ok">{{ $avLabel }}</x-studio.badge>@endif
             </div>
         @if ($result)
@@ -69,6 +69,7 @@
                 <div class="kh-sub__h">Kết quả lượt vừa chạy @if ($result['demo'])<x-studio.badge tone="warn">AI giả lập</x-studio.badge>@endif</div>
                 <p>Đọc {{ $result['pages_read'] }} trang · bỏ qua {{ $result['pages_skipped'] }} trang (không đổi hoặc quá ít chữ) · lỗi {{ $result['pages_failed'] }} trang · kế hoạch {{ $result['pages_planned'] }} trang.</p>
                 <p>{{ $result['items_auto'] }} mục tự nhận · <a href="{{ $reviewUrl }}" wire:navigate>{{ $result['items_proposed'] }} mục chờ duyệt (mở Kho trí tuệ để duyệt)</a>.</p>
+                @if (! empty($result['no_items_reason']))<p class="ss-muted ss-text-sm" data-testid="bb-no-items">{{ $result['no_items_reason'] }}</p>@endif
                 <div class="ss-muted ss-text-sm">Chi phí ước lượng {{ number_format($result['cost_vnd'], 0, ',', '.') }} ₫ <x-help title="Về chi phí"><p>Con số là ước lượng theo giá cấu hình, không phải hóa đơn.</p></x-help></div>
                 @if ($result['message'])<div class="ss-alert ss-alert--warn" role="status">{{ $result['message'] }}</div>@endif
                 @foreach ($result['rejected_urls'] as $u)<p class="ss-muted ss-text-xs">Bỏ URL không hợp lệ: {{ $u }}</p>@endforeach
@@ -79,7 +80,7 @@
                     <x-help title="Cách AI tự điền hồ sơ"><p>Chỉ điền trường đang trống, mỗi trường có đoạn nguyên văn từ trang. Từ cấm và đối thủ cần tránh không bao giờ tự điền. Sau mỗi lượt xây kho đọc được trang, AI thử điền các trường trống (chỉ khi trống từ 3 trường). Hãy xem lại ở trang hồ sơ.</p></x-help>
                 </div>
                 @if ($brandAuto)
-                    <p data-testid="bb-brand-done">Đã tự điền hồ sơ doanh nghiệp từ website lúc {{ \Illuminate\Support\Carbon::parse($brandAuto['at'])->format('d/m/Y H:i') }}: {{ implode(', ', array_map(fn ($f) => \App\Services\Brand\BrandProfileData::REQUIRED[$f] ?? $f, array_keys($brandAuto['fields']))) }}. @if ($brandAuto['demo'])<x-studio.badge tone="warn">AI giả lập</x-studio.badge>@endif <x-filament::button size="xs" color="gray" wire:click="undoBrand">Hoàn tác</x-filament::button></p>
+                    <p data-testid="bb-brand-done">Đã tự điền hồ sơ doanh nghiệp từ website lúc {{ \Illuminate\Support\Carbon::parse($brandAuto['at'])->format('d/m/Y H:i') }}: {{ \App\Services\Brand\BrandProfileData::labels(array_keys($brandAuto['fields'])) }}. @if ($brandAuto['demo'])<x-studio.badge tone="warn">AI giả lập</x-studio.badge>@endif <x-filament::button size="xs" color="gray" wire:click="undoBrand">Hoàn tác</x-filament::button></p>
                 @else
                     <p class="ss-muted ss-text-sm">Còn trống: {{ implode(', ', $brandMissing) }}.</p>
                 @endif
@@ -139,7 +140,7 @@
             @if ($pendingCount > 0)<p data-testid="bb-pending"><a href="{{ $reviewUrl }}" wire:navigate>{{ $pendingCount }} mục chờ duyệt</a> trong Kho trí tuệ.</p>@endif
         @if ($suggestions !== [])
         <div class="kh-sub" data-testid="bb-suggest">
-            <div class="kh-sub__h">Gợi ý cho kho từ các bài gần đây
+            <div class="kh-sub__h">Gợi ý cho kho từ các bài gần đây ({{ count($suggestions) }})
                 <x-help title="Về gợi ý"><p>Chỉ là gợi ý, không có gì tự vào kho. "Bổ sung từ website" chỉ đọc tối đa 5 trang có đường dẫn chứa từ khóa.</p></x-help>
             </div>
                 <table class="bb-t"><tbody>

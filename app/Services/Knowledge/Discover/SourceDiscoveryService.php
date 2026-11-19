@@ -43,6 +43,12 @@ final class SourceDiscoveryService
 
     public const MIN_TEXT_CHARS = 200;
 
+    /** Việc nên làm khi một nguồn không tải được. */
+    public const FETCH_ADVICE = 'Việc nên làm: kiểm tra địa chỉ, hoặc bỏ nguồn này.';
+
+    /** Mã lỗi tải (không phải lỗi AI): chỉ bỏ nguồn đó, không làm hỏng cả phiên. */
+    private const FETCH_ERRORS = ['dns', 'timeout', 'http_error', 'blocked', 'robots', 'too_large', 'not_html', 'off_domain'];
+
     /** Cửa sổ chống trùng cho lượt hệ thống tự chạy (phút). */
     public const DEDUPE_MINUTES = 10;
 
@@ -173,7 +179,7 @@ final class SourceDiscoveryService
         foreach ($rows as $x) {
             $url = (string) ($x['url'] ?? '');
             $host = BrainSourceRegistry::hostOf($url);
-            if ($host === null) {
+            if ($host === null || BadSourceMemory::isBad($host)) { // tên miền vừa không tải được (24 giờ): không gợi ý lại
                 continue;
             }
             $key = $host.'|'.rtrim((string) parse_url($url, PHP_URL_PATH), '/');
@@ -293,6 +299,9 @@ final class SourceDiscoveryService
                 $why = self::explainFetch((string) $page['error'], (string) $page['message'], $domain);
                 JobRunRecorder::step($run, 'source', $domain !== '' ? $domain : $url, 'failed', ['url' => $url, 'domain' => $domain, 'trust' => $trust['level'], 'error' => $page['error'], 'phase' => 'fetch'], null, 0, 0, $why);
                 $out['pages'][] = ['url' => $url, 'domain' => $domain, 'ok' => false, 'error' => $page['error'], 'message' => $page['message'], 'why' => $why, 'trust' => $trust['level']];
+                if (BadSourceMemory::hostLevel((string) $page['error'], isset($page['http_status']) ? (int) $page['http_status'] : null)) {
+                    BadSourceMemory::mark($domain, (string) $page['error'], (string) $page['message']);
+                }
 
                 continue;
             }
@@ -358,20 +367,56 @@ final class SourceDiscoveryService
                 break;
             }
         }
+        // Nguồn không tải được chỉ bị BỎ (ghi cảnh báo từng nguồn): phiên vẫn chạy tiếp các nguồn còn lại.
+        $fetchFailed = array_values(array_filter($out['pages'], fn ($p) => empty($p['ok']) && in_array($p['error'] ?? '', self::FETCH_ERRORS, true)));
+        $fetchedOk = count(array_filter($out['pages'], fn ($p) => ! empty($p['ok']))) + count(array_filter($out['pages'], fn ($p) => in_array($p['error'] ?? '', ['too_short', 'unchanged'], true)));
+        $skipNote = $fetchFailed !== [] ? 'Xong, bỏ '.count($fetchFailed).' nguồn không tải được: '.self::summarizeFetch($fetchFailed) : null;
+        $out['skipped_sources'] = count($fetchFailed);
+        if ($fetchFailed !== []) {
+            JobRunRecorder::step($run, 'source_summary', 'Nguồn không tải được', 'warn', ['count' => count($fetchFailed), 'sources' => array_map(fn ($p) => ['domain' => $p['domain'] ?? '', 'url' => $p['url'] ?? '', 'error' => $p['error'] ?? '', 'why' => $p['why'] ?? ''], $fetchFailed)], null, 0, 0, $skipNote);
+        }
         if ($ownRun) {
             $itemIds = array_merge($out['auto_item_ids'], $out['proposed_item_ids']);
-            $failedPages = array_values(array_filter($out['pages'], fn ($p) => empty($p['ok']) && ! in_array($p['error'] ?? '', ['too_short', 'unchanged'], true) || (! empty($p['ok']) && ! empty($p['why']) && ((int) ($p['items_auto'] ?? 0) + (int) ($p['items_proposed'] ?? 0)) === 0)));
+            $failedPages = array_values(array_filter($out['pages'], fn ($p) => ! in_array($p['error'] ?? '', self::FETCH_ERRORS, true) && (empty($p['ok']) && ! in_array($p['error'] ?? '', ['too_short', 'unchanged'], true) || (! empty($p['ok']) && ! empty($p['why']) && ((int) ($p['items_auto'] ?? 0) + (int) ($p['items_proposed'] ?? 0)) === 0))));
+            $budgetNote = $out['stopped_reason'] === 'budget' ? 'Chạm trần chi phí.' : null;
             [$status, $reason] = match (true) {
                 $out['stopped_reason'] === 'emergency_stop' => ['blocked', null],
-                $itemIds !== [] => ['ready_for_review', $out['stopped_reason'] === 'budget' ? 'Chạm trần chi phí.' : null],
-                $failedPages !== [] || $out['stopped_reason'] === 'ai_error' => ['failed', 'Không rút được mục nào. '.self::summarize($failedPages)],
-                default => ['ready_for_review', $out['stopped_reason'] === 'budget' ? 'Chạm trần chi phí.' : ($list === [] ? 'Không có nguồn nào để nạp (không có nguồn tin cậy trong kết quả tìm).' : 'Không có mục mới: nội dung các nguồn đã có trong kho hoặc quá ít chữ.')],
+                $itemIds !== [] => ['ready_for_review', trim(($skipNote ?? '').' '.($budgetNote ?? '')) ?: null],
+                $out['stopped_reason'] === 'ai_error' => ['failed', 'Không rút được mục nào. '.self::summarize($failedPages)],
+                $fetchFailed !== [] && $fetchedOk === 0 && $failedPages === [] => ['failed', 'Không tải được nguồn nào. '.self::summarizeFetch($fetchFailed)],
+                $failedPages !== [] => ['failed', 'Không rút được mục nào. '.self::summarize($failedPages)],
+                default => ['ready_for_review', $skipNote ?? ($budgetNote ?? ($list === [] ? 'Không có nguồn nào để nạp (không có nguồn tin cậy trong kết quả tìm).' : 'Không có mục mới: nội dung các nguồn đã có trong kho hoặc quá ít chữ.'))],
             };
             JobRunRecorder::finish($run, $status, ['source_ids' => array_values(array_filter(array_column($out['pages'], 'source_id'))), 'item_ids' => $itemIds, 'auto_approved' => $out['items_auto'], 'proposed' => $out['items_proposed']], $reason);
         }
         $out['run_id'] = $run?->id;
 
         return $out;
+    }
+
+    /** Danh sách nguồn không tải được kèm lý do ngắn và việc nên làm. @param list<array<string,mixed>> $pages */
+    private static function summarizeFetch(array $pages): string
+    {
+        $parts = [];
+        foreach (array_slice($pages, 0, 5) as $p) {
+            $parts[] = ($p['domain'] ?? '') !== '' ? $p['domain'].' ('.self::shortReason((string) ($p['error'] ?? '')).')' : (string) ($p['url'] ?? '');
+        }
+
+        return implode('; ', $parts).(count($pages) > 5 ? '; …' : '').'. '.self::FETCH_ADVICE;
+    }
+
+    private static function shortReason(string $code): string
+    {
+        return match ($code) {
+            'dns' => 'không tìm thấy tên miền',
+            'timeout' => 'hết giờ chờ',
+            'robots' => 'robots.txt cấm đọc',
+            'blocked' => 'bị chặn an toàn mạng',
+            'too_large' => 'trang quá lớn',
+            'not_html' => 'không phải trang chữ',
+            'off_domain' => 'ngoài danh sách cho phép',
+            default => 'máy chủ nguồn lỗi hoặc từ chối',
+        };
     }
 
     /** Gộp lý do lỗi của vài nguồn thành một câu cho "Lý do kết thúc". @param list<array<string,mixed>> $pages */
@@ -389,6 +434,7 @@ final class SourceDiscoveryService
     public static function explainFetch(string $code, string $message, string $domain): string
     {
         $hint = match ($code) {
+            'dns' => 'Không tìm thấy tên miền (lỗi DNS) nên hệ thống không thử lại; kiểm tra địa chỉ có gõ đúng không, hoặc bỏ nguồn này.',
             'timeout' => 'Máy chủ nguồn trả lời quá chậm hoặc chặn kết nối từ máy chủ của hệ thống; thử lại sau, hoặc kiểm tra máy chủ chạy hệ thống có ra được Internet không.',
             'blocked' => 'Bị chặn theo quy tắc an toàn mạng (địa chỉ nội bộ hoặc giao thức không cho phép), không phải lỗi nguồn.',
             'robots' => 'Website nguồn cấm robot đọc trang này trong robots.txt; hệ thống tôn trọng và không tải.',
@@ -398,7 +444,13 @@ final class SourceDiscoveryService
             default => 'Máy chủ nguồn từ chối hoặc không phản hồi (có thể chặn máy chủ của hệ thống, cần đăng nhập, hoặc lỗi mạng/DNS/chứng chỉ).',
         };
 
-        return 'Không tải được '.($domain !== '' ? $domain : 'nguồn').' (AI chưa được gọi): '.rtrim($message, '. ').'. '.$hint;
+        return 'Không tải được '.($domain !== '' ? $domain : 'nguồn').' (AI chưa được gọi): '.rtrim($message, '. ').'. '.$hint.' '.self::FETCH_ADVICE;
+    }
+
+    /** Lý do ngắn cho một trang của chính website (không nhắc AI). */
+    public static function explainFetchShort(string $code, string $message): string
+    {
+        return rtrim($message, '. ').'. '.self::FETCH_ADVICE;
     }
 
     /**

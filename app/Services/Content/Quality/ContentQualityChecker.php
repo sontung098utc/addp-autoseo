@@ -26,6 +26,7 @@ use App\Services\Content\Quality\Rules\HeadingLeakRule;
 use App\Services\Content\Quality\Rules\ImagePlaceholderRule;
 use App\Services\Content\Quality\Rules\ProcessLeakRule;
 use App\Services\Content\Quality\Rules\IntentSpecificityRule;
+use App\Services\Content\Quality\Rules\InstructionRule;
 use App\Services\Content\Quality\Rules\PaddingRule;
 use App\Services\Content\Quality\Rules\TagLeakRule;
 use App\Services\Content\Quality\Rules\TextGlitchRule;
@@ -69,7 +70,7 @@ class ContentQualityChecker
         return [
             new LengthRule(), new HeadingRule(), new KeywordRule(), new MetaRule(), new DuplicateRule(),
             new ImageRule(), new SafetyRule(), new FactRule(), new FaqRule(), new BannedTermsRule(), new KnowledgeFigureRule(), new LinkRule(), new EvidenceRule(), new CitationRule(), new CitationFigureRule(), new MedicalSafetyRule(), new SourceRule(),
-            new PaddingRule(), new TextGlitchRule(), new HeadingLeakRule(), new ImagePlaceholderRule(), new IntentSpecificityRule(), new LayoutRule(), new ProcessLeakRule(), new TagLeakRule(),
+            new PaddingRule(), new TextGlitchRule(), new HeadingLeakRule(), new ImagePlaceholderRule(), new IntentSpecificityRule(), new LayoutRule(), new ProcessLeakRule(), new TagLeakRule(), new InstructionRule(),
         ];
     }
 
@@ -94,10 +95,11 @@ class ContentQualityChecker
         return $out;
     }
 
-    public function check(ArticleVersion $version, ?Article $article = null, ?array $brainIds = null, array $knownSources = []): QualityReport
+    public function check(ArticleVersion $version, ?Article $article = null, ?array $brainIds = null, array $knownSources = [], string $extraGuidance = ''): QualityReport
     {
         $ctx = new QualityContext($version, $article ?? $version->article, $brainIds);
         // Bản đã lắp ráp có khối "Nguồn tham khảo" gồm các tài liệu hệ thống đã tìm thấy thật: dùng làm nguồn đã biết khi người gọi không truyền (chấm lại bản giao, trang duyệt).
+        $ctx->extraGuidance = $extraGuidance;
         $ctx->knownSources = $knownSources !== [] ? $knownSources : self::refsOf((string) $version->html_content);
         $results = [];
         foreach ($this->rules as $rule) {

@@ -10,6 +10,7 @@ use App\Models\BrandProfile;
 use App\Models\MediaAsset;
 use App\Services\Agent\Refresh\HtmlSections;
 use App\Services\Agent\Risk\RiskClassifier;
+use App\Services\Agent\Risk\TopicScope;
 use App\Services\Brain\BrainContext;
 use App\Services\Media\MediaService;
 use Illuminate\Support\Str;
@@ -88,7 +89,7 @@ final class ArticleImageService
                 $out['skip_code'] = 'cost_cap';
                 break;
             }
-            $prompt = ImagePromptBuilder::build($slot['role'], (string) $article->primary_keyword, $slot['heading'], $brand, $health);
+            $prompt = ImagePromptBuilder::build($slot['role'], (string) $article->primary_keyword, $slot['heading'], $brand, $health, null, ! $this->isOffField($article, $brand));
             try {
                 $res = $generator->generate($prompt, ['aspect' => $slot['role'] === 'featured' ? '16:9' : '4:3', 'role' => $slot['role']]);
                 $asset = $this->store($media, $article, $version, $res, $slot);
@@ -257,6 +258,71 @@ final class ArticleImageService
         return ['attached' => $attached, 'placements' => $placements];
     }
 
+    /**
+     * GIỮ NGUYÊN ẢNH khi làm lại: gắn ảnh của bản trước vào bản mới (không tạo ảnh). Ảnh bìa chỉ gắn khi bản mới chưa có ảnh bìa; ảnh trong bài được chèn lại vào
+     * mục có cùng tên (hoặc cùng thứ tự) như ở bản trước, bỏ qua ảnh đã có sẵn trong nội dung bản mới để không chèn trùng.
+     *
+     * @return array{attached:int, placements:list<array<string,mixed>>}
+     */
+    public function carryOver(ArticleVersion $prev, ArticleVersion $version): array
+    {
+        $placements = [];
+        $bySection = [];
+        $prevSections = HtmlSections::split((string) $prev->html_content)['sections'];
+        $newSections = HtmlSections::split((string) $version->html_content)['sections'];
+        $newHtml = (string) $version->html_content;
+        $have = $version->mediaAssets()->pluck('media_assets.id')->all();
+        $hasCover = $version->mediaAssets()->get()->contains(fn (MediaAsset $a) => (bool) $a->pivot->is_featured);
+        $position = (int) ($version->mediaAssets()->max('position') ?? -1) + 1;
+        $attached = 0;
+        foreach ($prev->mediaAssets()->orderBy('position')->get() as $asset) {
+            if (in_array($asset->id, $have, true)) {
+                continue;
+            }
+            if ((bool) $asset->pivot->is_featured) {
+                if ($hasCover) {
+                    $placements[] = ['role' => 'featured', 'asset_id' => $asset->id, 'status' => 'unused', 'note' => 'bản mới đã có ảnh bìa'];
+
+                    continue;
+                }
+                $version->mediaAssets()->syncWithoutDetaching([$asset->id => ['is_featured' => true, 'position' => 0, 'custom_alt' => $asset->pivot->custom_alt ?? $asset->alt_text]]);
+                $hasCover = true;
+                $attached++;
+                $placements[] = ['role' => 'featured', 'asset_id' => $asset->id, 'status' => 'featured', 'note' => 'giữ ảnh bìa của bản trước'];
+
+                continue;
+            }
+            $version->mediaAssets()->syncWithoutDetaching([$asset->id => ['is_featured' => false, 'position' => $position++, 'custom_alt' => $asset->pivot->custom_alt ?? $asset->alt_text]]);
+            $attached++;
+            $url = (string) $asset->url;
+            if ($url !== '' && str_contains($newHtml, $url)) {
+                $placements[] = ['role' => 'inline', 'asset_id' => $asset->id, 'status' => 'present', 'note' => 'ảnh đã có trong nội dung bản mới'];
+
+                continue;
+            }
+            $from = null;
+            foreach ($prevSections as $i => $sec) {
+                if ($url !== '' && str_contains((string) $sec['html'], $url)) {
+                    $from = [$sec, $i + 1];
+                    break;
+                }
+            }
+            $idx = $from ? $this->sectionIndex($newSections, (string) $from[0]['heading'], (int) $from[1]) : null;
+            if ($idx === null) {
+                $placements[] = ['role' => 'inline', 'asset_id' => $asset->id, 'status' => 'unplaced', 'note' => 'ảnh gắn vào bài nhưng chưa tìm được mục để chèn lại'];
+
+                continue;
+            }
+            $bySection[$idx] = $asset;
+            $placements[] = ['role' => 'inline', 'asset_id' => $asset->id, 'status' => 'inserted', 'note' => 'chèn lại vào mục "'.($newSections[$idx]['heading'] ?? '').'"'];
+        }
+        if ($bySection !== [] && config('agent.images.insert_inline', true)) {
+            $version->update(['html_content' => self::insertFigures($newHtml, $bySection)]);
+        }
+
+        return ['attached' => $attached, 'placements' => $placements];
+    }
+
     /** @param list<array{index:int, heading:string, html:string}> $sections */
     private function sectionIndex(array $sections, string $heading, int $order): ?int
     {
@@ -360,6 +426,10 @@ final class ArticleImageService
         if (str_contains(implode(' ', $assess->reasons), 'sức khỏe')) {
             return true;
         }
+        // Bài chắc chắn ngoài lĩnh vực website/Trí tuệ (vd. thư xin học bổng trên website dược): không thừa hưởng "sức khỏe" từ ngành của website.
+        if ($this->isOffField($article, $brand)) {
+            return false;
+        }
         // Trí tuệ đã gắn (kể cả tự gắn) xếp bài vào hạng rủi ro cao (lĩnh vực sức khỏe...) thì cũng coi là sức khỏe: bộ từ khóa của RiskClassifier không phủ hết thuật ngữ.
         try {
             if (BrainContext::forArticle($article)->riskFloor() === 'high') {
@@ -371,6 +441,18 @@ final class ArticleImageService
         $f = Str::lower(Str::ascii((string) $brand?->business_field));
 
         return (bool) preg_match('/\b(y te|suc khoe|benh vien|phong kham|duoc pham|nha thuoc|dieu tri)\b/', $f);
+    }
+
+    /** Bài ngoài lĩnh vực của website (chỉ true khi chắc chắn; xem TopicScope). Không có bảng Trí tuệ thì chỉ xét hồ sơ. */
+    public function isOffField(Article $article, ?BrandProfile $brand): bool
+    {
+        try {
+            $ctx = BrainContext::forArticle($article, null, false);
+        } catch (\Throwable) {
+            $ctx = null;
+        }
+
+        return TopicScope::clearlyOffField((string) $article->primary_keyword, $brand, $ctx);
     }
 
     private static function money(float $v): string

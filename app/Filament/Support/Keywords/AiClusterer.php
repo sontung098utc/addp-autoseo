@@ -83,7 +83,7 @@ final class AiClusterer
             } catch (\Throwable $e) {
                 $res['unprocessed'] = array_merge($res['unprocessed'], $batch);
                 $res['batches'][] = ['n' => $n + 1, 'size' => count($batch), 'status' => 'failed', 'tokens' => 0, 'cost_vnd' => 0.0, 'model' => null];
-                $res['error'] = $e instanceof AiSchemaError ? 'AI trả về sai định dạng.' : 'AI lỗi: '.mb_substr($e->getMessage(), 0, 160);
+                $res['error'] = $e instanceof AiSchemaError ? 'AI trả về sai định dạng.' : 'AI lỗi: '.mb_substr(\App\Support\UserFacingError::from($e, 'ai-cluster'), 0, 160);
                 if (! $e instanceof AiSchemaError) {
                     $res['stopped'] = 'error';
                 }

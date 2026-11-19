@@ -190,4 +190,13 @@ class CampaignParentChildTest extends TestCase
         $mine = Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'của mình', 'workflow_status' => 'planned', 'campaign_id' => $this->camp->id]);
         $this->assertSame($mine->id, (new CampaignRunner(fn () => null))->nextPlanned($this->camp)?->id);
     }
+
+    public function test_trang_chien_dich_canh_bao_bai_khong_thuoc_file_ke_hoach(): void
+    {
+        Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'từ file', 'workflow_status' => 'planned', 'origin' => 'manual', 'origin_ref' => 'file:kh.xlsx', 'campaign_id' => $this->camp->id]);
+        Article::create(['website_id' => $this->site->id, 'primary_keyword' => 'bài lạ', 'workflow_status' => 'planned', 'origin' => 'plan', 'campaign_id' => $this->camp->id]);
+
+        Livewire::actingAs($this->user('admin'))->test(ViewCampaign::class, ['record' => $this->camp->id])
+            ->assertSeeHtml('data-outside-plan')->assertSee('không thuộc file kế hoạch ban đầu')->assertSee('từ file kế hoạch');
+    }
 }

@@ -3,6 +3,8 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\PublicationResource\Pages;
+use App\Integrations\Magento\MagentoBlogUrl;
+use App\Filament\Support\Schedule\ErrorExplainer;
 use App\Filament\Support\Schedule\ErrorMasker;
 use App\Filament\Support\Schedule\PublicationHoldAction;
 use App\Filament\Support\Schedule\ReconcileAction;
@@ -242,14 +244,15 @@ class PublicationResource extends Resource
                 Tables\Columns\TextColumn::make('last_error')->toggleable()
                     ->label('Lỗi')
                     ->formatStateUsing(fn (?string $state): string => ErrorMasker::short($state, 60))
-                    ->tooltip(fn (Publication $r): ?string => $r->last_error ? ErrorMasker::mask($r->last_error) : null)
+                    ->tooltip(fn (Publication $r): ?string => $r->last_error ? ErrorExplainer::explain($r->last_error) : null)
                     ->wrap()
                     ->extraCellAttributes(['style' => 'max-width:16rem'])
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('published_url')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Link bài')
+                    ->getStateUsing(fn (Publication $r): ?string => MagentoBlogUrl::display($r))
                     ->limit(30)
-                    ->url(fn (Publication $r) => $r->published_url, true)
+                    ->url(fn (Publication $r) => MagentoBlogUrl::display($r), true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('publication_key')->toggleable(isToggledHiddenByDefault: true)->sortable()
                     ->label('Khóa xuất bản')
@@ -267,7 +270,7 @@ class PublicationResource extends Resource
                         ? ArticleResource::getUrl('view', ['record' => $r->articleVersion->article_id]).'#tab-publish'
                         : PublicationResource::getUrl('view', ['record' => $r])),
                 Tables\Actions\Action::make('publishNow')
-                    ->label('Đăng ngay')
+                    ->label(fn (Publication $r): string => $r->status === 'failed' ? 'Đăng lại' : 'Đăng ngay')
                     ->icon('heroicon-o-paper-airplane')
                     ->color('success')
                     ->visible(fn (Publication $r) => in_array($r->status, ['scheduled', 'failed'], true))
@@ -281,7 +284,7 @@ class PublicationResource extends Resource
                         if ($r->status === 'published') {
                             Notification::make()
                                 ->title('Đã xuất bản thành công lên '.($r->website?->name ?? 'CMS'))
-                                ->body($r->published_url ? 'URL: '.$r->published_url : null)
+                                ->body($r->published_url ? 'URL: '.MagentoBlogUrl::display($r) : null)
                                 ->success()
                                 ->send();
                         } else {

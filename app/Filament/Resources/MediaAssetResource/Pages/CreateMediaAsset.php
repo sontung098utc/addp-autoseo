@@ -12,6 +12,8 @@ class CreateMediaAsset extends CreateRecord
 {
     protected static string $resource = MediaAssetResource::class;
 
+    protected static ?string $title = 'Tải ảnh mới';
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $filePath = $data['file_path'] ?? null;

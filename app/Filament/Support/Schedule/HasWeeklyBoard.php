@@ -47,7 +47,7 @@ trait HasWeeklyBoard
             Notification::make()->title('Đã đổi lịch')
                 ->body('Đã đổi lịch sang '.VnTime::format(VnTime::fromRaw($r, 'scheduled_at_utc')).' (giờ VN).')->success()->send();
         } catch (\InvalidArgumentException $e) {
-            Notification::make()->title('Không đổi được lịch')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Không đổi được lịch')->body(\App\Support\UserFacingError::from($e))->danger()->send();
         }
         $this->dispatch('ss-sched-refresh');
     }

@@ -159,7 +159,7 @@ final class DomainBrainBuilder
                 'chu_de' => array_map(fn ($t) => AiJson::clean($t['path'], 120), $scope['topics']),
                 'nguon_da_co' => KnowledgeSource::query()->where('brain_id', $brain->id)->limit(40)->get(['title', 'url'])->map(fn ($s) => AiJson::clean($s->title, 100).' | '.AiJson::clean($s->url, 160))->all(),
                 'nguon_da_thu_khong_tai_duoc' => array_slice($this->triedUrls, -20),
-                'ten_mien_tu_choi_may_chu_cua_he_thong_KHONG_de_xuat' => $this->blockedHosts,
+                'ten_mien_tu_choi_may_chu_cua_he_thong_KHONG_de_xuat' => array_values(array_unique(array_merge($this->blockedHosts, \App\Services\Knowledge\Discover\BadSourceMemory::hosts()))),
                 'ten_mien_tin_cay' => $scope['field'] ? array_slice(SourceTrust::domainsFor($scope['field']), 0, 30) : [],
                 'toi_da_nguon' => (int) $this->opt['max_sources'],
             ];
@@ -206,7 +206,7 @@ final class DomainBrainBuilder
         }
         $this->step($isGap ? 'gaps' : 'ingest', 'Nạp nguồn và rút mục kiến thức', $imported > 0 ? 'ok' : 'warn',
             ['imported' => $imported, 'auto' => $r['items_auto'], 'proposed' => $r['items_proposed'], 'pages' => array_map(fn ($p) => ['url' => $p['url'] ?? '', 'ok' => $p['ok'] ?? false, 'title' => $p['title'] ?? ($p['error'] ?? '')], $r['pages']), 'stopped' => $r['stopped_reason']],
-            'editor', $extract, "Đã nạp {$imported}/".count($cands).' nguồn: '.$r['items_auto'].' mục tự nhận (chỉ tầng không phải C, hoàn tác được), '.$r['items_proposed'].' mục chờ duyệt. Chi phí '.number_format($r['cost_vnd'], 0, ',', '.').' ₫.'
+            'editor', $extract, "Đã nạp {$imported}/".count($cands).' nguồn'.(($r['skipped_sources'] ?? 0) > 0 ? ' (bỏ '.$r['skipped_sources'].' nguồn không tải được, phiên vẫn chạy tiếp)' : '').': '.$r['items_auto'].' mục tự nhận (chỉ tầng không phải C, hoàn tác được), '.$r['items_proposed'].' mục chờ duyệt. Chi phí '.number_format($r['cost_vnd'], 0, ',', '.').' ₫.'
             .($r['stopped_reason'] ? ' Dừng vì: '.$r['stopped_reason'].'.' : ''), $this->label, 0, (float) $r['cost_vnd']);
 
         return $imported;
@@ -484,7 +484,7 @@ final class DomainBrainBuilder
 
                 continue;
             }
-            if (in_array(BrainSourceRegistry::hostOf($url), $this->blockedHosts, true)) {
+            if (in_array(BrainSourceRegistry::hostOf($url), $this->blockedHosts, true) || \App\Services\Knowledge\Discover\BadSourceMemory::isBad(BrainSourceRegistry::hostOf($url))) {
                 $drop[] = ['url' => mb_substr($url, 0, 120), 'reason' => 'host_blocks_us'];
 
                 continue;

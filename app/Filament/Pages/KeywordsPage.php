@@ -9,7 +9,9 @@ use App\Filament\Support\Keywords\KeywordArticleLinks;
 use App\Filament\Support\Keywords\KeywordIntent;
 use App\Filament\Support\Keywords\KeywordService;
 use App\Filament\Support\Planning\DuplicateKeywordException;
+use App\Filament\Support\Planning\KeywordDuplicateGuard;
 use App\Filament\Support\Planning\PlannedArticleCreator;
+use App\Models\Article;
 use App\Models\Campaign;
 use App\Models\Keyword;
 use App\Models\User;
@@ -240,7 +242,7 @@ class KeywordsPage extends Page
         try {
             $r = (new KeywordMetricsEnricher)->enrich($site);
         } catch (KeywordMetricsUnavailable $e) {
-            $this->fail('Chưa có nguồn số liệu', $e->getMessage());
+            $this->fail('Chưa có nguồn số liệu', \App\Support\UserFacingError::from($e));
 
             return;
         }
@@ -261,7 +263,7 @@ class KeywordsPage extends Page
         try {
             $r = (new KeywordResearchService)->suggest($site, $seeds === [] ? null : $seeds, $limit > 0 ? $limit : null);
         } catch (KeywordAiUnavailable $e) {
-            $this->fail('Chưa có AI', $e->getMessage());
+            $this->fail('Chưa có AI', \App\Support\UserFacingError::from($e));
 
             return;
         }
@@ -287,7 +289,7 @@ class KeywordsPage extends Page
         try {
             KeywordService::make()->addManual($this->newKeyword, $this->newVolume, $this->newIntent);
         } catch (InvalidArgumentException $e) {
-            $this->fail('Không thêm được từ khóa', $e->getMessage());
+            $this->fail('Không thêm được từ khóa', \App\Support\UserFacingError::from($e));
 
             return;
         }
@@ -308,17 +310,38 @@ class KeywordsPage extends Page
         return Action::make('deleteKeywordConfirm')
             ->requiresConfirmation()
             ->modalHeading('Xóa từ khóa này?')
-            ->modalDescription('Bài viết đã tạo từ từ khóa này không bị ảnh hưởng. Việc xóa không hoàn tác được.')
+            ->modalDescription(fn (array $arguments) => $this->deleteWarning((int) ($arguments['id'] ?? 0)))
             ->modalSubmitActionLabel('Xóa từ khóa')
             ->color('danger')
             ->action(fn (array $arguments) => $this->deleteKeyword((int) ($arguments['id'] ?? 0)));
+    }
+
+    /** Nói rõ trước khi xóa: từ khóa đang gắn bài/kế hoạch thì chỉ gỡ khỏi kho, bài và kế hoạch vẫn giữ nguyên. */
+    public function deleteWarning(int $id): string
+    {
+        $base = 'Việc xóa không hoàn tác được.';
+        $kw = null;
+        foreach (KeywordService::make()->repo()->all() as $r) {
+            if ((int) $r['id'] === $id) {
+                $kw = $r['keyword'];
+            }
+        }
+        if ($kw === null) {
+            return $base;
+        }
+        $l = KeywordArticleLinks::for(KeywordService::defaultSite(), [$kw])[Keyword::keyFor($kw)] ?? KeywordArticleLinks::none();
+        if ($l['article_id'] !== null) {
+            return '"'.$kw.'" đang gắn với một bài viết trong '.($l['status'] === 'planned' ? 'Kế hoạch' : 'danh sách bài').'. Xóa chỉ gỡ từ khóa khỏi kho từ khóa; bài và kế hoạch vẫn giữ nguyên. '.$base;
+        }
+
+        return 'Từ khóa này chưa gắn với bài nào. '.$base;
     }
 
     public function deleteKeyword(int $id): void
     {
         $this->guard();
         KeywordService::make()->delete($id);
-        Notification::make()->title('Đã xóa từ khóa')->body('Bài viết đã tạo từ từ khóa này không bị ảnh hưởng.')->success()->send();
+        Notification::make()->title('Đã xóa từ khóa')->body('Chỉ từ khóa bị gỡ khỏi kho; bài viết và kế hoạch đã tạo từ nó không bị ảnh hưởng.')->success()->send();
     }
 
     /** Nút "Thêm vào kế hoạch" ở bảng chỉ mở hộp chọn chiến dịch; việc tạo bài nằm ở addToPlanNow. */
@@ -399,12 +422,18 @@ class KeywordsPage extends Page
             if ($campaignId !== null) {
                 $a->update(['campaign_id' => $campaignId]);
             }
-        } catch (DuplicateKeywordException) {
-            Notification::make()->title('Từ khóa đã có bài')->body('Website đã có bài dùng từ khóa này, không tạo thêm.')->warning()->send();
+        } catch (DuplicateKeywordException $e) {
+            $d = ($dup = Article::find($e->existingArticleId)) ? KeywordDuplicateGuard::describe($dup) : null;
+            $n = Notification::make()->title('Từ khóa đã có bài')->warning()
+                ->body($d ? 'Bài #'.$d['id'].' (trạng thái: '.$d['status_label'].') đang dùng từ khóa này trên website, không tạo thêm.' : 'Website đã có bài dùng từ khóa này, không tạo thêm.');
+            if ($d && $d['url']) {
+                $n->actions([\Filament\Notifications\Actions\Action::make('open')->label('Mở bài đó')->url($d['url'])]);
+            }
+            $n->send();
 
             return;
         } catch (InvalidArgumentException $e) {
-            $this->fail('Không thêm được vào kế hoạch', $e->getMessage());
+            $this->fail('Không thêm được vào kế hoạch', \App\Support\UserFacingError::from($e));
 
             return;
         }
@@ -423,7 +452,7 @@ class KeywordsPage extends Page
         try {
             KeywordService::make()->renameCluster((string) $this->renaming, $this->renameTo);
         } catch (InvalidArgumentException $e) {
-            $this->fail('Không đổi được tên cụm', $e->getMessage());
+            $this->fail('Không đổi được tên cụm', \App\Support\UserFacingError::from($e));
 
             return;
         }
@@ -441,7 +470,7 @@ class KeywordsPage extends Page
             try {
                 $r = $service->proposeWithAi();
             } catch (KeywordAiUnavailable $e) {
-                $this->fail('Chưa gom cụm được bằng AI', $e->getMessage());
+                $this->fail('Chưa gom cụm được bằng AI', \App\Support\UserFacingError::from($e));
 
                 return;
             }
@@ -472,7 +501,7 @@ class KeywordsPage extends Page
         try {
             $r = KeywordService::make()->proposeWithSerp();
         } catch (SerpUnavailable $e) {
-            $this->fail('Chưa gom cụm theo SERP được', $e->getMessage());
+            $this->fail('Chưa gom cụm theo SERP được', \App\Support\UserFacingError::from($e));
 
             return;
         }
@@ -488,7 +517,7 @@ class KeywordsPage extends Page
         try {
             $fn(KeywordService::make());
         } catch (InvalidArgumentException $e) {
-            $this->fail('Không thực hiện được', $e->getMessage());
+            $this->fail('Không thực hiện được', \App\Support\UserFacingError::from($e));
         }
     }
 
@@ -645,7 +674,7 @@ class KeywordsPage extends Page
             ['key' => 'volume', 'label' => 'Lượt tìm', 'type' => 'number', 'sortable' => true],
             ['key' => 'cluster', 'label' => 'Cụm chủ đề', 'type' => 'text', 'sortable' => true, 'filter' => true],
             ['key' => 'status', 'label' => 'Trạng thái', 'type' => 'link', 'sortable' => true, 'filter' => true],
-            ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Thêm vào kế hoạch', 'method' => 'addToPlan', 'tone' => 'primary'], ['label' => 'Xóa', 'method' => 'confirmDeleteKeyword', 'tone' => 'muted']]],
+            ['key' => 'act', 'label' => '', 'type' => 'actions', 'actions' => [['label' => 'Thêm vào kế hoạch', 'method' => 'addToPlan', 'tone' => 'primary', 'showIf' => 'canPlan'], ['label' => 'Xóa', 'method' => 'confirmDeleteKeyword', 'tone' => 'muted']]],
             ['key' => 'intent', 'label' => 'Ý định', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'visible' => false, 'tones' => ['Thông tin' => 'info', 'Thương mại' => 'accent', 'Giao dịch' => 'warn', 'Điều hướng' => 'muted']],
             ['key' => 'volumeSource', 'label' => 'Nguồn số liệu', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'visible' => false, 'tones' => ['CSV' => 'info', 'DataForSEO' => 'ok', 'Nhập tay' => 'muted', 'Search Console' => 'ok', 'Giả lập' => 'warn', 'Chưa có số liệu' => 'muted']],
             ['key' => 'source', 'label' => 'Nguồn', 'type' => 'badge', 'sortable' => true, 'filter' => true, 'visible' => false, 'tones' => ['CSV' => 'info', 'Nhập tay' => 'muted', 'AI đề xuất' => 'accent', 'Search Console' => 'ok', 'Trang đã quét' => 'muted', 'Đối thủ' => 'warn']],
@@ -681,6 +710,8 @@ class KeywordsPage extends Page
                 'volumeReal' => $r['volume'] !== null && in_array($r['volume_source'] ?? null, self::REAL_VOLUME_SOURCES, true),
                 'source' => $source,
                 'usage' => $usage,
+                // Từ khóa đã nằm trong kế hoạch hoặc đã có bài thì không thêm lần nữa; cột Trạng thái là liên kết mở bài/kế hoạch.
+                'canPlan' => $usage === 'unused',
                 'status' => ['text' => self::USAGE_LABELS[$usage], 'href' => $href],
             ];
         }, $all);

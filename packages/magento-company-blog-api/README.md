@@ -48,3 +48,9 @@ Module REST API cầu nối cho hệ thống **Auto SEO & Tự động đăng b�
 * **Ảnh bìa phải là JPG/PNG, không WebP**: Magento 2.4.8 (GD2) không resize được WebP mà theme resize `featured_img`. Hệ thống tự chuyển WebP sang JPEG (chất lượng 85, nền trắng) ở phía Laravel trước khi tải lên; module không chuyển đổi.
 * Kiểm định dạng cột: `SELECT post_id, featured_img FROM magefan_blog_post WHERE featured_img IS NOT NULL ORDER BY post_id DESC LIMIT 5;`
 * Module không lọc nội dung bài (không có strip_tags/purifier), nên không tự bỏ `target`/`rel`.
+
+## 5. Link bài đã đăng
+
+* Phản hồi tạo nháp, tra theo `publication_key` và xuất bản có thêm hai trường tùy chọn: `url` (link công khai do Magefan `getPostUrl()` hoặc Mageplaza `getUrl()` dựng, rỗng nếu không lấy được) và `blog_driver` (`magefan` | `mageplaza`).
+* Hệ thống chỉ nhận `url` khi cùng tên miền với website; không có thì tự dựng: Magefan `{base_url}/blog/{url_key}`, Mageplaza `{base_url}/blog/post/{url_key}`. Site còn chạy mô-đun cũ (chưa có hai trường này) được coi là Magefan, đúng với ADDP.
+* Sau khi cập nhật mô-đun: `bin/magento setup:di:compile` (chế độ production) rồi `bin/magento cache:flush`.

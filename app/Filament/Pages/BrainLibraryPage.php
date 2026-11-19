@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Services\Knowledge\Suggest\KnowledgeTodo;
 use App\Filament\Clusters\KhoTriTue;
 use App\Models\Brain;
 use App\Models\BrainProfile;
@@ -155,7 +156,7 @@ class BrainLibraryPage extends Page
         try {
             $r = (new BrainService)->installTemplates($keys, null, Auth::user());
         } catch (KnowledgeError $e) {
-            Notification::make()->title('Chưa cài được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa cài được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -175,7 +176,7 @@ class BrainLibraryPage extends Page
         try {
             $brain = (new BrainService)->createFromTemplate((string) $this->create['name'], (string) $this->create['template'] ?: null, array_map('intval', (array) $this->create['websites']), Auth::user());
         } catch (KnowledgeError|\InvalidArgumentException $e) {
-            Notification::make()->title('Chưa tạo được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Chưa tạo được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return null;
         }
@@ -228,9 +229,13 @@ class BrainLibraryPage extends Page
             ];
         });
 
+        $todo = BrainBuildPage::canAccess() ? KnowledgeTodo::busiest() : null;
+
         return [
             'kinds' => BrainKinds::all(), 'kindOk' => collect(BrainKinds::all())->map(fn ($k) => $k['mode'] !== 'flow' || BrainKinds::flowUrl($k['key']) !== null)->all(),
-            'buildUrl' => BrainBuildPage::canAccess() ? BrainBuildPage::getUrl() : null,
+            'buildUrl' => BrainBuildPage::canAccess() ? KnowledgeTodo::url($todo['site']->id ?? null) : null,
+            'todo' => $todo === null ? null : ['suggestions' => $todo['suggestions'], 'pending' => $todo['pending']],
+            'todoSite' => $todo['site']->name ?? null,
             'cards' => $cards, 'manage' => static::canManage(), 'archived' => $archived,
             'archivedCount' => Brain::query()->where('status', 'archived')->count(),
             'templates' => BrainTemplates::all(), 'sites' => Website::query()->orderBy('name')->get(['id', 'name']),

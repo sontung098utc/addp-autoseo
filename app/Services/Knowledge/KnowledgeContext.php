@@ -174,8 +174,8 @@ final class KnowledgeContext
 
     private function recordGap(Article $article, string $query, ?int $brainId = null): void
     {
-        if ($query === '') {
-            return;
+        if ($query === '' || \App\Services\Agent\Risk\TopicScope::forArticle($article)) {
+            return; // bài ngoài lĩnh vực của website không phải khoảng trống kiến thức của kho (vd. Trí tuệ y tế)
         }
         $gap = KnowledgeGap::firstOrCreate(['website_id' => $article->website_id, 'query' => $query], ['article_id' => $article->id, 'count' => 0]);
         // AG-S21: tìm vẫn không ra dù từng "đã bổ sung" (mục bị cũ/loại, hoặc chưa đủ khớp) → mở lại.

@@ -39,7 +39,7 @@ class ReviewActions
         try {
             $fn();
         } catch (InvalidArgumentException $e) {
-            Notification::make()->title('Không thực hiện được')->body($e->getMessage())->danger()->send();
+            Notification::make()->title('Không thực hiện được')->body(\App\Support\UserFacingError::from($e))->danger()->send();
 
             return;
         }
@@ -77,25 +77,60 @@ class ReviewActions
             : null;
     }
 
-    /** @return array<int, Forms\Components\Component> */
-    public static function approveForm(bool $selfApproval, ?QualityReport $quality = null): array
+    public static function instructionLine(?ArticleVersion $version): ?string
+    {
+        if (! $version || ! filled($version->article?->guidance)) {
+            return null;
+        }
+
+        return \App\Services\Content\Quality\GuidanceConstraints::summaryLine((string) $version->article->guidance, (string) $version->html_content);
+    }
+
+    /**
+     * Khung tóm tắt đầu hộp Duyệt: tên bài, rủi ro chủ đề, số lỗi chưa đạt (bằng lời), để người duyệt biết đang duyệt gì.
+     *
+     * @param  array{title:string,risk:?string,counts:?array<string,int>}  $summary
+     */
+    public static function summaryHtml(array $summary): HtmlString
+    {
+        $html = '<div><strong>' . e($summary['title']) . '</strong></div>';
+        $html .= '<div>Rủi ro chủ đề: ' . e($summary['risk'] ?? 'chưa phân hạng') . '</div>';
+        $html .= '<div>Lỗi chưa đạt: ' . e($summary['counts'] === null ? 'chưa kiểm' : \App\Filament\Resources\ArticleResource::severityText($summary['counts'])) . '</div>';
+
+        return new HtmlString($html);
+    }
+
+    /**
+     * Ghi chú duyệt chỉ BẮT BUỘC khi người duyệt cũng là người tạo bài (chính sách tự duyệt, AuditRecorder cũng chặn nếu thiếu); còn lại không bắt buộc.
+     *
+     * @param  array{title:string,risk:?string,counts:?array<string,int>}|null  $summary
+     * @param  ArticleVersion|null  $version  bản đang duyệt (để hiện dòng "Chỉ dẫn của người phụ trách")
+     * @return array<int, Forms\Components\Component>
+     */
+    public static function approveForm(bool $selfApproval, ?QualityReport $quality = null, ?array $summary = null, ?ArticleVersion $version = null): array
     {
         $fields = [];
+        if ($summary !== null) {
+            $fields[] = Forms\Components\Placeholder::make('approve_summary')->label('Bài đang duyệt')->content(self::summaryHtml($summary));
+        }
+        if (($line = self::instructionLine($version)) !== null) {
+            $fields[] = Forms\Components\Placeholder::make('instruction_line')->label('Chỉ dẫn của người phụ trách')->content($line);
+        }
         if ($quality?->hasBlocking()) {
             $items = '';
             foreach ($quality->blocking() as $r) {
                 $items .= '<li><strong>' . e($r->code) . '</strong> — ' . e($r->message) . ($r->measured ? ' (' . e($r->measured) . ', yêu cầu ' . e((string) $r->threshold) . ')' : '') . '</li>';
             }
             $fields[] = Forms\Components\Placeholder::make('quality_blockers')
-                ->label('Bài còn lỗi chặn duyệt (P0)')
+                ->label('Bài còn lỗi nặng (chặn duyệt)')
                 ->content(new HtmlString('<ul style="list-style:disc;padding-left:1.25rem">' . $items . '</ul>'));
             $fields[] = Forms\Components\Textarea::make('override_reason')
                 ->label('Lý do duyệt ngoại lệ (bắt buộc)')
-                ->helperText('Chỉ người có quyền duyệt được bỏ qua lỗi P0. Lý do và mã lỗi được ghi vào log audit.')
+                ->helperText('Chỉ người có quyền duyệt được bỏ qua lỗi nặng. Lý do và mã lỗi được ghi vào log audit.')
                 ->required()->minLength(ReviewWorkflow::MIN_OVERRIDE_REASON);
         }
         $fields[] = Forms\Components\Textarea::make('note')
-            ->label($selfApproval ? 'Ghi chú tự duyệt (bắt buộc)' : 'Ghi chú (không bắt buộc)')
+            ->label($selfApproval ? 'Lý do tự duyệt (bắt buộc vì bài do chính bạn tạo)' : 'Ghi chú (không bắt buộc)')
             ->helperText($selfApproval ? 'Bạn đang duyệt bài do chính mình tạo; hệ thống ghi log tự duyệt.' : null)
             ->required($selfApproval);
 
@@ -105,7 +140,44 @@ class ReviewActions
     /** @return array<int, Forms\Components\Component> */
     public static function rejectForm(): array
     {
-        return [Forms\Components\Textarea::make('reason')->label('Lý do từ chối')->required()];
+        return [self::reasonField('reason', 'Lý do từ chối (bắt buộc)')];
+    }
+
+    /**
+     * Ô lý do bắt buộc dùng kiểm tra của Filament (thông báo tiếng Việt), KHÔNG dùng thuộc tính HTML required
+     * (trình duyệt tự hiện tiếng Anh theo ngôn ngữ máy). Máy chủ vẫn từ chối lý do trống ở ReviewWorkflow/EmergencyStopService.
+     */
+    public static function reasonField(string $name, string $label): Forms\Components\Textarea
+    {
+        return Forms\Components\Textarea::make($name)->label($label)->rows(3)
+            ->rules(['required', 'string'])
+            ->validationMessages(['required' => 'Vui lòng nhập lý do.']);
+    }
+
+    /** Bản mới nhất vừa bị từ chối và chưa sửa gì: "Gửi duyệt" chỉ tiếp tục khi người gửi xác nhận gửi lại nguyên bản. */
+    public static function resubmitOfRejected(\App\Models\Article $article): ?ArticleVersion
+    {
+        return RejectionInfo::unrevised($article);
+    }
+
+    public static function submitLabel(\App\Models\Article $article): string
+    {
+        return self::resubmitOfRejected($article) ? 'Gửi lại nguyên bản' : 'Gửi duyệt';
+    }
+
+    public static function submitHeading(\App\Models\Article $article): string
+    {
+        return self::resubmitOfRejected($article) ? 'Gửi lại bản đã bị từ chối?' : 'Gửi duyệt';
+    }
+
+    public static function submitDescription(\App\Models\Article $article): string
+    {
+        $v = self::resubmitOfRejected($article);
+        if (! $v) {
+            return 'Bạn có chắc chắn muốn thực hiện hành động này?';
+        }
+
+        return 'Bản này đã bị từ chối vì: '.(trim((string) $v->review_notes) !== '' ? trim((string) $v->review_notes) : 'không ghi lý do').'. Chưa có bản mới hơn. Chỉ gửi lại khi bạn chắc người duyệt sẽ xem xét lại nguyên bản này; nếu không, hãy sửa hoặc "Giao làm lại" để có bản mới.';
     }
 
     /** Ô chọn website đích dùng chung cho Xếp lịch và Đăng ngay. */

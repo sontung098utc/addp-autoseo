@@ -76,4 +76,10 @@ class Article extends Model
     {
         return $this->hasOne(ArticleVersion::class)->latestOfMany('version');
     }
+
+    /** Phiên chạy mới nhất của bài (cho danh sách: nạp trước một lượt thay vì truy vấn từng dòng). ArticleRows::lastRun dùng quan hệ này khi đã nạp. */
+    public function lastRun(): HasOne
+    {
+        return $this->hasOne(AgentRun::class)->latestOfMany('id');
+    }
 }

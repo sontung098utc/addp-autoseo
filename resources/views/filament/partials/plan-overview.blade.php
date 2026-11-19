@@ -68,7 +68,7 @@
                 <div>
                     <div class="po-name">{{ $g['name'] }}</div>
                     <div class="po-sub">
-                        @if ($g['from'])Dự kiến {{ $g['from']->format('d/m') }}@if ($g['to'] && $g['to']->format('d/m') !== $g['from']->format('d/m')) – {{ $g['to']->format('d/m/Y') }}@else /{{ $g['from']->format('Y') }}@endif
+                        @if ($g['from'])Dự kiến {{ \App\Filament\Support\ContentPlan\PlanStatus::rangeLabel($g['from'], $g['to']) }}
                         @else Chưa xếp ngày @endif
                     </div>
                 </div>
