@@ -247,6 +247,7 @@ class ContentPlanPage extends Page
     public function deletePlannedAction(): Action
     {
         return Action::make('deletePlanned')
+            ->requiresConfirmation()
             ->label('Xóa')->color('danger')
             ->modalHeading('Xóa bài khỏi kế hoạch?')
             ->modalDescription(function (array $arguments): string {
@@ -254,7 +255,7 @@ class ContentPlanPage extends Page
 
                 return $a ? 'Xóa bài chờ viết «'.$a->primary_keyword.'». Không hoàn tác được. Từ khóa vẫn còn trong kho từ khóa.' : 'Không tìm thấy bài, tải lại trang.';
             })
-            ->requiresConfirmation()->modalSubmitActionLabel('Xóa bài')->modalCancelActionLabel('Giữ lại')
+            ->modalSubmitActionLabel('Xóa bài')->modalCancelActionLabel('Giữ lại')
             ->action(fn (array $arguments) => $this->runPlanDelete(fn (PlanDeleter $d, Website $site) => $d->deletePlanned(Auth::user(), $site, [(int) ($arguments['article'] ?? 0)])));
     }
 
@@ -262,6 +263,7 @@ class ContentPlanPage extends Page
     public function deleteGroupAction(): Action
     {
         return Action::make('deleteGroup')
+            ->requiresConfirmation()
             ->label('Xóa bài chờ viết')->color('danger')
             ->modalHeading(fn (array $arguments): string => ($arguments['group'] ?? '') === 'solo' ? 'Xóa các bài lẻ chưa viết?' : 'Xóa các bài chờ viết của chiến dịch?')
             ->modalDescription(function (array $arguments): string {
@@ -272,7 +274,7 @@ class ContentPlanPage extends Page
 
                 return 'Sẽ xóa '.$q->count().' bài "Đã lên kế hoạch" của nhóm này. Bài đã viết hoặc đang viết được giữ nguyên. Không hoàn tác được; từ khóa vẫn còn trong kho từ khóa.';
             })
-            ->requiresConfirmation()->modalSubmitActionLabel('Xóa')->modalCancelActionLabel('Giữ lại')
+            ->modalSubmitActionLabel('Xóa')->modalCancelActionLabel('Giữ lại')
             ->action(fn (array $arguments) => $this->runPlanDelete(fn (PlanDeleter $d, Website $site) => $d->deleteGroupPlanned(Auth::user(), $site, (string) ($arguments['group'] ?? ''))));
     }
 
