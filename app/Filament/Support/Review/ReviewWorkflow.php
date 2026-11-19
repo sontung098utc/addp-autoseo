@@ -39,19 +39,23 @@ class ReviewWorkflow
         return "pub-{$websiteId}-a{$articleId}-v{$version}";
     }
 
-    public function submitForReview(User $actor, ArticleVersion $version): void
+    /** @param bool $confirmResubmit true = người gửi chủ động xác nhận gửi lại NGUYÊN BẢN vừa bị từ chối (chưa sửa gì). */
+    public function submitForReview(User $actor, ArticleVersion $version, bool $confirmResubmit = false): void
     {
         $this->assertActive($actor);
         if (! $actor->isWriter()) {
             throw new InvalidArgumentException('Vai trò hiện tại không đủ quyền gửi duyệt.');
         }
 
-        DB::transaction(function () use ($actor, $version) {
+        DB::transaction(function () use ($actor, $version, $confirmResubmit) {
             [$article, $version] = $this->lock($version);
             if (! in_array($article->workflow_status, ['planned', 'rejected', 'drafting'], true)) {
                 throw new InvalidArgumentException('Chỉ gửi duyệt được bài ở trạng thái Đã lên kế hoạch, Đang viết hoặc Cần sửa.');
             }
             $this->assertLatest($article, $version);
+            if ($version->review_status === 'rejected' && ! $confirmResubmit) {
+                throw new InvalidArgumentException('Bản này đã bị từ chối vì: '.($version->review_notes ?: 'không ghi lý do').'. Sửa hoặc giao làm lại để có bản mới, hoặc xác nhận gửi lại nguyên bản.');
+            }
 
             $version->update(['review_status' => 'needs_review']);
             $article->update(['workflow_status' => 'needs_review']);

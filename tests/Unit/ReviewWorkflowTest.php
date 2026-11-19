@@ -56,7 +56,7 @@ class ReviewWorkflowTest extends TestCase
     {
         $w = $this->user('writer');
         $v = $this->make('planned', 'rejected');
-        $this->wf->submitForReview($w, $v);
+        $this->wf->submitForReview($w, $v, confirmResubmit: true);
         $this->assertSame('needs_review', $v->fresh()->article->workflow_status);
         $this->assertCount(1, $this->sink->entries);
 
