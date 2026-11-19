@@ -382,7 +382,7 @@ final class ArticleImageService
     public function isOffField(Article $article, ?BrandProfile $brand): bool
     {
         try {
-            $ctx = BrainContext::forArticle($article);
+            $ctx = BrainContext::forArticle($article, null, false);
         } catch (\Throwable) {
             $ctx = null;
         }

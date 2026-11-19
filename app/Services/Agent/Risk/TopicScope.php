@@ -22,6 +22,12 @@ final class TopicScope
     /** Từ vựng y tế rộng (ngoài bộ từ của RiskClassifier) để không bỏ sót thuật ngữ y tế khi quyết định bài ngoài lĩnh vực. */
     private const MEDICAL_HINTS = '/(?<![\p{L}\p{N}])(bệnh|benh|thuốc|thuoc|đau|dau\s+(?:đầu|bụng|lưng)|y tế|y te|y khoa|sức khỏe|suc khoe|khám|kham\s+benh|bác sĩ|bac si|dược|duoc|vitamin|dinh dưỡng|dinh duong|ăn kiêng|an kieng|triệu chứng|chẩn đoán|xét nghiệm|huyết|tim|gan|thận|phổi|dạ dày|da liễu|viêm|nhiễm|virus|vi khuẩn|vắc.?xin|vaccine|thai|sinh sản|béo phì|tiểu đường|ung thư|dị ứng|mất ngủ|stress|trầm cảm|lo âu|cholesterol|insulin|sơ cứu|cấp cứu|phẫu thuật|điều trị|chữa|thực đơn|chế độ ăn|thực phẩm|người cao tuổi|người lớn tuổi|người già|trẻ em|trẻ nhỏ|bà bầu|cơ thể|tập luyện|thể dục|giảm cân|mẹ và bé|răng|mắt|da|tóc|cân nặng)(?![\p{L}\p{N}])/iu';
 
+    /** Theo bài: lấy hồ sơ của website và (nếu không truyền) mọi Trí tuệ đã gắn, chưa lọc. */
+    public static function forArticle(\App\Models\Article $article, ?BrainContext $full = null): bool
+    {
+        return self::clearlyOffField((string) $article->primary_keyword, BrandProfileData::forWebsite($article->website_id), $full ?? BrainContext::forArticle($article, null, false));
+    }
+
     public static function clearlyOffField(string $keyword, ?BrandProfile $brand, ?BrainContext $ctx = null): bool
     {
         $keyword = trim($keyword);

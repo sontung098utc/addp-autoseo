@@ -41,10 +41,7 @@ final class ArticleReadiness
         $ctx = BrainContext::forArticle($article, $campaignId);
 
         $assess = (new RiskClassifier)->assess($keyword);
-        $offField = $site && $keyword !== '' && \App\Services\Agent\Risk\TopicScope::clearlyOffField($keyword, BrandProfileData::forWebsite($site->id), $ctx);
-        if ($offField) {
-            $ctx = $ctx->withoutStrict();
-        }
+        $offField = $site && $keyword !== '' && \App\Services\Agent\Risk\TopicScope::clearlyOffField($keyword, BrandProfileData::forWebsite($site->id), BrainContext::forArticle($article, $campaignId, false));
         $level = $ctx->raise($assess->level); // bài chắc chắn ngoài lĩnh vực: hạng theo chủ đề, không theo ngành của Trí tuệ
         $reasons = $assess->reasons;
         if ($level !== $assess->level) {
