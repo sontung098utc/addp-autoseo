@@ -20,6 +20,8 @@ final class RuleResult
         public readonly ?string $excerpt = null,
         /** Chi tiết có cấu trúc cho vòng sửa (ví dụ các đoạn chưa trích dẫn); luật nào không cần thì để trống. @var list<string> */
         public readonly array $details = [],
+        /** Số liệu có cấu trúc cho máy đọc (ví dụ độ lệch so với chỉ dẫn); không hiển thị trực tiếp. @var array<string,mixed> */
+        public readonly array $data = [],
     ) {
     }
 

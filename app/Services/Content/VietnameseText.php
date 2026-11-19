@@ -30,4 +30,35 @@ final class VietnameseText
 
         return self::wordCount(strip_tags(str_replace(['</p>', '</li>', '</h1>', '</h2>', '</h3>', '</h4>', '<br>', '<br/>', '</td>', '</tr>'], ' ', $html)));
     }
+
+    /**
+     * Số từ THÂN BÀI của HTML: bỏ tiêu đề trang (H1), ảnh và chú thích, mục lục, ghi chú, danh sách nguồn. MỘT hàm cho cột "Số từ" ở bảng phiên bản và luật INS01
+     * để hai nơi ra cùng số.
+     */
+    public static function bodyWordCountHtml(string $html): int
+    {
+        if (trim($html) === '') {
+            return 0;
+        }
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+        $prev = libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="UTF-8"><div id="ss-root">'.$html.'</div>', LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NONET);
+        libxml_clear_errors();
+        libxml_use_internal_errors($prev);
+        $x = new \DOMXPath($dom);
+        $drop = '//h1|//figure|//figcaption|//script|//style|//img|//*[contains(@class,"autoseo-refs") or contains(@class,"autoseo-notes") or contains(@class,"toc")]';
+        $nodes = [];
+        foreach ($x->query($drop) ?: [] as $n) {
+            $nodes[] = $n;
+        }
+        foreach ($nodes as $n) {
+            $n->parentNode?->removeChild($n);
+        }
+        $parts = [];
+        foreach ($x->query('//text()') ?: [] as $t) {
+            $parts[] = $t->nodeValue;
+        }
+
+        return self::wordCount(implode(' ', $parts));
+    }
 }

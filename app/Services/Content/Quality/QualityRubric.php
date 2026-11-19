@@ -108,6 +108,11 @@ final class QualityRubric
             ], 'heuristic',
                 'Người tìm "báo giá"/"so sánh" cần số và tên cụ thể; bài chung chung không đáp ứng ý định.', 'internal', [],
                 'Heuristic theo từ khóa và hình thức; không kiểm số liệu có thật. Có thể báo nhầm khi bài cố tình nói "liên hệ để nhận báo giá" kèm khung giá; không chặn, chỉ gắn cờ để người duyệt xem.'),
+            'INS01' => self::entry('INS01', 'Tuân chỉ dẫn của người phụ trách', 'Chỉ khi bài có "Chỉ dẫn cho đội AI" (hoặc lời nhắn làm lại) chứa ràng buộc đo được cú pháp rõ: số từ thân bài, số bảng, số mục H2, số ảnh. Đo trên bản viết thật; vi phạm là P1 kèm giá trị đo và làm điểm thấp hơn bài sạch. Câu đòi bỏ quy tắc an toàn hay đăng bài bị bỏ qua.', [
+                'approx_tolerance_percent' => 15,
+            ], 'internal',
+                'Người phụ trách đã nêu giới hạn đo được; bài vượt giới hạn mà vẫn đạt điểm cao là sai lệch giữa cái được yêu cầu và cái được chấm.', 'internal', [],
+                'Quy tắc nội bộ, tất định, không dùng AI. Chỉ nhận mẫu câu rõ ("dưới 600 từ", "đúng một bảng", "ít nhất 3 mục H2"); câu mơ hồ không được suy đoán. Số ảnh chưa kiểm tự động trên bản nháp (ảnh gắn ở bước lắp ráp). Không thay người duyệt.'),
             'FAQ01' => self::entry('FAQ01', 'FAQ', 'Gợi ý (P2) khi bài có/không có phần hỏi–đáp; không bắt buộc.', [], 'heuristic',
                 'Phần hỏi–đáp có thể giúp người đọc.', 'partial', ['https://developers.google.com/search/blog/2023/08/howto-faq-changes', 'https://developers.google.com/search/updates'],
                 'FAQ rich result đã bị giới hạn từ 08/2023; changelog ghi đã ngừng hiển thị năm 2026 (mốc ngày cần mở trang gốc để chốt). Không nên kỳ vọng rich result từ FAQ schema và không ép bài phải có FAQ.'),

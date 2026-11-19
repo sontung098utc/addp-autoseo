@@ -21,10 +21,21 @@ final class RunScorer
     /** Mốc tham khảo hiển thị cạnh điểm; không dùng để quyết định. */
     public const REFERENCE_THRESHOLD = 80;
 
+    /** Trừ thêm khi INS01 trượt (ngoài 5 điểm P1): điểm tối đa còn 90. */
+    public const INSTRUCTION_EXTRA = 5;
+
     public static function score(QualityReport $report): int
     {
         $c = $report->counts();
         $score = 100 - $c['P0'] * self::WEIGHT_P0 - $c['P1'] * self::WEIGHT_P1 - $c['P2'] * self::WEIGHT_P2;
+
+        // Chưa tuân chỉ dẫn đo được của người phụ trách (INS01) thì không được điểm gần tối đa: bài vượt giới hạn từ không thể là "95/100".
+        foreach ($report->failed() as $r) {
+            if ($r->code === 'INS01') {
+                $score -= self::INSTRUCTION_EXTRA;
+                break;
+            }
+        }
 
         return max(0, min(100, $score));
     }

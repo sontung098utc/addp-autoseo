@@ -458,6 +458,7 @@ final class AgentRunOrchestrator
         }
         $this->prepareEvidence($run, $article, $assess);
         $this->prepareKeywordBrief($run, $article);
+        $this->noteGuidanceConstraints($run, $article);
         if ($this->presetOutline !== null) {
             $outline = ['outline' => $this->presetOutline];
             $this->skills['brief'] = [null, 'Dàn ý có sẵn.'];
@@ -570,6 +571,7 @@ final class AgentRunOrchestrator
         if ($reason === null && $this->needsRepair($report) && $round >= $maxRounds) {
             $this->decision($run, 'max_rounds', 'Dừng sửa vì hết số vòng cho phép', "Đã sửa {$round}/{$maxRounds} vòng, còn ".count($report->failed()).' mục chưa đạt nên không sửa thêm.', ['rounds' => $round, 'max_rounds' => $maxRounds, 'score' => $score]);
         }
+        $this->noteUnmetInstructions($run, $report, $round, $reason);
         $run->update(['repair_rounds' => $round]);
         $attrs = $this->pruneUnverifiedSources($run, $article, $attrs);
         $attrs = $this->pruneUnsupportedCitations($run, $attrs);
@@ -1720,6 +1722,9 @@ final class AgentRunOrchestrator
         foreach (array_slice($report->layoutGaps(), 0, 6) as $gap) {
             $feedback[] = 'LAY01: '.$gap;
         }
+        foreach ($report->instructionGaps() as $gap) {
+            $feedback[] = 'INS01: chưa đạt chỉ dẫn của người phụ trách, '.$gap.'. Đây là yêu cầu nội dung bắt buộc phải đạt: sửa đúng số đo này, giữ nguyên phần còn lại (không đổi quy tắc an toàn, nguồn hay trích dẫn).';
+        }
         foreach (array_slice($report->leakGaps(), 0, 8) as $gap) {
             $feedback[] = 'PROC01: câu «'.$gap.'» nói về việc tìm/đối chiếu nguồn hoặc gắn nhãn độ tin cậy. CẤM trong thân bài (kiểu "chúng tôi đối chiếu", "một nguồn nêu", "các nguồn đồng thuận", "chưa xác minh", "không chắc chắn", "bằng chứng còn hạn chế", "bài này không đưa..."). Viết lại thành khẳng định trực tiếp, đúng mức chắc chắn, giữ nguyên nội dung hữu ích.';
         }
@@ -1953,7 +1958,7 @@ final class AgentRunOrchestrator
     private function gradeDelivered(AgentRun $run, Article $article, ArticleVersion $version, bool $passed): bool
     {
         $fresh = ArticleVersion::query()->find($version->id) ?? $version;
-        $report = $this->checker->check($fresh, $article, $this->brainCtx->ids() ?: null, array_map(fn ($r) => ['title' => (string) ($r['title'] ?? ''), 'url' => (string) ($r['url'] ?? ''), 'domain' => (string) ($r['domain'] ?? '')], $this->references));
+        $report = $this->checker->check($fresh, $article, $this->brainCtx->ids() ?: null, array_map(fn ($r) => ['title' => (string) ($r['title'] ?? ''), 'url' => (string) ($r['url'] ?? ''), 'domain' => (string) ($r['domain'] ?? '')], $this->references), $this->redoMessage());
         $c = $report->counts();
         $block = $report->blockingCodes();
         $score = RunScorer::score($report);
@@ -1973,7 +1978,7 @@ final class AgentRunOrchestrator
 
     private function grade(AgentRun $run, Article $article, array $attrs, string $title, int $round, ?Playbook $editorPb = null, string $note = ''): QualityReport
     {
-        $report = $this->checker->check(new ArticleVersion($attrs), $article, $this->brainCtx->ids() ?: null, array_map(fn ($r) => ['title' => (string) ($r['title'] ?? ''), 'url' => (string) ($r['url'] ?? ''), 'domain' => (string) ($r['domain'] ?? '')], $this->references));
+        $report = $this->checker->check(new ArticleVersion($attrs), $article, $this->brainCtx->ids() ?: null, array_map(fn ($r) => ['title' => (string) ($r['title'] ?? ''), 'url' => (string) ($r['url'] ?? ''), 'domain' => (string) ($r['domain'] ?? '')], $this->references), $this->redoMessage());
         [$report, $judge] = $this->judgeCitations($report, (string) ($attrs['html_content'] ?? ''));
         $c = $report->counts();
         $failed = array_map(fn ($r) => ['code' => $r->code, 'severity' => $r->severity, 'message' => $r->message], array_slice($report->failed(), 0, 8));
@@ -2288,6 +2293,35 @@ final class AgentRunOrchestrator
             $c['missing'] === [] ? 'Mọi từ khóa phụ đều xuất hiện trong bản viết đầu.' : 'Chưa thấy trong bản viết đầu: '.implode('; ', $c['missing']).'. Chỉ ghi nhận, không ép chèn nếu không hợp mạch.', ['purpose' => 'keyword_coverage'] + $c);
     }
 
+    private function redoMessage(): string
+    {
+        return $this->redo !== null ? (string) $this->redo['message'] : '';
+    }
+
+    /**
+     * Ghi vào Diễn biến các ràng buộc đo được đã nhận từ chỉ dẫn, và các câu bị BỎ QUA vì đòi đổi quy tắc an toàn/đăng bài (chỉ dẫn là dữ liệu nội dung, không điều khiển hệ thống).
+     */
+    private function noteGuidanceConstraints(AgentRun $run, Article $article): void
+    {
+        $ex = \App\Services\Content\Quality\GuidanceConstraints::extract((string) $article->guidance, $this->redoMessage());
+        if ($ex['constraints'] !== []) {
+            $this->decision($run, 'guidance_constraints', 'Chỉ dẫn có ràng buộc đo được: '.implode('; ', array_column($ex['constraints'], 'label')), 'Hệ thống sẽ đo bản viết theo các ràng buộc này (luật INS01) và yêu cầu sửa nếu chưa đạt.', ['constraints' => $ex['constraints']]);
+        }
+        if ($ex['ignored'] !== []) {
+            $this->decision($run, 'guidance_ignored', 'Đã bỏ qua phần chỉ dẫn yêu cầu thay đổi quy tắc an toàn/đăng bài', 'Chỉ dẫn là dữ liệu hướng dẫn nội dung, không đổi được quy tắc an toàn hay quyết định đăng bài. Đã bỏ qua: «'.implode('», «', $ex['ignored']).'». Bài vẫn qua đủ kiểm tra và chờ người duyệt.', ['ignored' => $ex['ignored']]);
+        }
+    }
+
+    /** Hết vòng/dừng sớm mà vẫn chưa đạt chỉ dẫn đo được: ghi rõ cho người duyệt, không giấu. */
+    private function noteUnmetInstructions(AgentRun $run, QualityReport $report, int $round, ?string $reason): void
+    {
+        $gaps = $report->instructionGaps();
+        if ($gaps === []) {
+            return;
+        }
+        $this->decision($run, 'instruction_unmet', 'Chưa đạt chỉ dẫn: '.implode('; ', $gaps), "Sau {$round} vòng sửa bản giữ lại vẫn chưa đạt chỉ dẫn của người phụ trách. ".($reason !== null ? $reason.' ' : '').'Người duyệt cần xem và sửa tay hoặc giao làm lại; điểm đã bị trừ vì chưa đạt chỉ dẫn.', ['gaps' => $gaps, 'rounds' => $round]);
+    }
+
     private function guidanceOptions(Article $article): array
     {
         $parts = [];
@@ -2480,6 +2514,9 @@ final class AgentRunOrchestrator
      * mỗi đề xuất có dòng "how would we know this failed"). Lời mặc định theo mã quyết định; nơi gọi có thể tự đặt `why` / `if_wrong` trong dữ kiện.
      */
     private const DECISION_NOTES = [
+        'guidance_constraints' => ['Trích bằng mẫu câu cố định từ chỉ dẫn của người phụ trách, không dùng AI chốt số.', 'Hệ thống hiểu sai câu chỉ dẫn: sửa lại câu cho rõ (ví dụ "dưới 600 từ") hoặc bỏ qua cảnh báo INS01 khi duyệt.'],
+        'guidance_ignored' => ['Câu đòi bỏ quy tắc an toàn hoặc đăng bài không phải chỉ dẫn nội dung (AGENTS.md: chỉ dẫn là dữ liệu).', 'Nếu bỏ nhầm một yêu cầu nội dung hợp lệ, viết lại yêu cầu đó thành câu riêng.'],
+        'instruction_unmet' => ['Luật INS01 đo bản viết còn lệch chỉ dẫn sau khi hết vòng sửa hoặc dừng sớm.', 'Người duyệt xem số đo, sửa tay hoặc giao làm lại; không tự coi là đạt.'],
         'kb_coordination' => ['Dựa vào số mục kho ĐÃ DUYỆT khớp chủ đề và Trí tuệ đang gắn với website.', 'Bài thiếu căn cứ (bước Tổng hợp báo khoảng trống) hoặc nạp nhầm Trí tuệ; xem mục Kho và nguồn.'],
         'synthesis' => ['Dựa vào các đoạn trích tài liệu web và mục kho đã tìm được, đối chiếu rồi chốt luận điểm dùng/bỏ.', 'Người viết dùng ý không có trong nguồn (CITE/EVID báo lỗi) hoặc bỏ sót ý quan trọng ở lần chấm.'],
         'fix_plan' => ['Dựa vào các mục chưa đạt ở lần chấm vừa rồi; giao đúng nhóm lỗi cho người viết.', 'Điểm không tăng ở lần chấm sau: bản sửa bị bỏ, dừng sau 2 lần liên tiếp không cải thiện.'],
@@ -2516,7 +2553,7 @@ final class AgentRunOrchestrator
         $c = $r->counts();
         // Ngoài số luật còn trượt, tính cả SỐ CHỖ còn lệch (đoạn thiếu trích dẫn, trích dẫn không hỗ trợ câu, khối bố cục lạm dụng): sửa 11 chỗ còn 2 chỗ là tiến bộ thật
         // dù luật vẫn trượt. Trước đây chỉ đếm luật nên vòng sửa dừng nhầm với lý do "không cải thiện".
-        $gaps = count($r->citationGaps()) + count($r->supportGaps()) + count($r->layoutGaps()) + count($r->leakGaps());
+        $gaps = count($r->citationGaps()) + count($r->supportGaps()) + count($r->layoutGaps()) + count($r->leakGaps()) + $r->instructionDistance();
 
         return $c['P0'] * 10 + $c['P1'] * 3 + $c['P2'] + $gaps;
     }

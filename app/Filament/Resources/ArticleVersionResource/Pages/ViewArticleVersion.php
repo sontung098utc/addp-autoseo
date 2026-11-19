@@ -44,7 +44,7 @@ class ViewArticleVersion extends ViewRecord
                 ->authorize(fn () => ReviewActions::canApprove())
                 ->tooltip(fn () => ReviewActions::blockedHint(ReviewActions::qualityFor($this->record)))
                 ->modalHeading(fn () => ReviewActions::qualityFor($this->record)->hasBlocking() ? 'Duyệt ngoại lệ: bài còn lỗi P0' : 'Duyệt nội dung')
-                ->form(fn () => ReviewActions::approveForm((int) $this->record->article?->created_by === (int) ReviewActions::user()?->id, ReviewActions::qualityFor($this->record)))
+                ->form(fn () => ReviewActions::approveForm((int) $this->record->article?->created_by === (int) ReviewActions::user()?->id, ReviewActions::qualityFor($this->record), null, $this->record))
                 ->action(function (array $data) {
                     abort_unless(ReviewActions::canApprove(), 403);
                     ReviewActions::run(fn () => (new ReviewWorkflow)->approve(ReviewActions::user(), $this->record, $data['note'] ?? null, $data['override_reason'] ?? null), 'Đã duyệt nội dung');

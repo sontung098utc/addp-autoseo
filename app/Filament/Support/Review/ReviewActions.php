@@ -77,6 +77,15 @@ class ReviewActions
             : null;
     }
 
+    public static function instructionLine(?ArticleVersion $version): ?string
+    {
+        if (! $version || ! filled($version->article?->guidance)) {
+            return null;
+        }
+
+        return \App\Services\Content\Quality\GuidanceConstraints::summaryLine((string) $version->article->guidance, (string) $version->html_content);
+    }
+
     /**
      * Khung tóm tắt đầu hộp Duyệt: tên bài, rủi ro chủ đề, số lỗi chưa đạt (bằng lời), để người duyệt biết đang duyệt gì.
      *
@@ -95,13 +104,17 @@ class ReviewActions
      * Ghi chú duyệt chỉ BẮT BUỘC khi người duyệt cũng là người tạo bài (chính sách tự duyệt, AuditRecorder cũng chặn nếu thiếu); còn lại không bắt buộc.
      *
      * @param  array{title:string,risk:?string,counts:?array<string,int>}|null  $summary
+     * @param  ArticleVersion|null  $version  bản đang duyệt (để hiện dòng "Chỉ dẫn của người phụ trách")
      * @return array<int, Forms\Components\Component>
      */
-    public static function approveForm(bool $selfApproval, ?QualityReport $quality = null, ?array $summary = null): array
+    public static function approveForm(bool $selfApproval, ?QualityReport $quality = null, ?array $summary = null, ?ArticleVersion $version = null): array
     {
         $fields = [];
         if ($summary !== null) {
             $fields[] = Forms\Components\Placeholder::make('approve_summary')->label('Bài đang duyệt')->content(self::summaryHtml($summary));
+        }
+        if (($line = self::instructionLine($version)) !== null) {
+            $fields[] = Forms\Components\Placeholder::make('instruction_line')->label('Chỉ dẫn của người phụ trách')->content($line);
         }
         if ($quality?->hasBlocking()) {
             $items = '';
