@@ -268,7 +268,7 @@
                 </section>
 
                 <details class="pfm-more" @if (! $pv) open @endif>
-                    <summary>Chỉnh cột và tùy chọn <span class="pfm-muted">· dùng {{ $usedCols }}/{{ $dataCols }} cột · AI đã đoán, chỉ sửa khi sai</span></summary>
+                    <summary>Chỉnh cột và tùy chọn <span class="pfm-muted">· dùng {{ $usedCols }}/{{ $dataCols }} cột · {{ ! empty($st['analyzed']) ? 'AI đã đoán' : 'đoán theo tên cột' }}, chỉ sửa khi sai</span></summary>
                     <div class="pfm-more-body">
                         @if ($pv && $pv['count'] > 0)
                             <p class="pfm-muted" style="margin:0 0 .5rem">{{ $pv['dated'] }}/{{ $pv['count'] }} bài có ngày · {{ $pv['with_notes'] ?? 0 }} có chỉ dẫn viết · {{ $pv['with_secondary'] ?? 0 }} có từ khóa phụ@if (($pv['volumes'] ?? 0) > 0) · {{ $pv['volumes'] }} có lượng tìm @endif
