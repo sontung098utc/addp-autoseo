@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ArticleResource\Pages;
 use App\Filament\Support\Agent\RunActivity;
+use App\Filament\Support\Planning\KeywordDuplicateGuard;
 use App\Filament\Support\Review\ArticleRows;
 use App\Filament\Support\Review\ReviewActions;
 use App\Filament\Support\Review\ReviewWorkflow;
@@ -249,6 +250,32 @@ class ArticleResource extends Resource
             });
     }
 
+    /** Bài đang dùng từ khóa này trên website (null nếu chưa, hoặc chưa chọn website / chưa nhập từ khóa). */
+    public static function duplicateOf(mixed $websiteId, string $keyword): ?Article
+    {
+        if (! $websiteId || trim($keyword) === '') {
+            return null;
+        }
+
+        return KeywordDuplicateGuard::find((int) $websiteId, $keyword);
+    }
+
+    /** Cảnh báo ngay dưới ô "Từ khóa chính": nêu bài đang có (tên, trạng thái) và liên kết "Mở bài đó". */
+    public static function duplicateNotice(mixed $websiteId, string $keyword): ?HtmlString
+    {
+        $a = static::duplicateOf($websiteId, $keyword);
+        if ($a === null) {
+            return null;
+        }
+        $d = KeywordDuplicateGuard::describe($a);
+        $open = $d['url'] ? ' <a href="'.e($d['url']).'" class="font-semibold underline">Mở bài đó</a>' : '';
+        $msg = $d['reopenable']
+            ? 'Website này đã có bài #'.$d['id'].' "'.e($d['keyword']).'" (trạng thái: '.e($d['status_label']).') dùng từ khóa này. Bài cũ đang bị trả về, bạn có thể tạo lại bằng cách tích ô xác nhận bên dưới.'
+            : 'Website này đã có bài #'.$d['id'].' "'.e($d['keyword']).'" (trạng thái: '.e($d['status_label']).') dùng từ khóa này, nên không thể tạo thêm. Hãy mở bài đó để làm tiếp, hoặc đổi từ khóa.';
+
+        return new HtmlString('<div class="text-sm text-warning-600 dark:text-warning-400" role="alert">'.$msg.$open.'</div>');
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -264,7 +291,16 @@ class ArticleResource extends Resource
                             ->required(),
                         Forms\Components\TextInput::make('primary_keyword')
                             ->label('Từ khóa chính')
+                            ->live(onBlur: true)
                             ->required(),
+                        Forms\Components\Placeholder::make('keyword_duplicate_notice')
+                            ->hiddenLabel()
+                            ->content(fn (Get $get) => static::duplicateNotice($get('website_id'), (string) $get('primary_keyword')))
+                            ->visible(fn (Get $get, string $operation) => $operation === 'create' && static::duplicateOf($get('website_id'), (string) $get('primary_keyword')) !== null),
+                        Forms\Components\Checkbox::make('confirm_reopen')
+                            ->label('Tôi hiểu, vẫn tạo thêm một bài mới cho từ khóa này')
+                            ->dehydrated(false)
+                            ->visible(fn (Get $get, string $operation) => $operation === 'create' && ($d = static::duplicateOf($get('website_id'), (string) $get('primary_keyword'))) !== null && KeywordDuplicateGuard::isReopenable($d)),
                         Forms\Components\TagsInput::make('secondary_keywords')
                             ->label('Từ khóa phụ'),
                         Forms\Components\Select::make('search_intent')
