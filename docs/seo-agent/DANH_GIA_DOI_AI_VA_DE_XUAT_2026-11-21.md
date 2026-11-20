@@ -63,7 +63,7 @@ Nguồn: bản xem thử cục bộ `wt/ag-s27/database/preview.sqlite` (110 phi
 | Kết quả chung | 79/110 phiên tới "chờ duyệt", 24 thất bại, 3 giữ nháp, 3 chặn. Chi phí trung bình phiên thành công khoảng 7.000 ₫ | 22% thất bại là cao; phần lớn là lỗi nhà cung cấp AI/hạn ngạch, chưa phân loại riêng ở đây |
 | Họa viên | 23/31 bước ảnh cảnh báo; phần lớn **HTTP 429 hết hạn ngạch ảnh**, không phải do thiết kế | Vấn đề hạ tầng/hạn ngạch trước, chất lượng sau. Với ảnh tạo được: ảnh bìa là "người trung niên cầm sổ khám bên cửa sổ" (cảnh tâm trạng, ít thông tin, có hình người), 2 ảnh trong bài tốt hơn (thanh chỉ số 3 vùng màu, đĩa ăn chia phần). Prompt cuối còn đuôi dài "Friendly, calm, stylized…" lặp ở mọi ảnh |
 | Biên tập | 50/166 bước cảnh báo; nội dung hay lặp: "cấu trúc rối (mục lục lẫn tóm tắt), lặp ý, hỏi–đáp thiếu câu hỏi, ngưỡng chẩn đoán mơ hồ" | Bắt lỗi đúng và nhất quán; nhưng cùng một loại lỗi cấu trúc lặp lại qua nhiều bài nghĩa là Người viết chưa học được từ phản hồi → nên dùng tab **Bài học** để ghi quy tắc; đề xuất vai trò "Người đọc thử" |
-| Người viết | 25/100 bước viết cảnh báo | Cần phân tích sâu hơn theo mã luật; chưa làm trong đợt này |
+| Người viết | 25/100 bước viết cảnh báo. Theo mã luật qua 54 phiên có chấm lại: lần chấm đầu hay trượt **CITE01 (39 phiên), EVID01 (34), SRC01 (32), KW01 (22)**; sau các vòng sửa còn **CITE01 34, EVID01 34, SRC01 20, KW01 19**. Điểm trung bình 84,9 → 87,3 sau 2,7 lần chấm | **Vòng sửa gần như không chữa được lỗi trích dẫn/bằng chứng** (EVID01 34 → 34): gốc là thiếu tài liệu chứ không phải viết kém, nên viết lại không giúp. Đây là lý do Quản lý SEO nay soát tài liệu TRƯỚC khi viết. SRC01 nghĩa là AI tự nêu nguồn không có trong kho ("HubSpot…" cho bài y tế): cần bài học "chỉ trích nguồn có trong danh sách". KW01 (từ khóa) kéo dài qua các vòng: nên ghi bài học đặt từ khóa chính vào tiêu đề SEO, H1/mở bài ngay lần viết đầu |
 | Chiến lược | 50 ok, 2 cảnh báo, 9 bỏ qua | Ổn về mặt vận hành; chất lượng dàn ý chưa đo |
 | Quản lý SEO (cũ) | 9 bước, đều là đọc lời nhắn làm lại | Đúng như bạn nhận xét: gần như không có vai trò quyết định trong phiên thường |
 | Nạp kho / nghiên cứu | Nhiều lượt "0 nguồn" (mục 1, điểm 4) | Do nguồn và tải trang, không do model |
@@ -75,7 +75,7 @@ Nguồn: bản xem thử cục bộ `wt/ag-s27/database/preview.sqlite` (110 phi
 - `reviewEvidenceAgainstOutline` dùng so khớp từ (không AI) nên có thể báo nhầm "mục thiếu tài liệu" khi tiêu đề mục dùng từ khác với tài liệu; chỉ tốn tối đa 2 lượt tìm và có trần chi phí. Chưa đo tỉ lệ báo nhầm.
 - Chỉ dẫn lưu theo bài kiểu "chỉ tạo ảnh" sẽ áp cho MỌI lần giao tiếp theo của bài đó cho tới khi xóa chỉ dẫn; nhật ký phiên ghi rõ "đã đọc chỉ dẫn của bài". Nên xóa chỉ dẫn sau khi dùng.
 - Mẫu chuyên gia và kỹ năng y khoa chưa có chuyên gia y khoa rà (dự án chưa có).
-- Chưa làm: nối lại tự động ảnh bù khi hết hạn ngạch; vai trò Người đọc thử / Người kiểm ảnh; phân tích sâu lỗi của Người viết; làm mới tab Huấn luyện ngoài nút mẫu và hướng dẫn nhanh.
+- Chưa làm: nối lại tự động ảnh bù khi hết hạn ngạch; vai trò Người đọc thử / Người kiểm ảnh; làm mới tab Huấn luyện ngoài nút mẫu và hướng dẫn nhanh.
 - 5 test có sẵn trên `origin/main` vẫn lỗi trong môi trường này (AgentRunWebResearch, AgentTeamHub, AiImageRoute, Campaign, ImagesLinks); không do nhánh này (đã ghi từ trước ở bộ nhớ dự án, xác nhận cùng tên).
 
 ## 7. Cách thử sáng mai (10 phút)
