@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 /** AG-S11: một nhà cung cấp AI. Khóa lưu mã hóa, bị ẩn khỏi mọi serialize, KHÔNG BAO GIỜ hiển thị lại. */
 class AiProvider extends Model
 {
-    public const KINDS = ['gemini' => 'Google Gemini', 'anthropic' => 'Anthropic Claude', 'openai_compat' => 'OpenAI-tương thích'];
+    public const KINDS = ['gemini' => 'Google Gemini', 'anthropic' => 'Anthropic Claude', 'openai_compat' => 'OpenAI-tương thích', 'custom_http' => 'API tùy chỉnh (HTTP)'];
 
     /**
      * Model gợi ý theo kiểu provider và bậc. Chỉ là giá trị khởi tạo có thể sửa trong giao diện — logic không phụ thuộc tên model.
@@ -17,17 +17,18 @@ class AiProvider extends Model
         'gemini' => ['cheap' => 'gemini-3.5-flash-lite', 'standard' => 'gemini-3.6-flash', 'reasoning' => 'gemini-3.8-flash'],
         'anthropic' => ['cheap' => 'claude-haiku-5-5', 'standard' => 'claude-sonnet-5-5', 'reasoning' => 'claude-opus-5-5'],
         'openai_compat' => [],
+        'custom_http' => [],
     ];
 
     public const TIER_LABELS = ['cheap' => 'Rẻ', 'standard' => 'Chuẩn', 'reasoning' => 'Suy luận'];
 
-    protected $fillable = ['name', 'kind', 'base_url', 'api_key', 'monthly_budget_vnd', 'enabled', 'pricing', 'models', 'last_test_at', 'last_test_ok', 'last_test_message', 'updated_by', 'models_synced_at'];
+    protected $fillable = ['name', 'kind', 'base_url', 'api_key', 'monthly_budget_vnd', 'enabled', 'pricing', 'models', 'last_test_at', 'last_test_ok', 'last_test_message', 'updated_by', 'models_synced_at', 'http_config'];
 
     protected $hidden = ['api_key'];
 
     protected function casts(): array
     {
-        return ['api_key' => 'encrypted', 'monthly_budget_vnd' => 'float', 'enabled' => 'boolean', 'pricing' => 'array', 'models' => 'array', 'last_test_at' => 'datetime', 'last_test_ok' => 'boolean', 'models_synced_at' => 'datetime'];
+        return ['api_key' => 'encrypted', 'monthly_budget_vnd' => 'float', 'enabled' => 'boolean', 'pricing' => 'array', 'models' => 'array', 'http_config' => 'array', 'last_test_at' => 'datetime', 'last_test_ok' => 'boolean', 'models_synced_at' => 'datetime'];
     }
 
     public function hasKey(): bool
