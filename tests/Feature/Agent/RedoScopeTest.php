@@ -417,4 +417,14 @@ class RedoScopeTest extends TestCase
         $this->assertSame(['images', 'sources'], RedoScope::resolve('Tìm thêm nguồn và làm lại ảnh bìa, giữ nguyên bài viết.', [])['parts']);
         $this->assertSame(['images'], RedoScope::resolve('Làm ảnh bìa dạng infographic có chữ tiêu đề.', [])['parts']);
     }
+
+    public function test_hop_giao_doi_ai_noi_truoc_pham_vi_khi_chi_dan_gioi_han_pham_vi(): void
+    {
+        $this->article->update(['guidance' => 'Chỉ tạo lại ảnh, giữ nguyên bài viết.']);
+        $html = (string) ArticleResource::assignContent($this->article->fresh());
+        $this->assertStringContainsString('assign-guidance-scope', $html);
+        $this->assertStringContainsString('chỉ làm lại ảnh, giữ nguyên chữ của bài', $html);
+        $this->article->update(['guidance' => 'Viết cho người trên 50 tuổi.']);
+        $this->assertStringNotContainsString('assign-guidance-scope', (string) ArticleResource::assignContent($this->article->fresh()));
+    }
 }

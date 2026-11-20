@@ -697,7 +697,7 @@ final class AgentRunOrchestrator
         $attrs['cost_vnd'] = 0;
         $version = $this->persistCopy($article, $attrs, $prev);
         $run->update(['final_version_id' => $version->id]);
-        $this->decision($run, 'redo_no_write', 'Điều phối: chỉ làm '.RedoScope::describe($scope), 'Chữ của bài giữ nguyên bản v'.$prev->version.'; không dàn ý, không viết, không chấm lại chữ. Bản mới v'.$version->version.' chỉ khác phần được giao.', ['scope' => $scope, 'from_version' => $prev->version]);
+        $this->decision($run, 'redo_no_write', 'Điều phối: '.RedoScope::describe($scope), 'Chữ của bài giữ nguyên bản v'.$prev->version.'; không dàn ý, không viết, không chấm lại chữ. Bản mới v'.$version->version.' chỉ khác phần được giao.', ['scope' => $scope, 'from_version' => $prev->version]);
         if ($imagesIn) {
             if (! $hasInline && $prev->mediaAssets()->exists()) { // chỉ khi bản cũ có ảnh để giữ (không ghi bước "dùng lại 0 ảnh" thừa)
                 $this->carryOverImages($run, $article, $version); // ảnh trong bài cũ vẫn dùng; ảnh bìa mới thay ảnh bìa cũ ngay dưới

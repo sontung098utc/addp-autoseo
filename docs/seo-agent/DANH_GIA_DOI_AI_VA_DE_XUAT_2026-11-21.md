@@ -117,6 +117,24 @@ Kết quả sau sửa (viết = số lần gọi AI viết, gồm vòng sửa):
 Ngoài ra: không có model ảnh được gán thì lượt chỉ-ảnh `blocked` kèm lý do rõ và **không** sinh bản trùng; giao diện phiên chạy hiển thị tên "Quản lý SEO", "Người nghiên cứu", "Họa viên".
 **Chưa kiểm được:** model thật (viết/ảnh), chữ tiếng Việt trong ảnh thật, tìm kiếm web thật cho bước soát tài liệu, cron `agent:retry-images` thật, nhập tệp thật.
 
+## 10. Kiểm thử thao tác trên giao diện (bản 8110, chế độ demo: AI và ảnh giả lập)
+
+Thao tác bằng chuột/bàn phím trong trình duyệt, như người dùng:
+
+| Thao tác | Kết quả |
+|---|---|
+| Trang bài → **Giao làm lại** → gõ «Chỉ tạo lại ảnh bìa có chữ «Ăn gì khi bị tiểu đường», giữ nguyên bài viết.» | Mục "Dự kiến" cập nhật **sau khi rời ô nhập** (không cập nhật lúc đang gõ): "chỉ làm lại ảnh, giữ nguyên chữ của bài và nguồn/kho". Giao xong: thông báo đúng phạm vi, chuyển sang tab Phiên chạy, phiên #96 xong. Bản v2: 15 từ (chữ y nguyên), 1 ảnh bìa AI tạo; prompt chứa cụm chữ, khung "không chữ" đã gỡ |
+| Trang **chi tiết bản bài** (nút mới) → Giao làm lại → "Giữ nguyên ảnh, nguồn, dàn ý, bài viết." | Dự kiến "không làm gì (lời nhắn yêu cầu giữ nguyên mọi phần)"; phiên #97 dừng với lý do rõ, không tạo bản mới |
+| Chỉ dẫn cho đội AI → gõ "Chỉ tạo lại ảnh, giữ nguyên bài viết." → Lưu → Giao đội AI → Giao việc | Phiên #98 ghi "Điều phối đã đọc chỉ dẫn của bài", phạm vi chỉ ảnh |
+| Đội AI → Vai trò | 14 nhân sự; hộp hồ sơ mở được |
+| Hồ sơ Người viết → Huấn luyện → **Nạp mẫu chuyên gia** → Lưu → Hoàn tác | Nạp chỉ điền ô và báo "chưa Lưu thì chưa thay đổi"; Lưu tạo phiên bản; Hoàn tác về mặc định |
+| Diễn biến phiên | Hiện tên "Quản lý SEO", "Người nghiên cứu", "Họa viên hình ảnh" |
+
+Lỗi tìm thấy qua giao diện và đã sửa: (1) tiêu đề quyết định bị lặp "chỉ làm chỉ làm lại ảnh"; (2) hộp xác nhận "Giao đội AI" mô tả đầy đủ các bước dù chỉ dẫn đang giới hạn phạm vi: nay có dòng đậm nói trước phạm vi sẽ chạy.
+
+Còn tồn tại, chưa sửa: mục "Dự kiến" của hộp Giao làm lại chỉ cập nhật khi rời ô nhập (người dùng gõ xong bấm thẳng nút Giao vẫn thấy dự kiến cũ lúc đó, nhưng phạm vi thật do điều phối chốt khi chạy, hiện trong diễn biến); hộp "Giao đội AI" vẫn liệt kê "đọc 5 trang, viết…" ở các gạch đầu dòng phía trên dù đã có dòng đậm về phạm vi.
+Chưa thử trên giao diện: server `autoseo.addp.vn` (do bạn đăng nhập), model thật, ảnh thật, cron ảnh bù.
+
 ## 7. Cách thử sáng mai (10 phút)
 1. Mở một bài đã có bản nháp → trang chi tiết bản bài → bấm **Giao làm lại** (nút mới) → gõ: `Chỉ tạo lại ảnh bìa có chữ «Tên tiêu đề ngắn». Giữ nguyên bài viết.` Kỳ vọng: nhật ký có bước "Điều phối đã đọc lời nhắn", phạm vi "chỉ làm lại ảnh, giữ nguyên chữ của bài", **không** có bước viết/chấm, bản mới v+1 chữ y hệt bản cũ, ảnh bìa mới. Xem chữ trên ảnh có đúng dấu không.
 2. Vào bài khác → **Chỉ dẫn cho đội AI** → gõ `Chỉ tạo lại ảnh, giữ nguyên bài viết.` → **Giao đội AI**. Kỳ vọng như trên, bước điều phối ghi "đã đọc chỉ dẫn của bài". Xóa chỉ dẫn sau đó.

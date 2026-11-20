@@ -205,6 +205,11 @@ class ArticleResource extends Resource
             $html .= '<li>'.e($l).'</li>';
         }
         $html .= '</ul>';
+        // Chỉ dẫn của bài nêu phạm vi rõ ("chỉ tạo ảnh", "giữ nguyên bài viết") thì đội làm đúng phạm vi đó: nói trước để người bấm không tưởng sẽ chạy đủ mọi bước.
+        $g = trim((string) $record->guidance);
+        if ($g !== '' && RedoScope::mentionsScope($g) && $record->versions()->exists()) {
+            $html .= '<p class="mt-2 text-sm font-medium" data-testid="assign-guidance-scope">Chỉ dẫn của bài đang nêu phạm vi, nên lần này đội sẽ '.e(RedoScope::describe(RedoScope::resolve($g)['parts'])).' (xem lại hoặc xóa chỉ dẫn nếu muốn chạy đủ).</p>';
+        }
 
         return new HtmlString($html);
     }
