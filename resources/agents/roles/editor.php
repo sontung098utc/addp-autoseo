@@ -46,6 +46,9 @@ return [
     'skills' => [
         'editor/qa-review',
         'editor/eeat-check',
+        // Nạp thêm vào lượt biên tập khi chủ đề rủi ro vừa/cao.
+        'editor/ymyl-medical-review',
+        'editor/citation-support',
     ],
     'orchestrator_steps' => [
         'risk' => 'editor',

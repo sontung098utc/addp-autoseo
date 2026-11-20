@@ -8,8 +8,9 @@ use Illuminate\Support\Str;
  * PHẠM VI "Giao làm lại": các phần đội AI được phép làm lại. Danh sách TRẮNG cố định (dàn ý, bài viết, ảnh, nguồn/kho).
  *
  * Lời nhắn của người dùng và đầu ra của AI chỉ có thể CHỌN trong danh sách này; mọi giá trị khác bị bỏ, nên lời nhắn không thể điều khiển công cụ nào ngoài
- * (đăng bài, đổi quy tắc, gọi mạng...). Quy tắc xác định ĐÈ lên AI: lời nhắn nói "giữ nguyên ảnh/nguồn/dàn ý" thì phần đó bị loại dù AI đề xuất. Không rõ thì
- * mặc định chỉ "bài viết" (rẻ nhất). "Bài viết" luôn có: làm lại nghĩa là viết lại chữ.
+ * (đăng bài, đổi quy tắc, gọi mạng...). Quy tắc xác định ĐÈ lên AI: lời nhắn nói "giữ nguyên ảnh/nguồn/dàn ý/bài viết" hoặc "CHỈ làm ảnh" thì phần đó bị loại/giữ dù AI đề xuất.
+ * Không rõ thì mặc định chỉ "bài viết" (rẻ nhất). Trước đây "bài viết" luôn bị ép vào mọi lượt nên "chỉ sửa ảnh" vẫn chạy cả viết; nay "bài viết" chỉ có khi được yêu cầu,
+ * hoặc khi không còn bản cũ để giữ, hoặc khi đổi dàn ý (đổi dàn ý nghĩa là phải viết lại).
  */
 final class RedoScope
 {
@@ -49,7 +50,7 @@ final class RedoScope
     /**
      * Phần bị lời nhắn yêu cầu GIỮ NGUYÊN (quy tắc xác định, đè lên AI).
      *
-     * @return list<string> các phần trong PARTS (không bao giờ gồm "bài viết")
+     * @return list<string> các phần trong PARTS
      */
     public static function kept(string $message): array
     {
@@ -63,6 +64,9 @@ final class RedoScope
         }
         if (self::keeps($n, 'dan y|bo cuc|cac muc')) {
             $kept[] = self::OUTLINE;
+        }
+        if (self::keeps($n, 'bai viet|noi dung|van ban|bai')) {
+            $kept[] = self::WRITE;
         }
 
         return $kept;
@@ -91,24 +95,83 @@ final class RedoScope
     }
 
     /**
-     * Chốt phạm vi từ lời nhắn và (nếu có) gợi ý của AI. Chỉ nhận phần thuộc danh sách trắng; "giữ nguyên ảnh/nguồn/dàn ý" trong lời nhắn loại phần đó.
+     * "CHỈ làm X": lời nhắn giới hạn rõ phạm vi ("chỉ tạo lại ảnh", "chỉ cần thêm nguồn", "chỉ sửa ảnh bìa"). Trả về đúng các phần được nêu sau chữ "chỉ",
+     * hoặc null nếu không có giới hạn rõ. Chỉ tính khi cụm sau "chỉ" nêu danh từ của một phần và KHÔNG nêu bài viết/nội dung.
+     *
+     * @return list<string>|null
+     */
+    public static function exclusive(string $message): ?array
+    {
+        $n = self::norm($message);
+        $parts = [];
+        if (preg_match_all('/\bchi\b(?:\s+can|\s+muon|\s+hay)?([^.;,\n]{0,70})/u', $n, $m)) {
+            foreach ($m[1] as $clause) {
+                if (preg_match('/\b(bai viet|noi dung|van ban|viet lai|viet bai|giong van|doan van)\b/u', $clause)) {
+                    continue;
+                }
+                if (preg_match('/\b(anh|hinh anh|hinh minh hoa|anh bia|infographic)\b/u', $clause)) {
+                    $parts[] = self::IMAGES;
+                }
+                if (preg_match('/\b(nguon|tai lieu|kho|kien thuc)\b/u', $clause)) {
+                    $parts[] = self::SOURCES;
+                }
+                if (preg_match('/\b(dan y|bo cuc|cac muc)\b/u', $clause)) {
+                    $parts[] = self::OUTLINE;
+                }
+            }
+        }
+        $parts = array_values(array_unique($parts));
+
+        return $parts === [] ? null : $parts;
+    }
+
+    /**
+     * Chốt phạm vi từ lời nhắn và (nếu có) gợi ý của AI. Chỉ nhận phần thuộc danh sách trắng. Thứ tự ưu tiên của quy tắc xác định (đè lên AI):
+     * 1) "chỉ làm X" → đúng X; 2) "giữ nguyên Y" → loại Y (kể cả bài viết); 3) đổi dàn ý kéo theo viết lại; 4) không rõ gì → chỉ bài viết.
+     * $hasPrevious=false (bài chưa có bản nào để giữ): bắt buộc có bài viết vì không có gì để dùng lại.
      *
      * @param  array<int|string,mixed>|null  $aiParts  null = không có AI phân loại (dùng luật từ khóa)
-     * @return array{parts: list<string>, kept: list<string>, defaulted: bool, source: string}
+     * @return array{parts: list<string>, kept: list<string>, defaulted: bool, source: string, exclusive: bool}
      */
-    public static function resolve(string $message, ?array $aiParts = null): array
+    public static function resolve(string $message, ?array $aiParts = null, bool $hasPrevious = true): array
     {
+        $only = self::exclusive($message);
         $proposed = $aiParts === null ? self::requested($message) : $aiParts;
-        $set = [self::WRITE];
-        foreach ($proposed as $p) {
+        $set = [];
+        foreach ($only ?? $proposed as $p) {
             if (is_string($p) && in_array($p, self::PARTS, true)) {
                 $set[] = $p; // giá trị ngoài danh sách trắng bị bỏ im lặng
             }
         }
         $kept = self::kept($message);
-        $parts = array_values(array_filter(self::PARTS, fn ($p) => in_array($p, $set, true) && ! in_array($p, $kept, true)));
+        $proposedAny = $set !== [];
+        if (in_array(self::OUTLINE, $set, true)) {
+            $set[] = self::WRITE; // đổi dàn ý nghĩa là phải viết lại theo dàn ý mới
+        }
+        if ($set === [] || ! $hasPrevious) {
+            $set[] = self::WRITE;
+        }
+        $parts = array_values(array_filter(self::PARTS, fn ($p) => in_array($p, $set, true) && (! in_array($p, $kept, true) || ! $hasPrevious && $p === self::WRITE)));
+        if ($parts === []) { // giữ nguyên mọi thứ được đề xuất: không còn việc gì hợp lý, quay về phần rẻ nhất chưa bị giữ
+            $parts = [! in_array(self::WRITE, $kept, true) ? self::WRITE : self::IMAGES];
+        }
 
-        return ['parts' => $parts, 'kept' => $kept, 'defaulted' => $parts === [self::WRITE], 'source' => $aiParts === null ? 'rules' : 'ai'];
+        return ['parts' => $parts, 'kept' => $kept, 'defaulted' => ! $proposedAny && $parts === [self::WRITE], 'source' => $aiParts === null ? 'rules' : 'ai', 'exclusive' => $only !== null];
+    }
+
+    /**
+     * Chỉ dẫn lưu theo bài có NÊU phạm vi rõ không ("chỉ tạo ảnh", "giữ nguyên bài viết/ảnh/nguồn"). Chặt hơn requested(): chỉ dẫn là lời dặn lâu dài nên câu như
+     * "thêm ảnh minh họa dễ hiểu" là hướng nội dung, không phải lệnh bỏ qua bước viết.
+     */
+    public static function mentionsScope(string $message): bool
+    {
+        return self::exclusive($message) !== null || self::kept($message) !== [];
+    }
+
+    /** Phạm vi có bỏ qua bước viết không (chỉ ảnh/nguồn, giữ nguyên chữ của bản cũ). @param list<string> $parts */
+    public static function skipsWriting(array $parts): bool
+    {
+        return ! in_array(self::WRITE, $parts, true) && ! in_array(self::OUTLINE, $parts, true);
     }
 
     /** @param list<string> $parts */
@@ -126,6 +189,9 @@ final class RedoScope
     {
         $do = array_map(fn ($p) => self::LABELS[$p], array_values(array_filter(self::PARTS, fn ($p) => in_array($p, $parts, true))));
         $keep = array_map(fn ($p) => self::LABELS[$p], array_values(array_filter([self::IMAGES, self::SOURCES], fn ($p) => ! in_array($p, $parts, true))));
+        if (self::skipsWriting($parts)) { // không viết lại: nói rõ chữ của bản cũ được giữ nguyên
+            return 'chỉ làm lại '.implode(' + ', $do).', giữ nguyên chữ của bài'.($keep !== [] ? ' và '.implode(' và ', $keep) : '');
+        }
         $text = $do === [self::LABELS[self::WRITE]] ? 'chỉ viết lại bài viết' : 'làm lại '.implode(' + ', $do);
 
         return $text.($keep !== [] ? ', giữ nguyên '.implode(' và ', $keep) : '');

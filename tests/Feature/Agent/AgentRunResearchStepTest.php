@@ -89,7 +89,7 @@ class AgentRunResearchStepTest extends TestCase
         $this->assertSame(['guard', 'risk', 'research', 'synthesize', 'brief', 'research', 'images', 'write', 'grade', 'assemble', 'grade', 'handoff'], $run->steps->pluck('stage')->all());
         $r = $run->steps->where('stage', 'research')->last();
         $this->assertSame('ok', $r->status);
-        $this->assertSame('system', $r->role);
+        $this->assertSame('researcher', $r->role);
         $this->assertSame(0, (int) $r->tokens_used);
         $this->assertSame(0.0, (float) $r->cost_vnd);
         $this->assertSame([$kb->id], $r->data['knowledge']['ids']);

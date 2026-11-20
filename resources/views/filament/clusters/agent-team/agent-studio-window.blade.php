@@ -156,6 +156,20 @@
                                 @empty<span class="text-xs" style="opacity:.7">Đang dùng mặc định từ tệp vai trò.</span>@endforelse
                             </div>
                         @endif
+                        @if ($edit)
+                            @php $tpl = \App\Services\Agent\Roles\ExpertTemplates::for((string) $studioRole); @endphp
+                            <div class="ags-card" style="margin-bottom:.6rem" data-testid="studio-quick-teach">
+                                <div style="font-weight:600;font-size:.85rem">Cách dạy nhanh</div>
+                                <ol style="margin:.3rem 0 0 1.1rem;font-size:.8rem;opacity:.85;list-style:decimal">
+                                    <li>@if ($tpl)Bấm <b>Nạp mẫu chuyên gia</b> để điền sẵn persona và quy tắc chuyên môn.@else Viết persona (người này là ai, giọng nào) và vài quy tắc ngắn.@endif</li>
+                                    <li>Sửa cho hợp website của bạn, rồi bấm <b>Lưu</b>. Có hiệu lực từ lần chạy kế tiếp, hoàn tác được ở nút Lịch sử.</li>
+                                    <li>Khi thấy bài sai một chỗ, vào tab <b>Bài học</b> ghi một câu quy tắc để người này nhớ mãi.</li>
+                                </ol>
+                                @if ($tpl)
+                                    <div style="margin-top:.5rem"><button type="button" style="{{ $btn }}" wire:click="applyExpertTemplate" data-testid="studio-apply-template">Nạp mẫu chuyên gia: {{ $tpl['label'] }}</button></div>
+                                @endif
+                            </div>
+                        @endif
                         <fieldset @disabled(! $edit) style="border:0;padding:0;margin:0">
                             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.6rem">
                                 <div><label>Tên hiển thị</label><input style="{{ $input }}" wire:model="fName" maxlength="80" data-testid="studio-f-name"></div>

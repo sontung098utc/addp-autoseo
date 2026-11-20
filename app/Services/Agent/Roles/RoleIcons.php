@@ -15,6 +15,11 @@ final class RoleIcons
         'editor' => ['icon' => 'heroicon-o-shield-check', 'color' => '#16a34a'],
         'monitor' => ['icon' => 'heroicon-o-chart-bar', 'color' => '#ca8a04'],
         'manager' => ['icon' => 'heroicon-o-briefcase', 'color' => '#be185d'],
+        'researcher' => ['icon' => 'heroicon-o-globe-alt', 'color' => '#0e7490'],
+        'planner' => ['icon' => 'heroicon-o-calendar-days', 'color' => '#6d28d9'],
+        'file_analyst' => ['icon' => 'heroicon-o-table-cells', 'color' => '#0d9488'],
+        'fact_checker' => ['icon' => 'heroicon-o-clipboard-document-check', 'color' => '#dc2626'],
+        'designer' => ['icon' => 'heroicon-o-photo', 'color' => '#ea580c'],
     ];
 
     /** @return array{icon: string, color: string} */

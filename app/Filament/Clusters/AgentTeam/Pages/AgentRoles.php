@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Agent\Ai\AiModelCatalog;
 use App\Services\Agent\Pipeline\PipelineVisual;
 use App\Services\Agent\Roles\AgentProfiles;
+use App\Services\Agent\Roles\ExpertTemplates;
 use App\Services\Agent\Roles\AgentStudioData;
 use App\Services\Agent\Roles\RoleAssignments;
 use App\Services\Agent\Roles\RoleRegistry;
@@ -237,6 +238,20 @@ class AgentRoles extends Page
             ], $u);
             $this->loadStudioForm();
         }, 'Đã lưu hồ sơ. Có hiệu lực từ lần chạy kế tiếp.');
+    }
+
+    /** Điền sẵn persona và quy tắc từ mẫu chuyên gia của vai trò vào ô trên màn hình; chưa lưu, người dùng xem lại rồi bấm Lưu. */
+    public function applyExpertTemplate(): void
+    {
+        $t = ExpertTemplates::for((string) $this->studioRole);
+        if ($t === null) {
+            Notification::make()->title('Vai trò này chưa có mẫu chuyên gia.')->warning()->send();
+
+            return;
+        }
+        $this->fPersona = $t['persona'];
+        $this->fInstructions = $t['instructions'];
+        Notification::make()->title('Đã điền mẫu «'.$t['label'].'»')->body('Xem lại rồi bấm Lưu để áp dụng từ lần chạy kế tiếp. Chưa bấm Lưu thì chưa có gì thay đổi.')->success()->send();
     }
 
     public function undoProfile(): void
