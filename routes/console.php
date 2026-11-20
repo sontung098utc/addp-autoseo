@@ -65,3 +65,10 @@ Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3 --sleep=
     ->when(fn () => config('queue.default') !== 'sync')
     ->withoutOverlapping(5)
     ->runInBackground();
+
+// Ảnh bù: bài chờ duyệt thiếu ảnh vì nhà cung cấp ảnh hết hạn ngạch/lỗi thì tự tạo lại CHỈ ảnh (giữ nguyên chữ), tối đa 3 lượt mỗi bài, cách nhau 20 phút.
+Schedule::command('agent:retry-images')
+    ->cron('*/20 * * * *')
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->withoutOverlapping()
+    ->runInBackground();

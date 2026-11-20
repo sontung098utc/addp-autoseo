@@ -697,6 +697,17 @@ final class AgentRunOrchestrator
                 $this->carryOverImages($run, $article, $version); // ảnh trong bài cũ vẫn dùng; ảnh bìa mới thay ảnh bìa cũ ngay dưới
             }
             $this->assembleImages($run, $article, $version);
+            $imgStep = $run->steps()->where('stage', 'images')->latest('id')->first();
+            if ((int) (((array) ($imgStep?->data))['generated'] ?? 0) === 0 && ! RedoScope::has($scope, RedoScope::SOURCES)) { // không tạo được ảnh nào (hết hạn ngạch, lỗi nhà cung cấp): bản mới chỉ là bản sao, không giữ để khỏi sinh phiên bản trùng mỗi lần thử lại
+                $version->mediaAssets()->detach();
+                $version->delete();
+                $run->update(['final_version_id' => null]);
+                $why = (string) (((array) ($imgStep?->data))['skipped_reason'] ?? 'Không tạo được ảnh nào.');
+                $this->step($run, 'handoff', 'system', 'warn', 'Không tạo được ảnh, giữ nguyên bài', $why.' Không tạo bản mới; bài giữ nguyên bản v'.$prev->version.'.', ['scope' => $scope, 'retryable' => true]);
+                $article->update(['workflow_status' => $previousStatus]);
+
+                return $this->finish($run, 'blocked', $why);
+            }
             $newCover = $version->mediaAssets()->get()->filter(fn ($a) => (bool) $a->pivot->is_featured && ($a->metadata['article_version_id'] ?? null) === $version->id)->first();
             if ($newCover !== null) { // đã có ảnh bìa mới: gỡ cờ bìa của ảnh cũ
                 foreach ($version->mediaAssets()->get() as $a) {
@@ -1024,10 +1035,11 @@ final class AgentRunOrchestrator
             ]);
             $ins = count(array_filter($res['placements'], fn ($p) => $p['status'] === 'inserted'));
             $this->skills['assemble'] = [null, ''];
-            $this->step($run, 'assemble', 'system', $made === 0 || collect($res['placements'])->contains(fn ($p) => in_array($p['status'], ['missing', 'unplaced'], true)) ? 'warn' : 'ok',
+            $qa = \App\Services\Images\ImageQaChecker::check($slots, $items); // Người kiểm ảnh (luật): lỗi đo được của ảnh vừa tạo
+            $this->step($run, 'assemble', 'system', $made === 0 || $qa['serious'] > 0 || collect($res['placements'])->contains(fn ($p) => in_array($p['status'], ['missing', 'unplaced'], true)) ? 'warn' : 'ok',
                 'Lắp ráp bài: '.$ins.' ảnh trong bài'.(collect($res['placements'])->contains('status', 'featured') ? ' + ảnh bìa' : ''),
-                'Ghép bài viết với ảnh theo kế hoạch: '.implode('; ', array_map(fn ($p) => ($p['role'] === 'featured' ? 'Ảnh bìa' : 'Ảnh '.$p['slot']).' — '.$p['note'], $res['placements'])).'.',
-                ['version_id' => $version->id, 'placements' => $res['placements']]);
+                'Ghép bài viết với ảnh theo kế hoạch: '.implode('; ', array_map(fn ($p) => ($p['role'] === 'featured' ? 'Ảnh bìa' : 'Ảnh '.$p['slot']).' — '.$p['note'], $res['placements'])).'.'.($qa['summary'] !== '' ? ' '.$qa['summary'] : ''),
+                ['version_id' => $version->id, 'placements' => $res['placements'], 'image_qa' => $qa['rows']]);
             if ($made === 0) { // báo về điều phối: không có ảnh nào để ghép
                 $this->decision($run, 'attention_images', 'Điều phối: không có ảnh nào để ghép, giữ bài không ảnh cho người duyệt', 'Họa viên không tạo được ảnh nào ('.(($errors[0] ?? null) ? mb_substr((string) (is_array($errors[0]) ? json_encode($errors[0], JSON_UNESCAPED_UNICODE) : $errors[0]), 0, 140) : 'nhà cung cấp ảnh lỗi hoặc hết hạn mức').'). Bài giao không có ảnh; người duyệt cần bổ sung ảnh hoặc chạy lại bước tạo ảnh.', ['routes' => []]);
             }

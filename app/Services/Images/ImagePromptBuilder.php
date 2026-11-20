@@ -22,7 +22,7 @@ final class ImagePromptBuilder
     /** Người duyệt đòi chữ/nhãn/tiêu đề/số liệu trên ảnh. Chỉ khớp khi nhắc tới ảnh gần đó, để câu "viết chữ in đậm" trong bài không bị nhầm. */
     private const TEXT_REQUEST = '/(?:\b(?:anh|hinh|infographic|bia|minh hoa)\b[^.;\n]{0,40}\b(?:co|chen|ghi|kem|them|dat|hien thi|viet)\b[^.;\n]{0,20}\b(?:chu|text|tieu de|nhan|so lieu|caption|dong chu)\b|\b(?:chu|text|tieu de|nhan|so lieu)\b[^.;\n]{0,20}\b(?:tren|trong|len|o)\s+(?:anh|hinh)\b|\bco\s+(?:chu|text)\b|\binfographic\b)/u';
 
-    private const SAFE_HEALTH = ' Friendly, calm, stylized illustration. Health themes (for example a glucose meter, a heart icon, healthy food, a walking person silhouette) are fine, kept non-graphic and without readable text.';
+    private const SAFE_HEALTH = ' Friendly, calm, stylized illustration. Health themes are fine, kept non-graphic, simple and uncluttered with plenty of empty space.';
 
     private const BEFORE_AFTER = '/(tr[uư][oơ]́?c\s*(và|va|&|-)\s*sau|before\s*(and|&|-)\s*after)/iu';
 

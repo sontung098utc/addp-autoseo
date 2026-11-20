@@ -19,6 +19,7 @@ final class RoleIcons
         'planner' => ['icon' => 'heroicon-o-calendar-days', 'color' => '#6d28d9'],
         'file_analyst' => ['icon' => 'heroicon-o-table-cells', 'color' => '#0d9488'],
         'fact_checker' => ['icon' => 'heroicon-o-clipboard-document-check', 'color' => '#dc2626'],
+        'image_qa' => ['icon' => 'heroicon-o-eye-dropper', 'color' => '#9333ea'],
         'designer' => ['icon' => 'heroicon-o-photo', 'color' => '#ea580c'],
     ];
 

@@ -362,4 +362,21 @@ class RedoScopeTest extends TestCase
         $this->assertGreaterThan(0, $ai->outlines, 'dàn ý được lập lại');
         $this->assertSame('redo_keep', $run->steps->firstWhere('stage', 'images')->data['skip_code']);
     }
+
+    public function test_chi_anh_ma_nha_cung_cap_anh_loi_thi_khong_sinh_ban_trung_va_bai_giu_nguyen(): void
+    {
+        Http::fake(['*' => Http::response('quota', 429)]);
+        $g = \App\Models\AiProvider::create(['name' => 'Gem', 'kind' => 'gemini', 'api_key' => 'k', 'enabled' => true, 'models' => ['gemini-3.1-flash-image']]);
+        \App\Models\AgentRoleAssignment::create(['role_key' => 'designer', 'provider_id' => $g->id, 'model' => 'gemini-3.1-flash-image', 'enabled' => true]);
+        $ai = $this->ai(['scope' => ['images'], 'reuse_outline' => true, 'summary' => 'x']);
+        $run = $this->redo($ai, 'Chỉ tạo lại ảnh bìa, giữ nguyên bài viết.');
+
+        $this->assertSame('blocked', $run->status);
+        $this->assertSame(1, ArticleVersion::query()->where('article_id', $this->article->id)->count(), 'không sinh bản sao khi không có ảnh mới');
+        $this->assertNull($run->final_version_id);
+        $this->assertSame('needs_review', $this->article->fresh()->workflow_status);
+        $h = $run->steps->first(fn ($s) => ($s->data['retryable'] ?? false) === true);
+        $this->assertNotNull($h);
+        $this->assertSame(0, $this->writes($ai));
+    }
 }

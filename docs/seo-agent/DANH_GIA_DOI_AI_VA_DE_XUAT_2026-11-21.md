@@ -35,14 +35,14 @@ Mức kiểm chứng dùng thang của AGENTS.md: **(1)** đã viết code → *
 | **Người nghiên cứu** (`researcher`) | Đã nối: các bước tìm nguồn, nạp kho, soát tài liệu ghi tên vai trò | Kỹ năng `evidence-hunting` (thang nguồn, cách đặt truy vấn, xử lý 0 kết quả) và `trend-research` (mới là hướng dẫn, chưa tự chạy) |
 | **Người lập kế hoạch nội dung** (`planner`) | Chưa nối: việc này chạy ở trang Kế hoạch | Kỹ năng `planner/content-calendar` |
 | **Người phân tích tệp** (`file_analyst`) | Chưa nối: nhập tệp kế hoạch chạy ở trang Kế hoạch | Kỹ năng `analyst/file-intake` |
+| **Người kiểm ảnh** (`image_qa`) | Đã chạy bằng luật trong bước Lắp ráp (mục `image_qa`); chưa có AI nhìn ảnh | Bắt ảnh trống, trùng, thấp phân giải, sai tỉ lệ, thiếu alt; với ảnh có chữ chỉ **nhắc người duyệt kiểm chữ và dấu** |
 | **Kiểm chứng viên y khoa** (`fact_checker`) | Đề xuất (idea) | Hiện nằm trong bước Biên tập (kỹ năng `ymyl-medical-review` được nạp khi rủi ro vừa/cao). Chỉ tách riêng khi có chuyên gia y khoa nghiệm thu |
 
 Giải thích "ai là người nghiên cứu xu hướng, lập kế hoạch, phân tích file": trước đây ba việc này **có code** (từ khóa/SERP/Search Console, trang Kế hoạch, nhập tệp) nhưng không có tên trong sổ vai trò nên không thấy ở tab Vai trò. Nay hai việc sau hiện tên và ghi rõ "chưa vào nhật ký phiên chạy bài".
 
 ### Đề xuất thêm (chưa làm, cần bạn quyết)
 1. **Người đọc thử** (reader advocate): đọc bài như người đọc lo lắng trên điện thoại, báo chỗ khó hiểu, mục lục thừa, đoạn lặp. Dữ liệu cho thấy biên tập viên phải bắt lỗi "cấu trúc rối, lặp ý, hỏi–đáp thiếu câu hỏi" ở nhiều phiên (mục 5).
-2. **Người kiểm ảnh** (image QA): đối chiếu ảnh đã sinh với yêu cầu (có đúng thông điệp, chữ có đúng dấu, có đúng quy tắc). Hiện không ai kiểm ảnh sau khi sinh; kỹ năng `designer/image-qa` có sẵn nhưng chưa nối bước.
-3. **Người làm ảnh bù**: khi nhà cung cấp ảnh hết hạn ngạch (xem mục 5) tự xếp lại một lượt "chỉ ảnh" sau giờ đặt lại hạn ngạch. Nay đã có chế độ "chỉ ảnh" rẻ nên việc này khả thi.
+2. ~~Người kiểm ảnh~~ và ~~ảnh bù~~: **đã làm** (xem mục 8).
 4. **Người rà soát định kỳ**: bài y tế sắp quá hạn rà soát (khuyến cáo đổi theo năm). Kỹ năng `monitor/refresh-trigger` có sẵn.
 
 ## 4. Huấn luyện và kỹ năng
@@ -75,8 +75,15 @@ Nguồn: bản xem thử cục bộ `wt/ag-s27/database/preview.sqlite` (110 phi
 - `reviewEvidenceAgainstOutline` dùng so khớp từ (không AI) nên có thể báo nhầm "mục thiếu tài liệu" khi tiêu đề mục dùng từ khác với tài liệu; chỉ tốn tối đa 2 lượt tìm và có trần chi phí. Chưa đo tỉ lệ báo nhầm.
 - Chỉ dẫn lưu theo bài kiểu "chỉ tạo ảnh" sẽ áp cho MỌI lần giao tiếp theo của bài đó cho tới khi xóa chỉ dẫn; nhật ký phiên ghi rõ "đã đọc chỉ dẫn của bài". Nên xóa chỉ dẫn sau khi dùng.
 - Mẫu chuyên gia và kỹ năng y khoa chưa có chuyên gia y khoa rà (dự án chưa có).
-- Chưa làm: nối lại tự động ảnh bù khi hết hạn ngạch; vai trò Người đọc thử / Người kiểm ảnh; làm mới tab Huấn luyện ngoài nút mẫu và hướng dẫn nhanh.
+- Chưa làm: vai trò Người đọc thử; AI nhìn ảnh (kiểm đúng chủ đề và chính tả chữ); làm mới tab Huấn luyện ngoài nút mẫu và hướng dẫn nhanh.
 - 5 test có sẵn trên `origin/main` vẫn lỗi trong môi trường này (AgentRunWebResearch, AgentTeamHub, AiImageRoute, Campaign, ImagesLinks); không do nhánh này (đã ghi từ trước ở bộ nhớ dự án, xác nhận cùng tên).
+
+## 8. Ảnh bù và kiểm ảnh (làm thêm sau báo cáo đầu)
+
+- **Ảnh bù** (`agent:retry-images`, chạy mỗi 20 phút): bài còn chờ duyệt mà lần chạy mới nhất thiếu ảnh vì nhà cung cấp ảnh lỗi/hết hạn ngạch (`provider_error`/`not_finished`, 0 ảnh) thì tự xếp một lượt **chỉ ảnh, giữ nguyên chữ**. Giới hạn cứng: tối đa 3 lượt mỗi bài, cách nhau 20 phút, tối đa 3 bài mỗi nhịp, chỉ khi nhà cung cấp ảnh đã cấu hình, không dừng khẩn cấp, không có phiên đang chạy, chỉ phiên trong 48 giờ. Ảnh bị tắt chủ ý (`role_off`, `medical`, `disabled`) không được bù. Lượt thử lại đếm bằng nhãn `[auto-image-retry]` trong lời nhắn.
+- **Không sinh bản trùng:** nếu lượt chỉ ảnh không tạo được ảnh nào thì bản sao bị bỏ, bài giữ nguyên bản cũ, phiên ghi `blocked` kèm lý do (trước đó mỗi lần thử lỗi sẽ để lại một bản v+1 giống hệt).
+- **Kiểm ảnh** (`ImageQaChecker`, luật, không AI): kết quả nằm trong bước Lắp ráp bài (`image_qa`), bước chuyển vàng khi có lỗi đo được. Ngưỡng: tệp ≥ 4 KB, cạnh ngắn ≥ 640 px, độ lệch chuẩn độ sáng ≥ 8 (không trống), tỉ lệ lệch ≤ 25% so với kế hoạch, alt ≥ 8 ký tự; ảnh mock miễn kiểm kích thước. **Ngưỡng là heuristic chưa hiệu chỉnh với ảnh thật.**
+- Mức kiểm chứng: (2) test giả lập (`ImageRetryTest`, `ImageQaCheckerTest`, 1 test mới trong `RedoScopeTest` với Gemini giả trả 429). **Cần Dev1 rà:** lịch `agent:retry-images` trong `routes/console.php` (chạy `BackgroundRun::start`, cùng đường với nút Giao làm lại); chưa chạy với cron thật.
 
 ## 7. Cách thử sáng mai (10 phút)
 1. Mở một bài đã có bản nháp → trang chi tiết bản bài → bấm **Giao làm lại** (nút mới) → gõ: `Chỉ tạo lại ảnh bìa có chữ «Tên tiêu đề ngắn». Giữ nguyên bài viết.` Kỳ vọng: nhật ký có bước "Điều phối đã đọc lời nhắn", phạm vi "chỉ làm lại ảnh, giữ nguyên chữ của bài", **không** có bước viết/chấm, bản mới v+1 chữ y hệt bản cũ, ảnh bìa mới. Xem chữ trên ảnh có đúng dấu không.

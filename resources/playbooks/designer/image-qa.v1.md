@@ -25,7 +25,7 @@ Sau khi ảnh được tạo, kiểm từng ảnh đủ điều kiện gắn và
 # Các bước
 1. **Alt:** mỗi ảnh phải có alt, mô tả đúng nội dung ảnh, liên quan mục, không nhồi từ khóa, không bắt đầu bằng "hình ảnh của" hay "ảnh về". Thiếu alt thì đề xuất alt dựa trên prompt (luật IMG01 vẫn là cổng cuối).
 2. **Nhãn AI tạo:** mỗi ảnh có `ai_generated` ở siêu dữ liệu và chú thích trong bài; thiếu nhãn thì báo lỗi.
-3. **Quy tắc mô tả ảnh:** prompt đã dùng không yêu cầu chữ, logo, nhãn hiệu, watermark, người thật có thể nhận ra. Vi phạm thì loại ảnh khỏi bài và ghi lý do.
+3. **Quy tắc mô tả ảnh:** prompt đã dùng không yêu cầu logo, nhãn hiệu, watermark, người thật có thể nhận ra; không yêu cầu chữ trừ khi người duyệt yêu cầu ảnh có chữ (khi đó chỉ 1–3 cụm ngắn đã chốt, và nhắc người duyệt kiểm chính tả, dấu tiếng Việt). Vi phạm thì loại ảnh khỏi bài và ghi lý do.
 4. **Định dạng và kích thước:** ghi nhận loại tệp, kích thước byte, tỉ lệ; ảnh quá lớn so với ngưỡng cấu hình thì cảnh báo (không tự nén).
 5. **Bố cục:** ảnh trong bài cần có kích thước rộng và cao để tránh xô lệch bố cục; thiếu thì cảnh báo.
 6. **Chi phí:** tổng chi phí ảnh không vượt trần; vượt thì báo và không tạo thêm.
