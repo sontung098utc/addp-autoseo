@@ -13,11 +13,14 @@ use App\Services\Agent\Ai\AiModelRouter;
 use App\Services\Agent\Ai\AiProviderFactory;
 use App\Services\Agent\Roles\RoleAssignments;
 use App\Services\Agent\Settings\AgentAi;
+use App\Services\Images\CustomHttpImageGenerator;
+use App\Services\Images\Http\HttpApiSpec;
 use App\Services\Security\UrlSafetyService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Get;
@@ -99,10 +102,11 @@ trait ManagesAiAccounts
                     }),
                 TextInput::make('name')->label('Tên tài khoản')->required()->maxLength(80)->helperText('Tự đặt, ví dụ "Gemini – tài khoản công ty". Thêm được nhiều tài khoản cùng nhà cung cấp.'),
                 TextInput::make('base_url')->label('Base URL')->url()->maxLength(255)->rules([fn () => $this->baseUrlRule()])
-                    ->required(fn (Get $get) => ($get('preset') ?? '') === 'custom')
-                    ->visible(fn (Get $get) => in_array($get('preset'), ['custom', 'openai', 'openrouter', 'anthropic'], true))
+                    ->required(fn (Get $get) => in_array($get('preset') ?? '', ['custom', 'http_custom', 'sangtao'], true))
+                    ->visible(fn (Get $get) => in_array($get('preset'), ['custom', 'openai', 'openrouter', 'anthropic', 'http_custom', 'sangtao'], true))
                     ->helperText('Điền sẵn với OpenAI và OpenRouter. Máy chủ tùy chỉnh cần địa chỉ dạng …/v1. Địa chỉ nội bộ bị chặn.'),
                 TextInput::make('api_key')->label('Khóa API')->password()->revealable()->required()->autocomplete(false)->helperText('Lưu mã hóa, chỉ ghi. Sau khi lưu chỉ hiện 4 ký tự cuối để nhận diện.'),
+                $this->httpConfigField(fn (Get $get) => $this->isHttpPreset((string) $get('preset'))),
                 TextInput::make('monthly_budget_vnd')->label('Ngân sách tháng (₫)')->numeric()->minValue(0),
                 ...$this->modelFields(),
                 Toggle::make('suggest')->label('Gợi ý model cho các loại việc chưa có cấu hình')->default(true)
@@ -116,7 +120,13 @@ trait ManagesAiAccounts
 
                     return;
                 }
+                if ($kind === 'custom_http' && blank($baseUrl)) {
+                    Notification::make()->title('Thiếu Base URL')->body('API tùy chỉnh cần Base URL.')->danger()->send();
+
+                    return;
+                }
                 $p = AiProvider::create([
+                    'http_config' => $kind === 'custom_http' ? HttpApiSpec::normalize((string) ($data['http_config'] ?? '')) : null,
                     'name' => $data['name'], 'kind' => $kind, 'base_url' => $baseUrl, 'api_key' => $data['api_key'],
                     'monthly_budget_vnd' => $data['monthly_budget_vnd'] ?? null, 'enabled' => true, 'updated_by' => Auth::id(),
                     'models' => $this->mergeModels($brand, (array) ($data['models'] ?? []), (array) ($data['custom_models'] ?? []), (array) ($data['custom_image_models'] ?? [])),
@@ -133,7 +143,9 @@ trait ManagesAiAccounts
         $def = AiModelCatalog::presets()[$preset] ?? AiModelCatalog::presets()['custom'];
         $same = AiProvider::query()->get()->filter(fn (AiProvider $p) => AiModelCatalog::brandOf($p) === $preset)->count();
 
-        return ['preset' => $preset, 'name' => $same === 0 ? $def['label'] : $def['label'].' – tài khoản '.($same + 1), 'base_url' => $def['base_url'], 'models' => AiModelCatalog::defaults($preset), 'custom_models' => [], 'custom_image_models' => []];
+        $http = ($def['kind'] ?? '') === 'custom_http' ? json_encode(HttpApiSpec::preset((string) ($def['http_preset'] ?? '')), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null;
+
+        return ['http_config' => $http, 'preset' => $preset, 'name' => $same === 0 ? $def['label'] : $def['label'].' – tài khoản '.($same + 1), 'base_url' => $def['base_url'], 'models' => AiModelCatalog::defaults($preset), 'custom_models' => [], 'custom_image_models' => []];
     }
 
     /** @return array{0: string, 1: ?string, 2: string} [kind, base_url, brand] */
@@ -194,7 +206,7 @@ trait ManagesAiAccounts
                 $ids = array_column($enabled, 'id');
                 $custom = array_filter($enabled, fn ($m) => ! in_array($m['id'], $catalogIds, true));
 
-                return ['name' => $p->name, 'base_url' => $p->base_url, 'monthly_budget_vnd' => $p->monthly_budget_vnd, 'enabled' => $p->enabled, 'preset' => $brand,
+                return ['http_config' => $p->kind === 'custom_http' ? json_encode($p->http_config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null, 'name' => $p->name, 'base_url' => $p->base_url, 'monthly_budget_vnd' => $p->monthly_budget_vnd, 'enabled' => $p->enabled, 'preset' => $brand,
                     'models' => array_values(array_intersect($ids, $catalogIds)),
                     'custom_models' => array_values(array_column(array_filter($custom, fn ($m) => $m['kind'] === 'text'), 'id')),
                     'custom_image_models' => array_values(array_column(array_filter($custom, fn ($m) => $m['kind'] === 'image'), 'id'))];
@@ -203,16 +215,20 @@ trait ManagesAiAccounts
                 TextInput::make('name')->label('Tên tài khoản')->required()->maxLength(80),
                 TextInput::make('base_url')->label('Base URL')->url()->maxLength(255)->rules([fn () => $this->baseUrlRule()]),
                 TextInput::make('monthly_budget_vnd')->label('Ngân sách tháng (₫)')->numeric()->minValue(0),
+                $this->httpConfigField(fn () => AiProvider::query()->find((int) ($this->mountedActionsArguments[0]['id'] ?? 0))?->kind === 'custom_http'),
                 Toggle::make('enabled')->label('Đang bật')->helperText('Tắt thì model của tài khoản này không hiện để chọn và các việc dùng nó không chạy.'),
                 ...$this->modelFields('preset', fn () => AiProvider::query()->find((int) ($this->mountedActionsArguments[0]['id'] ?? 0))),
             ])
             ->action(function (array $data, array $arguments) {
                 $this->guardAdmin();
                 $p = AiProvider::findOrFail($arguments['id']);
-                if ($p->kind === 'openai_compat' && empty($data['base_url'])) {
-                    Notification::make()->title('Thiếu Base URL')->body('Tài khoản OpenAI-tương thích cần Base URL.')->danger()->send();
+                if (in_array($p->kind, ['openai_compat', 'custom_http'], true) && empty($data['base_url'])) {
+                    Notification::make()->title('Thiếu Base URL')->body('Tài khoản này cần Base URL.')->danger()->send();
 
                     return;
+                }
+                if ($p->kind === 'custom_http') {
+                    $p->http_config = HttpApiSpec::normalize((string) ($data['http_config'] ?? ''));
                 }
                 $p->update(['name' => $data['name'], 'base_url' => $data['base_url'] ?: null, 'monthly_budget_vnd' => $data['monthly_budget_vnd'] ?? null, 'enabled' => (bool) $data['enabled'],
                     'models' => $this->mergeModels(AiModelCatalog::brandOf($p), (array) ($data['models'] ?? []), (array) ($data['custom_models'] ?? []), (array) ($data['custom_image_models'] ?? []), $p), 'updated_by' => Auth::id()]);
@@ -256,6 +272,19 @@ trait ManagesAiAccounts
             ->action(function (array $arguments) {
                 $this->guardAdmin();
                 $p = AiProvider::findOrFail($arguments['id']);
+                if ($p->kind === 'custom_http') { // API tạo ảnh không có chat: kiểm bằng lời gọi GET nhẹ, không tốn tiền ảnh
+                    try {
+                        $r = CustomHttpImageGenerator::fromProvider($p, '')->ping();
+                    } catch (\App\Services\Images\ImageGeneratorUnavailable $e) {
+                        $r = ['ok' => false, 'message' => \App\Support\UserFacingError::from($e)];
+                    }
+                    $p->update(['last_test_at' => now(), 'last_test_ok' => $r['ok'], 'last_test_message' => $r['message'], 'updated_by' => Auth::id()]);
+                    $n = Notification::make()->title($r['ok'] ? 'Kết nối thành công' : 'Kết nối không được')->body($r['message']);
+                    $r['ok'] ? $n->success() : $n->danger();
+                    $n->send();
+
+                    return;
+                }
                 $models = array_values(array_filter(AiModelCatalog::enabledModels($p), fn ($m) => $m['kind'] === AiModelCatalog::KIND_TEXT)); // ping bằng model chữ, không dùng model ảnh
                 $pick = collect($models)->firstWhere('tier', 'cheap') ?? collect($models)->firstWhere('tier', 'standard') ?? ($models[0] ?? null);
                 $model = $pick['id'] ?? AiModelRoute::query()->where('primary_provider_id', $p->id)->value('primary_model');
@@ -378,6 +407,29 @@ trait ManagesAiAccounts
         }
 
         return $n;
+    }
+
+    private function isHttpPreset(string $preset): bool
+    {
+        return (AiModelCatalog::presets()[$preset]['kind'] ?? '') === 'custom_http';
+    }
+
+    /** Ô cấu hình JSON của API tùy chỉnh; kiểm bằng HttpApiSpec::normalize nên sai là báo rõ chỗ sai. */
+    private function httpConfigField(\Closure $visible): Textarea
+    {
+        return Textarea::make('http_config')->label('Cấu hình API (JSON)')->rows(16)->visible($visible)->required($visible)
+            ->extraInputAttributes(['style' => 'font-family:monospace;font-size:12px', 'spellcheck' => 'false'])
+            ->helperText('Mẫu đã điền sẵn theo dịch vụ; sửa theo tài liệu API của họ. Không dán khóa API vào đây (khóa nhập ở ô riêng). Chỗ trống dùng được: {{prompt}} {{model}} {{aspect}} {{size}} {{width}} {{height}} {{resolution}} {{request_id}}, và {{job_id}} ở đường dẫn hỏi trạng thái.')
+            ->rules([fn () => function (string $attribute, $value, \Closure $fail) {
+                if (blank($value)) {
+                    return;
+                }
+                try {
+                    HttpApiSpec::normalize((string) $value);
+                } catch (\InvalidArgumentException $e) {
+                    $fail(\App\Support\UserFacingError::from($e));
+                }
+            }]);
     }
 
     private function baseUrlRule(): \Closure

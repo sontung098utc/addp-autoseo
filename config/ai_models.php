@@ -14,6 +14,9 @@ return [
         'openai' => ['label' => 'OpenAI', 'kind' => 'openai_compat', 'base_url' => 'https://api.openai.com/v1', 'logo' => 'openai', 'hint' => 'Dùng giao thức OpenAI-tương thích.'],
         'openrouter' => ['label' => 'OpenRouter', 'kind' => 'openai_compat', 'base_url' => 'https://openrouter.ai/api/v1', 'logo' => 'openrouter', 'hint' => 'Một khóa dùng được nhiều hãng; tên model dạng hãng/model.'],
         'custom' => ['label' => 'OpenAI-tương thích tùy chỉnh', 'kind' => 'openai_compat', 'base_url' => null, 'logo' => 'custom', 'hint' => 'Máy chủ tự dựng hoặc dịch vụ khác (cần Base URL).'],
+        // API tạo ảnh bất kỳ cấu hình bằng JSON (kind custom_http); `http_preset` là khóa mẫu trong HttpApiSpec::preset().
+        'http_custom' => ['label' => 'API tạo ảnh tùy chỉnh (HTTP)', 'kind' => 'custom_http', 'base_url' => null, 'logo' => 'custom', 'http_preset' => 'openai_images', 'hint' => 'Dịch vụ tạo ảnh bất kỳ: sửa cấu hình JSON theo tài liệu của họ (xác thực, đường dẫn, mẫu body, cách đọc kết quả).'],
+        'sangtao' => ['label' => 'sangtao.ai (tạo ảnh)', 'kind' => 'custom_http', 'base_url' => 'https://api.sangtao.ai/v2', 'logo' => 'custom', 'http_preset' => 'sangtao', 'hint' => 'Xác thực bằng header X-Api-Key, tạo ảnh bất đồng bộ. Mẫu viết theo tài liệu docs.sangtao.ai, chưa chạy thật.'],
     ],
 
     'models' => [
@@ -48,6 +51,10 @@ return [
             ['id' => 'google/gemini-2.5-pro', 'name' => 'Gemini 2.5 Pro (qua OpenRouter)', 'tier' => 'reasoning', 'context' => 1048576, 'price' => null],
         ],
         'custom' => [],
+        'http_custom' => [],
+        'sangtao' => [
+            ['id' => 'gpt-image-2.6', 'name' => 'GPT Image 2.6', 'tier' => 'standard', 'kind' => 'image', 'context' => null, 'price' => null, 'default' => true],
+        ],
     ],
 
     /**

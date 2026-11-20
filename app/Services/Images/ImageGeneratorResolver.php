@@ -14,7 +14,7 @@ use Throwable;
  *  1) model ảnh gán cho vai trò Họa viên (designer) ở Đội AI → Vai trò → Mô hình & kỹ thuật (chính, và dự phòng nếu có; bản gán đang bật);
  *  2) route cũ 'image_gen' (AiModelRoute) để tương thích với cấu hình đã có;
  *  3) không có gì: môi trường local dùng ảnh giả lập có nhãn, nơi khác ném ImageGeneratorUnavailable.
- * Hỗ trợ provider kiểu gemini (Imagen/Gemini ảnh) và openai_compat; kiểu khác (anthropic) không tạo ảnh.
+ * Hỗ trợ provider kiểu gemini (Imagen/Gemini ảnh), openai_compat và custom_http (API tạo ảnh bất kỳ, cấu hình bằng dữ liệu); kiểu khác (anthropic) không tạo ảnh.
  * Giá một ảnh: pricing['image_vnd'] của provider nếu có, không thì config('agent.images.cost_vnd_per_image') (ước tính, chưa đo thật).
  */
 final class ImageGeneratorResolver
@@ -129,7 +129,8 @@ final class ImageGeneratorResolver
         return match ($p->kind) {
             'gemini' => new GeminiImageGenerator($p->api_key, $model, $cost),
             'openai_compat' => new OpenAiCompatImageGenerator($p->api_key, $model, $p->base_url, $cost),
-            default => throw new ImageGeneratorUnavailable("Provider \"{$p->name}\" (kiểu {$p->kind}) không hỗ trợ tạo ảnh. Chọn Google hoặc OpenAI-tương thích."),
+            'custom_http' => CustomHttpImageGenerator::fromProvider($p, $model, $cost),
+            default => throw new ImageGeneratorUnavailable("Provider \"{$p->name}\" (kiểu {$p->kind}) không hỗ trợ tạo ảnh. Chọn Google, OpenAI-tương thích hoặc API tùy chỉnh."),
         };
     }
 }

@@ -51,6 +51,7 @@ final class AiModelSync
             $rows = match ($p->kind) {
                 'gemini' => $this->fetchGemini($key),
                 'anthropic' => $this->fetchAnthropic($p, $key),
+                'custom_http' => $this->fetchCustomHttp($p),
                 default => $this->fetchOpenAiCompat($p, $key),
             };
         } catch (RuntimeException $e) {
@@ -65,7 +66,7 @@ final class AiModelSync
             if ($id === '' || ! AiModelCatalog::validCustomName($id) || ($exclude !== '' && preg_match($exclude, $id))) {
                 continue;
             }
-            $out[$id] = ['id' => $id, 'name' => isset($r['name']) && trim((string) $r['name']) !== '' ? mb_substr(trim((string) $r['name']), 0, 200) : null, 'kind' => AiModelCatalog::inferKind($id)];
+            $out[$id] = ['id' => $id, 'name' => isset($r['name']) && trim((string) $r['name']) !== '' ? mb_substr(trim((string) $r['name']), 0, 200) : null, 'kind' => $p->kind === 'custom_http' ? AiModelCatalog::KIND_IMAGE : AiModelCatalog::inferKind($id)];
         }
         if ($out === []) {
             throw new RuntimeException('Hãng không trả model nào dùng được (danh sách rỗng).');
@@ -121,6 +122,22 @@ final class AiModelSync
         $this->assertOk($resp);
 
         return array_map(fn ($m) => ['id' => (string) ($m['id'] ?? ''), 'name' => $m['display_name'] ?? $m['name'] ?? null], (array) ($resp->json('data') ?? $resp->json('models') ?? []));
+    }
+
+    /** API tùy chỉnh (chỉ tạo ảnh ở bản này): dùng cấu hình models của tài khoản. @return list<array{id: string, name: ?string}> */
+    private function fetchCustomHttp(AiProvider $p): array
+    {
+        try {
+            $gen = \App\Services\Images\CustomHttpImageGenerator::fromProvider($p, '');
+            $rows = $gen->listModels();
+        } catch (\App\Services\Images\ImageGeneratorUnavailable|\App\Services\Images\ImageGenerationError $e) {
+            throw new RuntimeException($e->getMessage(), (int) ($e instanceof \App\Services\Images\ImageGenerationError ? $e->status : 0));
+        }
+        if ($rows === []) {
+            throw new RuntimeException('API tùy chỉnh này chưa cấu hình danh sách model (models.path) hoặc không trả model; hãy nhập model theo tên.');
+        }
+
+        return $rows;
     }
 
     private function assertSafeBase(?string $base): void
