@@ -73,6 +73,11 @@ final class AiModelCatalog
         if ($p->kind === 'anthropic') {
             return 'anthropic';
         }
+        if ($p->kind === 'custom_http') {
+            $pr = (string) ($p->http_config['preset'] ?? '');
+
+            return isset(self::presets()[$pr]) ? $pr : 'http_custom';
+        }
         $host = strtolower((string) parse_url((string) $p->base_url, PHP_URL_HOST));
         if ($host !== '' && str_ends_with($host, 'openai.com')) {
             return 'openai';
