@@ -474,6 +474,12 @@ final class AgentRunOrchestrator
             if ($this->redoPlan['reuse_outline'] && $this->presetOutline === null) {
                 $this->presetOutline = $this->redoPlan['previous_outline'];
             }
+            if ($this->redoPlan['scope'] === []) { // lời nhắn bảo giữ nguyên mọi phần: không làm gì, nói rõ để người dùng không tưởng đội bỏ sót
+                $this->step($run, 'handoff', 'system', 'warn', 'Không có gì để làm lại', 'Lời nhắn yêu cầu giữ nguyên mọi phần (chữ, ảnh, nguồn) nên đội không đổi gì. Muốn làm lại một phần, giao lại và nêu phần đó.', ['scope' => []]);
+                $article->update(['workflow_status' => $previousStatus]);
+
+                return $this->finish($run, 'blocked', 'Lời nhắn yêu cầu giữ nguyên mọi phần nên không có gì để làm lại.');
+            }
             if (RedoScope::skipsWriting($this->redoPlan['scope']) && $this->redoPrevVersionId !== null) { // chỉ ảnh/nguồn: không dàn ý, không viết, không chấm; chữ của bản cũ giữ nguyên
                 return $this->executeWithoutWriting($run, $article, $assess, $previousStatus);
             }
@@ -693,7 +699,7 @@ final class AgentRunOrchestrator
         $run->update(['final_version_id' => $version->id]);
         $this->decision($run, 'redo_no_write', 'Điều phối: chỉ làm '.RedoScope::describe($scope), 'Chữ của bài giữ nguyên bản v'.$prev->version.'; không dàn ý, không viết, không chấm lại chữ. Bản mới v'.$version->version.' chỉ khác phần được giao.', ['scope' => $scope, 'from_version' => $prev->version]);
         if ($imagesIn) {
-            if (! $hasInline) {
+            if (! $hasInline && $prev->mediaAssets()->exists()) { // chỉ khi bản cũ có ảnh để giữ (không ghi bước "dùng lại 0 ảnh" thừa)
                 $this->carryOverImages($run, $article, $version); // ảnh trong bài cũ vẫn dùng; ảnh bìa mới thay ảnh bìa cũ ngay dưới
             }
             $this->assembleImages($run, $article, $version);

@@ -38,8 +38,21 @@ final class RedoScope
     /** Từ chỉ "giữ nguyên/đừng đổi" đứng gần danh từ chỉ phần đó. */
     private static function keeps(string $n, string $noun): bool
     {
-        return (bool) preg_match('/\b(giu( nguyen| lai)?|khong (can |muon |duoc )?(doi|thay|sua|lam lai|tao( moi| lai)?|thiet ke( lai)?|tim( them)?|nap( them)?)|dung (doi|sua|dong|thay|tao|lam lai|tim|nap)|khoi (doi|lam lai|tao|tim|nap))\b[^.;\n]{0,25}\b(?:'.$noun.')\b/u', $n)
-            || (bool) preg_match('/\b(?:'.$noun.')\b[^.;\n]{0,15}\b(giu nguyen|nhu cu|khong doi|khong can doi)\b/u', $n);
+        return (bool) preg_match('/\b(giu( nguyen| lai)?|khong (can |muon |duoc )?(doi|thay|sua|lam lai|tao( moi| lai)?|thiet ke( lai)?|tim( them)?|nap( them)?)|dung (doi|sua|dong|thay|tao|lam lai|tim|nap)|khoi (doi|lam lai|tao|tim|nap))\b[^.;,\n]{0,25}\b(?:'.$noun.')\b/u', $n)
+            || (bool) preg_match('/\b(?:'.$noun.')\b[^.;,\n]{0,15}\b(giu nguyen|nhu cu|khong doi|khong can doi)\b/u', $n);
+    }
+
+    /**
+     * "Giữ nguyên bài viết": chặt hơn các phần khác vì "bài" xuất hiện trong mọi lời nhắn ("Mở bài dài dòng, giữ nguyên ảnh" KHÔNG phải giữ nguyên bài).
+     * Chỉ khớp khi cụm "giữ nguyên/không đổi" đứng sát (≤ 12 ký tự, không qua dấu câu) trước hoặc sau danh từ bài viết/nội dung/văn bản/bài.
+     */
+    private static function keepsWrite(string $n): bool
+    {
+        $noun = '(?:bai viet|noi dung|van ban|bai(?!\s+(?:dai|viet|nay co|can)\b))';
+        $keep = '(?:giu( nguyen| lai)?|khong (?:can |muon |duoc )?(?:doi|thay|sua|viet lai|lam lai)|dung (?:doi|sua|viet lai|lam lai)|khoi (?:doi|viet lai|lam lai))';
+
+        return (bool) preg_match('/\b'.$keep.'\b[^.;,\n]{0,12}\b'.$noun.'\b/u', $n)
+            || (bool) preg_match('/\b'.$noun.'\s{0,3}(?:giu nguyen|nhu cu|khong doi|khong can doi)\b/u', $n);
     }
 
     private static function wants(string $n, string $verbs, string $noun): bool
@@ -65,7 +78,7 @@ final class RedoScope
         if (self::keeps($n, 'dan y|bo cuc|cac muc')) {
             $kept[] = self::OUTLINE;
         }
-        if (self::keeps($n, 'bai viet|noi dung|van ban|bai')) {
+        if (self::keepsWrite($n)) {
             $kept[] = self::WRITE;
         }
 
@@ -81,7 +94,7 @@ final class RedoScope
     {
         $n = self::norm($message);
         $out = [];
-        if (self::wants($n, 'doi|thay|lam lai|tao lai|thiet ke lai|sua|them|bo sung', 'anh|hinh anh|anh bia|anh minh hoa') || preg_match('/\banh bia\b[^.;\n]{0,20}\b(chua|khong|sai|xau|khong hop)\b/u', $n)) {
+        if (self::wants($n, 'doi|thay|lam( lai)?|tao( lai| moi)?|thiet ke( lai)?|ve( lai)?|sua|them|bo sung', 'anh|hinh anh|anh bia|anh minh hoa|infographic') || preg_match('/\banh bia\b[^.;\n]{0,20}\b(chua|khong|sai|xau|khong hop)\b/u', $n)) {
             $out[] = self::IMAGES;
         }
         if (self::wants($n, 'them|bo sung|tim them|tim|cap nhat|doi', 'nguon|tai lieu')) {
@@ -89,6 +102,10 @@ final class RedoScope
         }
         if (self::wants($n, 'them|bo|doi|lap lai|sua|sap xep lai|thieu', 'muc|dan y|bo cuc')) {
             $out[] = self::OUTLINE;
+        }
+        // Câu hỗn hợp ("viết lại mở bài và thêm ảnh"): nhắc tới chữ thì vẫn viết lại; chỉ nói về ảnh/nguồn thì không ép viết.
+        if ($out !== [] && preg_match('/\b(viet|mo bai|ket bai|ket luan|doan van|giong van|van phong|do dai|ngan hon|dai hon|rut gon|so lieu|trich dan|tu khoa|tieu de bai|cau chu|noi dung)\b/u', $n)) {
+            $out[] = self::WRITE;
         }
 
         return $out;
@@ -136,7 +153,7 @@ final class RedoScope
     public static function resolve(string $message, ?array $aiParts = null, bool $hasPrevious = true): array
     {
         $only = self::exclusive($message);
-        $proposed = $aiParts === null ? self::requested($message) : $aiParts;
+        $proposed = $aiParts === null || $aiParts === [] ? self::requested($message) : $aiParts; // AI không nêu phần nào thì dùng luật từ khóa thay vì coi như "chỉ viết"
         $set = [];
         foreach ($only ?? $proposed as $p) {
             if (is_string($p) && in_array($p, self::PARTS, true)) {
@@ -152,8 +169,8 @@ final class RedoScope
             $set[] = self::WRITE;
         }
         $parts = array_values(array_filter(self::PARTS, fn ($p) => in_array($p, $set, true) && (! in_array($p, $kept, true) || ! $hasPrevious && $p === self::WRITE)));
-        if ($parts === []) { // giữ nguyên mọi thứ được đề xuất: không còn việc gì hợp lý, quay về phần rẻ nhất chưa bị giữ
-            $parts = [! in_array(self::WRITE, $kept, true) ? self::WRITE : self::IMAGES];
+        if ($parts === []) { // mọi phần được đề xuất đều bị giữ nguyên: chữ bị giữ thì KHÔNG làm gì (đừng tự tạo lại ảnh người dùng bảo giữ); không thì quay về phần rẻ nhất
+            $parts = in_array(self::WRITE, $kept, true) ? [] : [self::WRITE];
         }
 
         return ['parts' => $parts, 'kept' => $kept, 'defaulted' => ! $proposedAny && $parts === [self::WRITE], 'source' => $aiParts === null ? 'rules' : 'ai', 'exclusive' => $only !== null];
@@ -187,6 +204,9 @@ final class RedoScope
      */
     public static function describe(array $parts): string
     {
+        if ($parts === []) {
+            return 'không làm gì (lời nhắn yêu cầu giữ nguyên mọi phần)';
+        }
         $do = array_map(fn ($p) => self::LABELS[$p], array_values(array_filter(self::PARTS, fn ($p) => in_array($p, $parts, true))));
         $keep = array_map(fn ($p) => self::LABELS[$p], array_values(array_filter([self::IMAGES, self::SOURCES], fn ($p) => ! in_array($p, $parts, true))));
         if (self::skipsWriting($parts)) { // không viết lại: nói rõ chữ của bản cũ được giữ nguyên

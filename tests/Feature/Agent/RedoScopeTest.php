@@ -379,4 +379,42 @@ class RedoScopeTest extends TestCase
         $this->assertNotNull($h);
         $this->assertSame(0, $this->writes($ai));
     }
+
+    public function test_giu_nguyen_bai_viet_khong_nham_voi_mo_bai_hay_giu_nguyen_anh(): void
+    {
+        $this->assertSame(['images'], RedoScope::kept('Mở bài dài dòng, giữ nguyên ảnh.'), '"bài" của "mở bài" không phải đối tượng giữ nguyên');
+        $this->assertSame(['write'], RedoScope::kept('Giữ nguyên bài viết.'));
+        $this->assertSame(['write'], RedoScope::kept('Giữ nguyên bài.'));
+        $this->assertSame(['write'], RedoScope::kept('Không đổi nội dung bài, đổi ảnh bìa.'));
+        $this->assertSame(['write'], RedoScope::kept('Chỉ đổi ảnh bìa, bài viết giữ nguyên.'));
+        $this->assertSame([], RedoScope::kept('Viết lại phần mở bài cho ngắn hơn.'));
+        $this->assertSame(['write'], RedoScope::resolve('Mở bài dài dòng, giữ nguyên ảnh.', ['write'])['parts'], 'sửa mở bài, giữ ảnh: vẫn viết lại chữ');
+    }
+
+    public function test_giu_nguyen_moi_thu_thi_khong_lam_gi_va_noi_ro(): void
+    {
+        Http::fake();
+        $ai = $this->ai(['scope' => ['write', 'images']]);
+        $run = $this->redo($ai, 'Giữ nguyên ảnh, giữ nguyên nguồn, giữ nguyên dàn ý, giữ nguyên bài viết.');
+        $this->assertSame([], $this->planStep($run)->data['scope']);
+        $this->assertSame('blocked', $run->status);
+        $this->assertSame(0, $this->writes($ai));
+        $this->assertSame(1, ArticleVersion::query()->where('article_id', $this->article->id)->count(), 'không sinh bản mới');
+        $this->assertSame('needs_review', $this->article->fresh()->workflow_status);
+        $this->assertSame('không làm gì (lời nhắn yêu cầu giữ nguyên mọi phần)', RedoScope::describe([]));
+    }
+
+    public function test_cau_hon_hop_van_viet_lai_chu_va_cau_chi_ve_anh_thi_khong(): void
+    {
+        $this->assertContains('write', RedoScope::resolve('Viết lại mở bài cho ngắn và thêm ảnh minh họa.')['parts']);
+        $this->assertSame(['images'], RedoScope::resolve('Làm ảnh bìa dạng infographic có chữ tiêu đề.')['parts'], 'yêu cầu chỉ về ảnh (kể cả "làm/tạo/vẽ ảnh") không ép viết lại');
+        $this->assertSame(['images'], RedoScope::resolve('Vẽ lại ảnh bìa.')['parts']);
+        $this->assertSame(['images'], RedoScope::resolve('Đổi ảnh bìa. Giữ nguyên bài viết.')['parts']);
+    }
+
+    public function test_ai_tra_pham_vi_rong_thi_dung_luat_tu_khoa_thay_vi_chi_viet(): void
+    {
+        $this->assertSame(['images', 'sources'], RedoScope::resolve('Tìm thêm nguồn và làm lại ảnh bìa, giữ nguyên bài viết.', [])['parts']);
+        $this->assertSame(['images'], RedoScope::resolve('Làm ảnh bìa dạng infographic có chữ tiêu đề.', [])['parts']);
+    }
 }

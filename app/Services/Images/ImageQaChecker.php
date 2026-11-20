@@ -59,7 +59,7 @@ final class ImageQaChecker
                 if (! $mock && $a->width && $a->height && min($a->width, $a->height) < self::MIN_SIDE) {
                     $issues[] = 'low_res';
                 }
-                if (self::isNearlyBlank($bytes)) {
+                if (! $mock && self::isNearlyBlank($bytes)) { // ảnh giả lập vốn là khối màu: không chê
                     $issues[] = 'nearly_blank';
                 }
             }
