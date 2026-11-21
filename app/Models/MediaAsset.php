@@ -12,8 +12,17 @@ class MediaAsset extends Model
 {
     use HasFactory;
 
+    public const KINDS = ['photo', 'product', 'logo_brand', 'infographic', 'ai_generated', 'crawled_ref', 'screenshot', 'other'];
+
+    public const STATUSES = ['inbox', 'ready', 'archived'];
+
     protected $fillable = [
         'website_id',
+        'kind',
+        'status',
+        'folder_id',
+        'usage_count',
+        'slug',
         'uploaded_by',
         'disk',
         'file_path',
@@ -53,6 +62,21 @@ class MediaAsset extends Model
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    public function folder(): BelongsTo
+    {
+        return $this->belongsTo(MediaCollection::class, 'folder_id');
+    }
+
+    public function collections(): BelongsToMany
+    {
+        return $this->belongsToMany(MediaCollection::class, 'media_collection_asset')->withTimestamps();
+    }
+
+    public function tagModels(): BelongsToMany
+    {
+        return $this->belongsToMany(MediaTag::class, 'media_asset_tag');
     }
 
     public function articleVersions(): BelongsToMany
