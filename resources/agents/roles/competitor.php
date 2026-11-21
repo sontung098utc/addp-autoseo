@@ -34,6 +34,7 @@ return [
         'analyst/serp-gap',
         // Ý ĐỊNH (chưa có playbook, chưa nối): khoảng trống liên kết/backlink; xem ROLE_WORKFLOWS.md mục 3.9
         'analyst/backlink-gap',
+        'analyst/competitor-claims-reading',
     ],
     'orchestrator_steps' => [],
     'readiness' => 'not_connected',

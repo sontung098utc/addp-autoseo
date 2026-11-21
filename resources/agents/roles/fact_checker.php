@@ -36,6 +36,8 @@ return [
     'skills' => [
         'editor/ymyl-medical-review',
         'editor/citation-support',
+        'editor/claim-evidence-matrix',
+        'editor/evidence-wording',
     ],
     'orchestrator_steps' => [],
     'readiness' => 'idea',

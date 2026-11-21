@@ -135,6 +135,88 @@ Lỗi tìm thấy qua giao diện và đã sửa: (1) tiêu đề quyết địn
 Hai chỗ còn tồn tại ban đầu đã sửa và kiểm lại trên giao diện: mục "Dự kiến" cập nhật ngay lúc gõ (debounce 0,5 giây); hộp "Giao đội AI" khi chỉ dẫn giới hạn phạm vi chỉ còn câu phạm vi, rủi ro và chi phí theo phạm vi (không liệt kê các bước sẽ không chạy).
 Chưa thử trên giao diện: server `autoseo.addp.vn` (do bạn đăng nhập), model thật, ảnh thật, cron ảnh bù.
 
+## 11. Nạp huấn luyện từ file và file mẫu (21/11, bổ sung theo yêu cầu)
+
+**Nạp từ file cho vai trò** (Đội AI → Vai trò → hồ sơ → Huấn luyện → tab **Nạp từ file**):
+1. Chọn tệp (.md, .txt, .csv, .json, .docx, dưới 200 KB) → bấm **Phân tích bằng AI**.
+2. AI đọc, phân loại và chuẩn hóa thành: **tiêu chí** (kèm mức Bắt buộc/Nên/Gợi ý và lý do), **bài học ngắn**, **kỹ năng** (quy trình), **tài liệu kiến thức**; kèm danh sách "Không nạp" và lý do.
+3. Xem trước, **tick chọn** từng mục (bộ đếm "Nạp N mục đã chọn"), rồi bấm Nạp. Chưa bấm Nạp thì chưa có gì thay đổi.
+4. Hiển thị gọn: một dòng **Hồ sơ đào tạo hiện có** (số tiêu chí/bài học đang bật, kỹ năng, tài liệu, chỉ dẫn mặc định hay đã tùy chỉnh) kèm mức dùng prompt (cảnh báo ≥ 85%); một dòng thu gọn "đưa vào prompt ở các bước (N)"; khối tải tệp có sẵn liên kết tải mẫu; danh sách **Đã nạp từ file** thu gọn (tên tệp, loại, ngày, số tiêu chí còn bật, bấm xem từng tiêu chí, nút **Gỡ** xóa cả lô).
+5. Tiêu chí nạp xong đi vào prompt của vai trò ở mọi lần chạy (có test). Không tạo bảng mới (lưu bằng bài học `source=file`, kỹ năng/tài liệu và một bản ghi `agent_documents.kind=import`).
+- An toàn: nội dung tệp đóng khung nonce và coi là dữ liệu; mục đòi bỏ quy tắc an toàn/đăng bài bị loại (`GuidanceConstraints::isUnsafe`); mục trùng bài học đã có bị bỏ qua; chỉ quản trị viên phân tích và nạp; không có AI thật thì báo rõ, không bịa (riêng môi trường demo có bộ tách dòng đơn giản, ghi nhãn "không phải AI thật").
+
+**File mẫu tải về** (khung viền nhấn xanh dịu ở nhập kế hoạch; ở huấn luyện là liên kết tải mẫu nằm ngay trong khối tải tệp, sau khi người dùng nhận xét giao diện quá rối):
+- **Nhập kế hoạch từ file** (trang Kế hoạch, hiện ngay ở khung giới thiệu trước khi chọn file và cả ở hộp chọn file): **mẫu Excel (.xlsx)** gồm sheet "Kế hoạch" (11 cột, 2 dòng ví dụ ghi "xóa dòng này") và sheet "Hướng dẫn" từng cột; hoặc **mẫu CSV** (UTF-8 có BOM). Có test vòng tròn: tải mẫu → đọc lại → mọi cột nhận đúng trường. Dòng ví dụ quên xóa bị bỏ qua, không tạo bài mẫu.
+- **Huấn luyện vai trò**: **bảng tiêu chí (.csv)**: điền đúng cột (Loại, Tiêu chí, Quy tắc cụ thể, Vì sao, Mức) thì được **đọc trực tiếp, không cần AI, không tốn chi phí** và dùng được cả khi chưa kết nối AI (hỗ trợ dấu phẩy và chấm phẩy kiểu Excel Việt Nam); **văn bản (.md)** có sẵn khung các mục để AI đọc. Dòng ví dụ lấy từ rào chắn thật của từng vai trò.
+- Test: `RoleTrainingImportTest` (8), `FileTemplatesTest` (7). Đã thử trên giao diện bản 8110: nạp, tick, gỡ, nạp form mẫu CSV (đọc không AI, bỏ dòng ví dụ), khung tải mẫu hiển thị nổi bật, bấm tải mẫu kế hoạch trả 200.
+- Lỗi bắt được khi thử giao diện và đã sửa: nội dung quy tắc của tiêu chí bị ẩn (lỗi logic chống lặp, có test hồi quy); tên tệp cũ còn trong khu thả sau khi nạp; mã Blade thô lộ ra ở dòng "Đã nạp từ file" (chỉ thị `@if` dính liền chữ, có test hồi quy); giao diện quá rối (gộp lại như trên).
+- Đã thử thêm trên giao diện: tệp .exe bị từ chối kèm thông báo rõ; nạp 2 tiêu chí rồi **Gỡ** về 0; nhập kế hoạch bằng CSV theo form mẫu có dòng ví dụ chưa xóa (bỏ dòng ví dụ, 2 bài thật vào chiến dịch, 11/12 cột nhận đúng).
+- **Chưa kiểm:** AI thật phân tích tệp (mới thử bằng AI giả và bộ tách dòng demo), tệp .docx thật từ Word (mới thử docx dựng tay), tải mẫu bằng trình duyệt thật ngoài khung tích hợp (mới kiểm phản hồi 200 và test `assertFileDownloaded`). `app/Services/Planning/Import/PlanFileImporter.php` thêm luật bỏ dòng ví dụ: Dev1 vui lòng rà.
+
+## 12. Huấn luyện có thật sự được áp dụng vào phiên làm việc không? (kiểm tra và sửa, 21/11)
+
+**Phát hiện:** trước đợt sửa này, hồ sơ đào tạo (persona, quy tắc, bài học, kỹ năng riêng, tài liệu) chỉ đi vào prompt của **2 bước**: Chiến lược lập dàn ý và Người viết (viết/sửa bài), qua `roleOptions()`. Các bước AI dạng JSON không nhận: Biên tập viên (đọc bài, kiểm trích dẫn), Họa viên (yêu cầu và thiết kế ảnh), Quản lý SEO (đọc lời nhắn), Người nghiên cứu (điều phối kho), tổng hợp nguồn, nhận diện cột file kế hoạch. Nghĩa là nạp huấn luyện cho các vai trò đó **không có tác dụng**.
+
+**Đã sửa:** `AiJson::withProfile()` + `AgentProfiles::jsonBlock()` (rút gọn ≤ 6.000 ký tự, đã đóng khung "không ghi đè quy tắc an toàn") nối hồ sơ vào mọi lượt gọi JSON của vai trò đó. Danh sách thật (`AgentProfiles::APPLIED_AT`, mỗi mục có test chứng minh):
+
+| Vai trò | Bước nhận huấn luyện |
+|---|---|
+| Người viết | Viết bài; sửa bài theo góp ý |
+| Chiến lược | Lập dàn ý; tổng hợp nguồn và chốt hướng nội dung |
+| Biên tập | Biên tập viên đọc bài; kiểm trích dẫn có hỗ trợ câu |
+| Họa viên | Đặt yêu cầu và thiết kế ảnh |
+| Quản lý SEO | Đọc lời nhắn làm lại và chỉ dẫn của bài, chốt phạm vi |
+| Người nghiên cứu | Điều phối kho (phân loại chủ đề, chọn Trí tuệ) |
+| Người phân tích tệp | Nhận diện cột khi nhập file kế hoạch |
+
+**Chưa có bước nào nhận huấn luyện** (lưu được nhưng chưa có tác dụng): Kiểm chứng viên y khoa, Người kiểm ảnh (chạy bằng luật, không AI), Người lập kế hoạch, Nghiên cứu từ khóa, Đối thủ, Giám sát, Audit. Giao diện (tab Nạp từ file) nói rõ điều này cho từng vai trò thay vì để người dùng tưởng đã có tác dụng.
+
+**Bằng chứng:** `AgentTrainingAppliedTest` gán cho mỗi vai trò một "dấu" riêng rồi chạy phiên thật (AI giả ghi lại mọi prompt): dấu của vai trò nào xuất hiện ở bước của vai trò đó và **không lọt sang vai trò khác**; vai trò chưa dạy gì thì prompt không có khối hồ sơ. Chạy lại test với mã orchestrator cũ thì 5 test lỗi (Biên tập, Quản lý, Họa viên, Người nghiên cứu/phân tích tệp, khung an toàn), chứng tỏ test phân biệt được.
+
+**Giới hạn cần biết:**
+- Chỉ phần ĐÃ TÙY CHỈNH mới đi vào prompt (persona/quy tắc đã lưu, bài học, kỹ năng riêng, tài liệu). Persona mặc định trong file vai trò chỉ để hiển thị.
+- Hồ sơ cho bước JSON bị rút gọn còn 6.000 ký tự (bước viết/dàn ý nhận tối đa 14.000); hồ sơ dài thì phần cuối bị cắt, thanh mức dùng cảnh báo từ 85%.
+- Hồ sơ làm tăng token mỗi lượt gọi (chưa đo mức tăng chi phí thật).
+- Đã kiểm bằng AI giả (đúng nội dung prompt gửi đi); **chưa đo hiệu quả với model thật** (model có làm theo tiêu chí hay không).
+- `AiJson` (Knowledge) và `PlanFileMapper` (Planning) thuộc phạm vi dùng chung: Dev1 vui lòng rà.
+
+## 13. File kế hoạch: phân tích trường dữ liệu, mẫu nhiều sheet và phân tích file tự do (21/11)
+
+**Hệ thống hiện lưu có cấu trúc cho mỗi bài** (`articles`): từ khóa chính, từ khóa phụ (mảng), ý định (4 giá trị), cụm chủ đề, mức ưu tiên, chiến dịch, ngày dự kiến đăng; ở kho từ khóa (`keywords`): lượng tìm kiếm, độ khó, CPC, cạnh tranh; ở chiến dịch: tên, mô tả, ngày bắt đầu/kết thúc, số bài mục tiêu, trần bài mỗi ngày. **Mọi thứ khác nằm trong một ô văn bản tự do `guidance` (tối đa 1.500 ký tự)** và chỉ đến Người viết/Biên tập qua đó; bộ chấm ĐO được độ dài, số bảng, số ảnh, số mục H2 từ chính văn bản này. Mẫu cũ chỉ có 11 cột nên người dùng phải nhét đối tượng, giọng văn, độ dài... vào một cột ghi chú.
+
+**Đã thêm** (không cần migration): 16 trường "Chỉ dẫn viết" + độ khó từ khóa, mỗi trường có tên cột chắc chắn nhận được, được ghép thành các dòng có nhãn ở đầu chỉ dẫn của bài, theo câu mà bộ đo hiểu:
+
+| Nhóm | Cột | Hệ thống làm gì |
+|---|---|---|
+| Đo được | Độ dài (số từ), Số bảng, Số ảnh tối đa, Số mục H2 tối thiểu | Ghép thành "khoảng 1500 từ", "ít nhất 1200 từ, tối đa 1500 từ", "đúng 1 bảng", "tối đa 3 ảnh", "ít nhất 6 mục H2" → bộ chấm đo và yêu cầu sửa; luôn đứng đầu nên không bị cắt |
+| Mềm | Loại bài, Đối tượng đọc, Góc tiếp cận, Giọng văn, Câu hỏi bài cần trả lời, Nguồn nên dùng, Liên kết nội bộ nên có, Điều cần tránh, Đối thủ/bài tham khảo, CTA/sản phẩm, Có mục FAQ, Cần chuyên gia duyệt | Thành dòng có nhãn trong chỉ dẫn; link chỉ là văn bản, hệ thống **không tự tải** |
+| Số liệu | Độ khó từ khóa, CPC (VNĐ), Mức cạnh tranh (mới), Lượng tìm kiếm | Điền vào kho từ khóa chỉ chỗ còn trống, không ghi đè số liệu nguồn khác; xem trước ghi chú đã điền gì |
+
+**File mẫu Excel 4 sheet** (`docs/seo-agent/mau/mau-ke-hoach-noi-dung.xlsx`, tải ở trang Kế hoạch): **Bài viết** (một dòng một bài, 33 cột, màu theo nhóm; chỉ có dòng tiêu đề nên không phải xóa dòng ví dụ), **Chiến dịch** (mô tả, ngày; nối với sheet 1 qua tên chiến dịch), **Hướng dẫn** (từng cột: bắt buộc?, ý nghĩa, giá trị chấp nhận, hệ thống dùng để làm gì, kèm quy ước "ĐO ĐƯỢC"), **Ví dụ đã điền** (3 bài sức khỏe). File theo mẫu được **nhận ra và đọc trực tiếp, không gọi AI** (đúng sheet, đúng cột, nối sheet Chiến dịch), dùng được khi chưa kết nối AI.
+
+**Phân tích file KHÔNG theo mẫu:**
+- AI nhận diện cột (và luật theo tên cột khi AI lỗi) nay biết thêm 17 trường: các cột kiểu "Đối tượng", "Giọng điệu", "Số từ", "Số bảng", "Link nội bộ", "Cần tránh", "Chuyên gia duyệt", "KD", "Hỏi đáp", "Nguồn tham khảo"... được gán đúng trường thay vì gom chung vào ghi chú; chỉ thị gửi AI đã cập nhật.
+- Ràng buộc nằm TRONG ghi chú tự do ("viết dưới 2000 từ, có thực đơn 3 ngày") vẫn được bộ chấm đo vì ghi chú đi vào chỉ dẫn.
+- Bản xem trước mới: **"Thông tin viết bài tìm thấy trong file"** (từng loại có ở bao nhiêu bài), "Bộ chấm sẽ ĐO N bài", **gợi ý bổ sung** những gì file chưa có (độ dài, đối tượng, câu hỏi cần trả lời, nguồn, chuyên gia), cảnh báo khi chỉ dẫn bị cắt vì quá 1.500 ký tự, và mục xem **chỉ dẫn viết sẽ lưu** cho 5 bài đầu.
+- Kiểm bằng giao diện: file theo mẫu (27 cột, 2 bài, lưu đúng chỉ dẫn, độ khó 31, lượng tìm kiếm, từ khóa phụ, chiến dịch) và file tự do cột đặt tên khác (nhận đúng, gợi ý thiếu "câu hỏi cần trả lời, nguồn nên dùng"). Chưa thử AI thật cho file tự do (môi trường thử dùng luật theo tên cột).
+
+**Đề xuất chưa làm (cần bạn quyết, một số cần migration của Dev1):**
+1. **Cột `brief` (JSON) trên bài** thay vì ghép vào văn bản: sửa từng trường ở form bài, không bị trần 1.500 ký tự, thống kê theo trường. Hiện ghép văn bản chạy ngay không cần migration nhưng khó sửa từng trường sau khi nhập.
+2. **Liên kết nội bộ thật (một nửa đã làm)**: đã so khớp tên/từ khóa trong cột này với bài đã có trên website hoặc bài khác trong file và báo ở bản xem trước ("N khớp, M thiếu, K là URL"). Còn thiếu: đưa URL thật của bài khớp vào chỉ dẫn cho người viết.
+3. **Nguồn nên dùng thành nguồn bắt buộc**: đưa vào danh sách nguồn của Người nghiên cứu (qua danh sách tên miền tin cậy, chống SSRF) thay vì chỉ là gợi ý văn bản.
+4. **Sheet "Bài cần cập nhật"** cho bài đã đăng (URL cũ, phần cần sửa): hệ thống đã có luồng làm mới bài nhưng chưa nhập được từ file.
+5. **CMS**: chuyên mục/thẻ/slug mong muốn/tác giả cho WordPress và Magento (bài hiện không lưu các trường này).
+6. **Người duyệt/chuyên gia cụ thể** (tên người) thay vì Có/Không, cần ánh xạ sang tài khoản.
+- **Đã làm thêm (21/11, vòng cuối):** CPC và mức cạnh tranh (nhận "0,4", "40" thang 100, "Thấp/Trung bình/Cao") điền vào kho từ khóa; URL nội bộ/loopback/metadata/giao thức lạ ở cột nguồn & đối thủ bị **bỏ kèm cảnh báo** (chống SSRF, cùng quy tắc allowlist); dòng ví dụ "(VÍ DỤ… xóa dòng này)" tự bỏ qua. Kiểm bằng giao diện 8110: file mẫu 7 cột → xem trước "1 khớp, 1 là URL", cảnh báo bỏ `http://localhost/x`, tạo 2 bài, kho từ khóa có 1200/33/4500/0,4 và 800/20/3000/0,2, chỉ dẫn bài không còn địa chỉ nội bộ. Mức: code + test giả lập + thử giao diện cục bộ; chưa staging, chưa người thật nghiệm thu.
+- **Đã làm theo chấp thuận (21/11, sau khi bạn duyệt đề xuất 1, 2, 4?, 5, 6):** (1) cột `articles.brief` JSON (migration `2026_11_21_100000`) lưu brief có cấu trúc cùng bài; (2) tên bài trong «Liên kết nội bộ» khớp bài ĐÃ ĐĂNG thì chỉ dẫn ghi kèm URL thật (từ `publications.published_url`); (5) 3 cột Chuyên mục (CMS), Slug mong muốn, Tác giả hiển thị lưu vào `brief` — **chưa nối vào bộ đăng bài WordPress/Magento** (cần sửa tích hợp, thuộc phạm vi Dev1 theo AGENTS.md); (6) cột Người duyệt khớp tài khoản theo email/tên, lưu `reviewer_user_id`, cảnh báo nếu không khớp — **chưa dùng để giao việc duyệt**. Mục 3 (nguồn bắt buộc) theo ý bạn: KHÔNG làm. Mục 4 (sheet "Bài cần cập nhật") chưa làm.
+- Giới hạn cần biết: ghi chú quá dài bị cắt từ cuối (điều đo được đứng trước nên được giữ); `Số bảng = 0` thành "đúng 0 bảng"; hai ràng buộc độ dài mâu thuẫn trong file được bộ chấm đo cả hai (do người dùng nhập). `PlanFileImporter`, `PlanFileHeuristics`, `PlanFileMapper` thuộc phạm vi dùng chung: Dev1 vui lòng rà.
+
+## 14. Giao diện: hộp chi tiết Kho trí tuệ và khung Lập kế hoạch (21/11)
+
+- **Kho trí tuệ, xem một mục/nguồn:** trước đây là khung nhúng ở ĐẦU trang (người dùng phải cuộn lên, vùng nội dung nhỏ, nguồn là hộp cuộn nhỏ chứa cả phần điều hướng của trang web). Nay là **hộp nổi giữa màn hình** (bấm nền, nút X hoặc Esc để đóng): tiêu đề + trạng thái, **vùng Nội dung rộng** (chữ 1,02 rem, giãn dòng 1,75), cột **Nguồn** tự cuộn tới đoạn được tô sáng (kèm URL), lịch sử phiên bản thu gọn, nút Duyệt/Loại/Đánh dấu cũ ở chân hộp. Sửa lỗi cũ: thẻ (tags) hiển thị "—" vì dùng nhầm thành phần chip trạng thái. Có test hồi quy.
+- **Lập kế hoạch → Nhập từ file:** bỏ 3 bước, bỏ viền đậm bên trái, bỏ hộp xanh nhạt; một nút chính **Chọn file kế hoạch**, cùng hàng là "Chưa có file? Tải mẫu: Excel (.xlsx) · CSV" dạng nút phụ viền mảnh; thẻ chế độ đang chọn bỏ vòng sáng. Mô tả mẫu chuyển thành chú thích khi rê chuột. Tự đánh giá trước khi sửa: quá nhiều lớp màu (thẻ tint, panel, viên thuốc xám với chấm số đậm, hộp xanh nhạt, nút viền xám, nút xanh đậm), tiêu đề lặp, nút chính bị đẩy xuống dưới nút phụ.
+- **Phiên riêng** `chuyen-gia-vai-tro` đang nghiên cứu và nạp kỹ năng chuyên gia cho các vai trò (y khoa, sức khỏe, dinh dưỡng, kết hợp tri thức từ claude-seo và nguồn công khai); kết quả ở nhánh riêng, cần xem trước khi gộp.
+
 ## 7. Cách thử sáng mai (10 phút)
 1. Mở một bài đã có bản nháp → trang chi tiết bản bài → bấm **Giao làm lại** (nút mới) → gõ: `Chỉ tạo lại ảnh bìa có chữ «Tên tiêu đề ngắn». Giữ nguyên bài viết.` Kỳ vọng: nhật ký có bước "Điều phối đã đọc lời nhắn", phạm vi "chỉ làm lại ảnh, giữ nguyên chữ của bài", **không** có bước viết/chấm, bản mới v+1 chữ y hệt bản cũ, ảnh bìa mới. Xem chữ trên ảnh có đúng dấu không.
 2. Vào bài khác → **Chỉ dẫn cho đội AI** → gõ `Chỉ tạo lại ảnh, giữ nguyên bài viết.` → **Giao đội AI**. Kỳ vọng như trên, bước điều phối ghi "đã đọc chỉ dẫn của bài". Xóa chỉ dẫn sau đó.

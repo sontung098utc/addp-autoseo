@@ -37,6 +37,7 @@ return [
     'on_timeout' => 'Giữ kế hoạch ở trạng thái nháp.',
     'skills' => [
         'planner/content-calendar',
+        'planner/health-seasonal-planning',
     ],
     'orchestrator_steps' => [],
     'readiness' => 'not_connected',

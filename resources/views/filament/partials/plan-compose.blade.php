@@ -9,14 +9,13 @@
     ]));
     $keys = array_column($methods, 'key');
     $default = $keys[0];
-    $stepsFile = [['1', 'Chọn file'], ['2', 'AI đọc file'], ['3', 'Xem lại và tạo']];
 @endphp
 <style>
     .lk-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .75rem; margin: .25rem 0 1rem; }
     .lk-tile { display: flex; flex-direction: row; gap: .7rem; align-items: center; text-align: left; padding: .75rem .9rem; border: 1.5px solid var(--ss-border); border-radius: .85rem; background: var(--ss-surface); color: var(--ss-text); cursor: pointer; position: relative; transition: border-color .15s, box-shadow .15s, transform .15s; }
     .lk-tile:hover { border-color: var(--ss-accent-fg); transform: translateY(-1px); }
     .lk-tile:focus-visible { outline: 2px solid var(--ss-focus); outline-offset: 2px; }
-    .lk-tile.is-on { border-color: var(--ss-accent-fg); background: var(--ss-accent-bg); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ss-accent-fg) 18%, transparent); }
+    .lk-tile.is-on { border-color: var(--ss-accent-fg); background: var(--ss-accent-bg); }
     .lk-ico { display: inline-flex; align-items: center; justify-content: center; width: 2.2rem; height: 2.2rem; border-radius: .6rem; background: var(--ss-muted-bg); color: var(--ss-accent-fg); }
     .lk-tile.is-on .lk-ico { background: var(--ss-accent-fg); color: var(--ss-surface); }
     .lk-ico svg { width: 1.25rem; height: 1.25rem; }
@@ -26,11 +25,8 @@
     .lk-panel { border: 1px solid var(--ss-border); border-radius: .85rem; background: var(--ss-surface); padding: 1.1rem 1.25rem; }
     .lk-h { margin: 0; font-size: var(--ss-fs-lg); font-weight: 650; color: var(--ss-text); }
     .lk-sub { margin: .2rem 0 .9rem; color: var(--ss-text-muted); font-size: var(--ss-fs-sm); max-width: 44rem; }
-    .lk-steps { display: flex; flex-wrap: wrap; gap: .6rem; margin: .6rem 0 1rem; padding: 0; list-style: none; }
-    .lk-steps li { display: flex; gap: .55rem; align-items: center; padding: .45rem .8rem .45rem .5rem; border-radius: 999px; background: var(--ss-muted-bg); }
-    .lk-steps li > i { flex: none; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--ss-accent-fg); color: var(--ss-surface); font-style: normal; font-weight: 650; display: inline-flex; align-items: center; justify-content: center; font-size: var(--ss-fs-sm); }
-    .lk-steps b { display: block; font-size: var(--ss-fs-sm); }
-    .lk-steps small { color: var(--ss-text-muted); font-size: var(--ss-fs-xs); }
+    .lk-file { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; margin-top: .9rem; }
+    .lk-file__or { color: var(--ss-text-muted); font-size: var(--ss-fs-sm); }
     .lk-row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; margin: .5rem 0; }
     .lk-in { padding: .5rem .75rem; border: 1px solid var(--ss-border); border-radius: .55rem; background: var(--ss-surface); color: var(--ss-text); font-size: var(--ss-fs-base); max-width: 100%; }
     .lk-chips { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0 .8rem; }
@@ -55,16 +51,17 @@
 
     @if ($isApprover)
         <section class="lk-panel" x-show="m === 'file'" x-cloak role="tabpanel">
-            <h3 class="lk-h">Nhập từ file
+            <h3 class="lk-h">Nhập kế hoạch từ file
                 <x-help title="Nhập kế hoạch từ file">
-                    <p>Dùng khi bạn đã lập kế hoạch ở nơi khác (Excel, Google Sheets lưu ra CSV...). Mỗi người một kiểu file nên AI đọc và tự đoán cách nhập; bạn không phải cấu hình gì trước.</p>
+                    <p>Dùng khi bạn đã lập kế hoạch ở nơi khác (Excel, Google Sheets lưu ra CSV...). File theo mẫu được đọc trực tiếp; file khác thì AI đọc và tự đoán cách nhập, bạn không phải cấu hình gì trước. Bạn luôn xem trước rồi mới tạo.</p>
                     <p>Bài tạo ra ở "Đã lên kế hoạch", chiến dịch mới ở "Tạm dừng"; chưa viết nội dung, chưa tốn token viết bài.</p>
                 </x-help>
             </h3>
-            <ol class="lk-steps">
-                @foreach ($stepsFile as [$n, $t])<li><i>{{ $n }}</i><b>{{ $t }}</b></li>@endforeach
-            </ol>
-            <x-filament::button icon="heroicon-o-arrow-up-tray" wire:click="openImport" data-import-open>Chọn file kế hoạch</x-filament::button>
+            <p class="lk-sub" style="margin-bottom:0">Excel hoặc CSV. Làm theo file mẫu thì hệ thống nhận đúng cột ngay, không cần AI.</p>
+            <div class="lk-file">
+                <x-filament::button icon="heroicon-o-arrow-up-tray" wire:click="openImport" data-import-open>Chọn file kế hoạch</x-filament::button>
+                @include('filament.partials.plan-template-banner')
+            </div>
         </section>
 
         <section x-show="m === 'chu-de'" x-cloak role="tabpanel" class="lk-panel">

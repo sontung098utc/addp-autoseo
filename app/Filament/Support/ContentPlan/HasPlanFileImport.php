@@ -66,6 +66,17 @@ trait HasPlanFileImport
         abort_unless(Auth::user()?->isApprover() ?? false, 403);
     }
 
+    /** Tải file mẫu kế hoạch (xlsx hoặc csv) để điền rồi nhập lại; tiêu đề cột đã được bộ nhận diện hiểu chắc chắn. */
+    public function downloadPlanTemplate(string $format = 'xlsx'): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->importGuard();
+        $csv = $format === 'csv';
+
+        return response()->streamDownload(function () use ($csv) {
+            echo $csv ? \App\Services\Planning\Import\PlanFileTemplate::csv() : \App\Services\Planning\Import\PlanFileTemplate::xlsx();
+        }, 'mau-ke-hoach-noi-dung.'.($csv ? 'csv' : 'xlsx'), ['Content-Type' => $csv ? 'text/csv; charset=UTF-8' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
     public function openImport(): void
     {
         $this->importGuard();
@@ -194,6 +205,20 @@ trait HasPlanFileImport
             return;
         }
         $this->importError = null;
+        // File làm đúng theo FILE MẪU của hệ thống: đọc trực tiếp (đúng sheet, đúng cột, nối sheet Chiến dịch), không gọi AI, không tốn phí, dùng được cả khi chưa kết nối AI.
+        if (($rec = \App\Services\Planning\Import\PlanFileTemplate::recognize($sheets)) !== null) {
+            $main = collect($sheets)->firstWhere('name', $rec['sheet']);
+            $this->importState = array_merge($this->importState, [
+                'sheet' => $rec['sheet'], 'sheet_locked' => true, 'header_row' => $rec['header_row'], 'is_plan' => true, 'analyzed' => true, 'section_rows' => [], 'skip_rows' => [], 'links' => $rec['links'],
+                'columns' => PlanFileMapper::columns($main, $rec['header_row'], PlanFileHeuristics::seed($main, $rec['header_row'])),
+                'notes' => ['Nhận ra file mẫu của hệ thống: đọc trực tiếp theo tên cột, không dùng AI.'],
+                'ai' => ['label' => 'File mẫu của hệ thống (không dùng AI)', 'model' => null, 'cost_vnd' => 0],
+            ]);
+            $this->previewImport();
+            $this->defaultTargetFromFile();
+
+            return;
+        }
         try {
             $r = app(PlanFileMapper::class)->map($sheets, ($this->importState['sheet_locked'] ?? false) ? (string) $this->importState['sheet'] : null);
         } catch (InvalidArgumentException|KeywordAiUnavailable $e) {
@@ -359,7 +384,24 @@ trait HasPlanFileImport
             'over_limit' => $b['over_limit'],
             'unlinked' => $b['unlinked'],
             'link_hits' => $b['link_hits'],
-            'rows' => array_map(fn ($i) => ['row' => $i['row'], 'keyword' => $i['keyword'], 'campaign' => $i['campaign'], 'cluster' => $i['cluster'], 'date' => $i['date'], 'priority' => $i['priority'], 'intent' => $i['intent'], 'has_guidance' => $i['guidance'] !== null], array_slice($items, 0, 30)),
+            'warnings' => $b['warnings'] ?? [],
+            'difficulties' => count(array_filter(array_column($items, 'difficulty'), fn ($v) => $v !== null)),
+            // Thông tin viết bài (brief) tìm thấy trong file: số bài có từng loại, số bài có ràng buộc ĐO ĐƯỢC, và những gì file chưa có (gợi ý bổ sung)
+            'brief_cov' => array_filter(array_combine(\App\Services\Planning\Import\PlanBrief::keys(), array_map(fn ($k) => count(array_filter($items, fn ($i) => in_array($k, (array) ($i['brief'] ?? []), true))), \App\Services\Planning\Import\PlanBrief::keys()))),
+            'measurable' => count(array_filter($items, fn ($i) => ! empty($i['measurable']))),
+            'internal' => (function () use ($items) { // liên kết nội bộ: số khớp bài đã có/trong file, số URL (không kiểm), tên chưa có bài
+                $m = 0;
+                $u = 0;
+                $miss = [];
+                foreach ($items as $i) {
+                    $m += (int) ($i['link_report']['match'] ?? 0);
+                    $u += (int) ($i['link_report']['url'] ?? 0);
+                    $miss = array_merge($miss, (array) ($i['link_report']['missing'] ?? []));
+                }
+
+                return ['match' => $m, 'url' => $u, 'missing' => array_slice(array_values(array_unique($miss)), 0, 8), 'missing_total' => count(array_unique($miss))];
+            })(),
+            'rows' => array_map(fn ($i) => ['row' => $i['row'], 'keyword' => $i['keyword'], 'campaign' => $i['campaign'], 'cluster' => $i['cluster'], 'date' => $i['date'], 'priority' => $i['priority'], 'intent' => $i['intent'], 'has_guidance' => $i['guidance'] !== null, 'guidance' => $i['guidance'], 'measurable' => $i['measurable'] ?? []], array_slice($items, 0, 30)),
         ];
     }
 

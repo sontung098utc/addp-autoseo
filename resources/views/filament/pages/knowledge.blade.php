@@ -12,6 +12,18 @@
         .kb-menu__p button:hover{background:rgba(128,128,128,.2)}
         .kb-ai{border:1px solid rgb(var(--info-500,59 130 246));border-radius:.5rem;background:rgba(59,130,246,.06)}
         .kb-act{display:flex;gap:.3rem;align-items:center;justify-content:flex-end}
+        .kb-modal{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:1.2rem;background:rgba(15,23,42,.55);backdrop-filter:blur(2px)}
+        .kb-dlg{background:rgb(var(--gray-50,255 255 255));border-radius:1rem;box-shadow:0 25px 60px rgba(0,0,0,.35);width:min(1180px,96vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+        .dark .kb-dlg{background:rgb(var(--gray-900))}
+        .kb-dlg__h{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:.9rem 1.2rem;border-bottom:1px solid rgba(128,128,128,.25)}
+        .kb-dlg__b{padding:1.1rem 1.3rem;overflow:auto;flex:1}
+        .kb-dlg__f{padding:.75rem 1.2rem;border-top:1px solid rgba(128,128,128,.25);display:flex;gap:.5rem;justify-content:flex-end;flex-wrap:wrap}
+        .kb-cols{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1.4rem}
+        @media(max-width:860px){.kb-cols{grid-template-columns:1fr}}
+        .kb-sec{font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.65;margin-bottom:.35rem}
+        .kb-body{font-size:1.02rem;line-height:1.75;white-space:pre-wrap;padding:1rem 1.15rem;border:1px solid rgba(128,128,128,.25);border-radius:.8rem;background:rgba(128,128,128,.06);min-height:10rem}
+        .kb-src2{white-space:pre-wrap;font-size:.88rem;line-height:1.6;max-height:min(52vh,30rem);overflow:auto;border:1px solid rgba(128,128,128,.3);border-radius:.8rem;padding:.8rem 1rem}
+        .kb-src2 mark{background:rgba(250,204,21,.45);color:inherit;border-radius:.2rem;padding:0 .1rem}
     </style>
     <script>if (location.hash === '#tab-add') { location.hash = '#tab-sources'; }</script>
     @php
@@ -43,18 +55,22 @@
             @include('filament.pages.partials.brain-header')
         @endif
         @if ($selected)
-            <div class="ss-card" style="margin-bottom:1rem" role="region" aria-label="Chi tiết mục kiến thức"><div class="ss-card__b">
-                <div class="kb-bar">
-                    <div class="ss-card__h" style="margin:0">KB#{{ $selected->id }} · {{ $selected->title }}</div>
-                    <x-studio.badge :tone="$statusTone[$selected->status] ?? 'muted'">{{ $statuses[$selected->status] ?? $selected->status }}</x-studio.badge>
-                    <span class="ss-muted ss-text-xs">v{{ $selected->version }} · {{ $types[$selected->type] ?? $selected->type }} · {{ $scope($selected) }}</span>
-                    <span style="flex:1"></span>
-                    @if ($manage && ! $editing)
-                        <x-filament::button size="sm" wire:click="startEdit">Sửa</x-filament::button>
-                    @endif
-                    <x-close-x wire:click="closeItem" />
-                </div>
-                @if ($editing)
+            {{-- Chi tiết mục kiến thức: hộp NỔI giữa màn hình (bấm nền, nút X hoặc Esc để đóng), vùng đọc rộng, nguồn gốc cuộn tới đoạn được tô sáng --}}
+            <div class="kb-modal" wire:key="kb-modal-{{ $selected->id }}" x-data x-on:keydown.escape.window="$wire.closeItem()" x-on:click.self="$wire.closeItem()" x-init="$nextTick(() => { const m = $el.querySelector('mark'); if (m) m.scrollIntoView({block: 'center'}); })">
+                <div class="kb-dlg" role="dialog" aria-modal="true" aria-label="Chi tiết mục kiến thức">
+                    <div class="kb-dlg__h">
+                        <div style="min-width:0;flex:1">
+                            <div class="ss-card__h" style="margin:0;font-size:1.05rem">KB#{{ $selected->id }} · {{ $selected->title }}</div>
+                            <div class="ss-muted ss-text-xs" style="margin-top:.15rem">v{{ $selected->version }} · {{ $types[$selected->type] ?? $selected->type }} · {{ $scope($selected) }}</div>
+                        </div>
+                        <x-studio.badge :tone="$statusTone[$selected->status] ?? 'muted'">{{ $statuses[$selected->status] ?? $selected->status }}</x-studio.badge>
+                        @if ($manage && ! $editing)
+                            <x-filament::button size="sm" color="gray" wire:click="startEdit">Sửa</x-filament::button>
+                        @endif
+                        <x-close-x wire:click="closeItem" />
+                    </div>
+                    <div class="kb-dlg__b">
+                    @if ($editing)
                     <div class="kb-grid">
                         <label>Tiêu đề<input class="kb-in" style="width:100%" wire:model="edit.title" maxlength="200"></label>
                         <label>Loại<select class="kb-in" style="width:100%" wire:model="edit.type">@foreach ($types as $k => $l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></label>
@@ -71,65 +87,71 @@
                         <x-filament::button wire:click="saveEdit">Lưu</x-filament::button>
                         <x-filament::button color="gray" wire:click="$set('editing', false)">Hủy</x-filament::button>
                     </div>
-                @else
-                    <div class="ss-split">
-                        <div>
-                            <p style="white-space:pre-wrap">{{ $selected->body }}</p>
-                            <p class="ss-muted ss-text-xs">
-                                @if ($selected->entity){{ $selected->entity }} · {{ $selected->field }} = {{ $selected->value }} {{ $selected->value_unit }} ·@endif
-                                @if ($selected->valid_until) hiệu lực đến {{ $selected->valid_until->format('d/m/Y') }} ·@endif
-                                @foreach ($selected->tags ?? [] as $tag)<x-studio.chip>{{ $tag }}</x-studio.chip> @endforeach
-                            </p>
-                            @if ($manage && $selectedFlags)
+                    @else
+                        <div class="kb-cols">
+                            <div style="min-width:0">
+                                <div class="kb-sec">Nội dung</div>
+                                <div class="kb-body">{{ $selected->body }}</div>
+                                <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;margin-top:.6rem" class="ss-muted ss-text-xs">
+                                    @if ($selected->entity)<span>{{ $selected->entity }} · {{ $selected->field }} = {{ $selected->value }} {{ $selected->value_unit }}</span>@endif
+                                    @if ($selected->valid_until)<span>· hiệu lực đến {{ $selected->valid_until->format('d/m/Y') }}</span>@endif
+                                    @foreach ($selected->tags ?? [] as $tag)<x-studio.badge tone="muted">{{ $tag }}</x-studio.badge>@endforeach
+                                </div>
+                                @if ($manage && $selectedFlags)
                                 @foreach ($selectedFlags['conflict'] as $c)
                                     <div class="ss-alert ss-alert--danger" role="alert">Mâu thuẫn với KB#{{ $c->id }} "{{ $c->title }}": {{ $c->value }} {{ $c->value_unit }}. Chọn bản đúng để tiếp tục.</div>
                                 @endforeach
                                 @foreach ($selectedFlags['exact'] as $d)<div class="ss-alert ss-alert--info">Trùng y hệt KB#{{ $d->id }} "{{ $d->title }}".</div>@endforeach
                                 @foreach ($selectedFlags['similar'] as $d)<div class="ss-alert ss-alert--info">Gần giống KB#{{ $d['item']->id }} ({{ $d['percent'] }}%) "{{ $d['item']->title }}".</div>@endforeach
                             @endif
-                            <p class="ss-text-sm"><strong>Đã dùng trong {{ $selected->usages->pluck('articleVersion.article_id')->filter()->unique()->count() }} bài</strong>
-                                <x-studio.hint text="Mỗi lần Người viết đưa mục này vào prompt, hệ thống ghi bài và phiên bản mục đã dùng." /></p>
-                            <ul class="ss-text-sm">
-                                @foreach ($selected->usages->take(10) as $u)
-                                    @if ($u->articleVersion)
-                                        <li><a href="{{ \App\Filament\Resources\ArticleVersionResource::getUrl('view', ['record' => $u->articleVersion->id]) }}">{{ $u->articleVersion->title ?: 'Bài #'.$u->articleVersion->article_id }}</a> · dùng v{{ $u->item_version }}</li>
-                                    @endif
-                                @endforeach
-                            </ul>
-                            <div class="ss-text-sm"><strong>Lịch sử phiên bản</strong>
-                                <ul>@foreach ($selected->versions as $v)<li>v{{ $v->version }} · {{ $statuses[$v->status] ?? $v->status }} · {{ $v->created_at?->format('d/m/Y H:i') }} · {{ $v->note }}</li>@endforeach</ul>
+                                <div class="kb-sec" style="margin-top:1rem">Đã dùng trong {{ $selected->usages->pluck('articleVersion.article_id')->filter()->unique()->count() }} bài
+                                    <x-studio.hint text="Mỗi lần Người viết đưa mục này vào prompt, hệ thống ghi bài và phiên bản mục đã dùng." /></div>
+                                <ul class="ss-text-sm" style="margin:.2rem 0 0 1.1rem;list-style:disc">
+                                    @foreach ($selected->usages->take(10) as $u)
+                                        @if ($u->articleVersion)
+                                            <li><a href="{{ \App\Filament\Resources\ArticleVersionResource::getUrl('view', ['record' => $u->articleVersion->id]) }}">{{ $u->articleVersion->title ?: 'Bài #'.$u->articleVersion->article_id }}</a></li>
+                                        @endif
+                                    @endforeach
+                                </ul>
+                                <details class="ss-text-sm" style="margin-top:.8rem"><summary style="cursor:pointer;font-weight:600">Lịch sử phiên bản ({{ $selected->versions->count() }})</summary>
+                                    <ul style="margin:.3rem 0 0 1.1rem;list-style:disc">@foreach ($selected->versions as $v)<li>v{{ $v->version }} · {{ $statuses[$v->status] ?? $v->status }} · {{ $v->created_at?->format('d/m/Y H:i') }} · {{ $v->note }}</li>@endforeach</ul>
+                                </details>
                             </div>
-                            @if ($manage)
-                                <div class="kb-bar">
-                                    @if ($selected->status !== 'approved')
-                                        <x-filament::button size="sm" wire:click="approve({{ $selected->id }})">Duyệt</x-filament::button>
-                                    @endif
-                                    @if ($selectedFlags && $selectedFlags['conflict']->isNotEmpty())
-                                        <x-filament::button size="sm" color="warning" wire:click="pickCorrect({{ $selected->id }})" wire:confirm="Chọn mục này là bản đúng? Các mục mâu thuẫn sẽ bị loại/đánh dấu cũ.">Chọn bản này là đúng</x-filament::button>
-                                    @endif
-                                    @if ($selected->status !== 'rejected')<x-filament::button size="sm" color="gray" wire:click="reject({{ $selected->id }})">Loại</x-filament::button>@endif
-                                    @if ($selected->status === 'approved')<x-filament::button size="sm" color="gray" wire:click="outdate({{ $selected->id }})">Đánh dấu cũ</x-filament::button>@endif
-                                </div>
-                            @endif
+                            <div style="min-width:0">
+                                @if ($selected->source)
+                                    @php
+                                        $raw = (string) $selected->source->raw_text;
+                                        $needle = $selected->source_span ?: $selected->body;
+                                        $pos = $needle !== '' ? mb_strpos($raw, mb_substr($needle, 0, 80)) : false;
+                                        $len = $pos === false ? 0 : mb_strlen($needle);
+                                    @endphp
+                                    <div class="kb-sec">Nguồn: {{ $selected->source->title }}
+                                        <x-studio.hint text="Văn bản gốc đã tải. Đoạn của mục này được tô sáng và hộp tự cuộn tới đó. Nguồn chỉ là dữ liệu tham khảo." /></div>
+                                    @if ($selected->source->url)<div class="ss-muted ss-text-xs" style="word-break:break-all;margin-bottom:.3rem">{{ $selected->source->url }}</div>@endif
+                                    <div class="kb-src2">@if ($pos === false){{ mb_substr($raw, 0, 8000) }}@else{{ mb_substr($raw, 0, $pos) }}<mark>{{ mb_substr($raw, $pos, $len) }}</mark>{{ mb_substr($raw, $pos + $len, 8000) }}@endif</div>
+                                    @if ($pos === false)<p class="ss-muted ss-text-xs" style="margin-top:.3rem">Không tìm thấy đoạn trích chính xác trong nguồn; đang hiện phần đầu văn bản gốc.</p>@endif
+                                @else
+                                    <div class="kb-sec">Nguồn</div>
+                                    <p class="ss-muted ss-text-sm">Mục nhập tay, không có tài liệu nguồn.</p>
+                                @endif
+                            </div>
                         </div>
-                        <div>
-                            @if ($selected->source)
-                                <div class="ss-text-sm"><strong>Nguồn: {{ $selected->source->title }}</strong>
-                                    <x-studio.hint text="Văn bản gốc đã dán. Đoạn của mục này được tô sáng. Nguồn chỉ là dữ liệu tham khảo." /></div>
-                                @php
-                                    $raw = (string) $selected->source->raw_text;
-                                    $needle = $selected->source_span ?: $selected->body;
-                                    $pos = $needle !== '' ? mb_strpos($raw, mb_substr($needle, 0, 80)) : false;
-                                    $len = $pos === false ? 0 : mb_strlen($needle);
-                                @endphp
-                                <div class="kb-src">@if ($pos === false){{ mb_substr($raw, 0, 6000) }}@else{{ mb_substr($raw, 0, $pos) }}<mark>{{ mb_substr($raw, $pos, $len) }}</mark>{{ mb_substr($raw, $pos + $len, 6000) }}@endif</div>
-                            @else
-                                <p class="ss-muted ss-text-sm">Mục nhập tay, không có tài liệu nguồn.</p>
-                            @endif
-                        </div>
+                    @endif
                     </div>
-                @endif
-            </div></div>
+                    @if ($manage && ! $editing)
+                        <div class="kb-dlg__f">
+                            @if ($selected->status !== 'approved')
+                                <x-filament::button size="sm" wire:click="approve({{ $selected->id }})">Duyệt</x-filament::button>
+                            @endif
+                            @if ($selectedFlags && $selectedFlags['conflict']->isNotEmpty())
+                                <x-filament::button size="sm" color="warning" wire:click="pickCorrect({{ $selected->id }})" wire:confirm="Chọn mục này là bản đúng? Các mục mâu thuẫn sẽ bị loại/đánh dấu cũ.">Chọn bản này là đúng</x-filament::button>
+                            @endif
+                            @if ($selected->status !== 'rejected')<x-filament::button size="sm" color="gray" wire:click="reject({{ $selected->id }})">Loại</x-filament::button>@endif
+                            @if ($selected->status === 'approved')<x-filament::button size="sm" color="gray" wire:click="outdate({{ $selected->id }})">Đánh dấu cũ</x-filament::button>@endif
+                        </div>
+                    @endif
+                </div>
+            </div>
         @endif
 
         <x-studio.tabs :persist="$brain ? 'tri-tue' : 'kho-kien-thuc'" :default="$brain ? ($isBrand ? 'brand' : 'profile') : ($manage && $inbox->count() ? 'inbox' : 'all')" :tabs="$tabs">

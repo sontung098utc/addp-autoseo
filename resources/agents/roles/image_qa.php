@@ -36,6 +36,7 @@ return [
     'on_timeout' => 'Bỏ qua kiểm, ghi lý do; không chặn bài.',
     'skills' => [
         'designer/image-qa',
+        'designer/health-image-safety-qa',
     ],
     'orchestrator_steps' => [],
     'readiness' => 'demo',

@@ -799,7 +799,7 @@ final class AgentRunOrchestrator
             $dai = $this->roleOff('strategist') ? null : $this->lightAi();
             if ($dai !== null) {
                 // Họa viên làm việc như người thiết kế: yêu cầu ảnh phải nêu mục đích và giá trị, rồi mới thiết kế (lỗi AI thì dùng kế hoạch theo luật như cũ).
-                $designer = new \App\Services\Images\ImageDesigner(new AiJson($dai, $this->sleep)); // thử lại như các bước AI khác: lỗi tạm thời của nhà cung cấp không được làm mất thiết kế ảnh
+                $designer = new \App\Services\Images\ImageDesigner($this->jsonAi($dai, 'designer')); // thử lại như các bước AI khác: lỗi tạm thời của nhà cung cấp không được làm mất thiết kế ảnh
                 $maxInline = max(0, min((int) config('agent.images.max_inline', 2), 3));
                 $b = $designer->brief($article, \App\Services\Images\ImagePlanner::candidates($outline), $maxInline, $libraryCover, (string) ($this->contentPlan['angle'] ?? ''));
                 $this->imageDesign = ['brief' => $b];
@@ -1173,7 +1173,7 @@ final class AgentRunOrchestrator
         if ($ai === null || $this->roleOff('editor') || $this->spent($run) >= $this->policy->budgetVnd || trim((string) ($attrs['html_content'] ?? '')) === '') {
             return [$attrs, $report, 0];
         }
-        $r = (new \App\Services\Content\EditorialReviewer(new AiJson($ai, $this->sleep)))
+        $r = (new \App\Services\Content\EditorialReviewer($this->jsonAi($ai, 'editor')))
             ->review((string) $attrs['html_content'], (string) $article->primary_keyword, (string) ($article->search_intent ?: 'informational'), $risk, $risk === 'low' ? '' : (string) ($this->usePlaybook('editor', 'ymyl-medical-review')[0]?->body ?? ''));
         if ($r['status'] !== 'done') {
             $this->step($run, 'edit', 'editor', 'warn', 'Biên tập viên chưa chạy', ($r['reason'] ?? 'Lỗi AI.').' Bỏ qua bước biên tập; bài vẫn đi tiếp theo bộ luật.', ['reason' => $r['reason']], $r['model'], $r['tokens'], $r['cost']);
@@ -1248,7 +1248,7 @@ final class AgentRunOrchestrator
 
             return;
         }
-        $planner = new \App\Services\Content\ContentPlanner(new AiJson($ai, $this->sleep));
+        $planner = new \App\Services\Content\ContentPlanner($this->jsonAi($ai, 'strategist'));
         $intent = (string) ($article->search_intent ?: 'informational');
         $kb = $this->kbForPlanner($article);
         $r = $planner->plan((string) $article->primary_keyword, $intent, $risk, $kb, $this->references);
@@ -1417,7 +1417,7 @@ final class AgentRunOrchestrator
             }
         }
         $existing = $this->suggestedBrainFields($article);
-        $r = (new \App\Services\Knowledge\KnowledgeCoordinator(new AiJson($ai, $this->sleep, 0)))->classify($kw, $brains, $existing); // phân loại chỉ là tư vấn: một lần gọi, lỗi thì bỏ qua
+        $r = (new \App\Services\Knowledge\KnowledgeCoordinator($this->jsonAi($ai, 'researcher', 0)))->classify($kw, $brains, $existing); // phân loại chỉ là tư vấn: một lần gọi, lỗi thì bỏ qua
         if ($r['status'] === 'done' && $r['uncovered'] && $r['field'] !== '') {
             $r['field'] = \App\Services\Knowledge\KnowledgeCoordinator::reuseName($r['field'], $existing); // cùng một lĩnh vực thì dùng đúng tên đã đề xuất, không sinh gợi ý trùng
         }
@@ -2261,7 +2261,7 @@ final class AgentRunOrchestrator
         }
         try {
             $pb = $this->usePlaybook('editor', 'citation-support')[0] ?? null;
-            $aiJson = new AiJson($ai);
+            $aiJson = $this->jsonAi($ai, 'editor', null, false);
             $t = microtime(true);
             $r = (new CitationSupportJudge($aiJson, (string) $pb?->body))->judge($html);
             $this->aiMs += (microtime(true) - $t) * 1000;
@@ -2424,7 +2424,7 @@ final class AgentRunOrchestrator
         } else {
             try {
                 $pb = $this->usePlaybook('manager', 'redo-coordination')[0] ?? null;
-                $aiJson = new AiJson($ai);
+                $aiJson = $this->jsonAi($ai, 'manager', null, false);
                 $heads = implode("\n", array_map(fn ($o) => '- '.AiJson::clean(is_array($o) ? ($o['heading'] ?? $o['title'] ?? '') : $o, 160), array_slice($prevOutline, 0, 20)));
                 [$nonce, $framed] = AiJson::frame('LOINHAN', "Từ khóa chính: ".AiJson::clean((string) $article->primary_keyword, 160)."\nDàn ý hiện tại:\n".($heads !== '' ? $heads : '(không có)')."\nLời nhắn của người duyệt: ".$message);
                 $system = "Bạn là điều phối của đội AI viết bài SEO. Người duyệt gửi lời nhắn sau khi xem bản nháp; quyết định làm lại phần nào và dặn từng bộ phận.\n"
@@ -2592,6 +2592,12 @@ final class AgentRunOrchestrator
         }
 
         return $parts === [] ? [] : ['guidance' => implode("\n\n", $parts)];
+    }
+
+    /** AiJson của một vai trò, có kèm hồ sơ đào tạo của vai trò đó (Agent Studio) để huấn luyện thật sự đi vào mọi bước AI của vai trò. */
+    private function jsonAi(StructuredAiInterface $ai, string $role, ?int $retries = null, bool $withSleep = true): AiJson
+    {
+        return (new AiJson($ai, $withSleep ? $this->sleep : null, $retries))->withProfile(\App\Services\Agent\Roles\AgentProfiles::jsonBlock($role));
     }
 
     private function roleOptions(string $key): array

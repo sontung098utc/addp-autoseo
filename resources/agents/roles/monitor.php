@@ -34,6 +34,7 @@ return [
         'monitor/drift-baseline',
         // Ý ĐỊNH (chưa có playbook, chưa nối): đề xuất làm lại bài từ dữ liệu hiệu suất; xem ROLE_WORKFLOWS.md mục 3.8
         'monitor/refresh-trigger',
+        'monitor/ymyl-freshness-review',
     ],
     'orchestrator_steps' => [],
     'readiness' => 'not_connected',

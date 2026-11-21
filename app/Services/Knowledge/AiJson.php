@@ -32,9 +32,22 @@ final class AiJson
         $this->sleep = $sleep ?? static fn (int $s) => sleep($s);
     }
 
+    /** Hồ sơ đào tạo của vai trò (khối prompt đã đóng khung ở AgentProfiles) nối vào chỉ dẫn hệ thống của MỌI lượt gọi qua đối tượng này. */
+    private ?string $profile = null;
+
+    public function withProfile(?string $block): static
+    {
+        $this->profile = $block !== null && trim($block) !== '' ? $block : null;
+
+        return $this;
+    }
+
     /** @return array<string,mixed> phần `data` của phản hồi (mảng rỗng nếu AI không trả mảng) */
     public function call(string $system, string $user): array
     {
+        if ($this->profile !== null) {
+            $system .= "\n\n".$this->profile;
+        }
         $n = 0;
         while (true) {
             try {

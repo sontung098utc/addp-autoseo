@@ -15,6 +15,7 @@ use App\Models\Website;
 use App\Services\Keywords\KeywordResearchService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 /**
@@ -56,6 +57,14 @@ final class PlanFileImporter
         foreach (Article::query()->where('website_id', $site->id)->pluck('primary_keyword') as $k) {
             $existing[PlannedArticleCreator::normalize((string) $k)] = true;
         }
+        // URL thật của bài đã đăng (theo từ khóa chính) để đưa vào chỉ dẫn cho người viết khi "Liên kết nội bộ nên có" khớp tới bài đó
+        $urlOf = [];
+        foreach (\App\Models\Publication::query()->where('website_id', $site->id)->where('status', 'published')->whereNotNull('published_url')->orderBy('id')->with('articleVersion.article')->get() as $pub) {
+            $kwp = $pub->articleVersion?->article?->primary_keyword;
+            if ($kwp && PlanBrief::safeUrl((string) $pub->published_url)) {
+                $urlOf[PlannedArticleCreator::normalize((string) $kwp)] = (string) $pub->published_url;
+            }
+        }
         $first = fn (array $r, string $f): string => isset($byField[$f]) ? (string) ($r[$byField[$f][0]] ?? '') : '';
 
         $linkIndex = [];
@@ -73,11 +82,19 @@ final class PlanFileImporter
         $skipSet = array_flip(array_map('intval', $skip));
         $headerCells = $headerRow > 0 ? array_map(fn ($c) => mb_strtolower(trim((string) $c)), $rows[$headerRow - 1] ?? []) : [];
         $section = null;
+        $fileKeys = [];
+        foreach ($rows as $fr) {
+            $fk = PlanFileFields::text((string) ($fr[$kwCol] ?? ''), 255);
+            if ($fk !== '') {
+                $fileKeys[PlannedArticleCreator::normalize($fk)] = true;
+            }
+        }
         $items = [];
         $problems = [];
         $seen = [];
         $blank = 0;
         $over = false;
+        $warnings = [];
         foreach ($rows as $i => $r) {
             $n = $i + 1;
             // dòng đề mục: chỉ nhận khi đúng một ô có chữ (kiểm lại ở đây, không tin hoàn toàn danh sách đưa vào)
@@ -92,6 +109,10 @@ final class PlanFileImporter
             }
             // dòng tiêu đề cột lặp lại giữa bảng (thường gặp khi mỗi nhóm có một hàng tiêu đề riêng) không phải là bài
             if ($headerCells !== [] && count($filled) >= 2 && count(array_filter($filled, fn ($c, $k) => mb_strtolower(trim((string) $c)) === ($headerCells[$k] ?? null), ARRAY_FILTER_USE_BOTH)) >= count($filled) * 0.6) {
+                continue;
+            }
+            // dòng VÍ DỤ của file mẫu ("(VÍ DỤ, xóa dòng này)") người dùng quên xóa: bỏ qua im lặng, không tạo bài mẫu
+            if (preg_match('/\(\s*v[íi]\s*d[ụu][^)]*x[óo]a d[òo]ng n[àa]y/iu', implode(' ', array_map('strval', $r)))) {
                 continue;
             }
             $kw = PlanFileFields::text((string) ($r[$kwCol] ?? ''), 255);
@@ -171,7 +192,60 @@ final class PlanFileImporter
                 $secondary = array_values(array_filter(array_unique(array_merge($secondary, $lk['secondary'])), fn ($s) => PlannedArticleCreator::normalize($s) !== $key && ! preg_match(KeywordResearchService::INJECTION, $s)));
             }
 
-            $notes = [];
+            // BRIEF của bài (đối tượng, giọng văn, độ dài, cấu trúc, câu hỏi, nguồn, liên kết nội bộ...): ghép thành các dòng có nhãn đứng ĐẦU chỉ dẫn,
+            // điều đo được (độ dài, bảng, ảnh, H2) đứng trước nhất để không bị cắt khi chỉ dẫn quá dài.
+            $briefVals = [];
+            foreach (PlanBrief::keys() as $bk) {
+                $briefVals[$bk] = $first($r, $bk);
+            }
+            foreach (['must_sources', 'competitor_refs', 'internal_links'] as $rk) { // loại URL trỏ về địa chỉ nội bộ (không lưu, báo ở xem trước)
+                $sp = PlanBrief::splitRefs($briefVals[$rk]);
+                if ($sp['dropped'] !== []) {
+                    $warnings[] = "dòng {$n} ({$kw}): bỏ ".count($sp['dropped']).' địa chỉ nội bộ/không an toàn ở cột «'.PlanBrief::FIELDS[$rk][0].'»';
+                }
+                $briefVals[$rk] = implode('; ', $sp['kept']);
+            }
+            // liên kết nội bộ: tên/từ khóa khớp bài đã có trên website hoặc bài khác trong file thì tính là khớp; URL không kiểm; còn lại là chưa có bài
+            $linkReport = ['match' => 0, 'url' => 0, 'missing' => [], 'resolved' => 0];
+            $linkOut = [];
+            foreach (PlanBrief::splitRefs($briefVals['internal_links'])['kept'] as $lt) {
+                $nk = PlannedArticleCreator::normalize($lt);
+                if (preg_match('#^https?://#i', $lt)) {
+                    $linkReport['url']++;
+                } elseif (isset($existing[$nk]) || isset($fileKeys[$nk])) {
+                    $linkReport['match']++;
+                    if (isset($urlOf[$nk])) { // bài đã đăng: ghi kèm URL thật để người viết gắn đúng liên kết
+                        $linkReport['resolved']++;
+                        $lt .= ' ('.$urlOf[$nk].')';
+                    }
+                } else {
+                    $linkReport['missing'][] = $lt;
+                }
+                $linkOut[] = $lt;
+            }
+            $briefVals['internal_links'] = implode('; ', $linkOut);
+            $briefLines = PlanBrief::lines($briefVals);
+            // brief có cấu trúc lưu cùng bài (JSON): các trường brief đã làm sạch + thông tin xuất bản; người duyệt khớp tài khoản theo email/tên
+            $briefJson = array_filter(array_map(fn ($v) => trim((string) $v), $briefVals), fn ($v) => $v !== '');
+            foreach (['cms_category' => 120, 'cms_author' => 120] as $ck => $max) {
+                if (($cv = PlanFileFields::text($first($r, $ck), $max)) !== '') {
+                    $briefJson[$ck] = $cv;
+                }
+            }
+            if (($sl = Str::slug(preg_replace('~[/\\\\_.,;:+&|]+~u', ' ', PlanFileFields::text($first($r, 'cms_slug'), 120)))) !== '') {
+                $briefJson['cms_slug'] = $sl;
+            }
+            if (($rv = PlanFileFields::text($first($r, 'reviewer'), 120)) !== '') {
+                $briefJson['reviewer'] = $rv;
+                $ru = \App\Models\User::query()->where('is_active', true)->where(fn ($q) => $q->where('email', $rv)->orWhere('name', $rv))->first();
+                if ($ru) {
+                    $briefJson['reviewer_user_id'] = $ru->id;
+                } else {
+                    $warnings[] = "dòng {$n} ({$kw}): người duyệt «{$rv}» không khớp tài khoản nào, chỉ lưu tên";
+                }
+            }
+            $briefFilled = array_keys(array_filter($briefVals, fn ($v) => trim((string) $v) !== ''));
+            $notes = $briefLines;
             if (($t = PlanFileFields::text($lk['title'] ?? $first($r, 'title'), 200)) !== '') {
                 $notes[] = 'Tiêu đề gợi ý: '.$t;
             }
@@ -185,7 +259,11 @@ final class PlanFileImporter
             foreach ($lk['guidance'] as $g) {
                 $notes[] = $g;
             }
-            $guidance = mb_substr(implode("\n", $notes), 0, 1500);
+            $fit = PlanBrief::fit($notes);
+            $guidance = $fit['text'];
+            if ($fit['cut']) {
+                $warnings[] = "dòng {$n} ({$kw}): chỉ dẫn dài hơn ".PlanBrief::GUIDANCE_MAX.' ký tự nên phần cuối bị cắt (điều đo được như độ dài, bảng, ảnh luôn được giữ trước)';
+            }
             if ($guidance !== '' && preg_match(KeywordResearchService::INJECTION, $guidance)) {
                 $problems[] = ['row' => $n, 'keyword' => $kw, 'reason' => 'Ghi chú giống chỉ dẫn điều khiển AI nên bị chặn'];
 
@@ -208,11 +286,18 @@ final class PlanFileImporter
                 'date_invalid' => trim($dateRaw) !== '' && $date === null,
                 'priority' => PlanFileFields::priority($lk['priority'] ?? $first($r, 'priority')),
                 'volume' => PlanFileFields::volume($first($r, 'search_volume')),
+                'difficulty' => PlanFileFields::difficulty($first($r, 'difficulty')),
+                'cpc' => PlanFileFields::cpc($first($r, 'cpc')),
+                'competition' => PlanFileFields::competition($first($r, 'competition')),
                 'guidance' => $guidance !== '' ? $guidance : null,
+                'brief' => $briefFilled,
+                'brief_json' => $briefJson,
+                'link_report' => $linkReport,
+                'measurable' => $guidance !== '' ? PlanBrief::measurable($guidance) : [],
             ];
         }
 
-        return ['items' => $items, 'problems' => $problems, 'blank' => $blank, 'over_limit' => $over, 'unlinked' => array_slice(array_keys($unlinked), 0, 10), 'link_hits' => $hits];
+        return ['items' => $items, 'problems' => $problems, 'warnings' => array_slice($warnings, 0, 20), 'blank' => $blank, 'over_limit' => $over, 'unlinked' => array_slice(array_keys($unlinked), 0, 10), 'link_hits' => $hits];
     }
 
     /**
@@ -260,6 +345,7 @@ final class PlanFileImporter
             $unsaved = 0;
             $volNew = 0;
             $volFilled = 0;
+            $metaFilled = 0;
             $canDate = PlanData::canPersistDates();
             foreach ($items as $it) {
                 $name = match ($target) {
@@ -273,17 +359,33 @@ final class PlanFileImporter
                 }
                 $kw = $stored->get(Keyword::keyFor($it['keyword']));
                 // lượng tìm kiếm trong file: điền vào kho từ khóa (chỉ chỗ còn trống, không ghi đè số liệu từ nguồn khác); từ khóa chưa có trong kho thì thêm vào
-                if (($it['volume'] ?? null) !== null) {
+                if (($it['volume'] ?? null) !== null || ($it['difficulty'] ?? null) !== null || ($it['cpc'] ?? null) !== null || ($it['competition'] ?? null) !== null) {
                     if ($kw === null && \App\Filament\Support\Keywords\KeywordSanitizer::check((string) $it['keyword'])['keyword'] === null) {
                         // từ khóa có thẻ/mã: không đưa vào kho từ khóa
                     } elseif ($kw === null) {
-                        $kw = Keyword::create(['website_id' => $site->id, 'keyword' => $it['keyword'], 'keyword_key' => Keyword::keyFor($it['keyword']), 'volume' => $it['volume'], 'volume_source' => 'csv',
-                            'intent' => $it['intent'], 'source' => 'csv', 'status' => 'new', 'created_by' => $actor->id]);
+                        $kw = Keyword::create(['website_id' => $site->id, 'keyword' => $it['keyword'], 'keyword_key' => Keyword::keyFor($it['keyword']), 'volume' => $it['volume'] ?? null, 'volume_source' => ($it['volume'] ?? null) !== null ? 'csv' : null,
+                            'difficulty' => $it['difficulty'] ?? null, 'cpc_vnd' => $it['cpc'] ?? null, 'competition' => $it['competition'] ?? null, 'intent' => $it['intent'], 'source' => 'csv', 'status' => 'new', 'created_by' => $actor->id]);
                         $stored->put($kw->keyword_key, $kw);
                         $volNew++;
-                    } elseif ($kw->volume === null) {
-                        $kw->update(['volume' => $it['volume'], 'volume_source' => 'csv']);
-                        $volFilled++;
+                    } else {
+                        $fill = [];
+                        if (($it['volume'] ?? null) !== null && $kw->volume === null) {
+                            $fill += ['volume' => $it['volume'], 'volume_source' => 'csv'];
+                            $volFilled++;
+                        }
+                        if (($it['difficulty'] ?? null) !== null && $kw->difficulty === null) {
+                            $fill['difficulty'] = $it['difficulty']; // độ khó trong file chỉ điền chỗ còn trống, không ghi đè số liệu từ nguồn khác
+                        }
+                        if (($it['cpc'] ?? null) !== null && $kw->cpc_vnd === null) {
+                            $fill['cpc_vnd'] = $it['cpc'];
+                        }
+                        if (($it['competition'] ?? null) !== null && $kw->competition === null) {
+                            $fill['competition'] = $it['competition'];
+                        }
+                        if ($fill !== []) {
+                            $kw->update($fill);
+                            $metaFilled += count(array_intersect(array_keys($fill), ['difficulty', 'cpc_vnd', 'competition']));
+                        }
                     }
                 }
                 try {
@@ -298,6 +400,7 @@ final class PlanFileImporter
                     'campaign_id' => $campaign?->id,
                     'priority' => $it['priority'],
                     'guidance' => $it['guidance'],
+                    'brief' => ($it['brief_json'] ?? []) !== [] ? $it['brief_json'] : null,
                 ], fn ($v) => $v !== null));
                 $created++;
 
@@ -334,6 +437,9 @@ final class PlanFileImporter
             }
             if ($volNew + $volFilled > 0) {
                 $notes[] = "Lượng tìm kiếm đã lưu vào kho từ khóa: $volFilled từ khóa có sẵn được điền, $volNew từ khóa mới được thêm.";
+            }
+            if ($metaFilled > 0) {
+                $notes[] = "Độ khó, CPC, mức cạnh tranh: đã điền $metaFilled số liệu vào kho từ khóa (chỉ chỗ còn trống).";
             }
             if ($dated > 0) {
                 $notes[] = "$dated bài đã được xếp ngày dự kiến (giờ Việt Nam).";

@@ -25,3 +25,7 @@ Route::get('/', function () {
         'timestamp' => now()->toIso8601String(),
     ]);
 });
+
+// Search Console: kết nối bằng tài khoản Google (OAuth chỉ-đọc). Quyền kiểm tra trong controller (người duyệt đang hoạt động).
+Route::get('/admin/search-console/oauth/start', [\App\Http\Controllers\GscOAuthController::class, 'start'])->name('gsc.oauth.start');
+Route::get('/admin/search-console/oauth/callback', [\App\Http\Controllers\GscOAuthController::class, 'callback'])->name('gsc.oauth.callback');

@@ -31,6 +31,7 @@ class Article extends Model
         'cluster_id',
         'priority',
         'guidance',
+        'brief',
         'approved_version_id',
     ];
 
@@ -38,6 +39,7 @@ class Article extends Model
     {
         return [
             'secondary_keywords' => 'array',
+            'brief' => 'array',
         ];
     }
 

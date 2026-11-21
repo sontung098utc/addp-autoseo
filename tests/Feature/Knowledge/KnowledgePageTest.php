@@ -137,4 +137,16 @@ class KnowledgePageTest extends TestCase
         $i = $this->item(['status' => 'approved']);
         Livewire::test(KnowledgePage::class)->call('openItem', $i->id)->assertSee('Đã dùng trong 0 bài')->assertSee('Lịch sử phiên bản');
     }
+
+    public function test_chi_tiet_la_hop_noi_giua_man_hinh_co_vung_doc_rong_va_nguon_to_sang_doan_trich(): void
+    {
+        $this->actingAs($this->user('admin'));
+        $claim = 'Định nghĩa mới yêu cầu thực phẩm phải chứa một lượng nhất định từ các nhóm thực phẩm lành mạnh.';
+        $src = KnowledgeSource::create(['kind' => 'url', 'title' => 'Nguồn FDA', 'url' => 'https://www.fda.gov/x', 'raw_text' => "Skip to main content\nHome\n\n".$claim."\n\nPhần sau của trang.", 'status' => 'split']);
+        $i = $this->item(['status' => 'proposed', 'body' => $claim, 'source_span' => $claim, 'source_id' => $src->id, 'tags' => ['fda', 'nhãn']]);
+        $c = Livewire::test(KnowledgePage::class)->call('openItem', $i->id);
+        $c->assertSeeHtml('class="kb-modal"')->assertSeeHtml('role="dialog"')->assertSeeHtml('class="kb-body"')->assertSee('Nội dung')->assertSee('Nguồn: Nguồn FDA')->assertSee('https://www.fda.gov/x')
+            ->assertSeeHtml('<mark>'.$claim.'</mark>')->assertSeeHtml('class="kb-dlg__f"')->assertSee('Duyệt')->assertSee('fda')->assertSee('nhãn');
+        $c->call('closeItem')->assertDontSeeHtml('class="kb-modal"');
+    }
 }

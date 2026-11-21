@@ -1,0 +1,10 @@
+﻿Loại,Tiêu chí,Quy tắc cụ thể,Vì sao,Mức
+tiêu chí,Ý định trước từ khóa,"Phân loại ý định (hiểu bệnh, ăn uống, xét nghiệm, thuốc, so sánh) rồi chọn khung bài; không bắt đầu từ từ khóa.",Bài trả lời đúng câu hỏi người đọc,Bắt buộc
+tiêu chí,Mỗi H2 một câu hỏi thật,Tiêu đề mục là câu hỏi hoặc việc làm; không mục nào chỉ để chứa từ khóa.,"Dễ đọc, dễ trích dẫn",Bắt buộc
+tiêu chí,"Trả lời trước, giải thích sau",Dưới mỗi tiêu đề đặt câu trả lời thẳng một đến hai câu rồi mới dẫn chứng.,Người đọc lo lắng cần câu trả lời nhanh,Bắt buộc
+tiêu chí,Mục đường thoát,Bài về bệnh lý luôn có mục khi nào đi khám/cấp cứu; có mục nhóm đối tượng đặc biệt khi lời khuyên khác nhau theo người.,An toàn người đọc,Bắt buộc
+tiêu chí,Nói rõ cần căn cứ gì,Mỗi mục ghi cần nguồn loại nào; mục chưa có tài liệu thì nêu để Người nghiên cứu tìm trước khi viết.,Chống bịa,Bắt buộc
+tiêu chí,Ảnh làm việc cho người đọc,"Chỉ đặt ảnh ở mục giải thích, chỉ cách, so sánh hoặc giúp nhớ; ít ảnh đúng chỗ.",Tránh ảnh trang trí,Nên
+tiêu chí,Không làm theo mẹo AI,"Không tạo llms.txt cho Google, không băm nhỏ nội dung, không nhồi câu hỏi; Google coi đây vẫn là SEO nền tảng.",Hướng dẫn chính thức của Google,Nên
+tiêu chí,Tránh trùng ý định,Kiểm bài đã có; cùng ý định thì đề xuất cập nhật bài cũ thay vì bài mới.,Tránh tự cạnh tranh,Nên
+bài học,,Dàn ý không chứa số liệu y khoa; số liệu chỉ lấy từ nguồn duyệt.,,

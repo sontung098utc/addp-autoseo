@@ -14,6 +14,8 @@ use App\Services\Agent\Ai\AiModelCatalog;
 use App\Services\Agent\Pipeline\PipelineVisual;
 use App\Services\Agent\Roles\AgentProfiles;
 use App\Services\Agent\Roles\ExpertTemplates;
+use App\Services\Agent\Roles\RoleTrainingImporter;
+use App\Services\Agent\Roles\RoleTrainingTemplate;
 use App\Services\Agent\Roles\AgentStudioData;
 use App\Services\Agent\Roles\RoleAssignments;
 use App\Services\Agent\Roles\RoleRegistry;
@@ -49,7 +51,7 @@ class AgentRoles extends Page
     /** Khối nhỏ đang mở trong tab Huấn luyện. */
     public string $trainSec = 'instructions';
 
-    public const TRAIN_SECTIONS = ['instructions' => 'Chỉ dẫn', 'lessons' => 'Bài học', 'docs' => 'Tài liệu', 'skills' => 'Kỹ năng', 'brain' => 'Trí tuệ'];
+    public const TRAIN_SECTIONS = ['instructions' => 'Chỉ dẫn', 'import' => 'Nạp từ file', 'lessons' => 'Bài học', 'docs' => 'Tài liệu', 'skills' => 'Kỹ năng', 'brain' => 'Trí tuệ'];
 
     /** Tên mục cũ → [mục mới, khối trong Huấn luyện] để liên kết cũ vẫn mở đúng chỗ. */
     private const LEGACY_TABS = ['persona' => ['training', 'instructions'], 'model' => ['tech', null]];
@@ -65,6 +67,9 @@ class AgentRoles extends Page
 
     public string $fPersona = '';
 
+    /** Đã điền mẫu chuyên gia vào ô nhưng chưa Lưu: «Hoàn tác» khi đó chỉ bỏ phần điền, không đụng phiên bản đã lưu. */
+    public bool $templatePending = false;
+
     public string $fInstructions = '';
 
     public bool $showHistory = false;
@@ -76,6 +81,15 @@ class AgentRoles extends Page
     public string $docBody = '';
 
     public $docFile = null;
+
+    /** Nạp huấn luyện từ tệp: tệp vừa chọn, bản xem trước do AI phân tích, và các mục đang được tick. */
+    public $trainFile = null;
+
+    /** @var array<string,mixed>|null */
+    public ?array $trainPreview = null;
+
+    /** @var array<string,bool> */
+    public array $trainPick = [];
 
     public string $skillTitle = '';
 
@@ -139,6 +153,9 @@ class AgentRoles extends Page
         $this->actor();
         abort_if((new RoleRegistry)->find($key) === null, 404);
         $this->studioRole = $key;
+        $this->trainPreview = null;
+        $this->trainFile = null;
+        $this->trainPick = [];
         $this->trainSec = 'instructions';
         [$tab, $sec] = $this->resolveTab($tab, $sec);
         $this->studioTab = $tab;
@@ -192,6 +209,7 @@ class AgentRoles extends Page
         $this->fName = (string) $p['display_name'];
         $this->fTitle = (string) $p['title'];
         $this->fTraits = array_values((array) $p['traits']);
+        $this->templatePending = false;
         $this->fPersona = (string) $p['persona'];
         $this->fInstructions = (string) $p['instructions'];
         $this->grants = [];
@@ -250,12 +268,88 @@ class AgentRoles extends Page
             return;
         }
         $this->fPersona = $t['persona'];
+        $this->templatePending = true;
         $this->fInstructions = $t['instructions'];
         Notification::make()->title('Đã điền mẫu «'.$t['label'].'»')->body('Xem lại rồi bấm Lưu để áp dụng từ lần chạy kế tiếp. Chưa bấm Lưu thì chưa có gì thay đổi.')->success()->send();
     }
 
+    /** AI đọc tệp vừa chọn và chuẩn hóa thành các mục có thể nạp (chưa nạp gì cho tới khi bấm Nạp). */
+    public function analyzeTrainFile(): void
+    {
+        $u = $this->actor();
+        $this->trainPreview = null;
+        $this->trainPick = [];
+        try {
+            abort_unless($u->isAdmin(), 403);
+            if (! $this->trainFile) {
+                throw new \InvalidArgumentException('Chọn một tệp trước.');
+            }
+            $x = RoleTrainingImporter::extract($this->trainFile->getRealPath(), $this->trainFile->getClientOriginalName(), (int) $this->trainFile->getSize());
+            $p = app(RoleTrainingImporter::class)->analyze((string) $this->studioRole, $x['text'], $this->trainFile->getClientOriginalName(), $x['truncated']);
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()->title('Chưa phân tích được tệp')->body(\App\Support\UserFacingError::from($e))->danger()->send();
+
+            return;
+        }
+        $this->trainPreview = $p + ['role' => $this->studioRole];
+        foreach ($p['items'] as $it) {
+            $this->trainPick[$it['id']] = true;
+        }
+        if ($p['items'] === []) {
+            Notification::make()->title('Không có mục nào để nạp')->body('AI không rút được tiêu chí hay quy trình mới nào từ tệp này (xem phần "Không nạp").')->warning()->send();
+        }
+    }
+
+    public function applyTrainPreview(): void
+    {
+        $this->guarded(function (User $u) {
+            abort_unless($this->trainPreview && ($this->trainPreview['role'] ?? null) === $this->studioRole, 422);
+            $pick = array_keys(array_filter($this->trainPick));
+            $r = RoleTrainingImporter::apply((string) $this->studioRole, $this->trainPreview, $pick, $u);
+            if ($r['import_id'] === null) {
+                throw new \InvalidArgumentException($r['failed'] !== [] ? implode(' ', $r['failed']) : 'Chưa chọn mục nào để nạp.');
+            }
+            Notification::make()->title('Đã nạp: '.$r['lessons'].' tiêu chí/bài học, '.$r['skills'].' kỹ năng, '.$r['docs'].' tài liệu')
+                ->body($r['failed'] !== [] ? 'Không nạp được: '.implode(' ', $r['failed']) : 'Có hiệu lực từ lần chạy kế tiếp. Có thể gỡ cả lần nạp này ở danh sách bên dưới.')->success()->send();
+            $this->trainPreview = null;
+            $this->trainPick = [];
+            $this->trainFile = null;
+        });
+    }
+
+    /** Tải file mẫu huấn luyện của vai trò đang mở. $format: csv (đọc trực tiếp, không cần AI) | md (AI đọc). */
+    public function downloadTrainTemplate(string $format = 'csv'): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->actor();
+        $role = (string) $this->studioRole;
+        abort_if((new RoleRegistry)->find($role) === null, 404);
+        $md = $format === 'md';
+
+        return response()->streamDownload(function () use ($role, $md) {
+            echo $md ? RoleTrainingTemplate::markdown($role) : RoleTrainingTemplate::csv($role);
+        }, 'mau-huan-luyen-'.$role.($md ? '.md' : '.csv'), ['Content-Type' => $md ? 'text/markdown; charset=UTF-8' : 'text/csv; charset=UTF-8']);
+    }
+
+    public function discardTrainPreview(): void
+    {
+        $this->trainPreview = null;
+        $this->trainPick = [];
+        $this->trainFile = null;
+    }
+
+    public function removeImport(int $id): void
+    {
+        $this->guarded(fn (User $u) => RoleTrainingImporter::remove($id, (string) $this->studioRole, $u), 'Đã gỡ lần nạp này.');
+    }
+
     public function undoProfile(): void
     {
+        if ($this->templatePending) {
+            $this->loadStudioForm();
+            Notification::make()->title('Đã bỏ phần điền mẫu chưa lưu.')->success()->send();
+
+            return;
+        }
         $this->guarded(function (User $u) {
             $prev = AgentProfiles::previousVersion((string) $this->studioRole);
             if ($prev === null) {
@@ -418,6 +512,7 @@ class AgentRoles extends Page
     {
         return [
             'sec' => $this->trainSec, 'sections' => self::TRAIN_SECTIONS,
+            'overview' => RoleTrainingImporter::overview($key), 'imports' => RoleTrainingImporter::imports($key), 'preview' => ($this->trainPreview['role'] ?? null) === $key ? $this->trainPreview : null,
             'lessons' => AgentProfiles::lessons($key), 'docs' => AgentProfiles::documents($key, 'knowledge'), 'chars' => AgentProfiles::knowledgeChars($key), 'max' => AgentProfiles::PROMPT_MAX,
             'issues' => AgentStudioData::trainingIssues($key),
             'skills' => $reg->skills($role), 'custom' => AgentProfiles::documents($key, 'skill'),

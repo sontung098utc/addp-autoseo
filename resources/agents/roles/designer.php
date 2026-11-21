@@ -46,6 +46,7 @@ return [
         'designer/image-design',
         'designer/health-infographic',
         'designer/image-qa',
+        'designer/accessible-health-visual',
     ],
     'orchestrator_steps' => [
         'images' => 'designer',
