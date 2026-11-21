@@ -42,6 +42,20 @@ class ExpertTemplatesTest extends TestCase
         $this->assertStringContainsString('sức khỏe', (string) (AgentProfiles::custom('writer')['persona'] ?? ''));
     }
 
+    public function test_hoan_tac_sau_khi_dien_mau_chua_luu_chi_bo_phan_dien_va_khong_doi_ban_da_luu(): void
+    {
+        $admin = User::create(['name' => 'a', 'email' => uniqid().'@x.vn', 'password' => 'secret123', 'role' => 'admin', 'is_active' => true]);
+        $this->actingAs($admin);
+        $c = Livewire::test(AgentRoles::class)->call('openStudio', 'writer', 'training')
+            ->set('fPersona', 'Bản đã lưu A')->call('saveProfile')
+            ->set('fPersona', 'Bản đã lưu B')->call('saveProfile')
+            ->call('applyExpertTemplate')->call('undoProfile');
+        $this->assertSame('Bản đã lưu B', $c->get('fPersona'), 'chỉ bỏ phần điền mẫu, không lùi về bản lưu trước');
+        $this->assertSame('Bản đã lưu B', AgentProfiles::custom('writer')['persona']);
+        $c->call('undoProfile');
+        $this->assertSame('Bản đã lưu A', $c->get('fPersona'), 'lần Hoàn tác sau mới lùi bản đã lưu');
+    }
+
     public function test_moi_vai_tro_deu_co_mau_va_nap_chi_dien_vao_o(): void
     {
         $admin = User::create(['name' => 'a', 'email' => uniqid().'@x.vn', 'password' => 'secret123', 'role' => 'admin', 'is_active' => true]);

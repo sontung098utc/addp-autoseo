@@ -232,7 +232,7 @@ final class PlanFileImporter
                     $briefJson[$ck] = $cv;
                 }
             }
-            if (($sl = Str::slug(PlanFileFields::text($first($r, 'cms_slug'), 120))) !== '') {
+            if (($sl = Str::slug(preg_replace('~[/\\\\_.,;:+&|]+~u', ' ', PlanFileFields::text($first($r, 'cms_slug'), 120)))) !== '') {
                 $briefJson['cms_slug'] = $sl;
             }
             if (($rv = PlanFileFields::text($first($r, 'reviewer'), 120)) !== '') {

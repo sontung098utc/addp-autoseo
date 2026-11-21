@@ -67,6 +67,9 @@ class AgentRoles extends Page
 
     public string $fPersona = '';
 
+    /** Đã điền mẫu chuyên gia vào ô nhưng chưa Lưu: «Hoàn tác» khi đó chỉ bỏ phần điền, không đụng phiên bản đã lưu. */
+    public bool $templatePending = false;
+
     public string $fInstructions = '';
 
     public bool $showHistory = false;
@@ -206,6 +209,7 @@ class AgentRoles extends Page
         $this->fName = (string) $p['display_name'];
         $this->fTitle = (string) $p['title'];
         $this->fTraits = array_values((array) $p['traits']);
+        $this->templatePending = false;
         $this->fPersona = (string) $p['persona'];
         $this->fInstructions = (string) $p['instructions'];
         $this->grants = [];
@@ -264,6 +268,7 @@ class AgentRoles extends Page
             return;
         }
         $this->fPersona = $t['persona'];
+        $this->templatePending = true;
         $this->fInstructions = $t['instructions'];
         Notification::make()->title('Đã điền mẫu «'.$t['label'].'»')->body('Xem lại rồi bấm Lưu để áp dụng từ lần chạy kế tiếp. Chưa bấm Lưu thì chưa có gì thay đổi.')->success()->send();
     }
@@ -339,6 +344,12 @@ class AgentRoles extends Page
 
     public function undoProfile(): void
     {
+        if ($this->templatePending) {
+            $this->loadStudioForm();
+            Notification::make()->title('Đã bỏ phần điền mẫu chưa lưu.')->success()->send();
+
+            return;
+        }
         $this->guarded(function (User $u) {
             $prev = AgentProfiles::previousVersion((string) $this->studioRole);
             if ($prev === null) {

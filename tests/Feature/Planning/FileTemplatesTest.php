@@ -332,4 +332,16 @@ class FileTemplatesTest extends TestCase
         $this->assertSame($u->id, $a->brief['reviewer_user_id']);
         $this->assertNull(\App\Models\Article::where('primary_keyword', 'bài brief hai')->first()->brief['reviewer_user_id'] ?? null);
     }
+
+    public function test_slug_tach_tu_o_dau_gach_cheo_va_dau_cau_khong_dinh_chu(): void
+    {
+        $site = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://s.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+        $u = $this->user('approver');
+        $rows = [['Từ khóa chính', 'Slug mong muốn'], ['bài slug một', '  Ăn Gì/Khi Mỡ Máu_cao.2026  ']];
+        $map = PlanFileHeuristics::mapByHeader(['rows' => $rows], 1);
+        $imp = new PlanFileImporter;
+        $b = $imp->build($site, $rows, $map, 1);
+        $imp->apply($u, $site, $b['items'], PlanFileImporter::TARGET_SOLO);
+        $this->assertSame('an-gi-khi-mo-mau-cao-2026', \App\Models\Article::where('primary_keyword', 'bài slug một')->first()->brief['cms_slug']);
+    }
 }
