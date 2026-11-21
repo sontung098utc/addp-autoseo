@@ -127,7 +127,7 @@
                     </div>
                     <div class="ags-subtabs" role="tablist" aria-label="Phần huấn luyện" data-testid="studio-train-tabs">
                         @foreach ($s['sections'] as $k => $label)
-                            @php $cnt = match ($k) { 'instructions' => 0, 'lessons' => $activeLessons, 'docs' => count($s['docs']), 'skills' => count(array_filter($s['skills'], fn ($x) => $x['exists'] && $x['enabled'])) + count(array_filter($s['custom'], $customOn)), 'brain' => count(array_filter($grants)) }; @endphp
+                            @php $cnt = match ($k) { 'instructions' => 0, 'import' => count($s['imports']), 'lessons' => $activeLessons, 'docs' => count($s['docs']), 'skills' => count(array_filter($s['skills'], fn ($x) => $x['exists'] && $x['enabled'])) + count(array_filter($s['custom'], $customOn)), 'brain' => count(array_filter($grants)) }; @endphp
                             <button type="button" role="tab" aria-selected="{{ $tsec === $k ? 'true' : 'false' }}" class="ags-subtab" wire:click="setTrainSec('{{ $k }}')" data-sec="{{ $k }}">{{ $label }}@if ($cnt > 0)<span class="ags-subtab__n">{{ $cnt }}</span>@endif</button>
                         @endforeach
                     </div>
@@ -189,12 +189,125 @@
                             <textarea style="{{ $input }}" rows="8" wire:model="fInstructions" data-testid="studio-f-instructions"></textarea>
                         </fieldset>
 
+                    @elseif ($tsec === 'import')
+                        @php
+                            $ov = $s['overview'];
+                            $pv = $s['preview'];
+                            $pct = min(100, (int) round($ov['prompt_chars'] / max(1, $ov['prompt_max']) * 100));
+                            $sevColor = ['bat_buoc' => '#dc2626', 'nen' => '#d97706', 'goi_y' => '#64748b'];
+                            $sevLabel = \App\Services\Agent\Roles\RoleTrainingImporter::SEVERITY;
+                            $picked = collect($trainPick)->filter()->count();
+                        @endphp
+                        {{-- 1) Tóm tắt một dòng: đang có gì + mức dùng prompt --}}
+                        <div class="ags-card" data-testid="train-overview" style="display:flex;gap:.6rem 1.2rem;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:0">
+                            <div style="display:flex;gap:.3rem 1.1rem;flex-wrap:wrap;font-size:.85rem;align-items:baseline">
+                                <span style="font-weight:600">Hồ sơ đào tạo hiện có</span>
+                                <span><b>{{ $ov['lessons_active'] }}</b> tiêu chí/bài học @if (($ov['by_source']['file'] ?? 0) > 0)<span class="text-xs" style="opacity:.6">({{ $ov['by_source']['file'] }} từ file)</span>@endif</span>
+                                <span><b>{{ $ov['skills'] }}</b> kỹ năng</span>
+                                <span><b>{{ $ov['docs'] }}</b> tài liệu</span>
+                                <span>chỉ dẫn <b>{{ $ov['customized'] ? 'đã tùy chỉnh' : 'mặc định' }}</b></span>
+                            </div>
+                            <div data-testid="train-meter" style="min-width:10rem;font-size:.72rem;opacity:.85" title="Hồ sơ đi vào prompt: {{ number_format($ov['prompt_chars']) }}/{{ number_format($ov['prompt_max']) }} ký tự">Prompt {{ $pct }}%@if ($pct >= 85) <strong style="color:#d97706">· sắp đầy</strong>@endif<div class="ags-bar" style="margin-top:.2rem"><i style="width:{{ $pct }}%"></i></div></div>
+                        </div>
+                        <div data-testid="train-applied" style="margin:.4rem 0 .9rem;font-size:.8rem">
+                            @if ($ov['applied_at'] !== [])
+                                <details><summary style="cursor:pointer;opacity:.85">Hồ sơ này được đưa vào prompt ở các bước ({{ count($ov['applied_at']) }})</summary>
+                                    <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin:.4rem 0 .2rem">@foreach ($ov['applied_at'] as $st)<span class="ags-chip ags-chip--on">{{ $st }}</span>@endforeach</div>
+                                    <div class="text-xs" style="opacity:.7">Áp dụng cho mọi phiên chạy từ lần chạy kế tiếp. Chỉ phần đã tùy chỉnh (bài học, kỹ năng riêng, tài liệu, chỉ dẫn đã lưu) mới đi vào prompt; không phủ lên quy tắc an toàn hay bộ luật chất lượng.</div>
+                                </details>
+                            @else
+                                <span style="color:#b45309">Vai trò này chưa có bước AI nào trong phiên chạy dùng hồ sơ đào tạo: nạp được nhưng chưa có tác dụng.</span>
+                            @endif
+                        </div>
+
+                        {{-- 2) Khối chính: tải tệp (kèm liên kết tải mẫu ngay trong khối) --}}
+                        @if ($edit)
+                            <div class="ags-card" data-testid="train-upload" wire:key="train-zone-{{ count($s['imports']) }}-{{ $pv ? 'p' : 'n' }}">
+                                <div style="display:flex;justify-content:space-between;gap:.5rem 1rem;flex-wrap:wrap;align-items:center;margin-bottom:.55rem">
+                                    <div style="font-weight:600;font-size:.9rem">Nạp thêm từ file</div>
+                                    <div data-testid="train-template-banner" style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;font-size:.78rem">
+                                        <span style="opacity:.75">Chưa có file? Tải mẫu:</span>
+                                        <button type="button" wire:click="downloadTrainTemplate('csv')" data-testid="train-template-csv" title="Điền theo cột thì đọc trực tiếp, không cần AI, không tốn chi phí" style="display:inline-flex;align-items:center;gap:.3rem;background:rgba(15,118,110,.1);color:#0f766e;border:1px solid rgba(15,118,110,.35);border-radius:.55rem;padding:.25rem .6rem;font-weight:600;cursor:pointer;font-size:.78rem"><x-filament::icon icon="heroicon-m-arrow-down-tray" style="width:.9rem;height:.9rem" /> Bảng tiêu chí (.csv)</button>
+                                        <button type="button" wire:click="downloadTrainTemplate('md')" data-testid="train-template-md" title="Có sẵn khung các mục, AI đọc và phân loại" style="display:inline-flex;align-items:center;gap:.3rem;background:transparent;color:inherit;border:1px solid rgba(128,128,128,.4);border-radius:.55rem;padding:.25rem .6rem;font-weight:600;cursor:pointer;font-size:.78rem"><x-filament::icon icon="heroicon-m-arrow-down-tray" style="width:.9rem;height:.9rem" /> Văn bản (.md)</button>
+                                    </div>
+                                </div>
+                                <x-upload-zone name="studio-train-file" model="trainFile" accept=".md,.txt,.csv,.json,.docx" hint="MD, TXT, CSV, JSON, DOCX · dưới 200 KB">
+                                    <button type="button" style="{{ $btnPrimary }};align-self:flex-start" wire:click="analyzeTrainFile" wire:loading.attr="disabled" wire:target="analyzeTrainFile,trainFile" data-testid="train-analyze">
+                                        <span wire:loading.remove wire:target="analyzeTrainFile">Phân tích bằng AI</span><span wire:loading wire:target="analyzeTrainFile">AI đang đọc tệp…</span>
+                                    </button>
+                                </x-upload-zone>
+                                <div class="text-xs" style="opacity:.65;margin-top:.4rem">Mẫu bảng tiêu chí (.csv) điền đúng cột được đọc trực tiếp, không cần AI. Xóa các dòng ví dụ trước khi nạp.</div>
+                            </div>
+                        @endif
+
+                        @if ($pv)
+                            <div class="ags-card" style="border:1.5px solid #6366f1" data-testid="train-preview">
+                                <div style="display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap"><strong>Kết quả phân tích: {{ $pv['file'] }}</strong><span class="ags-chip">{{ \App\Services\Agent\Roles\RoleTrainingImporter::DOC_TYPES[$pv['doc_type']] ?? 'Khác' }}</span></div>
+                                @if ($pv['summary'] !== '')<div style="font-size:.85rem;margin:.25rem 0">{{ $pv['summary'] }}</div>@endif
+                                <div class="text-xs" style="opacity:.65">{{ $pv['model'] ?? 'AI' }}@if ($pv['demo']) · môi trường demo @endif @if ($pv['truncated']) · <strong style="color:#d97706">tệp dài, chỉ đọc {{ number_format(\App\Services\Agent\Roles\RoleTrainingImporter::MAX_CHARS) }} ký tự đầu</strong>@endif</div>
+                                @php $groups = ['criterion' => 'Tiêu chí', 'lesson' => 'Bài học ngắn', 'skill' => 'Kỹ năng (quy trình)', 'doc' => 'Tài liệu kiến thức']; @endphp
+                                @foreach ($groups as $kind => $gl)
+                                    @php $rows = array_values(array_filter($pv['items'], fn ($i) => $i['kind'] === $kind)); @endphp
+                                    @if ($rows !== [])
+                                        <div class="ags-sec" style="margin-top:.7rem">{{ $gl }} ({{ count($rows) }})</div>
+                                        @foreach ($rows as $it)
+                                            <label style="display:flex;gap:.5rem;align-items:flex-start;border-top:1px solid rgba(128,128,128,.18);padding:.35rem 0;cursor:pointer" data-testid="train-item">
+                                                <input type="checkbox" wire:model.live="trainPick.{{ $it['id'] }}" style="margin-top:.25rem">
+                                                <span style="font-size:.84rem;flex:1">
+                                                    @if ($kind === 'criterion')<span style="color:#fff;background:{{ $sevColor[$it['severity']] ?? '#64748b' }};border-radius:.4rem;padding:0 .35rem;font-size:.68rem;margin-right:.3rem">{{ $sevLabel[$it['severity']] ?? '' }}</span><strong>{{ $it['title'] }}</strong>@if (! empty($it['rule']) && \Illuminate\Support\Str::lower(trim($it['rule'], '.… ')) !== \Illuminate\Support\Str::lower(trim($it['title'], '.… ')) && ! \Illuminate\Support\Str::startsWith(\Illuminate\Support\Str::lower($it['rule']), \Illuminate\Support\Str::lower(rtrim($it['title'], '.…'))))<br>{{ $it['rule'] }}@elseif (! empty($it['rule']) && mb_strlen($it['rule']) > mb_strlen($it['title']) + 5)<br>{{ $it['rule'] }}@endif@if (! empty($it['why']))<br><span class="text-xs" style="opacity:.65">Vì sao: {{ $it['why'] }}</span>@endif
+                                                    @elseif ($kind === 'lesson'){{ $it['text'] }}
+                                                    @else<strong>{{ $it['title'] }}</strong><details><summary class="text-xs" style="cursor:pointer;opacity:.7">Xem nội dung ({{ number_format(mb_strlen($it['body'])) }} ký tự)</summary><pre style="white-space:pre-wrap;font-size:.76rem;margin:.2rem 0 0">{{ $it['body'] }}</pre></details>@endif
+                                                </span>
+                                            </label>
+                                        @endforeach
+                                    @endif
+                                @endforeach
+                                @if ($pv['skipped'] !== [])
+                                    <details style="margin-top:.6rem"><summary style="cursor:pointer;font-size:.8rem">Không nạp ({{ count($pv['skipped']) }}) và lý do</summary>
+                                        <ul style="margin:.3rem 0 0 1rem;list-style:disc;font-size:.78rem;opacity:.85">@foreach ($pv['skipped'] as $sk)<li>{{ $sk }}</li>@endforeach</ul></details>
+                                @endif
+                                @if ($pv['items'] === [])<div style="margin-top:.5rem;font-size:.84rem">Không có mục nào để nạp từ tệp này.</div>@endif
+                                <div style="display:flex;gap:.5rem;margin-top:.7rem">
+                                    @if ($pv['items'] !== [])<button type="button" style="{{ $btnPrimary }}" wire:click="applyTrainPreview" wire:loading.attr="disabled" wire:target="applyTrainPreview" @disabled($picked === 0) data-testid="train-apply">Nạp {{ $picked }} mục đã chọn</button>@endif
+                                    <button type="button" style="{{ $btn }}" wire:click="discardTrainPreview" data-testid="train-discard">Bỏ kết quả này</button>
+                                </div>
+                            </div>
+                        @endif
+
+                        @if ($s['imports'] !== [])
+                            <div class="ags-sec">Đã nạp từ file ({{ count($s['imports']) }})</div>
+                            @foreach ($s['imports'] as $im)
+                                @php
+                                    $imMeta = \App\Services\Agent\Roles\RoleTrainingImporter::DOC_TYPES[$im['doc_type'] ?? 'khac'] ?? 'Khác';
+                                    $imWhen = ! empty($im['at']) ? \Illuminate\Support\Carbon::parse($im['at'])->format('d/m/Y') : '';
+                                    $imLine = $imMeta.' · '.$imWhen.' · '.$im['active_lessons'].'/'.count($im['lesson_ids'] ?? []).' tiêu chí đang bật';
+                                    if (count($im['doc_ids'] ?? []) > 0) { $imLine .= ' · '.$im['alive_docs'].'/'.count($im['doc_ids']).' kỹ năng/tài liệu'; }
+                                @endphp
+                                <details class="ags-card" data-testid="train-import" style="padding:.5rem .75rem">
+                                    <summary style="cursor:pointer;display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap;align-items:center;list-style:none">
+                                        <span style="font-size:.85rem"><strong>{{ $im['file'] }}</strong> <span class="text-xs" style="opacity:.65">· {{ $imLine }}</span></span>
+                                    @if ($edit)<button type="button" style="{{ $btn }}" wire:click.stop="removeImport({{ $im['id'] }})" wire:confirm="Gỡ cả lần nạp này (các tiêu chí, kỹ năng, tài liệu đã tạo từ tệp)?" data-testid="train-import-remove">Gỡ</button>@endif
+                                    </summary>
+                                    @if (! empty($im['summary']))<div style="font-size:.8rem;margin:.4rem 0;opacity:.85">{{ $im['summary'] }}</div>@endif
+                                    @if (! empty($im['criteria']))
+                                        <div class="text-xs" style="opacity:.7">Xem {{ count($im['criteria']) }} tiêu chí đã nạp</div>
+                                        @foreach ($im['criteria'] as $c)
+                                            <div style="display:flex;gap:.4rem;align-items:baseline;border-top:1px solid rgba(128,128,128,.18);padding:.25rem 0;font-size:.8rem">
+                                                @if (! empty($c['severity']))<span style="color:#fff;background:{{ $sevColor[$c['severity']] ?? '#64748b' }};border-radius:.4rem;padding:0 .35rem;font-size:.68rem;white-space:nowrap">{{ $sevLabel[$c['severity']] ?? $c['severity'] }}</span>@else<span class="ags-chip" style="font-size:.68rem">Bài học</span>@endif
+                                                <span>{{ $c['text'] }}</span>
+                                            </div>
+                                        @endforeach
+                                    @endif
+                                </details>
+                            @endforeach
+                        @endif
+
                     @elseif ($tsec === 'lessons')
                         <div class="ags-sec" style="margin-top:0">Bài học <x-help text="Quy tắc ngắn nhân sự luôn nhớ. Phần lớn đến từ lần chạy có vấn đề." /></div>
                         @foreach ($s['lessons'] as $l)
                             <div class="ags-card" style="display:flex;justify-content:space-between;gap:.5rem;align-items:flex-start" data-testid="studio-lesson">
                                 <span style="{{ $l->active ? '' : 'opacity:.5' }}">{{ $l->text }}
-                                    <span class="text-xs" style="opacity:.6;display:block">{{ $l->source === 'run' ? 'từ lần chạy'.($l->run_id ? ' #'.$l->run_id : '') : 'nhập tay' }}</span></span>
+                                    <span class="text-xs" style="opacity:.6;display:block">{{ $l->source === 'run' ? 'từ lần chạy'.($l->run_id ? ' #'.$l->run_id : '') : ($l->source === 'file' ? 'nạp từ file' : 'nhập tay') }}</span></span>
                                 @if ($edit)<span style="display:flex;gap:.3rem;flex:none"><button type="button" style="{{ $btn }}" wire:click="toggleLesson({{ $l->id }}, {{ $l->active ? 'false' : 'true' }})">{{ $l->active ? 'Tắt' : 'Bật' }}</button><button type="button" style="{{ $btn }}" wire:click="deleteLesson({{ $l->id }})" wire:confirm="Xóa bài học?">Xóa</button></span>@endif
                             </div>
                         @endforeach

@@ -135,6 +135,51 @@ Lỗi tìm thấy qua giao diện và đã sửa: (1) tiêu đề quyết địn
 Hai chỗ còn tồn tại ban đầu đã sửa và kiểm lại trên giao diện: mục "Dự kiến" cập nhật ngay lúc gõ (debounce 0,5 giây); hộp "Giao đội AI" khi chỉ dẫn giới hạn phạm vi chỉ còn câu phạm vi, rủi ro và chi phí theo phạm vi (không liệt kê các bước sẽ không chạy).
 Chưa thử trên giao diện: server `autoseo.addp.vn` (do bạn đăng nhập), model thật, ảnh thật, cron ảnh bù.
 
+## 11. Nạp huấn luyện từ file và file mẫu (21/11, bổ sung theo yêu cầu)
+
+**Nạp từ file cho vai trò** (Đội AI → Vai trò → hồ sơ → Huấn luyện → tab **Nạp từ file**):
+1. Chọn tệp (.md, .txt, .csv, .json, .docx, dưới 200 KB) → bấm **Phân tích bằng AI**.
+2. AI đọc, phân loại và chuẩn hóa thành: **tiêu chí** (kèm mức Bắt buộc/Nên/Gợi ý và lý do), **bài học ngắn**, **kỹ năng** (quy trình), **tài liệu kiến thức**; kèm danh sách "Không nạp" và lý do.
+3. Xem trước, **tick chọn** từng mục (bộ đếm "Nạp N mục đã chọn"), rồi bấm Nạp. Chưa bấm Nạp thì chưa có gì thay đổi.
+4. Hiển thị gọn: một dòng **Hồ sơ đào tạo hiện có** (số tiêu chí/bài học đang bật, kỹ năng, tài liệu, chỉ dẫn mặc định hay đã tùy chỉnh) kèm mức dùng prompt (cảnh báo ≥ 85%); một dòng thu gọn "đưa vào prompt ở các bước (N)"; khối tải tệp có sẵn liên kết tải mẫu; danh sách **Đã nạp từ file** thu gọn (tên tệp, loại, ngày, số tiêu chí còn bật, bấm xem từng tiêu chí, nút **Gỡ** xóa cả lô).
+5. Tiêu chí nạp xong đi vào prompt của vai trò ở mọi lần chạy (có test). Không tạo bảng mới (lưu bằng bài học `source=file`, kỹ năng/tài liệu và một bản ghi `agent_documents.kind=import`).
+- An toàn: nội dung tệp đóng khung nonce và coi là dữ liệu; mục đòi bỏ quy tắc an toàn/đăng bài bị loại (`GuidanceConstraints::isUnsafe`); mục trùng bài học đã có bị bỏ qua; chỉ quản trị viên phân tích và nạp; không có AI thật thì báo rõ, không bịa (riêng môi trường demo có bộ tách dòng đơn giản, ghi nhãn "không phải AI thật").
+
+**File mẫu tải về** (khung viền nhấn xanh dịu ở nhập kế hoạch; ở huấn luyện là liên kết tải mẫu nằm ngay trong khối tải tệp, sau khi người dùng nhận xét giao diện quá rối):
+- **Nhập kế hoạch từ file** (trang Kế hoạch, hiện ngay ở khung giới thiệu trước khi chọn file và cả ở hộp chọn file): **mẫu Excel (.xlsx)** gồm sheet "Kế hoạch" (11 cột, 2 dòng ví dụ ghi "xóa dòng này") và sheet "Hướng dẫn" từng cột; hoặc **mẫu CSV** (UTF-8 có BOM). Có test vòng tròn: tải mẫu → đọc lại → mọi cột nhận đúng trường. Dòng ví dụ quên xóa bị bỏ qua, không tạo bài mẫu.
+- **Huấn luyện vai trò**: **bảng tiêu chí (.csv)**: điền đúng cột (Loại, Tiêu chí, Quy tắc cụ thể, Vì sao, Mức) thì được **đọc trực tiếp, không cần AI, không tốn chi phí** và dùng được cả khi chưa kết nối AI (hỗ trợ dấu phẩy và chấm phẩy kiểu Excel Việt Nam); **văn bản (.md)** có sẵn khung các mục để AI đọc. Dòng ví dụ lấy từ rào chắn thật của từng vai trò.
+- Test: `RoleTrainingImportTest` (8), `FileTemplatesTest` (7). Đã thử trên giao diện bản 8110: nạp, tick, gỡ, nạp form mẫu CSV (đọc không AI, bỏ dòng ví dụ), khung tải mẫu hiển thị nổi bật, bấm tải mẫu kế hoạch trả 200.
+- Lỗi bắt được khi thử giao diện và đã sửa: nội dung quy tắc của tiêu chí bị ẩn (lỗi logic chống lặp, có test hồi quy); tên tệp cũ còn trong khu thả sau khi nạp; mã Blade thô lộ ra ở dòng "Đã nạp từ file" (chỉ thị `@if` dính liền chữ, có test hồi quy); giao diện quá rối (gộp lại như trên).
+- Đã thử thêm trên giao diện: tệp .exe bị từ chối kèm thông báo rõ; nạp 2 tiêu chí rồi **Gỡ** về 0; nhập kế hoạch bằng CSV theo form mẫu có dòng ví dụ chưa xóa (bỏ dòng ví dụ, 2 bài thật vào chiến dịch, 11/12 cột nhận đúng).
+- **Chưa kiểm:** AI thật phân tích tệp (mới thử bằng AI giả và bộ tách dòng demo), tệp .docx thật từ Word (mới thử docx dựng tay), tải mẫu bằng trình duyệt thật ngoài khung tích hợp (mới kiểm phản hồi 200 và test `assertFileDownloaded`). `app/Services/Planning/Import/PlanFileImporter.php` thêm luật bỏ dòng ví dụ: Dev1 vui lòng rà.
+
+## 12. Huấn luyện có thật sự được áp dụng vào phiên làm việc không? (kiểm tra và sửa, 21/11)
+
+**Phát hiện:** trước đợt sửa này, hồ sơ đào tạo (persona, quy tắc, bài học, kỹ năng riêng, tài liệu) chỉ đi vào prompt của **2 bước**: Chiến lược lập dàn ý và Người viết (viết/sửa bài), qua `roleOptions()`. Các bước AI dạng JSON không nhận: Biên tập viên (đọc bài, kiểm trích dẫn), Họa viên (yêu cầu và thiết kế ảnh), Quản lý SEO (đọc lời nhắn), Người nghiên cứu (điều phối kho), tổng hợp nguồn, nhận diện cột file kế hoạch. Nghĩa là nạp huấn luyện cho các vai trò đó **không có tác dụng**.
+
+**Đã sửa:** `AiJson::withProfile()` + `AgentProfiles::jsonBlock()` (rút gọn ≤ 6.000 ký tự, đã đóng khung "không ghi đè quy tắc an toàn") nối hồ sơ vào mọi lượt gọi JSON của vai trò đó. Danh sách thật (`AgentProfiles::APPLIED_AT`, mỗi mục có test chứng minh):
+
+| Vai trò | Bước nhận huấn luyện |
+|---|---|
+| Người viết | Viết bài; sửa bài theo góp ý |
+| Chiến lược | Lập dàn ý; tổng hợp nguồn và chốt hướng nội dung |
+| Biên tập | Biên tập viên đọc bài; kiểm trích dẫn có hỗ trợ câu |
+| Họa viên | Đặt yêu cầu và thiết kế ảnh |
+| Quản lý SEO | Đọc lời nhắn làm lại và chỉ dẫn của bài, chốt phạm vi |
+| Người nghiên cứu | Điều phối kho (phân loại chủ đề, chọn Trí tuệ) |
+| Người phân tích tệp | Nhận diện cột khi nhập file kế hoạch |
+
+**Chưa có bước nào nhận huấn luyện** (lưu được nhưng chưa có tác dụng): Kiểm chứng viên y khoa, Người kiểm ảnh (chạy bằng luật, không AI), Người lập kế hoạch, Nghiên cứu từ khóa, Đối thủ, Giám sát, Audit. Giao diện (tab Nạp từ file) nói rõ điều này cho từng vai trò thay vì để người dùng tưởng đã có tác dụng.
+
+**Bằng chứng:** `AgentTrainingAppliedTest` gán cho mỗi vai trò một "dấu" riêng rồi chạy phiên thật (AI giả ghi lại mọi prompt): dấu của vai trò nào xuất hiện ở bước của vai trò đó và **không lọt sang vai trò khác**; vai trò chưa dạy gì thì prompt không có khối hồ sơ. Chạy lại test với mã orchestrator cũ thì 5 test lỗi (Biên tập, Quản lý, Họa viên, Người nghiên cứu/phân tích tệp, khung an toàn), chứng tỏ test phân biệt được.
+
+**Giới hạn cần biết:**
+- Chỉ phần ĐÃ TÙY CHỈNH mới đi vào prompt (persona/quy tắc đã lưu, bài học, kỹ năng riêng, tài liệu). Persona mặc định trong file vai trò chỉ để hiển thị.
+- Hồ sơ cho bước JSON bị rút gọn còn 6.000 ký tự (bước viết/dàn ý nhận tối đa 14.000); hồ sơ dài thì phần cuối bị cắt, thanh mức dùng cảnh báo từ 85%.
+- Hồ sơ làm tăng token mỗi lượt gọi (chưa đo mức tăng chi phí thật).
+- Đã kiểm bằng AI giả (đúng nội dung prompt gửi đi); **chưa đo hiệu quả với model thật** (model có làm theo tiêu chí hay không).
+- `AiJson` (Knowledge) và `PlanFileMapper` (Planning) thuộc phạm vi dùng chung: Dev1 vui lòng rà.
+
 ## 7. Cách thử sáng mai (10 phút)
 1. Mở một bài đã có bản nháp → trang chi tiết bản bài → bấm **Giao làm lại** (nút mới) → gõ: `Chỉ tạo lại ảnh bìa có chữ «Tên tiêu đề ngắn». Giữ nguyên bài viết.` Kỳ vọng: nhật ký có bước "Điều phối đã đọc lời nhắn", phạm vi "chỉ làm lại ảnh, giữ nguyên chữ của bài", **không** có bước viết/chấm, bản mới v+1 chữ y hệt bản cũ, ảnh bìa mới. Xem chữ trên ảnh có đúng dấu không.
 2. Vào bài khác → **Chỉ dẫn cho đội AI** → gõ `Chỉ tạo lại ảnh, giữ nguyên bài viết.` → **Giao đội AI**. Kỳ vọng như trên, bước điều phối ghi "đã đọc chỉ dẫn của bài". Xóa chỉ dẫn sau đó.

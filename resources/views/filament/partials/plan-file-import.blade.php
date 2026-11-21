@@ -120,6 +120,7 @@
                     </details>
                 @endif
             @elseif (! $st)
+                @include('filament.partials.plan-template-banner')
                 <label class="pfm-drop">
                     <x-filament::icon icon="heroicon-o-arrow-up-tray" style="width:2rem;height:2rem" />
                     <strong>Chọn file kế hoạch</strong>

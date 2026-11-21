@@ -94,6 +94,10 @@ final class PlanFileImporter
             if ($headerCells !== [] && count($filled) >= 2 && count(array_filter($filled, fn ($c, $k) => mb_strtolower(trim((string) $c)) === ($headerCells[$k] ?? null), ARRAY_FILTER_USE_BOTH)) >= count($filled) * 0.6) {
                 continue;
             }
+            // dòng VÍ DỤ của file mẫu ("(VÍ DỤ, xóa dòng này)") người dùng quên xóa: bỏ qua im lặng, không tạo bài mẫu
+            if (preg_match('/\(\s*v[íi]\s*d[ụu][^)]*x[óo]a d[òo]ng n[àa]y/iu', implode(' ', array_map('strval', $r)))) {
+                continue;
+            }
             $kw = PlanFileFields::text((string) ($r[$kwCol] ?? ''), 255);
             if ($kw === '') {
                 if (array_filter($r, fn ($c) => trim((string) $c) !== '') === []) {

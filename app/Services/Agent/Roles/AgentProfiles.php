@@ -531,6 +531,34 @@ final class AgentProfiles
     // ---- Khối chỉ dẫn cho prompt ----
 
     /** Khối chỉ dẫn gộp (≤ 14.000 ký tự, cắt theo ưu tiên: tên/tính cách → persona → quy tắc → bài học → kỹ năng riêng → tài liệu). Null nếu chưa có gì tùy chỉnh. */
+    /**
+     * Các BƯỚC AI trong phiên chạy THẬT SỰ nhận hồ sơ đào tạo của từng vai trò (mỗi mục có test chứng minh trong AgentTrainingAppliedTest).
+     * Vai trò không có trong danh sách hoặc có mảng rỗng: huấn luyện được lưu nhưng CHƯA có bước nào dùng, giao diện nói rõ điều đó.
+     *
+     * @var array<string, list<string>>
+     */
+    public const APPLIED_AT = [
+        'writer' => ['Viết bài', 'Sửa bài theo góp ý của biên tập'],
+        'strategist' => ['Lập dàn ý', 'Tổng hợp nguồn và chốt hướng nội dung'],
+        'editor' => ['Biên tập viên đọc bài như tổng biên tập', 'Kiểm trích dẫn có hỗ trợ câu không'],
+        'designer' => ['Đặt yêu cầu và thiết kế ảnh'],
+        'manager' => ['Đọc lời nhắn làm lại và chỉ dẫn của bài, chốt phạm vi'],
+        'researcher' => ['Điều phối kho: phân loại chủ đề và chọn Trí tuệ'],
+        'file_analyst' => ['Nhận diện cột khi nhập file kế hoạch'],
+    ];
+
+    /** Khối hồ sơ rút gọn (≤ $max ký tự) nối vào các lượt gọi AI dạng JSON; null nếu vai trò chưa tùy chỉnh gì hoặc lỗi (không làm hỏng phiên). */
+    public static function jsonBlock(string $roleKey, int $max = 6000): ?string
+    {
+        try {
+            $b = self::promptBlock($roleKey);
+        } catch (Throwable) {
+            return null;
+        }
+
+        return $b === null ? null : (mb_strlen($b) > $max ? mb_substr($b, 0, $max - 1).'…' : $b);
+    }
+
     public static function promptBlock(string $roleKey): ?string
     {
         $c = self::custom($roleKey);

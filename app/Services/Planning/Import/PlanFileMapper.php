@@ -72,7 +72,7 @@ final class PlanFileMapper
             [$ai, $label] = [$r['ai'], $r['label']];
         }
         [$nonce, $framed] = AiJson::frame('FILE', $this->sample($forceSheet !== null ? array_merge($pool, array_values(array_filter($sheets, fn ($x) => $x['name'] !== $forceSheet))) : $sheets));
-        $call = new AiJson($ai, null, 1);
+        $call = (new AiJson($ai, null, 1))->withProfile(\App\Services\Agent\Roles\AgentProfiles::jsonBlock('file_analyst')); // huấn luyện của Người phân tích tệp
         $data = $call->call(self::systemPrompt($nonce, $forceSheet), $framed);
 
         $sheet = $this->pickSheet($pool, (string) ($data['sheet'] ?? ''));

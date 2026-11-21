@@ -66,6 +66,17 @@ trait HasPlanFileImport
         abort_unless(Auth::user()?->isApprover() ?? false, 403);
     }
 
+    /** Tải file mẫu kế hoạch (xlsx hoặc csv) để điền rồi nhập lại; tiêu đề cột đã được bộ nhận diện hiểu chắc chắn. */
+    public function downloadPlanTemplate(string $format = 'xlsx'): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->importGuard();
+        $csv = $format === 'csv';
+
+        return response()->streamDownload(function () use ($csv) {
+            echo $csv ? \App\Services\Planning\Import\PlanFileTemplate::csv() : \App\Services\Planning\Import\PlanFileTemplate::xlsx();
+        }, 'mau-ke-hoach-noi-dung.'.($csv ? 'csv' : 'xlsx'), ['Content-Type' => $csv ? 'text/csv; charset=UTF-8' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
     public function openImport(): void
     {
         $this->importGuard();

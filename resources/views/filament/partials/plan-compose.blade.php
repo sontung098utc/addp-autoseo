@@ -64,6 +64,7 @@
             <ol class="lk-steps">
                 @foreach ($stepsFile as [$n, $t])<li><i>{{ $n }}</i><b>{{ $t }}</b></li>@endforeach
             </ol>
+            @include('filament.partials.plan-template-banner')
             <x-filament::button icon="heroicon-o-arrow-up-tray" wire:click="openImport" data-import-open>Chọn file kế hoạch</x-filament::button>
         </section>
 
