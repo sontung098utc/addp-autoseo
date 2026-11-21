@@ -43,6 +43,7 @@ return [
         // Ý ĐỊNH (chưa có playbook, chưa nối): audit theo site, nguyên nhân gốc, dữ liệu có cấu trúc; xem ROLE_WORKFLOWS.md mục 3.7
         'auditor/audit-site-rootcause',
         'auditor/audit-schema',
+        'auditor/audit-ymyl-trust',
     ],
     'orchestrator_steps' => [],
     'readiness' => 'not_connected',

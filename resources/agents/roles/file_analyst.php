@@ -37,6 +37,7 @@ return [
     'on_timeout' => 'Giữ phần đã đọc, ghi dòng chưa xử lý.',
     'skills' => [
         'analyst/file-intake',
+        'analyst/source-document-triage',
     ],
     'orchestrator_steps' => [],
     'readiness' => 'not_connected',

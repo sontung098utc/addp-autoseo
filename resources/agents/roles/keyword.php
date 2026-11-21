@@ -35,6 +35,7 @@ return [
         // Ý ĐỊNH (chưa có playbook, chưa nối): phát hiện trùng ý định giữa các bài, từ khóa local; xem ROLE_WORKFLOWS.md mục 3.2
         'researcher/cannibalization-check',
         'researcher/local-keywords',
+        'researcher/health-search-intent',
     ],
     'orchestrator_steps' => [],
     'readiness' => 'not_connected',

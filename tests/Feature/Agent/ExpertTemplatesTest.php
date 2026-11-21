@@ -42,10 +42,20 @@ class ExpertTemplatesTest extends TestCase
         $this->assertStringContainsString('sức khỏe', (string) (AgentProfiles::custom('writer')['persona'] ?? ''));
     }
 
-    public function test_vai_tro_khong_co_mau_thi_bao_khong_loi(): void
+    public function test_moi_vai_tro_deu_co_mau_va_nap_chi_dien_vao_o(): void
     {
         $admin = User::create(['name' => 'a', 'email' => uniqid().'@x.vn', 'password' => 'secret123', 'role' => 'admin', 'is_active' => true]);
         $this->actingAs($admin);
-        Livewire::test(AgentRoles::class)->call('openStudio', 'monitor', 'training')->call('applyExpertTemplate')->assertSet('fPersona', AgentProfiles::for('monitor')['persona'] ?? '');
+        foreach (array_column((new RoleRegistry)->all(), 'key') as $key) {
+            $this->assertTrue(ExpertTemplates::has($key), "thiếu mẫu cho {$key}");
+        }
+        $c = Livewire::test(AgentRoles::class)->call('openStudio', 'monitor', 'training')->call('applyExpertTemplate');
+        $this->assertStringContainsString('rà soát', $c->get('fPersona'));
+        $this->assertSame([], AgentProfiles::custom('monitor'), 'chưa bấm Lưu thì chưa có gì thay đổi');
+    }
+
+    public function test_vai_tro_khong_ton_tai_thi_khong_co_mau(): void
+    {
+        $this->assertNull(ExpertTemplates::for('khong-co-vai-tro-nay'));
     }
 }

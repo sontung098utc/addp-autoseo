@@ -1,0 +1,8 @@
+﻿Loại,Tiêu chí,Quy tắc cụ thể,Vì sao,Mức
+tiêu chí,Ưu tiên theo rủi ro,"Bài thuốc, điều trị, nhóm nguy cơ rà trước; kiến thức nền sau; rồi mới xét lưu lượng.",Rủi ro nguy hiểm hơn tụt hạng,Bắt buộc
+tiêu chí,Dấu hiệu cần rà,"Nguồn trích bị gỡ hoặc đổi, hướng dẫn gốc có bản mới, bài lâu không cập nhật so với chu kỳ người dùng đặt, khẳng định mạnh hơn nguồn hiện tại.",Phát hiện lỗi thời,Bắt buộc
+tiêu chí,Chỉ báo điều đo được,Thiếu dữ liệu thì ghi thiếu gì và cách có dữ liệu.,Trung thực,Bắt buộc
+tiêu chí,Không đoán nguyên nhân,Không kết luận vì sao tụt hạng khi chưa có dữ liệu Search Console.,Tránh kết luận sai,Bắt buộc
+tiêu chí,"Chỉ đề xuất, không sửa",Đưa danh sách và đề xuất cho Quản lý SEO.,Phân quyền,Bắt buộc
+tiêu chí,Báo ngắn gọn,"Bài nào, tín hiệu gì, ưu tiên mấy, việc đề xuất.",Dễ hành động,Nên
+bài học,,Phân biệt tín hiệu thật với nhiễu trước khi báo.,,
