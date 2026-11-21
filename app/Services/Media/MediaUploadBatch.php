@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Auth;
  */
 class MediaUploadBatch
 {
-    public function __construct(protected MediaService $media) {}
+    public function __construct(protected MediaService $media, protected MediaSuggester $suggester) {}
 
     /**
      * @param  array<int, mixed>  $files  UploadedFile / đường dẫn
@@ -40,6 +40,10 @@ class MediaUploadBatch
             $asset->update(array_filter(['status' => 'inbox', 'kind' => $opts['kind'] ?? null, 'folder_id' => $opts['folder_id'] ?? null], fn ($v) => filled($v)));
             if ($tagIds !== []) {
                 $asset->tagModels()->syncWithoutDetaching($tagIds);
+            }
+            try {
+                $this->suggester->store($asset->refresh()); // gợi ý phân loại, chờ người duyệt áp dụng
+            } catch (\Throwable) {
             }
         }
 

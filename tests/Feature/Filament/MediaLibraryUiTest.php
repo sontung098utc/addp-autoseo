@@ -316,4 +316,24 @@ class MediaLibraryUiTest extends TestCase
         // Ở gốc: không chọn thư mục
         Livewire::test(ListMediaAssets::class)->mountAction('upload')->assertActionDataSet(['folder_id' => null]);
     }
+
+    public function test_don_dep_va_goi_y_trong_khung_xem(): void
+    {
+        $f = MediaCollection::create(['name' => 'Sofa', 'slug' => 'sofa']);
+        $old = $this->asset('old', ['title' => 'Sofa cũ']);
+        $old->forceFill(['created_at' => now()->subDays(200)])->save();
+
+        // Hộp "Dọn dẹp": chỉ lưu trữ, không xóa
+        Livewire::test(ListMediaAssets::class)->callAction('housekeeping')->assertHasNoActionErrors();
+        $this->assertSame('archived', $old->fresh()->status);
+        $this->assertNotNull(MediaAsset::find($old->id));
+
+        // Gợi ý hiện trong khung xem; áp dụng do người duyệt
+        $a = $this->asset('s', ['title' => 'Sofa đẹp', 'metadata' => ['suggestion' => ['kind' => 'infographic', 'folder_id' => $f->id, 'tags' => [], 'reasons' => ['thử']]]]);
+        $p = Livewire::test(ListMediaAssets::class)->call('openViewer', $a->id)->assertSee('Gợi ý phân loại');
+        $p->call('applySuggestion');
+        $a->refresh();
+        $this->assertSame(['infographic', $f->id], [$a->kind, $a->folder_id]);
+        $p->assertDontSee('Gợi ý phân loại');
+    }
 }
