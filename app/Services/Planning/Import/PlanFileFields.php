@@ -26,6 +26,23 @@ final class PlanFileFields
         'campaign_description' => ['Mô tả chiến dịch', 'Chiến dịch', false, 'mục tiêu hoặc mô tả của chiến dịch'],
         'campaign_start' => ['Chiến dịch bắt đầu', 'Chiến dịch', false, 'ngày bắt đầu của chiến dịch/giai đoạn'],
         'campaign_end' => ['Chiến dịch kết thúc', 'Chiến dịch', false, 'ngày kết thúc của chiến dịch/giai đoạn'],
+        'difficulty' => ['Độ khó từ khóa', 'Bài viết', false, 'độ khó của từ khóa chính (số 0-100, thường gọi là KD/Keyword Difficulty)'],
+        'length_words' => ['Độ dài (số từ)', 'Chỉ dẫn viết', false, 'độ dài mong muốn của bài theo số từ: một số (1500) hoặc khoảng (1200-1500)'],
+        'table_count' => ['Số bảng', 'Chỉ dẫn viết', false, 'số bảng so sánh/tổng hợp bài cần có (số nguyên)'],
+        'image_count' => ['Số ảnh tối đa', 'Chỉ dẫn viết', false, 'số ảnh tối đa trong bài (số nguyên)'],
+        'h2_count' => ['Số mục H2 tối thiểu', 'Chỉ dẫn viết', false, 'số mục H2 (đề mục lớn) tối thiểu của bài (số nguyên)'],
+        'faq' => ['Có mục hỏi đáp (FAQ)', 'Chỉ dẫn viết', false, 'bài có mục câu hỏi thường gặp hay không (Có/Không)'],
+        'post_type' => ['Loại bài', 'Chỉ dẫn viết', false, 'dạng bài: trụ cột, hướng dẫn, so sánh, danh sách, hỏi đáp, tin tức, bài sản phẩm'],
+        'audience' => ['Đối tượng đọc', 'Chỉ dẫn viết', false, 'người đọc mục tiêu (tuổi, nghề, mức hiểu biết, hoàn cảnh)'],
+        'angle' => ['Góc tiếp cận / điều cần nhấn', 'Chỉ dẫn viết', false, 'góc viết, điều cần nhấn mạnh, thông điệp chính của bài'],
+        'tone' => ['Giọng văn', 'Chỉ dẫn viết', false, 'giọng văn/phong cách: gần gũi, chuyên môn, nghiêm túc'],
+        'questions' => ['Câu hỏi bài cần trả lời', 'Chỉ dẫn viết', false, 'các câu hỏi cụ thể bài phải trả lời (ngăn cách bằng chấm phẩy hoặc xuống dòng)'],
+        'must_sources' => ['Nguồn nên dùng', 'Chỉ dẫn viết', false, 'tên/URL nguồn, hướng dẫn, tổ chức nên dùng làm căn cứ (hệ thống không tự tải link)'],
+        'internal_links' => ['Liên kết nội bộ nên có', 'Chỉ dẫn viết', false, 'bài hoặc URL của chính website nên được liên kết tới trong bài'],
+        'avoid' => ['Điều cần tránh', 'Chỉ dẫn viết', false, 'điều không được nói hoặc không nên đề cập, từ cấm riêng của bài'],
+        'competitor_refs' => ['Đối thủ / bài tham khảo', 'Chỉ dẫn viết', false, 'URL hoặc tên bài đối thủ để tham khảo góc viết (chỉ tham khảo)'],
+        'cta' => ['CTA / sản phẩm liên quan', 'Chỉ dẫn viết', false, 'lời kêu gọi hành động hoặc sản phẩm/dịch vụ cần nhắc trong bài'],
+        'expert_review' => ['Cần chuyên gia duyệt', 'Chỉ dẫn viết', false, 'bài có cần người có chuyên môn duyệt kỹ trước khi dùng không (Có/Không)'],
         'ignore' => ['Bỏ qua (không nhập)', 'Khác', true, 'cột không dùng cho kế hoạch (số thứ tự, kết quả, người phụ trách, trạng thái, lượt tìm, link...)'],
     ];
 
@@ -82,6 +99,14 @@ final class PlanFileFields
         }
 
         return $s;
+    }
+
+    /** Độ khó từ khóa: số 0–100 (làm tròn); không phải số thì null. */
+    public static function difficulty(string $v): ?int
+    {
+        $t = str_replace(',', '.', trim($v));
+
+        return is_numeric($t) && (float) $t >= 0 && (float) $t <= 100 ? (int) round((float) $t) : null;
     }
 
     public static function intent(string $v): string

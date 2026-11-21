@@ -120,7 +120,7 @@
                     </details>
                 @endif
             @elseif (! $st)
-                @include('filament.partials.plan-template-banner')
+                <div style="margin:.2rem 0 .8rem">@include('filament.partials.plan-template-banner')</div>
                 <label class="pfm-drop">
                     <x-filament::icon icon="heroicon-o-arrow-up-tray" style="width:2rem;height:2rem" />
                     <strong>Chọn file kế hoạch</strong>
@@ -139,7 +139,7 @@
                     <button type="button" class="pfm-btn" wire:click="discardImport" wire:confirm="Bỏ file này và chọn file khác?">Đổi file</button>
                     <span style="flex:1"></span>
                     @if ($st['analyzed'])
-                        <span class="pfm-chip" title="{{ $st['ai']['label'] ?? 'AI' }}{{ ! empty($st['ai']['model']) ? ' · '.$st['ai']['model'] : '' }} · chi phí {{ number_format((float) ($st['ai']['cost_vnd'] ?? 0), 0, ',', '.') }} đ">✓ AI đã phân tích</span>
+                        <span class="pfm-chip" title="{{ $st['ai']['label'] ?? 'AI' }}{{ ! empty($st['ai']['model']) ? ' · '.$st['ai']['model'] : '' }} · chi phí {{ number_format((float) ($st['ai']['cost_vnd'] ?? 0), 0, ',', '.') }} đ">✓ {{ ($st['ai']['model'] ?? null) === null && str_contains((string) ($st['ai']['label'] ?? ''), 'File mẫu') ? 'Nhận ra file mẫu' : 'AI đã phân tích' }}</span>
                         @if (! empty($st['section_rows']))<span class="pfm-chip" title="AI thấy file chia nhóm bằng dòng đề mục: tên đề mục được dùng làm tên chiến dịch cho các bài bên dưới">{{ count($st['section_rows']) }} dòng đề mục → chiến dịch</span>@endif
                         @if (! empty($st['links']))<span class="pfm-chip" title="AI nối sheet chính với: {{ implode(', ', array_column($st['links'], 'sheet')) }} (tra tên, mô tả, ngày của chiến dịch theo mã)">⇄ {{ implode(', ', array_column($st['links'], 'sheet')) }}</span>@endif
                         @if ($st['notes'])<x-help title="Ghi chú của AI">@foreach ($st['notes'] as $n)<p>{{ $n }}</p>@endforeach</x-help>@endif
@@ -251,6 +251,26 @@
                             </div>
                         @endif
 
+                        @php
+                            $briefLabels = \App\Services\Planning\Import\PlanBrief::FIELDS;
+                            $briefCov = $pv['brief_cov'] ?? [];
+                            $suggest = array_values(array_filter(['length_words', 'audience', 'questions', 'must_sources', 'expert_review'], fn ($k) => ! isset($briefCov[$k])));
+                        @endphp
+                        @if ($pv['count'] > 0)
+                            <div class="pfm-box pfm-box--info" data-testid="plan-brief-cov" style="display:block">
+                                <strong>Thông tin viết bài tìm thấy trong file</strong>
+                                @if ($briefCov !== [])
+                                    <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin:.35rem 0">@foreach ($briefCov as $k => $n)<span class="pfm-muted" style="border:1px solid rgba(128,128,128,.35);border-radius:.5rem;padding:.05rem .45rem;font-size:.78rem">{{ $briefLabels[$k][0] }} · {{ $n }}/{{ $pv['count'] }}</span>@endforeach</div>
+                                @else
+                                    <div class="pfm-muted" style="margin:.25rem 0">File chưa có cột nào về đối tượng, giọng văn, độ dài, câu hỏi cần trả lời, nguồn... Đội AI sẽ viết theo từ khóa, từ khóa phụ và ghi chú (nếu có).</div>
+                                @endif
+                                @if (($pv['measurable'] ?? 0) > 0)<div class="pfm-muted" style="font-size:.82rem">Bộ chấm sẽ ĐO {{ $pv['measurable'] }} bài theo chỉ dẫn (độ dài, số bảng, số ảnh, số mục H2) và yêu cầu sửa nếu chưa đạt.</div>@endif
+                                @if ($suggest !== [])<div class="pfm-muted" style="font-size:.82rem;margin-top:.2rem">Nên bổ sung để bài sát ý hơn: {{ implode(', ', array_map(fn ($k) => mb_strtolower($briefLabels[$k][0]), $suggest)) }}. File mẫu ở trên có sẵn các cột này.</div>@endif
+                            </div>
+                        @endif
+                        @if (! empty($pv['warnings']))
+                            <div class="pfm-box pfm-box--warn" style="display:block"><strong>Lưu ý ({{ count($pv['warnings']) }})</strong><ul style="margin:.25rem 0 0 1.1rem;font-size:.84rem">@foreach ($pv['warnings'] as $w)<li>{{ $w }}</li>@endforeach</ul></div>
+                        @endif
 
                         @if ($pv['rows'])
                             <div class="pfm-wrap">
@@ -264,12 +284,21 @@
                                 </table>
                             </div>
                             @if ($pv['count'] > 5)<p class="pfm-muted" style="margin:.3rem 0 0">+{{ $pv['count'] - 5 }} bài nữa</p>@endif
+                            @if (collect($pv['rows'])->contains(fn ($r) => ! empty($r['guidance'])))
+                                <details class="pfm-inl" data-testid="plan-guidance-preview" style="margin-top:.5rem"><summary>Xem chỉ dẫn viết sẽ lưu cho {{ min(5, $pv['count']) }} bài đầu</summary>
+                                    @foreach (array_slice($pv['rows'], 0, 5) as $r)
+                                        @if (! empty($r['guidance']))
+                                            <div style="margin:.4rem 0;font-size:.82rem"><b>{{ $r['keyword'] }}</b>@if (! empty($r['measurable']))<span class="pfm-muted"> · bộ chấm đo: {{ implode(', ', $r['measurable']) }}</span>@endif<pre style="white-space:pre-wrap;margin:.2rem 0 0;font-family:inherit;opacity:.85">{{ $r['guidance'] }}</pre></div>
+                                        @endif
+                                    @endforeach
+                                </details>
+                            @endif
                         @endif
                     @endif
                 </section>
 
                 <details class="pfm-more" @if (! $pv) open @endif>
-                    <summary>Chỉnh cột và tùy chọn <span class="pfm-muted">· dùng {{ $usedCols }}/{{ $dataCols }} cột · {{ ! empty($st['analyzed']) ? 'AI đã đoán' : 'đoán theo tên cột' }}, chỉ sửa khi sai</span></summary>
+                    <summary>Chỉnh cột và tùy chọn <span class="pfm-muted">· dùng {{ $usedCols }}/{{ $dataCols }} cột · {{ ! empty($st['analyzed']) ? (str_contains((string) ($st['ai']['label'] ?? ''), 'File mẫu') ? 'theo file mẫu' : 'AI đã đoán') : 'đoán theo tên cột' }}, chỉ sửa khi sai</span></summary>
                     <div class="pfm-more-body">
                         @if ($pv && $pv['count'] > 0)
                             <p class="pfm-muted" style="margin:0 0 .5rem">{{ $pv['dated'] }}/{{ $pv['count'] }} bài có ngày · {{ $pv['with_notes'] ?? 0 }} có chỉ dẫn viết · {{ $pv['with_secondary'] ?? 0 }} có từ khóa phụ@if (($pv['volumes'] ?? 0) > 0) · {{ $pv['volumes'] }} có lượng tìm @endif

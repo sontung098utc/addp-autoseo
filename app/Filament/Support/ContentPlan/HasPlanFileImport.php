@@ -205,6 +205,20 @@ trait HasPlanFileImport
             return;
         }
         $this->importError = null;
+        // File làm đúng theo FILE MẪU của hệ thống: đọc trực tiếp (đúng sheet, đúng cột, nối sheet Chiến dịch), không gọi AI, không tốn phí, dùng được cả khi chưa kết nối AI.
+        if (($rec = \App\Services\Planning\Import\PlanFileTemplate::recognize($sheets)) !== null) {
+            $main = collect($sheets)->firstWhere('name', $rec['sheet']);
+            $this->importState = array_merge($this->importState, [
+                'sheet' => $rec['sheet'], 'sheet_locked' => true, 'header_row' => $rec['header_row'], 'is_plan' => true, 'analyzed' => true, 'section_rows' => [], 'skip_rows' => [], 'links' => $rec['links'],
+                'columns' => PlanFileMapper::columns($main, $rec['header_row'], PlanFileHeuristics::seed($main, $rec['header_row'])),
+                'notes' => ['Nhận ra file mẫu của hệ thống: đọc trực tiếp theo tên cột, không dùng AI.'],
+                'ai' => ['label' => 'File mẫu của hệ thống (không dùng AI)', 'model' => null, 'cost_vnd' => 0],
+            ]);
+            $this->previewImport();
+            $this->defaultTargetFromFile();
+
+            return;
+        }
         try {
             $r = app(PlanFileMapper::class)->map($sheets, ($this->importState['sheet_locked'] ?? false) ? (string) $this->importState['sheet'] : null);
         } catch (InvalidArgumentException|KeywordAiUnavailable $e) {
@@ -370,7 +384,12 @@ trait HasPlanFileImport
             'over_limit' => $b['over_limit'],
             'unlinked' => $b['unlinked'],
             'link_hits' => $b['link_hits'],
-            'rows' => array_map(fn ($i) => ['row' => $i['row'], 'keyword' => $i['keyword'], 'campaign' => $i['campaign'], 'cluster' => $i['cluster'], 'date' => $i['date'], 'priority' => $i['priority'], 'intent' => $i['intent'], 'has_guidance' => $i['guidance'] !== null], array_slice($items, 0, 30)),
+            'warnings' => $b['warnings'] ?? [],
+            'difficulties' => count(array_filter(array_column($items, 'difficulty'), fn ($v) => $v !== null)),
+            // Thông tin viết bài (brief) tìm thấy trong file: số bài có từng loại, số bài có ràng buộc ĐO ĐƯỢC, và những gì file chưa có (gợi ý bổ sung)
+            'brief_cov' => array_filter(array_combine(\App\Services\Planning\Import\PlanBrief::keys(), array_map(fn ($k) => count(array_filter($items, fn ($i) => in_array($k, (array) ($i['brief'] ?? []), true))), \App\Services\Planning\Import\PlanBrief::keys()))),
+            'measurable' => count(array_filter($items, fn ($i) => ! empty($i['measurable']))),
+            'rows' => array_map(fn ($i) => ['row' => $i['row'], 'keyword' => $i['keyword'], 'campaign' => $i['campaign'], 'cluster' => $i['cluster'], 'date' => $i['date'], 'priority' => $i['priority'], 'intent' => $i['intent'], 'has_guidance' => $i['guidance'] !== null, 'guidance' => $i['guidance'], 'measurable' => $i['measurable'] ?? []], array_slice($items, 0, 30)),
         ];
     }
 

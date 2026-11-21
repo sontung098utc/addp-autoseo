@@ -78,6 +78,7 @@ final class PlanFileImporter
         $seen = [];
         $blank = 0;
         $over = false;
+        $warnings = [];
         foreach ($rows as $i => $r) {
             $n = $i + 1;
             // dòng đề mục: chỉ nhận khi đúng một ô có chữ (kiểm lại ở đây, không tin hoàn toàn danh sách đưa vào)
@@ -175,7 +176,15 @@ final class PlanFileImporter
                 $secondary = array_values(array_filter(array_unique(array_merge($secondary, $lk['secondary'])), fn ($s) => PlannedArticleCreator::normalize($s) !== $key && ! preg_match(KeywordResearchService::INJECTION, $s)));
             }
 
-            $notes = [];
+            // BRIEF của bài (đối tượng, giọng văn, độ dài, cấu trúc, câu hỏi, nguồn, liên kết nội bộ...): ghép thành các dòng có nhãn đứng ĐẦU chỉ dẫn,
+            // điều đo được (độ dài, bảng, ảnh, H2) đứng trước nhất để không bị cắt khi chỉ dẫn quá dài.
+            $briefVals = [];
+            foreach (PlanBrief::keys() as $bk) {
+                $briefVals[$bk] = $first($r, $bk);
+            }
+            $briefLines = PlanBrief::lines($briefVals);
+            $briefFilled = array_keys(array_filter($briefVals, fn ($v) => trim((string) $v) !== ''));
+            $notes = $briefLines;
             if (($t = PlanFileFields::text($lk['title'] ?? $first($r, 'title'), 200)) !== '') {
                 $notes[] = 'Tiêu đề gợi ý: '.$t;
             }
@@ -189,7 +198,11 @@ final class PlanFileImporter
             foreach ($lk['guidance'] as $g) {
                 $notes[] = $g;
             }
-            $guidance = mb_substr(implode("\n", $notes), 0, 1500);
+            $fit = PlanBrief::fit($notes);
+            $guidance = $fit['text'];
+            if ($fit['cut']) {
+                $warnings[] = "dòng {$n} ({$kw}): chỉ dẫn dài hơn ".PlanBrief::GUIDANCE_MAX.' ký tự nên phần cuối bị cắt (điều đo được như độ dài, bảng, ảnh luôn được giữ trước)';
+            }
             if ($guidance !== '' && preg_match(KeywordResearchService::INJECTION, $guidance)) {
                 $problems[] = ['row' => $n, 'keyword' => $kw, 'reason' => 'Ghi chú giống chỉ dẫn điều khiển AI nên bị chặn'];
 
@@ -212,11 +225,14 @@ final class PlanFileImporter
                 'date_invalid' => trim($dateRaw) !== '' && $date === null,
                 'priority' => PlanFileFields::priority($lk['priority'] ?? $first($r, 'priority')),
                 'volume' => PlanFileFields::volume($first($r, 'search_volume')),
+                'difficulty' => PlanFileFields::difficulty($first($r, 'difficulty')),
                 'guidance' => $guidance !== '' ? $guidance : null,
+                'brief' => $briefFilled,
+                'measurable' => $guidance !== '' ? PlanBrief::measurable($guidance) : [],
             ];
         }
 
-        return ['items' => $items, 'problems' => $problems, 'blank' => $blank, 'over_limit' => $over, 'unlinked' => array_slice(array_keys($unlinked), 0, 10), 'link_hits' => $hits];
+        return ['items' => $items, 'problems' => $problems, 'warnings' => array_slice($warnings, 0, 20), 'blank' => $blank, 'over_limit' => $over, 'unlinked' => array_slice(array_keys($unlinked), 0, 10), 'link_hits' => $hits];
     }
 
     /**
@@ -277,17 +293,26 @@ final class PlanFileImporter
                 }
                 $kw = $stored->get(Keyword::keyFor($it['keyword']));
                 // lượng tìm kiếm trong file: điền vào kho từ khóa (chỉ chỗ còn trống, không ghi đè số liệu từ nguồn khác); từ khóa chưa có trong kho thì thêm vào
-                if (($it['volume'] ?? null) !== null) {
+                if (($it['volume'] ?? null) !== null || ($it['difficulty'] ?? null) !== null) {
                     if ($kw === null && \App\Filament\Support\Keywords\KeywordSanitizer::check((string) $it['keyword'])['keyword'] === null) {
                         // từ khóa có thẻ/mã: không đưa vào kho từ khóa
                     } elseif ($kw === null) {
-                        $kw = Keyword::create(['website_id' => $site->id, 'keyword' => $it['keyword'], 'keyword_key' => Keyword::keyFor($it['keyword']), 'volume' => $it['volume'], 'volume_source' => 'csv',
-                            'intent' => $it['intent'], 'source' => 'csv', 'status' => 'new', 'created_by' => $actor->id]);
+                        $kw = Keyword::create(['website_id' => $site->id, 'keyword' => $it['keyword'], 'keyword_key' => Keyword::keyFor($it['keyword']), 'volume' => $it['volume'] ?? null, 'volume_source' => ($it['volume'] ?? null) !== null ? 'csv' : null,
+                            'difficulty' => $it['difficulty'] ?? null, 'intent' => $it['intent'], 'source' => 'csv', 'status' => 'new', 'created_by' => $actor->id]);
                         $stored->put($kw->keyword_key, $kw);
                         $volNew++;
-                    } elseif ($kw->volume === null) {
-                        $kw->update(['volume' => $it['volume'], 'volume_source' => 'csv']);
-                        $volFilled++;
+                    } else {
+                        $fill = [];
+                        if (($it['volume'] ?? null) !== null && $kw->volume === null) {
+                            $fill += ['volume' => $it['volume'], 'volume_source' => 'csv'];
+                            $volFilled++;
+                        }
+                        if (($it['difficulty'] ?? null) !== null && $kw->difficulty === null) {
+                            $fill['difficulty'] = $it['difficulty']; // độ khó trong file chỉ điền chỗ còn trống, không ghi đè số liệu từ nguồn khác
+                        }
+                        if ($fill !== []) {
+                            $kw->update($fill);
+                        }
                     }
                 }
                 try {
