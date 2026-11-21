@@ -43,6 +43,23 @@
             <button type="button" class="mt-close" wire:click="closeViewer" aria-label="Đóng"><x-filament::icon icon="heroicon-m-x-mark" class="h-5 w-5" style="margin:auto" /></button>
             <div class="mt-scroll">
                 <h2 style="font-size:16px;font-weight:700;margin:0 40px 12px 0;word-break:break-word">{{ $asset->title ?: '(không tiêu đề)' }}</h2>
+                @php
+                    $sug = (array) ($asset->metadata['suggestion'] ?? []);
+                    $sugKind = in_array($sug['kind'] ?? null, \App\Models\MediaAsset::KINDS, true) && $sug['kind'] !== $asset->kind ? $sug['kind'] : null;
+                    $sugFolder = ! empty($sug['folder_id']) && (int) $sug['folder_id'] !== (int) $asset->folder_id ? \App\Models\MediaCollection::find($sug['folder_id']) : null;
+                @endphp
+                @if ($sugKind || $sugFolder)
+                    <div style="margin:0 0 12px;padding:10px 12px;border-radius:10px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.45);font-size:12.5px">
+                        <div style="font-weight:600;margin-bottom:4px">Gợi ý phân loại (chưa áp dụng)</div>
+                        @if ($sugKind)<div>Loại: <strong>{{ \App\Models\MediaAsset::KIND_LABELS[$sugKind] }}</strong></div>@endif
+                        @if ($sugFolder)<div>Thư mục: <strong>{{ $sugFolder->path_label }}</strong></div>@endif
+                        @foreach ((array) ($sug['reasons'] ?? []) as $why)<div style="opacity:.7">• {{ $why }}</div>@endforeach
+                        <div style="display:flex;gap:8px;margin-top:8px">
+                            <button type="button" wire:click="applySuggestion" style="padding:4px 12px;border-radius:8px;border:0;background:#d97706;color:#fff;font-size:12px;font-weight:600;cursor:pointer">Áp dụng</button>
+                            <button type="button" wire:click="dismissSuggestion" style="padding:4px 12px;border-radius:8px;border:1px solid rgba(127,127,127,.4);background:transparent;color:inherit;font-size:12px;cursor:pointer">Bỏ qua</button>
+                        </div>
+                    </div>
+                @endif
                 <dl style="margin:0;font-size:12.5px">
                     @foreach ($meta as $k => $v)
                         <div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid rgba(127,127,127,.18)">

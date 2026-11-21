@@ -296,6 +296,23 @@ class ListMediaAssets extends ListRecords
         Notification::make()->success()->title('Đã lưu thay đổi')->duration(2000)->send();
     }
 
+    public function applySuggestion(): void
+    {
+        if ($a = ($this->viewing ? MediaAsset::find($this->viewing) : null)) {
+            if (app(\App\Services\Media\MediaSuggester::class)->apply($a)) {
+                $this->openViewer($a->id);
+                Notification::make()->success()->title('Đã áp dụng gợi ý')->duration(2000)->send();
+            }
+        }
+    }
+
+    public function dismissSuggestion(): void
+    {
+        if ($a = ($this->viewing ? MediaAsset::find($this->viewing) : null)) {
+            app(\App\Services\Media\MediaSuggester::class)->dismiss($a);
+        }
+    }
+
     public function viewerDownload()
     {
         $a = $this->viewing ? MediaAsset::find($this->viewing) : null;
@@ -379,6 +396,19 @@ class ListMediaAssets extends ListRecords
                 ->action(function (): void {
                     $this->viewMode = $this->viewMode === 'grid' ? 'list' : 'grid';
                     $this->resetPage();
+                }),
+            Actions\Action::make('housekeeping')
+                ->label('Dọn dẹp')
+                ->icon('heroicon-o-sparkles')
+                ->color('gray')
+                ->modalHeading('Gợi ý dọn dẹp thư viện ảnh')
+                ->modalDescription('Chỉ là gợi ý: không có gì bị xóa. Ảnh chưa dùng lâu ngày có thể được chuyển sang "Đã lưu trữ" (vẫn khôi phục được).')
+                ->modalContent(fn () => view('filament.media.housekeeping', ['r' => app(\App\Services\Media\MediaHousekeeping::class)->report(90)]))
+                ->modalSubmitActionLabel('Lưu trữ ảnh chưa dùng')
+                ->modalWidth('3xl')
+                ->action(function (): void {
+                    $n = app(\App\Services\Media\MediaHousekeeping::class)->archiveUnused(90);
+                    Notification::make()->success()->title("Đã lưu trữ {$n} ảnh chưa dùng")->body('Không có ảnh hoặc file nào bị xóa.')->send();
                 }),
             Actions\Action::make('upload')
                 ->label('Tải ảnh lên')
