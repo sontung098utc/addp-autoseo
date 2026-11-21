@@ -30,7 +30,7 @@ class AgentRolesTest extends TestCase
     {
         $keys = array_column((new RoleRegistry)->all(), 'key');
         sort($keys);
-        $this->assertSame(['auditor', 'competitor', 'designer', 'editor', 'keyword', 'manager', 'monitor', 'strategist', 'writer'], $keys);
+        $this->assertSame(['auditor', 'competitor', 'designer', 'editor', 'fact_checker', 'file_analyst', 'image_qa', 'keyword', 'manager', 'monitor', 'planner', 'researcher', 'strategist', 'writer'], $keys);
         foreach ((new RoleRegistry)->all() as $r) {
             $this->assertNotSame([], $r['tools_denied']);
             $this->assertContains('Shell / chạy lệnh hệ thống', $r['tools_denied']);

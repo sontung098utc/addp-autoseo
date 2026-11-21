@@ -8,6 +8,7 @@ use App\Filament\Support\Article\VersionCompareAction;
 use App\Filament\Support\Explain\WhyAction;
 use App\Filament\Support\Review\ReviewActions;
 use App\Filament\Support\Review\ReviewWorkflow;
+use App\Filament\Support\Review\StopGate;
 use App\Models\Website;
 use App\Services\Agent\Handoff\CmsDraftHandoff;
 use Filament\Actions;
@@ -39,6 +40,19 @@ class ViewArticleVersion extends ViewRecord
                 ->url(fn () => ArticleResource::getUrl('view', ['record' => $this->record->article_id]).'#tab-content'),
             $this->compareAction(),
             WhyAction::page(),
+            // Cùng hộp "Giao làm lại" với trang bài và bảng Bài viết: xem nội dung xong có thể giao lại ngay, không phải quay về.
+            StopGate::lock(Actions\Action::make('redo_agent'))->label('Giao làm lại')->icon('heroicon-o-arrow-path')
+                ->visible(fn () => $this->record->article !== null && ArticleResource::canRedoWithAgent($this->record->article))
+                ->modalHeading('Giao bài này làm lại')
+                ->modalDescription(ArticleResource::REDO_DESCRIPTION)
+                ->form(fn () => ArticleResource::redoForm($this->record->article))
+                ->modalSubmitActionLabel('Giao làm lại')
+                ->action(function (array $data, Actions\Action $action) {
+                    $article = $this->record->article;
+                    abort_unless($article !== null && ArticleResource::canRedoWithAgent($article), 403);
+                    $url = ArticleResource::assignToAgent($article, background: true, redoMessage: ArticleResource::redoMessage($article, $data));
+                    $url ? $action->redirect($url) : null;
+                }),
             Actions\Action::make('approve')->label('Duyệt')->icon('heroicon-o-check')->color('primary')
                 ->visible(fn () => $this->record->review_status === 'needs_review')
                 ->authorize(fn () => ReviewActions::canApprove())

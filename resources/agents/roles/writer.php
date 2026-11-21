@@ -41,6 +41,9 @@ return [
     'on_timeout' => 'Giữ bản nháp tốt nhất, không vào hàng chờ duyệt.',
     'skills' => [
         'writer/article-draft',
+        'writer/article-layout',
+        // Nạp thêm vào prompt viết khi chủ đề rủi ro cao/bắt buộc nguồn (sức khỏe, y tế, dinh dưỡng).
+        'writer/health-nutrition-writing',
     ],
     'orchestrator_steps' => [
         'write' => 'writer',

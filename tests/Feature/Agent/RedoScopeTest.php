@@ -223,7 +223,7 @@ class RedoScopeTest extends TestCase
         $this->assertSame(['images'], RedoScope::kept('Giữ nguyên ảnh.'));
         $this->assertEqualsCanonicalizing(['images', 'sources'], RedoScope::kept('Không đổi ảnh, không tìm thêm nguồn.'));
         $this->assertSame([], RedoScope::kept('Mở bài dài dòng.'));
-        $this->assertSame(['write', 'images'], RedoScope::resolve('Ảnh bìa chưa hợp chủ đề.')['parts']);
+        $this->assertSame(['images'], RedoScope::resolve('Ảnh bìa chưa hợp chủ đề.')['parts'], 'chỉ nói về ảnh thì không ép viết lại bài');
 
         $full = 10000.0;
         $write = RedoScope::estimate($full, ['write']);
@@ -244,7 +244,7 @@ class RedoScopeTest extends TestCase
         $one = ArticleResource::redoPreview($this->article, 'Giữ nguyên ảnh.');
         $this->assertStringContainsString('chỉ viết lại bài viết', $one);
         $two = ArticleResource::redoPreview($this->article, 'Ảnh bìa chưa hợp chủ đề.');
-        $this->assertStringContainsString('làm lại bài viết + ảnh', $two);
+        $this->assertStringContainsString('chỉ làm lại ảnh, giữ nguyên chữ của bài', $two);
         $this->assertStringContainsString('chưa có số liệu để ước lượng', $one, 'không có phiên thật nào thì không bịa chi phí');
 
         // Một ô duy nhất, điền sẵn từ chỉ dẫn đã lưu, kèm chú thích khác nhau.
@@ -262,5 +262,170 @@ class RedoScopeTest extends TestCase
 
         $bare = Article::create(['website_id' => $this->article->website_id, 'primary_keyword' => 'bài chưa có chỉ dẫn', 'workflow_status' => 'needs_review']);
         $this->assertTrue(ArticleResource::redoForm($bare)[0]->isRequired(), 'chưa có chỉ dẫn lưu thì bắt buộc nhập yêu cầu');
+    }
+
+    private function writes(AiProviderInterface $ai): int
+    {
+        return count($ai->writeOptions);
+    }
+
+    public function test_chi_sua_anh_thi_khong_lap_dan_y_khong_viet_khong_cham_va_giu_nguyen_chu(): void
+    {
+        Http::fake();
+        $oldHtml = ArticleVersion::query()->where('article_id', $this->article->id)->first()->html_content;
+        $ai = $this->ai(['scope' => ['images'], 'reuse_outline' => true, 'image_note' => 'Ảnh bìa là giảng đường.', 'summary' => 'x']);
+        $run = $this->redo($ai, 'Chỉ tạo lại ảnh bìa, giữ nguyên bài viết.');
+
+        $this->assertSame(['images'], $this->planStep($run)->data['scope']);
+        $this->assertSame(0, $this->writes($ai), 'không gọi AI viết');
+        $this->assertSame(0, $ai->outlines, 'không lập dàn ý');
+        $this->assertNull($run->steps->firstWhere('stage', 'grade'), 'không chấm lại chữ');
+        $this->assertNotNull($run->steps->first(fn ($s) => ($s->data['decision'] ?? null) === 'redo_no_write'));
+        $this->assertSame('ready_for_review', $run->status);
+        $new = ArticleVersion::query()->find($run->final_version_id);
+        $this->assertSame(2, (int) $new->version);
+        $this->assertSame($oldHtml, $new->html_content, 'chữ giữ nguyên từng ký tự');
+        $img = $run->steps->firstWhere('stage', 'images');
+        $this->assertNotNull($img);
+        $this->assertGreaterThan(0, (int) ($img->data['generated'] ?? 0), 'ảnh mới được tạo');
+    }
+
+    public function test_quy_tac_chi_lam_anh_de_len_ai_de_xuat_them_viet(): void
+    {
+        Http::fake();
+        $ai = $this->ai(['scope' => ['write', 'images'], 'reuse_outline' => true, 'summary' => 'x']);
+        $run = $this->redo($ai, 'Chỉ làm lại ảnh minh họa thôi.');
+        $this->assertSame(['images'], $this->planStep($run)->data['scope']);
+        $this->assertSame(0, $this->writes($ai));
+    }
+
+    public function test_anh_co_chu_khi_nguoi_duyet_yeu_cau_khung_an_toan_cho_phep_dung_cum_chu(): void
+    {
+        Http::fake();
+        $ai = $this->ai(['scope' => ['images'], 'reuse_outline' => true, 'image_note' => 'Ảnh bìa có chữ.', 'image_text' => true, 'summary' => 'x']);
+        $run = $this->redo($ai, 'Tạo lại ảnh bìa có chữ «Học bổng toàn phần» thật to.');
+
+        $plan = $this->planStep($run);
+        $this->assertTrue($plan->data['image_text']);
+        $this->assertSame(['Học bổng toàn phần'], $plan->data['image_texts']);
+        $slots = (array) ($run->steps->firstWhere('stage', 'images')->data['plan']['slots'] ?? []);
+        $this->assertNotEmpty($slots);
+        $cover = collect($slots)->firstWhere('role', 'featured');
+        $this->assertStringContainsString('Học bổng toàn phần', $cover['prompt']);
+        $this->assertStringNotContainsString('no text, letters or numbers', $cover['prompt'], 'khung "không chữ" không còn đè lên yêu cầu có chữ');
+        $this->assertStringContainsString('no logos', $cover['prompt'], 'các điều cấm khác vẫn giữ');
+    }
+
+    public function test_khong_yeu_cau_chu_thi_van_khong_chu(): void
+    {
+        Http::fake();
+        $ai = $this->ai(['scope' => ['images'], 'reuse_outline' => true, 'image_note' => 'Ảnh bìa là giảng đường.', 'summary' => 'x']);
+        $run = $this->redo($ai, 'Chỉ làm lại ảnh bìa, không cần chữ trên ảnh.');
+        $this->assertFalse($this->planStep($run)->data['image_text']);
+        $cover = collect((array) ($run->steps->firstWhere('stage', 'images')->data['plan']['slots'] ?? []))->firstWhere('role', 'featured');
+        $this->assertStringContainsString('no text, letters or numbers', $cover['prompt']);
+    }
+
+    public function test_chi_dan_luu_cua_bai_neu_ro_chi_tao_anh_thi_phien_thuong_cung_nghe_theo(): void
+    {
+        Http::fake();
+        $this->article->update(['guidance' => 'Chỉ tạo lại ảnh, giữ nguyên bài viết.']);
+        $ai = $this->ai(['scope' => ['images'], 'reuse_outline' => true, 'summary' => 'x']);
+        $run = (new AgentRunOrchestrator($ai, policy: new RunPolicy))->run($this->article->fresh(), null, 'manual');
+
+        $this->assertSame(0, $this->writes($ai), 'chỉ dẫn "chỉ tạo ảnh" được tuân theo dù không bấm Giao làm lại');
+        $this->assertTrue((bool) $this->planStep($run)->data['from_guidance']);
+        $this->assertNotNull($run->steps->first(fn ($s) => ($s->data['decision'] ?? null) === 'redo_no_write'));
+    }
+
+    public function test_chi_dan_huong_noi_dung_binh_thuong_khong_bi_coi_la_gioi_han_pham_vi(): void
+    {
+        $this->assertFalse(RedoScope::mentionsScope('Viết cho người trên 50 tuổi, thêm ảnh minh họa dễ hiểu.'));
+        $this->assertTrue(RedoScope::mentionsScope('Chỉ tạo ảnh, không viết lại.'));
+        $this->assertTrue(RedoScope::mentionsScope('Giữ nguyên bài viết.'));
+        $this->assertNull(RedoScope::exclusive('Chỉ cần viết lại mở bài.'));
+        $this->assertSame(['images'], RedoScope::exclusive('Chỉ cần đổi ảnh bìa.'));
+        $this->assertTrue(\App\Services\Images\ImagePromptBuilder::wantsText('Tạo ảnh có chữ tiêu đề.'));
+        $this->assertTrue(\App\Services\Images\ImagePromptBuilder::wantsText('Làm infographic.'));
+        $this->assertFalse(\App\Services\Images\ImagePromptBuilder::wantsText('Không cần chữ trên ảnh.'));
+        $this->assertFalse(\App\Services\Images\ImagePromptBuilder::wantsText('Viết ngắn gọn hơn.'));
+    }
+
+    public function test_chi_dan_luu_chi_noi_giu_nguyen_anh_thi_cac_phan_con_lai_van_lam_day_du(): void
+    {
+        Http::fake();
+        $this->article->update(['guidance' => 'Giữ nguyên ảnh.']);
+        $ai = $this->ai(['scope' => ['write'], 'reuse_outline' => true, 'summary' => 'x']);
+        $run = (new AgentRunOrchestrator($ai, policy: new RunPolicy))->run($this->article->fresh(), null, 'manual');
+        $plan = $this->planStep($run);
+        $this->assertSame(['outline', 'write', 'sources'], $plan->data['scope'], 'chỉ ảnh bị giữ; dàn ý, viết, nguồn làm đủ như lượt giao thường');
+        $this->assertGreaterThan(0, $ai->outlines, 'dàn ý được lập lại');
+        $this->assertSame('redo_keep', $run->steps->firstWhere('stage', 'images')->data['skip_code']);
+    }
+
+    public function test_chi_anh_ma_nha_cung_cap_anh_loi_thi_khong_sinh_ban_trung_va_bai_giu_nguyen(): void
+    {
+        Http::fake(['*' => Http::response('quota', 429)]);
+        $g = \App\Models\AiProvider::create(['name' => 'Gem', 'kind' => 'gemini', 'api_key' => 'k', 'enabled' => true, 'models' => ['gemini-3.1-flash-image']]);
+        \App\Models\AgentRoleAssignment::create(['role_key' => 'designer', 'provider_id' => $g->id, 'model' => 'gemini-3.1-flash-image', 'enabled' => true]);
+        $ai = $this->ai(['scope' => ['images'], 'reuse_outline' => true, 'summary' => 'x']);
+        $run = $this->redo($ai, 'Chỉ tạo lại ảnh bìa, giữ nguyên bài viết.');
+
+        $this->assertSame('blocked', $run->status);
+        $this->assertSame(1, ArticleVersion::query()->where('article_id', $this->article->id)->count(), 'không sinh bản sao khi không có ảnh mới');
+        $this->assertNull($run->final_version_id);
+        $this->assertSame('needs_review', $this->article->fresh()->workflow_status);
+        $h = $run->steps->first(fn ($s) => ($s->data['retryable'] ?? false) === true);
+        $this->assertNotNull($h);
+        $this->assertSame(0, $this->writes($ai));
+    }
+
+    public function test_giu_nguyen_bai_viet_khong_nham_voi_mo_bai_hay_giu_nguyen_anh(): void
+    {
+        $this->assertSame(['images'], RedoScope::kept('Mở bài dài dòng, giữ nguyên ảnh.'), '"bài" của "mở bài" không phải đối tượng giữ nguyên');
+        $this->assertSame(['write'], RedoScope::kept('Giữ nguyên bài viết.'));
+        $this->assertSame(['write'], RedoScope::kept('Giữ nguyên bài.'));
+        $this->assertSame(['write'], RedoScope::kept('Không đổi nội dung bài, đổi ảnh bìa.'));
+        $this->assertSame(['write'], RedoScope::kept('Chỉ đổi ảnh bìa, bài viết giữ nguyên.'));
+        $this->assertSame([], RedoScope::kept('Viết lại phần mở bài cho ngắn hơn.'));
+        $this->assertSame(['write'], RedoScope::resolve('Mở bài dài dòng, giữ nguyên ảnh.', ['write'])['parts'], 'sửa mở bài, giữ ảnh: vẫn viết lại chữ');
+    }
+
+    public function test_giu_nguyen_moi_thu_thi_khong_lam_gi_va_noi_ro(): void
+    {
+        Http::fake();
+        $ai = $this->ai(['scope' => ['write', 'images']]);
+        $run = $this->redo($ai, 'Giữ nguyên ảnh, giữ nguyên nguồn, giữ nguyên dàn ý, giữ nguyên bài viết.');
+        $this->assertSame([], $this->planStep($run)->data['scope']);
+        $this->assertSame('blocked', $run->status);
+        $this->assertSame(0, $this->writes($ai));
+        $this->assertSame(1, ArticleVersion::query()->where('article_id', $this->article->id)->count(), 'không sinh bản mới');
+        $this->assertSame('needs_review', $this->article->fresh()->workflow_status);
+        $this->assertSame('không làm gì (lời nhắn yêu cầu giữ nguyên mọi phần)', RedoScope::describe([]));
+    }
+
+    public function test_cau_hon_hop_van_viet_lai_chu_va_cau_chi_ve_anh_thi_khong(): void
+    {
+        $this->assertContains('write', RedoScope::resolve('Viết lại mở bài cho ngắn và thêm ảnh minh họa.')['parts']);
+        $this->assertSame(['images'], RedoScope::resolve('Làm ảnh bìa dạng infographic có chữ tiêu đề.')['parts'], 'yêu cầu chỉ về ảnh (kể cả "làm/tạo/vẽ ảnh") không ép viết lại');
+        $this->assertSame(['images'], RedoScope::resolve('Vẽ lại ảnh bìa.')['parts']);
+        $this->assertSame(['images'], RedoScope::resolve('Đổi ảnh bìa. Giữ nguyên bài viết.')['parts']);
+    }
+
+    public function test_ai_tra_pham_vi_rong_thi_dung_luat_tu_khoa_thay_vi_chi_viet(): void
+    {
+        $this->assertSame(['images', 'sources'], RedoScope::resolve('Tìm thêm nguồn và làm lại ảnh bìa, giữ nguyên bài viết.', [])['parts']);
+        $this->assertSame(['images'], RedoScope::resolve('Làm ảnh bìa dạng infographic có chữ tiêu đề.', [])['parts']);
+    }
+
+    public function test_hop_giao_doi_ai_noi_truoc_pham_vi_khi_chi_dan_gioi_han_pham_vi(): void
+    {
+        $this->article->update(['guidance' => 'Chỉ tạo lại ảnh, giữ nguyên bài viết.']);
+        $html = (string) ArticleResource::assignContent($this->article->fresh());
+        $this->assertStringContainsString('assign-guidance-scope', $html);
+        $this->assertStringContainsString('chỉ làm lại ảnh, giữ nguyên chữ của bài', $html);
+        $this->assertStringNotContainsString('lập dàn ý', $html, 'không liệt kê bước sẽ không chạy');
+        $this->article->update(['guidance' => 'Viết cho người trên 50 tuổi.']);
+        $this->assertStringNotContainsString('assign-guidance-scope', (string) ArticleResource::assignContent($this->article->fresh()));
     }
 }

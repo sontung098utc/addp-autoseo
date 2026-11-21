@@ -114,7 +114,7 @@ class ArticleResource extends Resource
 
     public const REDO_NOTE = 'Chỉ dẫn lưu cho mọi lần chạy; yêu cầu này chỉ cho lần này.';
 
-    public const REDO_DESCRIPTION = 'Chưa vừa ý với bản hiện tại? Nêu yêu cầu cho lần làm lại này. Điều phối đọc yêu cầu và chỉ làm lại phần được nêu (dàn ý, bài viết, ảnh, nguồn/kho); không nói rõ thì chỉ viết lại bài viết, giữ nguyên ảnh và nguồn. Mọi quy tắc an toàn, nguồn và từ cấm vẫn áp dụng.';
+    public const REDO_DESCRIPTION = 'Chưa vừa ý với bản hiện tại? Nêu yêu cầu cho lần làm lại này. Điều phối đọc yêu cầu và chỉ làm lại phần được nêu (dàn ý, bài viết, ảnh, nguồn/kho); không nói rõ thì chỉ viết lại bài viết, giữ nguyên ảnh và nguồn. Chữ "chỉ" là giới hạn cứng: "chỉ tạo lại ảnh bìa, giữ nguyên bài viết" thì không đụng tới chữ. Muốn ảnh có chữ, nêu cụm chữ trong «ngoặc kép». Mọi quy tắc an toàn, nguồn và từ cấm vẫn áp dụng.';
 
     /** Yêu cầu thực tế của lần làm lại: ô để trống thì dùng chỉ dẫn đã lưu của bài. */
     public static function redoMessage(Article $record, array $data): string
@@ -152,8 +152,8 @@ class ArticleResource extends Resource
 
         return [
             Forms\Components\Textarea::make('message')->label('Yêu cầu lần làm lại này')->rows(5)->maxLength(1500)->minLength(10)
-                ->default($record->guidance)->required(! $hasGuidance)->live(onBlur: true)
-                ->placeholder('Ví dụ: Mở bài dài dòng; mục 2 thiếu số liệu; giữ nguyên ảnh…')
+                ->default($record->guidance)->required(! $hasGuidance)->live(debounce: 500)
+                ->placeholder('Ví dụ: Mở bài dài dòng; mục 2 thiếu số liệu; giữ nguyên ảnh… hoặc: Chỉ tạo lại ảnh bìa có chữ «Ăn gì khi bị tiểu đường», giữ nguyên bài viết.')
                 ->helperText(static::REDO_NOTE.($hasGuidance ? ' Đã điền sẵn từ chỉ dẫn đã lưu, bạn có thể sửa hoặc để trống để dùng nguyên chỉ dẫn.' : '').' Bản mới được lưu thành phiên bản mới, bản cũ vẫn còn.'),
             Forms\Components\Placeholder::make('scope_preview')->label('Phạm vi và chi phí')
                 ->content(fn (Get $get) => static::redoPreview($record, (string) ($get('message') ?? ''))),
@@ -200,6 +200,19 @@ class ArticleResource extends Resource
     public static function assignContent(Article $record): HtmlString
     {
         $r = static::readiness($record);
+        $g = trim((string) $record->guidance);
+        // Chỉ dẫn của bài nêu phạm vi rõ ("chỉ tạo ảnh", "giữ nguyên bài viết") thì đội làm đúng phạm vi đó: mô tả và chi phí theo phạm vi, không liệt kê các bước sẽ KHÔNG chạy.
+        if ($g !== '' && RedoScope::mentionsScope($g) && $record->versions()->exists()) {
+            $parts = RedoScope::resolve($g)['parts'];
+            $est = RedoScope::estimate($r['cost']['estimate_vnd'] === null ? null : (float) $r['cost']['estimate_vnd'], $parts);
+            $html = '<p data-testid="assign-guidance-scope">Chỉ dẫn của bài đang nêu phạm vi, nên lần này đội sẽ <b>'.e(RedoScope::describe($parts)).'</b>. Xem lại hoặc xóa chỉ dẫn nếu muốn chạy đủ mọi bước.</p>'
+                .'<ul class="list-disc pl-5 mt-2 text-sm" data-testid="assign-summary">'
+                .'<li>'.e('Rủi ro chủ đề: '.(self::RISK_LABELS[$r['risk']['level']] ?? $r['risk']['level']).'.').'</li>'
+                .'<li>'.e('Chi phí: '.($est === null ? 'chưa có số liệu để ước lượng' : 'khoảng '.self::vnd($est).' (thô, theo phạm vi)').' · ngân sách phiên tối đa '.self::vnd($r['cost']['budget_vnd']).'.').'</li></ul>'
+                .'<p class="mt-2 text-sm">Bản nháp luôn chờ người duyệt, không có gì được đăng.</p>';
+
+            return new HtmlString($html);
+        }
         $html = '<p>'.e(static::ASSIGN_DESCRIPTION).'</p><ul class="list-disc pl-5 mt-2 text-sm" data-testid="assign-summary">';
         foreach (static::assignLines($r) as $l) {
             $html .= '<li>'.e($l).'</li>';

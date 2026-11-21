@@ -95,7 +95,11 @@ final class ImagePlanner
             $d = $designs[$slot['id']] ?? null;
             if ($d !== null) {
                 $plan['slots'][$i]['design'] = ['concept' => $d['concept'], 'image_type' => $d['image_type'], 'composition' => $d['composition']];
-                $plan['slots'][$i]['prompt'] = ImagePromptBuilder::finish($d['prompt'], $health);
+                $texts = (array) ($d['text'] ?? []);
+                $plan['slots'][$i]['prompt'] = $texts !== [] ? ImagePromptBuilder::finishWithText($d['prompt'], $health, $texts) : ImagePromptBuilder::finish($d['prompt'], $health);
+                if ($texts !== []) {
+                    $plan['slots'][$i]['overlay_text'] = $texts;
+                }
                 if ($d['alt'] !== '') {
                     $plan['slots'][$i]['alt'] = $d['alt'];
                 }
