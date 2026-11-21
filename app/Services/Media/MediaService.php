@@ -51,27 +51,37 @@ class MediaService
             return $existingAsset;
         }
 
-        // 3. Chuẩn bị thư mục lưu trữ
+        // 3. Cùng nội dung (sha256) đã có file trên ổ lưu trữ (kể cả của website khác): tạo bản ghi mới dùng chung file, không nhân bản file.
         $disk = $attributes['disk'] ?? 'public';
-        $yearMonth = date('Y/m');
-        $fileBaseName = Str::random(20);
-        $optimizedFileName = "{$fileBaseName}.webp";
-        $thumbnailFileName = "{$fileBaseName}_thumb.webp";
+        $shared = MediaAsset::where('sha256', $securityData['sha256'])->where('disk', $disk)->orderBy('id')->get()
+            ->first(fn (MediaAsset $a) => Storage::disk($disk)->exists((string) $a->file_path));
 
-        $storageDir = Storage::disk($disk)->path("media/{$yearMonth}");
-        if (! is_dir($storageDir)) {
-            mkdir($storageDir, 0755, true);
+        if ($shared !== null) {
+            $relativeFilePath = $shared->file_path;
+            $relativeThumbPath = $shared->thumbnail_path;
+            $optimizedFileName = $shared->file_name;
+            $optimizationResult = [
+                'optimized_size' => $shared->file_size,
+                'width' => $shared->width,
+                'height' => $shared->height,
+                'compression_ratio' => $shared->metadata['compression_ratio'] ?? null,
+            ];
+        } else {
+            // Lưu theo địa chỉ nội dung: media/cas/{sha[0:2]}/{sha}/{sha[0:16]}.webp (+ _thumb.webp)
+            $dir = MediaPathBuilder::dir($securityData['sha256']);
+            $optimizedFileName = MediaPathBuilder::fileName($securityData['sha256']);
+            $relativeFilePath = MediaPathBuilder::original($securityData['sha256']);
+            $relativeThumbPath = MediaPathBuilder::thumb($securityData['sha256']);
+
+            $storageDir = Storage::disk($disk)->path($dir);
+            if (! is_dir($storageDir)) {
+                mkdir($storageDir, 0755, true);
+            }
+
+            // 4. Tối ưu nén ảnh và chuyển đổi sang WebP
+            $optimizationResult = $this->imageOptimizer->optimize($localPath, Storage::disk($disk)->path($relativeFilePath), 'webp');
+            $this->imageOptimizer->createThumbnail(Storage::disk($disk)->path($relativeFilePath), Storage::disk($disk)->path($relativeThumbPath), 360, 240);
         }
-
-        $optimizedLocalPath = "{$storageDir}/{$optimizedFileName}";
-        $thumbnailLocalPath = "{$storageDir}/{$thumbnailFileName}";
-
-        // 4. Tối ưu nén ảnh và chuyển đổi sang WebP
-        $optimizationResult = $this->imageOptimizer->optimize($localPath, $optimizedLocalPath, 'webp');
-        $this->imageOptimizer->createThumbnail($optimizedLocalPath, $thumbnailLocalPath, 360, 240);
-
-        $relativeFilePath = "media/{$yearMonth}/{$optimizedFileName}";
-        $relativeThumbPath = "media/{$yearMonth}/{$thumbnailFileName}";
 
         // 5. Chuẩn hóa tiêu đề và Alt Text
         $title = $attributes['title'] ?? pathinfo($originalName, PATHINFO_FILENAME);
@@ -102,6 +112,7 @@ class MediaService
                 'original_size' => $securityData['size'],
                 'compression_ratio' => $optimizationResult['compression_ratio'],
                 'original_mime' => $securityData['mime'],
+                'shared_file_from' => $shared?->id,
             ],
         ]);
     }

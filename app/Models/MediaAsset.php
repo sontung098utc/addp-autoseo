@@ -100,6 +100,12 @@ class MediaAsset extends Model
         return Storage::disk($this->disk)->url($this->thumbnail_path);
     }
 
+    /** URL biến thể (thumb|card|content|og), sinh lười; lỗi thì trả URL ảnh gốc. */
+    public function variantUrl(string $variant): string
+    {
+        return app(\App\Services\Media\MediaVariantService::class)->url($this, $variant);
+    }
+
     public function getHumanFileSizeAttribute(): string
     {
         $bytes = $this->file_size;
