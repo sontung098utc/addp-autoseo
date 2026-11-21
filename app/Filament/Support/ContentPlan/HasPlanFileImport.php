@@ -389,6 +389,18 @@ trait HasPlanFileImport
             // Thông tin viết bài (brief) tìm thấy trong file: số bài có từng loại, số bài có ràng buộc ĐO ĐƯỢC, và những gì file chưa có (gợi ý bổ sung)
             'brief_cov' => array_filter(array_combine(\App\Services\Planning\Import\PlanBrief::keys(), array_map(fn ($k) => count(array_filter($items, fn ($i) => in_array($k, (array) ($i['brief'] ?? []), true))), \App\Services\Planning\Import\PlanBrief::keys()))),
             'measurable' => count(array_filter($items, fn ($i) => ! empty($i['measurable']))),
+            'internal' => (function () use ($items) { // liên kết nội bộ: số khớp bài đã có/trong file, số URL (không kiểm), tên chưa có bài
+                $m = 0;
+                $u = 0;
+                $miss = [];
+                foreach ($items as $i) {
+                    $m += (int) ($i['link_report']['match'] ?? 0);
+                    $u += (int) ($i['link_report']['url'] ?? 0);
+                    $miss = array_merge($miss, (array) ($i['link_report']['missing'] ?? []));
+                }
+
+                return ['match' => $m, 'url' => $u, 'missing' => array_slice(array_values(array_unique($miss)), 0, 8), 'missing_total' => count(array_unique($miss))];
+            })(),
             'rows' => array_map(fn ($i) => ['row' => $i['row'], 'keyword' => $i['keyword'], 'campaign' => $i['campaign'], 'cluster' => $i['cluster'], 'date' => $i['date'], 'priority' => $i['priority'], 'intent' => $i['intent'], 'has_guidance' => $i['guidance'] !== null, 'guidance' => $i['guidance'], 'measurable' => $i['measurable'] ?? []], array_slice($items, 0, 30)),
         ];
     }

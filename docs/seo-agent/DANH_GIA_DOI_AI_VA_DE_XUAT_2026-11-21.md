@@ -190,9 +190,9 @@ Chưa thử trên giao diện: server `autoseo.addp.vn` (do bạn đăng nhập)
 |---|---|---|
 | Đo được | Độ dài (số từ), Số bảng, Số ảnh tối đa, Số mục H2 tối thiểu | Ghép thành "khoảng 1500 từ", "ít nhất 1200 từ, tối đa 1500 từ", "đúng 1 bảng", "tối đa 3 ảnh", "ít nhất 6 mục H2" → bộ chấm đo và yêu cầu sửa; luôn đứng đầu nên không bị cắt |
 | Mềm | Loại bài, Đối tượng đọc, Góc tiếp cận, Giọng văn, Câu hỏi bài cần trả lời, Nguồn nên dùng, Liên kết nội bộ nên có, Điều cần tránh, Đối thủ/bài tham khảo, CTA/sản phẩm, Có mục FAQ, Cần chuyên gia duyệt | Thành dòng có nhãn trong chỉ dẫn; link chỉ là văn bản, hệ thống **không tự tải** |
-| Số liệu | Độ khó từ khóa (mới), Lượng tìm kiếm | Điền vào kho từ khóa chỉ chỗ còn trống, không ghi đè số liệu nguồn khác |
+| Số liệu | Độ khó từ khóa, CPC (VNĐ), Mức cạnh tranh (mới), Lượng tìm kiếm | Điền vào kho từ khóa chỉ chỗ còn trống, không ghi đè số liệu nguồn khác; xem trước ghi chú đã điền gì |
 
-**File mẫu Excel 4 sheet** (`docs/seo-agent/mau/mau-ke-hoach-noi-dung.xlsx`, tải ở trang Kế hoạch): **Bài viết** (một dòng một bài, 27 cột, màu theo nhóm; chỉ có dòng tiêu đề nên không phải xóa dòng ví dụ), **Chiến dịch** (mô tả, ngày; nối với sheet 1 qua tên chiến dịch), **Hướng dẫn** (từng cột: bắt buộc?, ý nghĩa, giá trị chấp nhận, hệ thống dùng để làm gì, kèm quy ước "ĐO ĐƯỢC"), **Ví dụ đã điền** (3 bài sức khỏe). File theo mẫu được **nhận ra và đọc trực tiếp, không gọi AI** (đúng sheet, đúng cột, nối sheet Chiến dịch), dùng được khi chưa kết nối AI.
+**File mẫu Excel 4 sheet** (`docs/seo-agent/mau/mau-ke-hoach-noi-dung.xlsx`, tải ở trang Kế hoạch): **Bài viết** (một dòng một bài, 29 cột, màu theo nhóm; chỉ có dòng tiêu đề nên không phải xóa dòng ví dụ), **Chiến dịch** (mô tả, ngày; nối với sheet 1 qua tên chiến dịch), **Hướng dẫn** (từng cột: bắt buộc?, ý nghĩa, giá trị chấp nhận, hệ thống dùng để làm gì, kèm quy ước "ĐO ĐƯỢC"), **Ví dụ đã điền** (3 bài sức khỏe). File theo mẫu được **nhận ra và đọc trực tiếp, không gọi AI** (đúng sheet, đúng cột, nối sheet Chiến dịch), dùng được khi chưa kết nối AI.
 
 **Phân tích file KHÔNG theo mẫu:**
 - AI nhận diện cột (và luật theo tên cột khi AI lỗi) nay biết thêm 17 trường: các cột kiểu "Đối tượng", "Giọng điệu", "Số từ", "Số bảng", "Link nội bộ", "Cần tránh", "Chuyên gia duyệt", "KD", "Hỏi đáp", "Nguồn tham khảo"... được gán đúng trường thay vì gom chung vào ghi chú; chỉ thị gửi AI đã cập nhật.
@@ -202,12 +202,12 @@ Chưa thử trên giao diện: server `autoseo.addp.vn` (do bạn đăng nhập)
 
 **Đề xuất chưa làm (cần bạn quyết, một số cần migration của Dev1):**
 1. **Cột `brief` (JSON) trên bài** thay vì ghép vào văn bản: sửa từng trường ở form bài, không bị trần 1.500 ký tự, thống kê theo trường. Hiện ghép văn bản chạy ngay không cần migration nhưng khó sửa từng trường sau khi nhập.
-2. **Liên kết nội bộ thật**: so khớp "Liên kết nội bộ nên có" với bài đã có trên website (theo từ khóa/URL) và đưa URL đúng cho người viết; hiện chỉ là văn bản.
+2. **Liên kết nội bộ thật (một nửa đã làm)**: đã so khớp tên/từ khóa trong cột này với bài đã có trên website hoặc bài khác trong file và báo ở bản xem trước ("N khớp, M thiếu, K là URL"). Còn thiếu: đưa URL thật của bài khớp vào chỉ dẫn cho người viết.
 3. **Nguồn nên dùng thành nguồn bắt buộc**: đưa vào danh sách nguồn của Người nghiên cứu (qua danh sách tên miền tin cậy, chống SSRF) thay vì chỉ là gợi ý văn bản.
 4. **Sheet "Bài cần cập nhật"** cho bài đã đăng (URL cũ, phần cần sửa): hệ thống đã có luồng làm mới bài nhưng chưa nhập được từ file.
 5. **CMS**: chuyên mục/thẻ/slug mong muốn/tác giả cho WordPress và Magento (bài hiện không lưu các trường này).
 6. **Người duyệt/chuyên gia cụ thể** (tên người) thay vì Có/Không, cần ánh xạ sang tài khoản.
-7. **CPC và cạnh tranh** vào kho từ khóa (cột đã có ở `keywords`, mẫu chưa có).
+- **Đã làm thêm (21/11, vòng cuối):** CPC và mức cạnh tranh (nhận "0,4", "40" thang 100, "Thấp/Trung bình/Cao") điền vào kho từ khóa; URL nội bộ/loopback/metadata/giao thức lạ ở cột nguồn & đối thủ bị **bỏ kèm cảnh báo** (chống SSRF, cùng quy tắc allowlist); dòng ví dụ "(VÍ DỤ… xóa dòng này)" tự bỏ qua. Kiểm bằng giao diện 8110: file mẫu 7 cột → xem trước "1 khớp, 1 là URL", cảnh báo bỏ `http://localhost/x`, tạo 2 bài, kho từ khóa có 1200/33/4500/0,4 và 800/20/3000/0,2, chỉ dẫn bài không còn địa chỉ nội bộ. Mức: code + test giả lập + thử giao diện cục bộ; chưa staging, chưa người thật nghiệm thu.
 - Giới hạn cần biết: ghi chú quá dài bị cắt từ cuối (điều đo được đứng trước nên được giữ); `Số bảng = 0` thành "đúng 0 bảng"; hai ràng buộc độ dài mâu thuẫn trong file được bộ chấm đo cả hai (do người dùng nhập). `PlanFileImporter`, `PlanFileHeuristics`, `PlanFileMapper` thuộc phạm vi dùng chung: Dev1 vui lòng rà.
 
 ## 14. Giao diện: hộp chi tiết Kho trí tuệ và khung Lập kế hoạch (21/11)

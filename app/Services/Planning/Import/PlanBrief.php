@@ -143,6 +143,48 @@ final class PlanBrief
         return $out;
     }
 
+    /** URL an toàn để GHI vào chỉ dẫn: http/https, không trỏ về máy chủ nội bộ (localhost, IP riêng/loopback/metadata, tên miền .local/.internal). Hệ thống không tải URL, nhưng không lưu địa chỉ nội bộ. */
+    public static function safeUrl(string $url): bool
+    {
+        if (! preg_match('#^https?://#i', trim($url))) {
+            return false;
+        }
+        $host = strtolower((string) parse_url(trim($url), PHP_URL_HOST));
+        if ($host === '' || $host === 'localhost' || preg_match('/\.(local|internal|lan|home|corp)$/', $host)) {
+            return false;
+        }
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Tách danh sách (chấm phẩy, xuống dòng, dấu phẩy ngoài URL) và loại URL nội bộ. @return array{kept: list<string>, dropped: list<string>}
+     */
+    public static function splitRefs(string $raw): array
+    {
+        $kept = [];
+        $dropped = [];
+        foreach (preg_split('/[;\n]+|,(?!\d)/u', $raw) ?: [] as $t) {
+            $t = trim($t);
+            if ($t === '') {
+                continue;
+            }
+            if (preg_match('#^[a-z][a-z0-9+.-]*://#i', $t) || str_starts_with(strtolower($t), 'www.')) {
+                if (! self::safeUrl(str_starts_with(strtolower($t), 'www.') ? 'https://'.$t : $t)) {
+                    $dropped[] = $t;
+
+                    continue;
+                }
+            }
+            $kept[] = $t;
+        }
+
+        return ['kept' => $kept, 'dropped' => $dropped];
+    }
+
     /** Ghép các dòng (brief trước, ghi chú tự do sau) trong giới hạn; phần vượt bị cắt và báo. @return array{text:string, cut:bool} */
     public static function fit(array $lines): array
     {

@@ -264,6 +264,15 @@
                                 @else
                                     <div class="pfm-muted" style="margin:.25rem 0">File chưa có cột nào về đối tượng, giọng văn, độ dài, câu hỏi cần trả lời, nguồn... Đội AI sẽ viết theo từ khóa, từ khóa phụ và ghi chú (nếu có).</div>
                                 @endif
+                                @php
+                                    $lk = $pv['internal'] ?? ['match' => 0, 'url' => 0, 'missing_total' => 0, 'missing' => []];
+                                    $lkText = 'Liên kết nội bộ: '.$lk['match'].' khớp bài đã có hoặc trong file'
+                                        .($lk['url'] > 0 ? ', '.$lk['url'].' là URL (không kiểm)' : '')
+                                        .($lk['missing_total'] > 0 ? ', '.$lk['missing_total'].' chưa có bài ('.implode('; ', $lk['missing']).')' : '').'.';
+                                @endphp
+                                @if (($lk['match'] + $lk['url'] + $lk['missing_total']) > 0)
+                                    <div class="pfm-muted" style="font-size:.82rem" data-testid="plan-internal-links">{{ $lkText }}</div>
+                                @endif
                                 @if (($pv['measurable'] ?? 0) > 0)<div class="pfm-muted" style="font-size:.82rem">Bộ chấm sẽ ĐO {{ $pv['measurable'] }} bài theo chỉ dẫn (độ dài, số bảng, số ảnh, số mục H2) và yêu cầu sửa nếu chưa đạt.</div>@endif
                                 @if ($suggest !== [])<div class="pfm-muted" style="font-size:.82rem;margin-top:.2rem">Nên bổ sung để bài sát ý hơn: {{ implode(', ', array_map(fn ($k) => mb_strtolower($briefLabels[$k][0]), $suggest)) }}. File mẫu ở trên có sẵn các cột này.</div>@endif
                             </div>

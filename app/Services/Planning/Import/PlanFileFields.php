@@ -26,6 +26,8 @@ final class PlanFileFields
         'campaign_description' => ['Mô tả chiến dịch', 'Chiến dịch', false, 'mục tiêu hoặc mô tả của chiến dịch'],
         'campaign_start' => ['Chiến dịch bắt đầu', 'Chiến dịch', false, 'ngày bắt đầu của chiến dịch/giai đoạn'],
         'campaign_end' => ['Chiến dịch kết thúc', 'Chiến dịch', false, 'ngày kết thúc của chiến dịch/giai đoạn'],
+        'cpc' => ['CPC (VNĐ)', 'Bài viết', false, 'giá thầu CPC ước tính của từ khóa chính, tiền Việt Nam đồng (số nguyên)'],
+        'competition' => ['Mức cạnh tranh', 'Bài viết', false, 'mức cạnh tranh quảng cáo của từ khóa chính: số 0-1, 0-100 hoặc thấp/trung bình/cao'],
         'difficulty' => ['Độ khó từ khóa', 'Bài viết', false, 'độ khó của từ khóa chính (số 0-100, thường gọi là KD/Keyword Difficulty)'],
         'length_words' => ['Độ dài (số từ)', 'Chỉ dẫn viết', false, 'độ dài mong muốn của bài theo số từ: một số (1500) hoặc khoảng (1200-1500)'],
         'table_count' => ['Số bảng', 'Chỉ dẫn viết', false, 'số bảng so sánh/tổng hợp bài cần có (số nguyên)'],
@@ -99,6 +101,32 @@ final class PlanFileFields
         }
 
         return $s;
+    }
+
+    /** CPC (VNĐ): số nguyên không âm ("4.500", "4500", "4,5k"); không phải số thì null. */
+    public static function cpc(string $v): ?int
+    {
+        return self::volume($v);
+    }
+
+    /** Mức cạnh tranh về số 0–1: "0,35" → 0.35; "35" → 0.35 (thang 0-100); thấp/trung bình/cao → 0.2/0.5/0.8; không hiểu thì null. */
+    public static function competition(string $v): ?float
+    {
+        $t = mb_strtolower(trim($v));
+        if ($t === '') {
+            return null;
+        }
+        foreach (['thấp' => 0.2, 'low' => 0.2, 'trung bình' => 0.5, 'medium' => 0.5, 'cao' => 0.8, 'high' => 0.8] as $w => $n) {
+            if (str_contains($t, $w)) {
+                return $n;
+            }
+        }
+        $n = str_replace(',', '.', rtrim($t, '% '));
+        if (! is_numeric($n) || (float) $n < 0 || (float) $n > 100) {
+            return null;
+        }
+
+        return round((float) $n > 1 ? (float) $n / 100 : (float) $n, 2);
     }
 
     /** Độ khó từ khóa: số 0–100 (làm tròn); không phải số thì null. */

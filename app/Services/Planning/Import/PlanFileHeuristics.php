@@ -20,9 +20,11 @@ final class PlanFileHeuristics
 
     /** Luật theo tên cột (không dấu, chữ thường). Thứ tự = ưu tiên: luật cụ thể đặt trước. 'title' sẽ thành guidance nếu có từ 2 cột trở lên. */
     private const RULES = [
-        ['ignore', '/(trang thai|status|nguoi phu trach|nguoi duyet|reviewer|bac si tham dinh|bien tap vien|\bbtv\b|\bowner\b|\bwriter\b|ngan sach|budget|\bcpc\b)/'],
+        ['ignore', '/(trang thai|status|nguoi phu trach|nguoi duyet|reviewer|bac si tham dinh|bien tap vien|\bbtv\b|\bowner\b|\bwriter\b|ngan sach|budget)/'],
         ['internal_links', '/(lien ket noi bo|internal link|link noi bo|bai lien quan noi bo)/'],
         ['difficulty', '/(do kho|difficulty|\bkd\b)/'],
+        ['cpc', '/(\bcpc\b|gia thau)/'],
+        ['competition', '/(muc canh tranh|canh tranh quang cao|competition)/'],
         ['ignore', '/^(stt|#|no\.?|tt|id|so thu tu|link|url)\b/'],
         ['search_volume', '/(luong tim|search volume|\bvolume\b|\bvol\b)/'],
         ['secondary_keywords', '/(tu khoa phu|tu khoa lien quan|\blsi\b|related|secondary|cau hoi lien quan|\bpaa\b)/'],

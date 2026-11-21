@@ -44,7 +44,7 @@ class FileTemplatesTest extends TestCase
             'Tiêu đề gợi ý' => 'title', 'Đối tượng đọc' => 'audience', 'Góc tiếp cận / điều cần nhấn' => 'angle', 'Giọng văn' => 'tone', 'Độ dài (số từ)' => 'length_words', 'Số bảng' => 'table_count',
             'Số ảnh tối đa' => 'image_count', 'Số mục H2 tối thiểu' => 'h2_count', 'Có mục hỏi đáp (FAQ)' => 'faq', 'Câu hỏi bài cần trả lời' => 'questions', 'Nguồn nên dùng' => 'must_sources',
             'Liên kết nội bộ nên có' => 'internal_links', 'Điều cần tránh' => 'avoid', 'Đối thủ / bài tham khảo' => 'competitor_refs', 'CTA / sản phẩm liên quan' => 'cta', 'Cần chuyên gia duyệt' => 'expert_review',
-            'Lượng tìm kiếm/tháng' => 'search_volume', 'Độ khó từ khóa' => 'difficulty', 'Ngày dự kiến đăng' => 'planned_date', 'Mức ưu tiên' => 'priority', 'Tên chiến dịch' => 'campaign', 'Ghi chú khác' => 'guidance',
+            'Lượng tìm kiếm/tháng' => 'search_volume', 'Độ khó từ khóa' => 'difficulty', 'CPC (VNĐ)' => 'cpc', 'Mức cạnh tranh' => 'competition', 'Ngày dự kiến đăng' => 'planned_date', 'Mức ưu tiên' => 'priority', 'Tên chiến dịch' => 'campaign', 'Ghi chú khác' => 'guidance',
         ];
     }
 
@@ -141,7 +141,8 @@ class FileTemplatesTest extends TestCase
         ] as $header => $field) {
             $this->assertSame($field, PlanFileHeuristics::fieldForHeader($header), "cột \"{$header}\" phải nhận là {$field}");
         }
-        $this->assertSame('ignore', PlanFileHeuristics::fieldForHeader('CPC'), 'CPC vẫn bỏ qua');
+        $this->assertSame('cpc', PlanFileHeuristics::fieldForHeader('CPC'));
+        $this->assertSame('competition', PlanFileHeuristics::fieldForHeader('Mức cạnh tranh'));
         $this->assertSame('ignore', PlanFileHeuristics::fieldForHeader('Người phụ trách'));
         $this->assertSame('priority', PlanFileHeuristics::fieldForHeader('Mức ưu tiên'), 'không bị luật mới nuốt');
     }
@@ -239,5 +240,63 @@ class FileTemplatesTest extends TestCase
         $pv = $page->get('importPreview');
         $this->assertSame(2, $pv['count']);
         $this->assertSame(2, $pv['measurable']);
+    }
+
+    public function test_cpc_va_canh_tranh_duoc_chuan_hoa(): void
+    {
+        $this->assertSame(4500, \App\Services\Planning\Import\PlanFileFields::cpc('4.500'));
+        $this->assertSame(0.35, \App\Services\Planning\Import\PlanFileFields::competition('0,35'));
+        $this->assertSame(0.35, \App\Services\Planning\Import\PlanFileFields::competition('35'), 'thang 0-100 quy về 0-1');
+        $this->assertSame(0.2, \App\Services\Planning\Import\PlanFileFields::competition('Thấp'));
+        $this->assertNull(\App\Services\Planning\Import\PlanFileFields::competition('150'));
+        $this->assertNull(\App\Services\Planning\Import\PlanFileFields::cpc('abc'));
+    }
+
+    public function test_url_noi_bo_bi_loai_khoi_cot_nguon_va_doi_thu(): void
+    {
+        foreach (['http://localhost/admin', 'http://127.0.0.1:8000', 'https://192.168.1.5/x', 'http://169.254.169.254/latest', 'https://may.local/a', 'ftp://x.vn/a', 'javascript:alert(1)'] as $bad) {
+            $this->assertFalse(PlanBrief::safeUrl($bad), $bad);
+        }
+        $this->assertTrue(PlanBrief::safeUrl('https://www.who.int/health-topics'));
+        $r = PlanBrief::splitRefs('Bộ Y tế; https://www.who.int/x; http://localhost:8080/secret; http://10.0.0.5/a');
+        $this->assertSame(['Bộ Y tế', 'https://www.who.int/x'], $r['kept']);
+        $this->assertCount(2, $r['dropped']);
+    }
+
+    public function test_lien_ket_noi_bo_khop_bai_co_san_hoac_trong_file_va_url_noi_bo_bi_bo_kem_canh_bao(): void
+    {
+        $site = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://s.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+        \App\Models\Article::create(['website_id' => $site->id, 'primary_keyword' => 'chỉ số đường huyết', 'workflow_status' => 'published']);
+        $rows = [['Từ khóa chính', 'Liên kết nội bộ nên có', 'Đối thủ / bài tham khảo'],
+            ['thực đơn tiểu đường', 'chỉ số đường huyết; ăn giảm muối; https://s.vn/bai-a', 'http://localhost/x; https://example.com/a'],
+            ['ăn giảm muối', '', '']];
+        $r = (new PlanFileImporter)->build($site, $rows, PlanFileHeuristics::mapByHeader(['rows' => $rows], 1), 1);
+        $lk = $r['items'][0]['link_report'];
+        $this->assertSame(2, $lk['match'], 'một bài đã có trên website, một bài khác trong file');
+        $this->assertSame(1, $lk['url']);
+        $this->assertSame([], $lk['missing']);
+        $g = $r['items'][0]['guidance'];
+        $this->assertStringContainsString('example.com', $g);
+        $this->assertStringNotContainsString('localhost', $g, 'địa chỉ nội bộ không được lưu');
+        $this->assertStringContainsString('địa chỉ nội bộ', implode(' ', $r['warnings']));
+    }
+
+    public function test_nhap_luu_do_kho_cpc_canh_tranh_vao_kho_tu_khoa_chi_cho_con_trong(): void
+    {
+        $site = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://s.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+        \App\Models\Keyword::create(['website_id' => $site->id, 'keyword' => 'bài có sẵn số liệu', 'keyword_key' => \App\Models\Keyword::keyFor('bài có sẵn số liệu'), 'volume' => 999, 'difficulty' => 70, 'source' => 'csv', 'status' => 'new']);
+        $rows = [['Từ khóa chính', 'Lượng tìm kiếm/tháng', 'Độ khó từ khóa', 'CPC (VNĐ)', 'Mức cạnh tranh'],
+            ['bài mới có đủ số liệu', '1200', '33', '4.500', '0,4'],
+            ['bài có sẵn số liệu', '5000', '10', '3000', 'cao']];
+        $map = PlanFileHeuristics::mapByHeader(['rows' => $rows], 1);
+        $imp = new PlanFileImporter;
+        $b = $imp->build($site, $rows, $map, 1);
+        $res = $imp->apply($this->user('approver'), $site, $b['items'], PlanFileImporter::TARGET_SOLO);
+        $new = \App\Models\Keyword::where('keyword_key', \App\Models\Keyword::keyFor('bài mới có đủ số liệu'))->first();
+        $this->assertSame([1200, 33, 4500, 0.4], [$new->volume, $new->difficulty, $new->cpc_vnd, (float) $new->competition]);
+        $old = \App\Models\Keyword::where('keyword_key', \App\Models\Keyword::keyFor('bài có sẵn số liệu'))->first();
+        $this->assertSame([999, 70], [$old->volume, $old->difficulty], 'không ghi đè số liệu đã có');
+        $this->assertSame(3000, $old->cpc_vnd, 'chỗ còn trống thì được điền');
+        $this->assertStringContainsString('Độ khó, CPC, mức cạnh tranh', implode(' ', $res['notes']));
     }
 }
