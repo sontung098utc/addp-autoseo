@@ -19,19 +19,47 @@ final class GoogleSearchConsoleSource implements GscSource
 
     private ?string $error = null;
 
-    public function __construct(private readonly string $property, private readonly GscAccessToken $auth) {}
+    private bool $fresh = false;
+
+    public function __construct(private readonly string $property, private readonly GscTokenProvider $auth) {}
 
     /** Thuộc tính Search Console cho website, hoặc null nếu chưa cấu hình khóa / website không có địa chỉ. */
     public static function forWebsite(?Website $site): ?self
     {
-        $auth = GscAccessToken::fromConfig();
+        $auth = self::provider();
         $prop = $site ? self::propertyFor($site) : null;
 
         return $auth && $prop ? new self($prop, $auth) : null;
     }
 
+    /**
+     * Cách đăng nhập theo GSC_AUTH: 'service_account' | 'oauth' | 'auto' (mặc định: service account nếu có khóa, nếu không thì tài khoản Google đã kết nối).
+     * Cố tình không tự đổi sang cách còn lại khi một cách bị lỗi, để lỗi quyền không bị che bởi một nguồn khác.
+     */
+    public static function provider(): ?GscTokenProvider
+    {
+        return match ((string) config('gsc.auth', 'auto')) {
+            'service_account' => GscAccessToken::fromConfig(),
+            'oauth' => GscOAuthToken::fromConfig(),
+            default => GscAccessToken::fromConfig() ?? GscOAuthToken::fromConfig(),
+        };
+    }
+
+    public function authLabel(): string
+    {
+        return $this->auth->label();
+    }
+
+    public function authKind(): string
+    {
+        return $this->auth->kind();
+    }
+
     public static function propertyFor(Website $site): ?string
     {
+        if (is_string($own = $site->gsc_property ?? null) && trim($own) !== '') {
+            return trim($own); // đặt tay trong trang Website: ưu tiên cao nhất
+        }
         $host = strtolower((string) parse_url((string) $site->base_url, PHP_URL_HOST));
         $host = preg_replace('/^www\./', '', $host) ?? $host;
         if ($host === '') {
@@ -45,6 +73,14 @@ final class GoogleSearchConsoleSource implements GscSource
         }
 
         return config('gsc.property_type', 'domain') === 'url' ? 'https://'.$host.'/' : 'sc-domain:'.$host;
+    }
+
+    /** Bỏ qua cache khi đọc (dùng cho việc kiểm tra kết nối, để không che lỗi bằng số cũ). */
+    public function withoutCache(): self
+    {
+        $this->fresh = true;
+
+        return $this;
     }
 
     public function property(): string
@@ -69,7 +105,7 @@ final class GoogleSearchConsoleSource implements GscSource
             return [];
         }
         $ck = 'gsc:rows:'.md5($this->property.'|'.$dimension.'|'.$from->toDateString().'|'.$to->toDateString());
-        $rows = Cache::get($ck);
+        $rows = $this->fresh ? null : Cache::get($ck);
         if (! is_array($rows)) {
             try {
                 $rows = $this->fetch($dims, $from, $to);
@@ -103,7 +139,7 @@ final class GoogleSearchConsoleSource implements GscSource
                 throw new GscFailed('Không kết nối được Search Console. '.\App\Support\UserFacingError::from($e, 'gsc'));
             }
             if (! $res->successful()) {
-                throw new GscFailed('Search Console trả lỗi HTTP '.$res->status().($res->status() === 403 ? ' (service account chưa được thêm vào thuộc tính '.$this->property.').' : '.'));
+                throw new GscFailed('Search Console trả lỗi HTTP '.$res->status().($res->status() === 403 ? ' ('.$this->auth->label().' chưa có quyền với thuộc tính '.$this->property.'; hãy thêm vào Search Console hoặc kiểm tra loại thuộc tính domain/url).' : '.'));
             }
             $batch = (array) ($res->json('rows') ?? []);
             foreach ($batch as $r) {

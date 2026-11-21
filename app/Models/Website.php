@@ -20,6 +20,7 @@ class Website extends Model
         'capability_flags',
         'status',
         'last_synced_at',
+        'gsc_property',
     ];
 
     protected function casts(): array

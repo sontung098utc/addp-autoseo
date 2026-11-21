@@ -7,6 +7,11 @@ use App\Filament\Widgets\AgentTodayWidget;
 use App\Filament\Widgets\DecisionsWidget;
 use App\Filament\Widgets\NextPublicationsWidget;
 use App\Filament\Widgets\PublicationProblemsWidget;
+use App\Filament\Widgets\Charts\AiCostTrendChart;
+use App\Filament\Widgets\Charts\KpiOverviewWidget;
+use App\Filament\Widgets\Charts\LifecycleChart;
+use App\Filament\Widgets\Charts\PublicationsTrendChart;
+use App\Filament\Widgets\Charts\UpcomingScheduleChart;
 use App\Filament\Widgets\RecentActivityWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
 
@@ -42,7 +47,13 @@ class Dashboard extends BaseDashboard
 
     public function getWidgets(): array
     {
+        // Trên: bức tranh bằng số và biểu đồ (xu hướng); dưới: danh sách việc cần bấm xử lý.
         return [
+            KpiOverviewWidget::class,
+            LifecycleChart::class,
+            PublicationsTrendChart::class,
+            UpcomingScheduleChart::class,
+            AiCostTrendChart::class,
             DecisionsWidget::class,
             AgentTodayWidget::class,
             PublicationProblemsWidget::class,

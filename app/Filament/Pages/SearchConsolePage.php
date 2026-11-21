@@ -102,10 +102,20 @@ BLADE));
         }
     }
 
-    /** Demo: chỉ lật cờ. Thật sẽ là OAuth chỉ-đọc, token làm mới mã hóa, thu hồi được. */
+    /** Demo: lật cờ. Thật: chuyển sang Google để người dùng cấp quyền chỉ đọc (OAuth); token làm mới lưu mã hóa, thu hồi được. */
     public function connect(): void
     {
         abort_unless(static::canAccess(), 403);
+        if (! DemoMode::enabled()) {
+            if (! \App\Filament\Support\Gsc\GscOAuth::configured()) {
+                Notification::make()->title('Chưa cấu hình OAuth')->body('Thiếu GSC_OAUTH_CLIENT_ID hoặc GSC_OAUTH_CLIENT_SECRET trong cấu hình.')->danger()->send();
+
+                return;
+            }
+            $this->redirect(route('gsc.oauth.start'));
+
+            return;
+        }
         DemoStore::put('gsc.connected', true);
         $this->demo = null;
         Notification::make()->title('Đã kết nối (minh họa)')->body('Chỉ lật cờ minh họa; chưa có OAuth Google thật.')->success()->send();
@@ -114,6 +124,15 @@ BLADE));
     public function disconnect(): void
     {
         abort_unless(static::canAccess(), 403);
+        if (! DemoMode::enabled()) {
+            if (\App\Filament\Support\Gsc\GscOAuth::disconnect()) {
+                Notification::make()->title('Đã thu hồi kết nối Google')->success()->send();
+            } else {
+                Notification::make()->title('Không có kết nối Google để thu hồi')->body('Đang dùng service account: gỡ người dùng đó trong Search Console hoặc xóa GSC_SERVICE_ACCOUNT_JSON.')->warning()->send();
+            }
+
+            return;
+        }
         DemoStore::put('gsc.connected', false);
         $this->demo = null;
     }
@@ -225,6 +244,8 @@ BLADE));
             'selectedOpps' => $selected ? array_values(array_filter($report['opportunities'], fn ($o) => $o['key'] === $this->selKey)) : [],
             'websites' => Website::where('status', 'active')->orderBy('name')->get(['id', 'name', 'base_url']),
             'links' => $report ? PageArticleLinker::map() : [],
+            'websiteEditUrl' => ($this->websiteId && Auth::user()?->isAdmin()) ? \App\Filament\Resources\WebsiteResource::getUrl('edit', ['record' => $this->websiteId]) : null,
+            'authLabel' => ($src = \App\Filament\Support\Gsc\GoogleSearchConsoleSource::forWebsite($this->websiteId ? Website::find($this->websiteId) : null)) ? $src->authLabel() : null,
         ];
     }
 }
