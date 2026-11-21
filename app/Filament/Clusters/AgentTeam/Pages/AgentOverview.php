@@ -26,6 +26,13 @@ use App\Models\User;
 use App\Models\Website;
 use App\Services\Agent\Settings\AgentAi;
 use App\Services\Brain\BrainService;
+use App\Filament\Widgets\Charts\CostByModelChart;
+use App\Filament\Widgets\Charts\CostByProviderChart;
+use App\Filament\Widgets\Charts\CostByRoleChart;
+use App\Filament\Widgets\Charts\CostGaugeChart;
+use App\Filament\Widgets\Charts\RepairRoundsChart;
+use App\Filament\Widgets\Charts\RunOutcomesChart;
+use App\Filament\Widgets\Charts\StageDurationChart;
 use App\Services\Brand\BrandProfileData;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
@@ -57,6 +64,17 @@ class AgentOverview extends Page
         $u = Auth::user();
 
         return $u instanceof User && $u->is_active && $u->isApprover();
+    }
+
+    /** Biểu đồ nằm dưới phần "cần bạn" và "đang chạy": việc phải làm vẫn ở trên cùng. */
+    protected function getFooterWidgets(): array
+    {
+        return [RunOutcomesChart::class, CostGaugeChart::class, CostByRoleChart::class, CostByProviderChart::class, CostByModelChart::class, StageDurationChart::class, RepairRoundsChart::class];
+    }
+
+    public function getFooterWidgetsColumns(): int|string|array
+    {
+        return 2;
     }
 
     protected function getHeaderActions(): array
