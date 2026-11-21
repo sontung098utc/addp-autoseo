@@ -132,7 +132,7 @@ Thao tác bằng chuột/bàn phím trong trình duyệt, như người dùng:
 
 Lỗi tìm thấy qua giao diện và đã sửa: (1) tiêu đề quyết định bị lặp "chỉ làm chỉ làm lại ảnh"; (2) hộp xác nhận "Giao đội AI" mô tả đầy đủ các bước dù chỉ dẫn đang giới hạn phạm vi: nay có dòng đậm nói trước phạm vi sẽ chạy.
 
-Còn tồn tại, chưa sửa: mục "Dự kiến" của hộp Giao làm lại chỉ cập nhật khi rời ô nhập (người dùng gõ xong bấm thẳng nút Giao vẫn thấy dự kiến cũ lúc đó, nhưng phạm vi thật do điều phối chốt khi chạy, hiện trong diễn biến); hộp "Giao đội AI" vẫn liệt kê "đọc 5 trang, viết…" ở các gạch đầu dòng phía trên dù đã có dòng đậm về phạm vi.
+Hai chỗ còn tồn tại ban đầu đã sửa và kiểm lại trên giao diện: mục "Dự kiến" cập nhật ngay lúc gõ (debounce 0,5 giây); hộp "Giao đội AI" khi chỉ dẫn giới hạn phạm vi chỉ còn câu phạm vi, rủi ro và chi phí theo phạm vi (không liệt kê các bước sẽ không chạy).
 Chưa thử trên giao diện: server `autoseo.addp.vn` (do bạn đăng nhập), model thật, ảnh thật, cron ảnh bù.
 
 ## 7. Cách thử sáng mai (10 phút)

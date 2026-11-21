@@ -424,6 +424,7 @@ class RedoScopeTest extends TestCase
         $html = (string) ArticleResource::assignContent($this->article->fresh());
         $this->assertStringContainsString('assign-guidance-scope', $html);
         $this->assertStringContainsString('chỉ làm lại ảnh, giữ nguyên chữ của bài', $html);
+        $this->assertStringNotContainsString('lập dàn ý', $html, 'không liệt kê bước sẽ không chạy');
         $this->article->update(['guidance' => 'Viết cho người trên 50 tuổi.']);
         $this->assertStringNotContainsString('assign-guidance-scope', (string) ArticleResource::assignContent($this->article->fresh()));
     }
