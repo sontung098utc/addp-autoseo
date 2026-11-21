@@ -40,6 +40,8 @@ final class ImageSelector
         $assets = MediaAsset::query()
             ->where(fn ($q) => $q->where('website_id', $article->website_id)->orWhereNull('website_id'))
             ->where('mime_type', 'like', 'image/%')
+            ->where('status', '!=', 'archived') // ảnh đã lưu trữ không tự dùng lại
+            ->where('kind', '!=', 'crawled_ref') // ảnh tham khảo từ crawl không bao giờ được đăng
             ->get();
         if ($assets->isEmpty()) {
             return [];
