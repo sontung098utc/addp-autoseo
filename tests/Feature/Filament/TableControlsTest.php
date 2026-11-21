@@ -56,7 +56,11 @@ class TableControlsTest extends TestCase
         ];
 
         foreach ($expect as $page => $cols) {
-            $table = Livewire::test($page)->instance()->getTable();
+            $lw = Livewire::test($page);
+            if ($page === ListMediaAssets::class) {
+                $lw->set('viewMode', 'list'); // cột chọn ẩn/hiện có ở dạng bảng; dạng lưới dùng ô ảnh
+            }
+            $table = $page === ListMediaAssets::class ? \App\Filament\Resources\MediaAssetResource::table(\Filament\Tables\Table::make($lw->instance())) : $lw->instance()->getTable();
             foreach ($cols as $c) {
                 $this->assertTrue($table->getColumn($c)?->isToggleable() ?? false, "{$page}: cột {$c} phải chọn ẩn/hiện được");
             }

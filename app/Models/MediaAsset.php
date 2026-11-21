@@ -16,6 +16,13 @@ class MediaAsset extends Model
 
     public const STATUSES = ['inbox', 'ready', 'archived'];
 
+    public const KIND_LABELS = [
+        'photo' => 'Ảnh chụp', 'product' => 'Sản phẩm', 'logo_brand' => 'Logo/thương hiệu', 'infographic' => 'Infographic',
+        'ai_generated' => 'AI tạo', 'crawled_ref' => 'Ảnh tham khảo (không đăng)', 'screenshot' => 'Ảnh chụp màn hình', 'other' => 'Khác',
+    ];
+
+    public const STATUS_LABELS = ['inbox' => 'Chờ phân loại', 'ready' => 'Sẵn sàng', 'archived' => 'Đã lưu trữ'];
+
     protected $fillable = [
         'website_id',
         'kind',
@@ -98,6 +105,12 @@ class MediaAsset extends Model
         }
 
         return Storage::disk($this->disk)->url($this->thumbnail_path);
+    }
+
+    /** Ảnh đang gắn vào phiên bản bài đã có lượt đăng: không được xóa (URL đã nằm trên CMS). */
+    public function isUsedInPublication(): bool
+    {
+        return $this->articleVersions()->whereHas('publications')->exists();
     }
 
     /** URL biến thể (thumb|card|content|og), sinh lười; lỗi thì trả URL ảnh gốc. */
