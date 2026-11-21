@@ -44,7 +44,7 @@ final class GscOAuthToken implements GscTokenProvider
                 'client_id' => config('gsc.oauth.client_id'), 'client_secret' => config('gsc.oauth.client_secret'),
             ]);
         } catch (\Throwable $e) {
-            throw new GscFailed('Không kết nối được Google để lấy token: '.mb_substr($e->getMessage(), 0, 120));
+            throw new GscFailed('Không kết nối được Google để lấy token: '.\App\Support\UserFacingError::from($e));
         }
         $token = $res->successful() ? (string) ($res->json('access_token') ?? '') : '';
         if ($token === '') {

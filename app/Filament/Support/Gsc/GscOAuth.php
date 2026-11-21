@@ -45,7 +45,7 @@ final class GscOAuth
                 'client_id' => config('gsc.oauth.client_id'), 'client_secret' => config('gsc.oauth.client_secret'),
             ]);
         } catch (\Throwable $e) {
-            throw new GscFailed('Không kết nối được Google để đổi mã đăng nhập: '.mb_substr($e->getMessage(), 0, 120));
+            throw new GscFailed('Không kết nối được Google để đổi mã đăng nhập: '.\App\Support\UserFacingError::from($e));
         }
         $refresh = $res->successful() ? (string) ($res->json('refresh_token') ?? '') : '';
         $access = $res->successful() ? (string) ($res->json('access_token') ?? '') : '';
