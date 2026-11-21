@@ -49,6 +49,8 @@ return [
         // Nạp thêm vào lượt biên tập khi chủ đề rủi ro vừa/cao.
         'editor/ymyl-medical-review',
         'editor/citation-support',
+        'editor/evidence-wording',
+        'editor/claim-evidence-matrix',
     ],
     'orchestrator_steps' => [
         'risk' => 'editor',

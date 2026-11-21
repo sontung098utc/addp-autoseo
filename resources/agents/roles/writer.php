@@ -44,6 +44,9 @@ return [
         'writer/article-layout',
         // Nạp thêm vào prompt viết khi chủ đề rủi ro cao/bắt buộc nguồn (sức khỏe, y tế, dinh dưỡng).
         'writer/health-nutrition-writing',
+        'writer/nutrition-communication',
+        'writer/senior-readability',
+        'writer/supplement-claims-awareness',
     ],
     'orchestrator_steps' => [
         'write' => 'writer',

@@ -40,6 +40,7 @@ return [
         'manager/weekly-review',
         // Đã nối một phần: hiểu yêu cầu, chốt phạm vi, soát tài liệu trước khi viết, kế hoạch sửa; xem bảng tín hiệu → hành động trong kỹ năng.
         'manager/run-supervision',
+        'manager/ymyl-risk-triage',
     ],
     'orchestrator_steps' => [
         'redo_plan' => 'manager',

@@ -43,12 +43,14 @@ return [
         // Ý ĐỊNH (chưa có playbook, chưa nối): xem docs/seo-agent/ROLE_WORKFLOWS.md mục 3.4 và 3.9
         'strategist/internal-linking',
         'strategist/schema-plan',
+        'strategist/answer-first-structure',
     ],
     'orchestrator_steps' => [
         'brief' => 'strategist',
     ],
     'readiness_note' => 'Đã chạy được trong phiên chạy. Đã chạy với AI thật trên dữ liệu thử, chưa có người nghiệm thu. Mới nối bước dàn ý; phân tích SERP, liên kết nội bộ theo cụm, schema chỉ là thiết kế.',
     'origin' => [
+        'claude-seo/seo-geo',
         'claude-seo/seo-plan',
         'claude-seo/seo-content-brief',
     ],

@@ -38,6 +38,8 @@ return [
     'skills' => [
         'researcher/evidence-hunting',
         'researcher/trend-research',
+        'researcher/medical-literature-reading',
+        'researcher/source-vetting',
     ],
     'orchestrator_steps' => [
         'research' => 'researcher',
