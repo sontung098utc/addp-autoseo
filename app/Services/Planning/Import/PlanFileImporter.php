@@ -15,6 +15,7 @@ use App\Models\Website;
 use App\Services\Keywords\KeywordResearchService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 /**
@@ -224,6 +225,25 @@ final class PlanFileImporter
             }
             $briefVals['internal_links'] = implode('; ', $linkOut);
             $briefLines = PlanBrief::lines($briefVals);
+            // brief có cấu trúc lưu cùng bài (JSON): các trường brief đã làm sạch + thông tin xuất bản; người duyệt khớp tài khoản theo email/tên
+            $briefJson = array_filter(array_map(fn ($v) => trim((string) $v), $briefVals), fn ($v) => $v !== '');
+            foreach (['cms_category' => 120, 'cms_author' => 120] as $ck => $max) {
+                if (($cv = PlanFileFields::text($first($r, $ck), $max)) !== '') {
+                    $briefJson[$ck] = $cv;
+                }
+            }
+            if (($sl = Str::slug(PlanFileFields::text($first($r, 'cms_slug'), 120))) !== '') {
+                $briefJson['cms_slug'] = $sl;
+            }
+            if (($rv = PlanFileFields::text($first($r, 'reviewer'), 120)) !== '') {
+                $briefJson['reviewer'] = $rv;
+                $ru = \App\Models\User::query()->where('is_active', true)->where(fn ($q) => $q->where('email', $rv)->orWhere('name', $rv))->first();
+                if ($ru) {
+                    $briefJson['reviewer_user_id'] = $ru->id;
+                } else {
+                    $warnings[] = "dòng {$n} ({$kw}): người duyệt «{$rv}» không khớp tài khoản nào, chỉ lưu tên";
+                }
+            }
             $briefFilled = array_keys(array_filter($briefVals, fn ($v) => trim((string) $v) !== ''));
             $notes = $briefLines;
             if (($t = PlanFileFields::text($lk['title'] ?? $first($r, 'title'), 200)) !== '') {
@@ -271,6 +291,7 @@ final class PlanFileImporter
                 'competition' => PlanFileFields::competition($first($r, 'competition')),
                 'guidance' => $guidance !== '' ? $guidance : null,
                 'brief' => $briefFilled,
+                'brief_json' => $briefJson,
                 'link_report' => $linkReport,
                 'measurable' => $guidance !== '' ? PlanBrief::measurable($guidance) : [],
             ];
@@ -379,6 +400,7 @@ final class PlanFileImporter
                     'campaign_id' => $campaign?->id,
                     'priority' => $it['priority'],
                     'guidance' => $it['guidance'],
+                    'brief' => ($it['brief_json'] ?? []) !== [] ? $it['brief_json'] : null,
                 ], fn ($v) => $v !== null));
                 $created++;
 

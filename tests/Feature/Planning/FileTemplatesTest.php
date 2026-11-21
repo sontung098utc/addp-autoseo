@@ -43,7 +43,7 @@ class FileTemplatesTest extends TestCase
             'Từ khóa chính' => 'primary_keyword', 'Từ khóa phụ' => 'secondary_keywords', 'Ý định tìm kiếm' => 'search_intent', 'Cụm chủ đề' => 'topic_cluster', 'Loại bài' => 'post_type',
             'Tiêu đề gợi ý' => 'title', 'Đối tượng đọc' => 'audience', 'Góc tiếp cận / điều cần nhấn' => 'angle', 'Giọng văn' => 'tone', 'Độ dài (số từ)' => 'length_words', 'Số bảng' => 'table_count',
             'Số ảnh tối đa' => 'image_count', 'Số mục H2 tối thiểu' => 'h2_count', 'Có mục hỏi đáp (FAQ)' => 'faq', 'Câu hỏi bài cần trả lời' => 'questions', 'Nguồn nên dùng' => 'must_sources',
-            'Liên kết nội bộ nên có' => 'internal_links', 'Điều cần tránh' => 'avoid', 'Đối thủ / bài tham khảo' => 'competitor_refs', 'CTA / sản phẩm liên quan' => 'cta', 'Cần chuyên gia duyệt' => 'expert_review',
+            'Liên kết nội bộ nên có' => 'internal_links', 'Điều cần tránh' => 'avoid', 'Đối thủ / bài tham khảo' => 'competitor_refs', 'CTA / sản phẩm liên quan' => 'cta', 'Cần chuyên gia duyệt' => 'expert_review', 'Chuyên mục (CMS)' => 'cms_category', 'Slug mong muốn' => 'cms_slug', 'Tác giả hiển thị' => 'cms_author', 'Người duyệt' => 'reviewer',
             'Lượng tìm kiếm/tháng' => 'search_volume', 'Độ khó từ khóa' => 'difficulty', 'CPC (VNĐ)' => 'cpc', 'Mức cạnh tranh' => 'competition', 'Ngày dự kiến đăng' => 'planned_date', 'Mức ưu tiên' => 'priority', 'Tên chiến dịch' => 'campaign', 'Ghi chú khác' => 'guidance',
         ];
     }
@@ -310,5 +310,26 @@ class FileTemplatesTest extends TestCase
         $r = (new PlanFileImporter)->build($site, $rows, PlanFileHeuristics::mapByHeader(['rows' => $rows], 1), 1);
         $this->assertSame(1, $r['items'][0]['link_report']['resolved']);
         $this->assertStringContainsString('chỉ số đường huyết (https://s.vn/chi-so-duong-huyet)', $r['items'][0]['guidance']);
+    }
+
+    public function test_brief_json_luu_cung_bai_gom_thong_tin_xuat_ban_va_nguoi_duyet(): void
+    {
+        $site = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://s.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+        $u = $this->user('approver');
+        $rows = [['Từ khóa chính', 'Đối tượng đọc', 'Chuyên mục (CMS)', 'Slug mong muốn', 'Tác giả hiển thị', 'Người duyệt'],
+            ['bài brief một', 'Người cao tuổi', 'Dinh dưỡng', 'Thực Đơn Tiểu Đường!', 'Ban biên tập', $u->email],
+            ['bài brief hai', '', '', '', '', 'Không có người này']];
+        $map = PlanFileHeuristics::mapByHeader(['rows' => $rows], 1);
+        $this->assertSame(['primary_keyword', 'audience', 'cms_category', 'cms_slug', 'cms_author', 'reviewer'], array_values($map));
+        $imp = new PlanFileImporter;
+        $b = $imp->build($site, $rows, $map, 1);
+        $this->assertStringContainsString('không khớp tài khoản', implode(' ', $b['warnings']));
+        $imp->apply($u, $site, $b['items'], PlanFileImporter::TARGET_SOLO);
+        $a = \App\Models\Article::where('primary_keyword', 'bài brief một')->first();
+        $this->assertSame('Người cao tuổi', $a->brief['audience']);
+        $this->assertSame('thuc-don-tieu-duong', $a->brief['cms_slug']);
+        $this->assertSame('Dinh dưỡng', $a->brief['cms_category']);
+        $this->assertSame($u->id, $a->brief['reviewer_user_id']);
+        $this->assertNull(\App\Models\Article::where('primary_keyword', 'bài brief hai')->first()->brief['reviewer_user_id'] ?? null);
     }
 }

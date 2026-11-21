@@ -45,6 +45,10 @@ final class PlanFileTemplate
         ['Chỉ dẫn viết', 'Đối thủ / bài tham khảo', 'Không', 'URL hoặc tên bài đối thủ để tham khảo góc viết. Hệ thống KHÔNG tự tải; không sao chép.', 'URL hoặc tên, ngăn cách bằng chấm phẩy', 'Vào chỉ dẫn làm tham khảo góc viết.', 'https://example.com/an-gi-khi-bi-tieu-duong', '', ''],
         ['Chỉ dẫn viết', 'CTA / sản phẩm liên quan', 'Không', 'Lời kêu gọi hành động hoặc sản phẩm/dịch vụ cần nhắc.', 'Chữ tự do', 'Người viết đặt CTA tự nhiên ở cuối bài; không được hứa kết quả.', 'Đặt lịch tư vấn dinh dưỡng', '', 'Đăng ký nhận thực đơn mẫu'],
         ['Chỉ dẫn viết', 'Cần chuyên gia duyệt', 'Nên có (bài sức khỏe)', 'Bài có cần người có chuyên môn duyệt kỹ trước khi dùng không.', 'Có | Không', 'Vào chỉ dẫn; bài y tế rủi ro cao vẫn luôn chờ người có chuyên môn.', 'Có', 'Có', 'Có'],
+        ['Xuất bản', 'Chuyên mục (CMS)', 'Không', 'Chuyên mục/danh mục sẽ đăng bài lên website.', 'Chữ tự do', 'LƯU cùng bài (brief); CHƯA nối vào bộ đăng bài WordPress/Magento nên chưa tự chọn chuyên mục khi đăng.', 'Dinh dưỡng bệnh lý', 'Dinh dưỡng bệnh lý', 'Xét nghiệm'],
+        ['Xuất bản', 'Slug mong muốn', 'Không', 'Đường dẫn mong muốn của bài.', 'Chữ thường không dấu, nối bằng gạch ngang', 'LƯU cùng bài (brief); chưa nối vào bộ đăng bài.', 'thuc-don-tieu-duong', '', 'hba1c-la-gi'],
+        ['Xuất bản', 'Tác giả hiển thị', 'Không', 'Tên tác giả hiển thị khi đăng.', 'Chữ tự do', 'LƯU cùng bài (brief); chưa nối vào bộ đăng bài.', 'Ban biên tập', 'Ban biên tập', 'BS. Nguyễn Văn A'],
+        ['Xuất bản', 'Người duyệt', 'Nên có (bài sức khỏe)', 'Tên hoặc email người/chuyên gia cụ thể duyệt bài (khác với cột Có/Không ở trên).', 'Tên hoặc email', 'Khớp với tài khoản hệ thống nếu có và lưu vào brief; bài vẫn đi qua luồng duyệt thông thường.', '', '', ''],
         ['Số liệu & lịch', 'Lượng tìm kiếm/tháng', 'Không', 'Lượng tìm của từ khóa chính nếu có số liệu thật; để TRỐNG nếu chưa có (đừng điền 0).', 'Số nguyên: 5400 hoặc 5.400', 'Điền vào kho từ khóa (chỉ chỗ còn trống, không ghi đè số liệu nguồn khác).', '5400', '2900', '8100'],
         ['Số liệu & lịch', 'Độ khó từ khóa', 'Không', 'Độ khó của từ khóa chính (KD) nếu có.', 'Số 0-100', 'Điền vào kho từ khóa (chỉ chỗ còn trống).', '28', '35', '42'],
         ['Số liệu & lịch', 'CPC (VNĐ)', 'Không', 'Giá thầu CPC ước tính của từ khóa chính (VNĐ), nếu có.', 'Số nguyên: 4500 hoặc 4.500', 'Điền vào kho từ khóa (chỉ chỗ còn trống).', '4500', '3200', '6000'],
@@ -74,6 +78,7 @@ final class PlanFileTemplate
             'Từ khóa & phân loại' => Color::rgb(15, 118, 110),
             'Chỉ dẫn viết' => Color::rgb(79, 70, 229),
             'Số liệu & lịch' => Color::rgb(180, 83, 9),
+            'Xuất bản' => Color::rgb(14, 116, 144),
             default => Color::rgb(71, 85, 105),
         };
     }

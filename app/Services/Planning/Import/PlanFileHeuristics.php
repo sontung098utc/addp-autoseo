@@ -20,6 +20,10 @@ final class PlanFileHeuristics
 
     /** Luật theo tên cột (không dấu, chữ thường). Thứ tự = ưu tiên: luật cụ thể đặt trước. 'title' sẽ thành guidance nếu có từ 2 cột trở lên. */
     private const RULES = [
+        ['cms_category', '/(chuyen muc|danh muc|category)/'],
+        ['cms_slug', '/(\bslug\b|duong dan mong muon)/'],
+        ['cms_author', '/(tac gia|author|byline)/'],
+        ['reviewer', '/(nguoi duyet|reviewer|bac si tham dinh|chuyen gia tham dinh)/'],
         ['ignore', '/(trang thai|status|nguoi phu trach|nguoi duyet|reviewer|bac si tham dinh|bien tap vien|\bbtv\b|\bowner\b|\bwriter\b|ngan sach|budget)/'],
         ['internal_links', '/(lien ket noi bo|internal link|link noi bo|bai lien quan noi bo)/'],
         ['difficulty', '/(do kho|difficulty|\bkd\b)/'],

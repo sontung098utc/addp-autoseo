@@ -45,6 +45,10 @@ final class PlanFileFields
         'competitor_refs' => ['Đối thủ / bài tham khảo', 'Chỉ dẫn viết', false, 'URL hoặc tên bài đối thủ để tham khảo góc viết (chỉ tham khảo)'],
         'cta' => ['CTA / sản phẩm liên quan', 'Chỉ dẫn viết', false, 'lời kêu gọi hành động hoặc sản phẩm/dịch vụ cần nhắc trong bài'],
         'expert_review' => ['Cần chuyên gia duyệt', 'Chỉ dẫn viết', false, 'bài có cần người có chuyên môn duyệt kỹ trước khi dùng không (Có/Không)'],
+        'cms_category' => ['Chuyên mục (CMS)', 'Xuất bản', false, 'chuyên mục/danh mục sẽ đăng bài lên website (chữ; chưa nối vào bộ đăng bài)'],
+        'cms_slug' => ['Slug mong muốn', 'Xuất bản', false, 'đường dẫn (slug) mong muốn của bài, chữ thường không dấu (chưa nối vào bộ đăng bài)'],
+        'cms_author' => ['Tác giả hiển thị', 'Xuất bản', false, 'tên tác giả hiển thị khi đăng (chưa nối vào bộ đăng bài)'],
+        'reviewer' => ['Người duyệt', 'Xuất bản', false, 'tên hoặc email người/chuyên gia cụ thể sẽ duyệt bài; khớp với tài khoản hệ thống nếu có'],
         'ignore' => ['Bỏ qua (không nhập)', 'Khác', true, 'cột không dùng cho kế hoạch (số thứ tự, kết quả, người phụ trách, trạng thái, lượt tìm, link...)'],
     ];
 
