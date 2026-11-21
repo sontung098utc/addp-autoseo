@@ -299,4 +299,16 @@ class FileTemplatesTest extends TestCase
         $this->assertSame(3000, $old->cpc_vnd, 'chỗ còn trống thì được điền');
         $this->assertStringContainsString('Độ khó, CPC, mức cạnh tranh', implode(' ', $res['notes']));
     }
+
+    public function test_lien_ket_noi_bo_khop_bai_da_dang_thi_ghi_kem_url_that(): void
+    {
+        $site = Website::create(['name' => 'S', 'cms_type' => 'wordpress', 'base_url' => 'https://s.vn', 'encrypted_credentials' => ['p' => 'x'], 'status' => 'active']);
+        $a = \App\Models\Article::create(['website_id' => $site->id, 'primary_keyword' => 'chỉ số đường huyết', 'workflow_status' => 'published']);
+        $v = \App\Models\ArticleVersion::create(['article_id' => $a->id, 'version' => 1, 'title' => 't', 'slug' => 'csdh', 'html_content' => '<p>x</p>', 'review_status' => 'approved']);
+        \App\Models\Publication::create(['website_id' => $site->id, 'article_version_id' => $v->id, 'status' => 'published', 'published_url' => 'https://s.vn/chi-so-duong-huyet', 'publication_key' => 'k1', 'scheduled_at_utc' => now(), 'timezone' => 'Asia/Ho_Chi_Minh']);
+        $rows = [['Từ khóa chính', 'Liên kết nội bộ nên có'], ['thực đơn tiểu đường', 'chỉ số đường huyết']];
+        $r = (new PlanFileImporter)->build($site, $rows, PlanFileHeuristics::mapByHeader(['rows' => $rows], 1), 1);
+        $this->assertSame(1, $r['items'][0]['link_report']['resolved']);
+        $this->assertStringContainsString('chỉ số đường huyết (https://s.vn/chi-so-duong-huyet)', $r['items'][0]['guidance']);
+    }
 }

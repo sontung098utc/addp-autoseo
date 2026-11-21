@@ -56,6 +56,14 @@ final class PlanFileImporter
         foreach (Article::query()->where('website_id', $site->id)->pluck('primary_keyword') as $k) {
             $existing[PlannedArticleCreator::normalize((string) $k)] = true;
         }
+        // URL thật của bài đã đăng (theo từ khóa chính) để đưa vào chỉ dẫn cho người viết khi "Liên kết nội bộ nên có" khớp tới bài đó
+        $urlOf = [];
+        foreach (\App\Models\Publication::query()->where('website_id', $site->id)->where('status', 'published')->whereNotNull('published_url')->orderBy('id')->with('articleVersion.article')->get() as $pub) {
+            $kwp = $pub->articleVersion?->article?->primary_keyword;
+            if ($kwp && PlanBrief::safeUrl((string) $pub->published_url)) {
+                $urlOf[PlannedArticleCreator::normalize((string) $kwp)] = (string) $pub->published_url;
+            }
+        }
         $first = fn (array $r, string $f): string => isset($byField[$f]) ? (string) ($r[$byField[$f][0]] ?? '') : '';
 
         $linkIndex = [];
@@ -197,16 +205,24 @@ final class PlanFileImporter
                 $briefVals[$rk] = implode('; ', $sp['kept']);
             }
             // liên kết nội bộ: tên/từ khóa khớp bài đã có trên website hoặc bài khác trong file thì tính là khớp; URL không kiểm; còn lại là chưa có bài
-            $linkReport = ['match' => 0, 'url' => 0, 'missing' => []];
+            $linkReport = ['match' => 0, 'url' => 0, 'missing' => [], 'resolved' => 0];
+            $linkOut = [];
             foreach (PlanBrief::splitRefs($briefVals['internal_links'])['kept'] as $lt) {
+                $nk = PlannedArticleCreator::normalize($lt);
                 if (preg_match('#^https?://#i', $lt)) {
                     $linkReport['url']++;
-                } elseif (isset($existing[PlannedArticleCreator::normalize($lt)]) || isset($fileKeys[PlannedArticleCreator::normalize($lt)])) {
+                } elseif (isset($existing[$nk]) || isset($fileKeys[$nk])) {
                     $linkReport['match']++;
+                    if (isset($urlOf[$nk])) { // bài đã đăng: ghi kèm URL thật để người viết gắn đúng liên kết
+                        $linkReport['resolved']++;
+                        $lt .= ' ('.$urlOf[$nk].')';
+                    }
                 } else {
                     $linkReport['missing'][] = $lt;
                 }
+                $linkOut[] = $lt;
             }
+            $briefVals['internal_links'] = implode('; ', $linkOut);
             $briefLines = PlanBrief::lines($briefVals);
             $briefFilled = array_keys(array_filter($briefVals, fn ($v) => trim((string) $v) !== ''));
             $notes = $briefLines;
